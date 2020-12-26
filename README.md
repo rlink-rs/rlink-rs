@@ -1,7 +1,7 @@
 # [rlink-rs](https://rlink.rs)
 
-[![Crates.io](https://img.shields.io/crates/v/rlink-core?color=blue)](https://crates.io/crates/rlink-core)
-[![Released API docs](https://docs.rs/rlink-core/badge.svg)](https://docs.rs/rlink-core)
+[![Crates.io](https://img.shields.io/crates/v/rlink?color=blue)](https://crates.io/crates/rlink)
+[![Released API docs](https://docs.rs/rlink/badge.svg)](https://docs.rs/rlink-core)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE-MIT)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE-APACHE)
 
@@ -23,7 +23,7 @@ cargo build --release --color=always --all --all-targets
 ### Config
 #### standalone.yaml
 ```bash
-# all job manager's addresses
+# all job manager's addresses, one or more
 job_manager_address: ["http://x.x.x.x:8370","http://y.y.y.y:8370"]
 
 metadata_storage_mode: "memory"
@@ -53,9 +53,9 @@ Worker
 ./start_task_manager.sh
 ```
 
-## Submit task 
+### Submit task 
 
-### On Standalone
+#### On Standalone
 ```bash
 ## job demo
 
@@ -69,34 +69,5 @@ curl http://x.x.x.x:8370/job/application/application-1591174445599 -X POST -H "C
 curl http://x.x.x.x:8370/job/application/application-1591174445599/shutdown -X POST -H "Content-Type:application/json"
 ```
 
-## SQL(Planning)
-```sql
-create table SourceTable (
-    `rowtime` u64,
-    `a` String,
-    `b` String,
-    `number` bigint,
-    rowtime FOR order_time AS order_time - INTERVAL '5' SECOND,
-) with (
-    'connector' = 'kafka',
-    'topic' = 'a',
-    'broker-servers' = '192.168.1.1:9200'
-    'startup-mode' = 'earliest-offset',
-    'decode-mode' = 'java|json',
-    'decode-java-class' = 'x.b.C',
-);
-
-create table SinkTable (
-    `ss` bigint,
-) with (
-    'connector' = 'kafka',
-    'topic' = 'a',
-    'broker-servers' = '192.168.1.1:9200'
-);
-
-insert into SinkTable
-select a, b, count(*), sum(nmuber),  window.start
-from   SourceTable
-group by TUMBLE(rowtime, interval  '2' minute ) , a, b;
-
-```
+## On Yarn
+// todo
