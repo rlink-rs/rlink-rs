@@ -1,0 +1,18 @@
+[package]
+name = "rlink-sql"
+version = "0.1.1"
+authors = ["yorkart <wangyue11.4@163.com>>"]
+edition = "2018"
+description = "High performance Stream Processing Framework"
+keywords = ["stream", "window", "flink", "spark", "sql"]
+repository = "https://github.com/yorkart/rlink.git"
+license = "MIT/Apache-2.0"
+
+[lib]
+name = "rlink_sql"
+
+[dependencies]
+rlink = {path = "../rlink", version = "0.1.1"}
+
+log = "0.4"
+sqlparser = '0.5'

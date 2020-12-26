@@ -1,0 +1,14 @@
+[workspace]
+members = [
+    "rlink",
+    "rlink-derive",
+    "rlink-sql",
+
+    "rlink-connectors/clickhouse-connector",
+    "rlink-connectors/kafka-connector",
+    "rlink-connectors/elasticsearch-connector",
+
+    "rlink-standalone",
+
+    "example/showcase",
+]

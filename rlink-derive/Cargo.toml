@@ -1,0 +1,18 @@
+[package]
+name = "rlink-derive"
+version = "0.1.1"
+authors = ["yorkart <wangyue11.4@163.com>>"]
+edition = "2018"
+description = "High performance Stream Processing Framework"
+keywords = ["stream", "window", "flink", "spark"]
+repository = "https://github.com/yorkart/rlink.git"
+license = "MIT/Apache-2.0"
+
+[lib]
+name = "rlink_derive"
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = {version = "1.0", features = ["full"]}

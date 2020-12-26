@@ -1,0 +1,66 @@
+[package]
+name = "rlink"
+version = "0.1.1"
+authors = ["yorkart <wangyue11.4@163.com>>"]
+edition = "2018"
+description = "High performance Stream Processing Framework"
+keywords = ["stream", "window", "flink", "spark"]
+repository = "https://github.com/yorkart/rlink.git"
+license = "MIT/Apache-2.0"
+
+[lib]
+name = "rlink"
+
+[dependencies]
+serbuffer = "0.1"
+
+log = "0.4"
+log4rs = "0.12"
+
+#num_cpus = "1.12.0"
+chrono="0.4"
+lazy_static = "1.4.0"
+backtrace = "0.3"
+anyhow = "1.0.31"
+thiserror = "1.0.20"
+
+hostname = "0.3"
+dns-lookup = "1.0"
+
+# randomness
+rand = "0.7"
+
+# serialization
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+serde_yaml = "0.8"
+
+# hash code
+murmur3 = "0.5"
+dashmap = "3.11"
+crossbeam = "0.7.3"
+
+metrics = "0.12"
+metrics-core = "0.5"
+metrics-runtime = "0.13"
+#metrics-exporter-http = "0.3"
+
+# net
+bytes = "0.5"
+futures = "0.3"
+futures-util = { version = "0.3", default-features = false, features = ["sink"] }
+tokio = { version = "0.2", features = ["full"] }
+tokio-util = {version = "0.3", features = ["codec"]}
+hyper = "0.13"
+
+# web
+actix-rt = "1.1"
+actix-web = "3.1"
+awc = "2.0"
+
+# storage
+mysql = "20.1"
+
+[dev-dependencies]
+uuid = { version = "0.8", features = ["serde", "v4"] }

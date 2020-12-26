@@ -1,0 +1,31 @@
+[package]
+name = "rlink-showcase"
+version = "0.1.1"
+authors = ["yorkart <wangyue11.4@163.com>>"]
+edition = "2018"
+description = "High performance Stream Processing Framework"
+keywords = ["stream", "window", "flink", "spark"]
+repository = "https://github.com/yorkart/rlink.git"
+license = "MIT/Apache-2.0"
+
+[dependencies]
+rlink = {path = "../../rlink", version = "0.1.1"}
+rlink-derive = {path = "../../rlink-derive", version = "0.1.1"}
+rlink-kafka-connector= {path = "../../rlink-connectors/kafka-connector", version = "0.1.1"}
+
+serbuffer = "0.1"
+
+log = "0.4.8"
+
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+
+rand = "0.7"
+chrono="0.4"
+
+## net
+tokio = { version = "0.2", features = ["full"] }
+
+[build-dependencies]
+serbuffer-gen = "0.1"

@@ -1,0 +1,7 @@
+job_manager_address: "http://0.0.0.0:8370"
+
+metadata_storage_mode: "memory"
+metadata_storage_endpoints: []
+
+task_manager_bind_ip: "0.0.0.0"
+task_manager_work_dir: "/data/rlink/job"

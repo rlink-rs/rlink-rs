@@ -1,0 +1,61 @@
+use crate::utils::get_work_space;
+use serde::export::Formatter;
+use std::fmt::{Debug, Display};
+use std::fs::DirBuilder;
+use std::path::PathBuf;
+
+pub mod job_manager;
+pub mod task_manager;
+
+fn get_resource_storage_path(application_id: &str) -> PathBuf {
+    let p = get_work_space().join("download").join(application_id);
+    DirBuilder::new().recursive(true).create(p.clone()).unwrap();
+    p
+}
+
+#[derive(Debug)]
+pub enum HttpClientError {
+    MessageStatusError(String),
+    SendRequestError(actix_web::client::SendRequestError),
+    JsonPayloadError(awc::error::JsonPayloadError),
+}
+
+impl actix_web::ResponseError for HttpClientError {}
+
+impl std::error::Error for HttpClientError {
+    // fn source(&self) -> Option<&dyn Error> {
+    //     match self {
+    //         HttpClientError::MessageStatusError(err_msg) => None,
+    //         HttpClientError::SendRequestError(err) => err,
+    //         HttpClientError::JsonPayloadError(err) => err,
+    //     }
+    // }
+}
+
+impl Display for HttpClientError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HttpClientError::MessageStatusError(err) => write!(f, "{}", err),
+            HttpClientError::SendRequestError(err) => write!(f, "{}", err),
+            HttpClientError::JsonPayloadError(err) => write!(f, "{}", err),
+        }
+    }
+}
+
+impl From<String> for HttpClientError {
+    fn from(err: String) -> Self {
+        HttpClientError::MessageStatusError(err)
+    }
+}
+
+impl From<actix_web::client::SendRequestError> for HttpClientError {
+    fn from(err: actix_web::client::SendRequestError) -> Self {
+        HttpClientError::SendRequestError(err)
+    }
+}
+
+impl From<awc::error::JsonPayloadError> for HttpClientError {
+    fn from(err: awc::error::JsonPayloadError) -> Self {
+        HttpClientError::JsonPayloadError(err)
+    }
+}
