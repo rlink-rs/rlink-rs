@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use crate::api::cluster::TaskResourceInfo;
 use crate::api::env::{StreamExecutionEnvironment, StreamJob};
 use crate::resource::local::LocalResourceManager;
@@ -5,7 +7,6 @@ use crate::resource::standalone::StandaloneResourceManager;
 use crate::resource::yarn::YarnResourceManager;
 use crate::runtime::context::Context;
 use crate::runtime::{ClusterMode, JobDescriptor};
-use std::fmt::Debug;
 
 pub mod local;
 pub mod standalone;

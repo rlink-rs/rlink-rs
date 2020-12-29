@@ -1,10 +1,14 @@
+use metrics::gauge;
+use std::str::FromStr;
+use std::time::Duration;
+
 use crate::api::backend::KeyedStateBackend;
 use crate::api::checkpoint::{CheckpointHandle, CheckpointedFunction, FunctionSnapshotContext};
 use crate::api::element::{Barrier, Element, Record};
-use crate::api::function::{Context, Function};
-use crate::api::input::{InputFormat, InputSplitSource};
+use crate::api::function::{
+    Context, Function, InputFormat, InputSplit, InputSplitAssigner, InputSplitSource,
+};
 use crate::api::properties::{Properties, SystemProperties};
-use crate::api::split::{InputSplit, InputSplitAssigner};
 use crate::api::window::Window;
 use crate::channel::{
     mb, named_bounded, ElementReceiver, ElementSender, RecvTimeoutError, TryRecvError,
@@ -14,9 +18,6 @@ use crate::runtime::worker::io::create_mem_channel;
 use crate::storage::keyed_state::{ReducingState, ReducingStateWrap, StateKey};
 use crate::utils;
 use crate::utils::date_time::timestamp_str;
-use metrics::gauge;
-use std::str::FromStr;
-use std::time::Duration;
 
 pub(crate) const WINDOWS_FINISH_CHECKPOINT_ID: u64 = 0;
 

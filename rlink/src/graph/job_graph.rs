@@ -1,6 +1,7 @@
+use std::collections::HashMap;
+
 use crate::api::operator::{StreamOperatorWrap, TStreamOperator, DEFAULT_PARALLELISM};
 use crate::graph::{ChainEdge, GraphNode, JobGraph, OperatorChain};
-use std::collections::HashMap;
 
 pub fn build_job_graph(operators: Vec<StreamOperatorWrap>) -> JobGraph {
     if operators.len() == 0 {

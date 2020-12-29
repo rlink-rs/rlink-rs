@@ -1,9 +1,9 @@
+use std::time::Duration;
+
 use crate::api::element::{Element, Record};
-use crate::api::function::{Context, Function};
-use crate::api::output::OutputFormat;
+use crate::api::function::{Context, Function, OutputFormat};
 use crate::channel::ElementSender;
 use crate::runtime::worker::io::create_mem_channel;
-use std::time::Duration;
 
 #[derive(Debug)]
 pub(crate) struct MemChannelOutputFormat {

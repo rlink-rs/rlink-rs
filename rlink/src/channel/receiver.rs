@@ -1,12 +1,11 @@
 use std::sync::atomic::Ordering;
 use std::sync::atomic::{AtomicI64, AtomicU64};
 use std::sync::Arc;
+use std::time::Duration;
 
 use crate::channel::{
     Receiver, RecvTimeoutError, TryRecvError, CHANNEL_CAPACITY_PREFIX, CHANNEL_SIZE_PREFIX,
 };
-// use metrics::gauge;
-use std::time::Duration;
 
 #[derive(Clone, Debug)]
 pub struct ChannelReceiver<T>

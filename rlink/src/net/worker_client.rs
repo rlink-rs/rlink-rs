@@ -1,21 +1,23 @@
-use crate::api::element::{Element, Serde};
-use crate::channel::{ElementSender, TrySendError};
-use crate::metrics::{register_counter, Tag};
-use crate::net::ResponseCode;
-use bytes::{Buf, BufMut, BytesMut};
-use futures_util::sink::SinkExt;
 use std::borrow::BorrowMut;
 use std::net::{Shutdown, SocketAddr};
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
+
+use bytes::{Buf, BufMut, BytesMut};
+use futures_util::sink::SinkExt;
 use tokio::net::tcp::ReadHalf;
 use tokio::net::TcpStream;
 use tokio::stream::StreamExt;
 use tokio_util::codec::FramedRead;
 use tokio_util::codec::LengthDelimitedCodec;
 use tokio_util::codec::{BytesCodec, FramedWrite};
+
+use crate::api::element::{Element, Serde};
+use crate::channel::{ElementSender, TrySendError};
+use crate::metrics::{register_counter, Tag};
+use crate::net::ResponseCode;
 
 pub struct Client {
     chain_id: u32,

@@ -1,8 +1,9 @@
-use crate::utils::get_runtime;
 use bytes::buf::Buf;
 use bytes::buf::BufExt;
 use hyper::{Body, Client, Request};
 use serde::Serialize;
+
+use crate::utils::get_runtime;
 
 pub fn post_sync<T>(
     url: String,

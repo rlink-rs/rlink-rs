@@ -11,9 +11,7 @@ use elasticsearch::http::transport::{SingleNodeConnectionPool, TransportBuilder}
 use elasticsearch::http::Url;
 use elasticsearch::{BulkParts, Elasticsearch};
 use rlink::api::element::Record;
-use rlink::api::function::Context;
-use rlink::api::function::Function;
-use rlink::api::output::OutputFormat;
+use rlink::api::function::{Context, Function, OutputFormat};
 use rlink::channel::mb;
 use rlink::metrics::Tag;
 use rlink::utils;

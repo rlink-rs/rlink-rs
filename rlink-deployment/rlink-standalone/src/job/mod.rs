@@ -1,7 +1,8 @@
-use crate::utils::read_file_as_string;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
+
+use crate::utils::read_file_as_string;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Status {

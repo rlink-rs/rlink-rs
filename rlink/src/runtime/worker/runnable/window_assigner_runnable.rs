@@ -1,8 +1,9 @@
+use std::borrow::BorrowMut;
+
 use crate::api::element::Element;
 use crate::api::operator::StreamOperator;
 use crate::api::window::{WindowAssigner, WindowAssignerContext};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
-use std::borrow::BorrowMut;
 
 #[derive(Debug)]
 pub(crate) struct WindowAssignerRunnable {

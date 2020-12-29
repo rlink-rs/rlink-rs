@@ -1,7 +1,9 @@
-use crate::api::window::WindowWrap;
-use bytes::{Buf, BufMut, BytesMut};
 use std::borrow::BorrowMut;
 use std::fmt::Debug;
+
+use bytes::{Buf, BufMut, BytesMut};
+
+use crate::api::window::WindowWrap;
 
 lazy_static! {
     static ref EMPTY_VEC: Vec<WindowWrap> = Vec::with_capacity(0);

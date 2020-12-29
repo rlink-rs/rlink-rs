@@ -1,9 +1,10 @@
+use std::sync::atomic::{AtomicI64, AtomicU64};
+use std::sync::Arc;
+
 use crate::api::element::Element;
 use crate::channel::receiver::ChannelReceiver;
 use crate::channel::sender::ChannelSender;
 use crate::metrics::global_metrics::Tag;
-use std::sync::atomic::{AtomicI64, AtomicU64};
-use std::sync::Arc;
 
 pub const CHANNEL_CAPACITY_PREFIX: &str = "Channel.Capacity.";
 pub const CHANNEL_SIZE_PREFIX: &str = "Channel.Size.";

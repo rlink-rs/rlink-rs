@@ -1,12 +1,14 @@
+use std::net::SocketAddr;
+use std::time::Duration;
+
+use metrics_runtime::observers::PrometheusBuilder;
+use metrics_runtime::Receiver;
+use rand::prelude::*;
+
 use crate::utils::get_runtime;
 // use metrics_exporter_http::HttpExporter;
 use crate::channel::bounded;
 use crate::metrics::exporter_http::HttpExporter;
-use metrics_runtime::observers::PrometheusBuilder;
-use metrics_runtime::Receiver;
-use rand::prelude::*;
-use std::net::SocketAddr;
-use std::time::Duration;
 
 mod exporter_http;
 pub mod global_metrics;

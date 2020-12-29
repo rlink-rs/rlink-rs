@@ -1,7 +1,8 @@
+use std::collections::HashMap;
+
 use crate::api::backend::{OperatorState, StateValue};
 use crate::runtime::CheckpointId;
 use crate::storage::operator_state::OperatorStateManager;
-use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 pub struct EmptyOperatorState {}

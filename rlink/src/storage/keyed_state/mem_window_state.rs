@@ -1,11 +1,12 @@
+use std::borrow::BorrowMut;
+use std::collections::HashMap;
+
 use crate::api::element::{Barrier, Record};
 use crate::api::window::WindowWrap;
 use crate::runtime::ChainId;
 use crate::storage::keyed_state::mem_reducing_state::MemoryReducingState;
 use crate::storage::keyed_state::mem_storage::{append_drop_window, StorageKey};
 use crate::storage::keyed_state::{ReducingState, StateKey, WindowState};
-use std::borrow::BorrowMut;
-use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 pub struct MemoryWindowState {

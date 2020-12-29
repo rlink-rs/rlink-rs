@@ -1,5 +1,5 @@
 use crate::api::data_stream::{DataStream, DataStreamSource, SinkStream};
-use crate::api::input::InputFormat;
+use crate::api::function::InputFormat;
 use crate::api::properties::Properties;
 use crate::runtime;
 

@@ -1,12 +1,13 @@
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
+use std::time::Duration;
+
 use crate::api::checkpoint::Checkpoint;
 use crate::api::properties::SystemProperties;
 use crate::graph::JobGraph;
 use crate::runtime::context::Context;
 use crate::runtime::{ChainId, JobDescriptor};
 use crate::storage::checkpoint::{CheckpointStorage, CheckpointStorageWrap};
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
-use std::time::Duration;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct ChainCheckpoint {

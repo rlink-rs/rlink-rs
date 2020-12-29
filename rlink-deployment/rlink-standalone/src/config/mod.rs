@@ -1,8 +1,10 @@
-use crate::utils::get_work_space;
-use rlink::api::cluster::load_config;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
+
+use rlink::api::cluster::load_config;
+
+use crate::utils::get_work_space;
 
 pub type ClusterConfig = rlink::api::cluster::ClusterConfig;
 

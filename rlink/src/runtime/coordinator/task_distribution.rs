@@ -1,10 +1,11 @@
+use std::collections::HashMap;
+
 use crate::api::properties::Properties;
 use crate::graph::{build_physic_graph, JobGraph};
 use crate::runtime::context::Context;
 use crate::runtime::{
     JobDescriptor, JobManagerDescriptor, TaskDescriptor, TaskManagerDescriptor, TaskManagerStatus,
 };
-use std::collections::HashMap;
 
 pub(crate) fn build_job_descriptor(
     job_name: &str,

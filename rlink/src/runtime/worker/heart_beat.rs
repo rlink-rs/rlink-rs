@@ -1,8 +1,9 @@
+use std::time::Duration;
+
 use crate::api::cluster::StdResponse;
 use crate::runtime::coordinator::server::HeartbeatModel;
 use crate::utils::http_client::post;
 use crate::utils::{date_time, get_runtime, panic};
-use std::time::Duration;
 
 pub(crate) fn status_heartbeat(
     coordinator_address: &str,

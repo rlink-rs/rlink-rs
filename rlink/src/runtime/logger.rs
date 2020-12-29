@@ -1,5 +1,5 @@
-use crate::runtime::ClusterMode;
-use crate::utils::get_work_space;
+use std::str::FromStr;
+
 use log::LevelFilter;
 use log::LevelFilter::Warn;
 use log4rs::append::console::{ConsoleAppender, Target};
@@ -10,7 +10,9 @@ use log4rs::append::rolling_file::RollingFileAppender;
 use log4rs::append::Append;
 use log4rs::config::{Appender, Config, Logger, Root};
 use log4rs::encode::pattern::PatternEncoder;
-use std::str::FromStr;
+
+use crate::runtime::ClusterMode;
+use crate::utils::get_work_space;
 
 /// init log4r
 /// cluster_mode: for appender build

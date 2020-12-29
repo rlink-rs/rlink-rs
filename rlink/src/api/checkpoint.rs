@@ -1,7 +1,8 @@
+use std::fmt::Debug;
+
 use crate::api::backend::{OperatorState, OperatorStateBackend};
 use crate::runtime::ChainId;
 use crate::storage::operator_state::{OperatorStateManager, OperatorStateManagerWrap};
-use std::fmt::Debug;
 
 #[derive(Clone, Debug)]
 pub struct FunctionSnapshotContext {

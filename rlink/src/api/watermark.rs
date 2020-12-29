@@ -1,8 +1,9 @@
+use std::fmt::Debug;
+use std::time::Duration;
+
 use crate::api::element::{Element, Record};
 use crate::api::function::Function;
 use crate::utils::date_time::timestamp_str;
-use std::fmt::Debug;
-use std::time::Duration;
 
 pub const MAX_WATERMARK: Watermark = Watermark {
     timestamp: 253402185600000u64,

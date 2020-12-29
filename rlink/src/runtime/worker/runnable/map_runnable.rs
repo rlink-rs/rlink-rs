@@ -1,11 +1,12 @@
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
+
 use crate::api::element::Element;
 use crate::api::function::MapFunction;
 use crate::api::operator::StreamOperator;
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
-use std::sync::atomic::AtomicU64;
-use std::sync::atomic::Ordering;
-use std::sync::Arc;
 
 #[derive(Debug)]
 pub(crate) struct MapRunnable {
