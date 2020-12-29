@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::api::cluster::{BatchExecuteRequest, ResponseCode, StdResponse, TaskResourceInfo};
 use crate::api::env::{StreamExecutionEnvironment, StreamJob};
-use crate::resource::{Resource, ResourceManager};
+use crate::deployment::{Resource, ResourceManager};
 use crate::runtime::context::Context;
 use crate::runtime::{JobDescriptor, ManagerType};
 use crate::utils::http_client;

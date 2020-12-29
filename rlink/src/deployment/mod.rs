@@ -2,9 +2,9 @@ use std::fmt::Debug;
 
 use crate::api::cluster::TaskResourceInfo;
 use crate::api::env::{StreamExecutionEnvironment, StreamJob};
-use crate::resource::local::LocalResourceManager;
-use crate::resource::standalone::StandaloneResourceManager;
-use crate::resource::yarn::YarnResourceManager;
+use crate::deployment::local::LocalResourceManager;
+use crate::deployment::standalone::StandaloneResourceManager;
+use crate::deployment::yarn::YarnResourceManager;
 use crate::runtime::context::Context;
 use crate::runtime::{ClusterMode, JobDescriptor};
 
