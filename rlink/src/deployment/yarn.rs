@@ -220,9 +220,10 @@ impl YarnCliCommand {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use crate::deployment::yarn::Data;
     use crate::utils;
-    use std::collections::HashMap;
 
     #[test]
     pub fn command_json_test() {

@@ -344,6 +344,8 @@ impl TEndStream for DataStreamSource {}
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use crate::api::data_stream::{DataStream, TDataStream, TWindowedStream};
     use crate::api::data_stream::{DataStreamSource, TKeyedStream};
     use crate::api::element::Record;
@@ -354,7 +356,6 @@ mod tests {
     use crate::api::properties::Properties;
     use crate::api::watermark::{BoundedOutOfOrdernessTimestampExtractor, TimestampAssigner};
     use crate::api::window::SlidingEventTimeWindows;
-    use std::time::Duration;
 
     #[test]
     pub fn data_stream_test() {

@@ -571,9 +571,10 @@ impl From<Barrier> for Element {
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::BorrowMut;
+
     use crate::api::element::types;
     use crate::api::element::{Element, Record, Serde, StreamStatus, Watermark};
-    use std::borrow::BorrowMut;
 
     // #[test]
     // pub fn record_test() {

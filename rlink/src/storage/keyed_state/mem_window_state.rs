@@ -103,6 +103,7 @@ impl WindowState for MemoryWindowState {
 
 #[cfg(test)]
 mod tests {
+
     #[test]
     pub fn dash_map_test() {
         let map = dashmap::DashMap::new();
