@@ -1,6 +1,6 @@
 use crate::api::cluster::TaskResourceInfo;
 use crate::api::env::{StreamExecutionEnvironment, StreamJob};
-use crate::resource::{Resource, ResourceManager};
+use crate::deployment::{Resource, ResourceManager};
 use crate::runtime::context::Context;
 use crate::runtime::{cluster, JobDescriptor, ManagerType};
 

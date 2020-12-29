@@ -189,8 +189,9 @@ impl<'a> Percentile<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::functions::percentile::{get_percentile_capacity, Percentile};
     use std::sync::Once;
+
+    use crate::functions::percentile::{get_percentile_capacity, Percentile};
 
     fn _get_scale() -> &'static [f64] {
         static mut SCALE: Option<Vec<f64>> = None;

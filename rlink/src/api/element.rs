@@ -1,7 +1,9 @@
-use crate::api::window::WindowWrap;
-use bytes::{Buf, BufMut, BytesMut};
 use std::borrow::BorrowMut;
 use std::fmt::Debug;
+
+use bytes::{Buf, BufMut, BytesMut};
+
+use crate::api::window::WindowWrap;
 
 lazy_static! {
     static ref EMPTY_VEC: Vec<WindowWrap> = Vec::with_capacity(0);
@@ -569,9 +571,10 @@ impl From<Barrier> for Element {
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::BorrowMut;
+
     use crate::api::element::types;
     use crate::api::element::{Element, Record, Serde, StreamStatus, Watermark};
-    use std::borrow::BorrowMut;
 
     // #[test]
     // pub fn record_test() {

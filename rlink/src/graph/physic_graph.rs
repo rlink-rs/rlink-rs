@@ -1,6 +1,7 @@
+use std::collections::HashMap;
+
 use crate::api::operator::StreamOperatorWrap;
 use crate::graph::{JobGraph, PhysicGraph, TaskInstance, TaskManagerInstance};
-use std::collections::HashMap;
 
 type TaskInstances = Vec<TaskInstance>;
 type InSameTaskInstances = Vec<TaskInstances>;

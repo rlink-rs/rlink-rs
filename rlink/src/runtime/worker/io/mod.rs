@@ -1,7 +1,8 @@
-use crate::channel::{mb, named_bounded, ElementReceiver, ElementSender};
-use crate::metrics::Tag;
 use std::collections::HashMap;
 use std::sync::Mutex;
+
+use crate::channel::{mb, named_bounded, ElementReceiver, ElementSender};
+use crate::metrics::Tag;
 
 pub(crate) mod mem_channel_input;
 pub(crate) mod mem_channel_output;

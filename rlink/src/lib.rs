@@ -7,9 +7,9 @@ extern crate lazy_static;
 
 #[macro_use]
 mod macros;
+mod deployment;
 mod graph;
 mod net;
-mod resource;
 mod runtime;
 mod storage;
 

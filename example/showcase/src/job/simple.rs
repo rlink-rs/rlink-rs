@@ -5,11 +5,11 @@ use rlink::api::backend::KeyedStateBackend;
 use rlink::api::data_stream::{SinkStream, TDataStream, TKeyedStream, TWindowedStream};
 use rlink::api::element::Record;
 use rlink::api::env::{StreamExecutionEnvironment, StreamJob};
-use rlink::api::function::{Context, FilterFunction, MapFunction};
-use rlink::api::input::{InputFormat, InputSplitSource};
-use rlink::api::output::OutputFormat;
+use rlink::api::function::{
+    Context, FilterFunction, InputFormat, InputSplit, InputSplitAssigner, InputSplitSource,
+    MapFunction, OutputFormat,
+};
 use rlink::api::properties::{Properties, SystemProperties};
-use rlink::api::split::{InputSplit, InputSplitAssigner};
 use rlink::api::watermark::BoundedOutOfOrdernessTimestampExtractor;
 use rlink::api::window::{SlidingEventTimeWindows, Window};
 use rlink::functions::column_base_function::key_selector::ColumnBaseKeySelector;

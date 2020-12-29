@@ -1,11 +1,11 @@
+use std::fmt::Debug;
+
 use crate::api::function::{
-    FilterFunction, Function, KeySelectorFunction, MapFunction, ReduceFunction,
+    FilterFunction, Function, InputFormat, KeySelectorFunction, MapFunction, OutputFormat,
+    ReduceFunction,
 };
-use crate::api::input::InputFormat;
-use crate::api::output::OutputFormat;
 use crate::api::watermark::WatermarkAssigner;
 use crate::api::window::WindowAssigner;
-use std::fmt::Debug;
 
 pub const DEFAULT_PARALLELISM: u32 = 0;
 

@@ -26,6 +26,7 @@ thiserror = "1.0.20"
 
 hostname = "0.3"
 dns-lookup = "1.0"
+async-trait = "0.1"
 
 # randomness
 rand = "0.7"

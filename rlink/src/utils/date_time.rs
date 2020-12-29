@@ -1,5 +1,6 @@
-use chrono::{DateTime, Local, Utc};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+use chrono::{DateTime, Local, Utc};
 
 pub const FMT_TIME: &str = "%T%z";
 pub const FMT_DATE_TIME: &str = "%Y-%m-%d %T";

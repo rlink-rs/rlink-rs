@@ -1,11 +1,12 @@
+use actix_web::web::Data;
+use actix_web::{middleware, web, App, HttpResponse, HttpServer};
+
 use crate::config::{create_context, Context};
 use crate::controller::job_manager::{
     create_application, download_application_resource, kill_job, shutdown_tasks, submit_job,
 };
 use crate::controller::task_manager::{execute_task, kill_job_tasks, kill_task};
 use crate::utils::parse_arg;
-use actix_web::web::Data;
-use actix_web::{middleware, web, App, HttpResponse, HttpServer};
 
 pub fn index() -> HttpResponse {
     let html = r#"<html>

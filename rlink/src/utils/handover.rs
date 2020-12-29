@@ -1,9 +1,10 @@
+use std::time::Duration;
+
 use crate::api::element::Record;
 use crate::channel::receiver::ChannelReceiver;
 use crate::channel::sender::ChannelSender;
 use crate::channel::{named_bounded, TryRecvError, TrySendError};
 use crate::metrics::Tag;
-use std::time::Duration;
 
 #[derive(Clone, Debug)]
 pub struct Handover {

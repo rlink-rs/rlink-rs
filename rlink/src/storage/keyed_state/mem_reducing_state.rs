@@ -1,7 +1,8 @@
+use std::collections::HashMap;
+
 use crate::api::element::Record;
 use crate::storage::keyed_state::mem_storage::remove_drop_window;
 use crate::storage::keyed_state::{ReducingState, StateIterator, StateKey};
-use std::collections::HashMap;
 
 // type RecordBuildHasher = std::hash::BuildHasherDefault<RecordHasher>;
 

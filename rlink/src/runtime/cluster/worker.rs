@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::api::env::{StreamExecutionEnvironment, StreamJob};
 use crate::net::worker_service::WorkerServer;
 use crate::runtime::context::Context;
@@ -8,7 +10,6 @@ use crate::runtime::{worker, JobDescriptor, TaskManagerDescriptor};
 use crate::storage::metadata::MetadataLoader;
 use crate::utils;
 use crate::utils::timer::start_window_timer;
-use std::time::Duration;
 
 pub(crate) fn run_task<S>(context: Context, stream_env: StreamExecutionEnvironment, stream_job: S)
 where

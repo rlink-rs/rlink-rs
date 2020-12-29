@@ -1,17 +1,17 @@
-use crate::api::checkpoint::Checkpoint;
-use crate::api::element::Element;
-use crate::api::input::InputFormat;
-use crate::api::operator::{FunctionCreator, StreamOperator, TStreamOperator};
-use crate::api::properties::SystemProperties;
-use crate::api::split::InputSplit;
-use crate::metrics::{register_counter, Tag};
-use crate::runtime::worker::checkpoint::report_checkpoint;
-use crate::runtime::worker::runnable::{Runnable, RunnableContext};
-use crate::utils::timer::TimerChannel;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
+
+use crate::api::checkpoint::Checkpoint;
+use crate::api::element::Element;
+use crate::api::function::{InputFormat, InputSplit};
+use crate::api::operator::{FunctionCreator, StreamOperator, TStreamOperator};
+use crate::api::properties::SystemProperties;
+use crate::metrics::{register_counter, Tag};
+use crate::runtime::worker::checkpoint::report_checkpoint;
+use crate::runtime::worker::runnable::{Runnable, RunnableContext};
+use crate::utils::timer::TimerChannel;
 
 #[derive(Debug)]
 pub(crate) struct SourceRunnable {

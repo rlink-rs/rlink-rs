@@ -1,9 +1,11 @@
+use std::borrow::BorrowMut;
+
+use tokio::time::{interval_at, Duration, Instant};
+
 use crate::channel::receiver::ChannelReceiver;
 use crate::channel::sender::ChannelSender;
 use crate::channel::{mb, named_bounded, TryRecvError, TrySendError};
 use crate::utils;
-use std::borrow::BorrowMut;
-use tokio::time::{interval_at, Duration, Instant};
 
 #[derive(Clone, Debug)]
 pub struct TimerChannel {

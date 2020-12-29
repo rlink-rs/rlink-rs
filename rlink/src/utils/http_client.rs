@@ -1,8 +1,9 @@
-use crate::utils::get_runtime;
 use bytes::buf::Buf;
 use bytes::buf::BufExt;
 use hyper::{Body, Client, Request};
 use serde::Serialize;
+
+use crate::utils::get_runtime;
 
 pub fn post_sync<T>(
     url: String,
@@ -61,14 +62,3 @@ pub async fn get(url: &str) -> Result<String, Box<dyn std::error::Error + Send +
 
     Ok(s)
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use crate::utils::http_client::get;
-//
-//     #[tokio::test(threaded_scheduler)]
-//     pub async fn get_test() {
-//         let n = get("http://10.100.202.155:29256/").await;
-//         println!("{}", n.unwrap());
-//     }
-// }

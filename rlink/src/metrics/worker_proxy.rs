@@ -1,7 +1,8 @@
+use tokio::task::JoinHandle;
+
 use crate::runtime::coordinator::heart_beat::get_global_job_descriptor;
 use crate::runtime::TaskManagerDescriptor;
 use crate::utils::http_client;
-use tokio::task::JoinHandle;
 
 pub(crate) async fn collect_worker_metrics() -> String {
     let job_descriptor = get_global_job_descriptor();

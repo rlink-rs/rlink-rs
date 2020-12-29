@@ -1,13 +1,13 @@
-use crate::api::input::InputFormat;
+use std::collections::HashMap;
+
+use crate::api::function::{InputFormat, OutputFormat};
 use crate::api::operator::{FunctionCreator, StreamOperatorWrap, TStreamOperator};
-use crate::api::output::OutputFormat;
 use crate::graph::{ChainEdge, GraphNode, JobGraph, OperatorChain};
 use crate::runtime::worker::io::mem_channel_input::MemChannelInputFormat;
 use crate::runtime::worker::io::mem_channel_output::MemChannelOutputFormat;
 use crate::runtime::worker::io::net_channel_input::NetChannelInputFormat;
 use crate::runtime::worker::io::net_channel_output::NetChannelOutputFormat;
 use crate::storage::metadata::MetadataLoader;
-use std::collections::HashMap;
 
 pub fn revise_logic_graph(mut job_graph: JobGraph, metadata_loader: MetadataLoader) -> JobGraph {
     let job_chain = job_graph.chain_map.clone();

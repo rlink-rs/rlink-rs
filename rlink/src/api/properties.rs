@@ -1,9 +1,10 @@
-use crate::api::backend::{CheckpointBackend, KeyedStateBackend, OperatorStateBackend};
-use crate::api::metadata::MetadataStorageMode;
 use std::collections::HashMap;
 use std::num::ParseIntError;
 use std::str::FromStr;
 use std::time::Duration;
+
+use crate::api::backend::{CheckpointBackend, KeyedStateBackend, OperatorStateBackend};
+use crate::api::metadata::MetadataStorageMode;
 
 pub type ClusterMode = crate::runtime::ClusterMode;
 

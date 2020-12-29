@@ -1,10 +1,11 @@
-use crate::api::function::{FilterFunction, KeySelectorFunction, MapFunction, ReduceFunction};
-use crate::api::input::InputFormat;
+use std::fmt::Debug;
+
+use crate::api::function::{
+    FilterFunction, InputFormat, KeySelectorFunction, MapFunction, OutputFormat, ReduceFunction,
+};
 use crate::api::operator::{FunctionCreator, StreamOperatorWrap};
-use crate::api::output::OutputFormat;
 use crate::api::watermark::WatermarkAssigner;
 use crate::api::window::WindowAssigner;
-use std::fmt::Debug;
 
 pub(crate) const ROOT_ID: u32 = 100;
 
@@ -343,19 +344,18 @@ impl TEndStream for DataStreamSource {}
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use crate::api::data_stream::{DataStream, TDataStream, TWindowedStream};
     use crate::api::data_stream::{DataStreamSource, TKeyedStream};
     use crate::api::element::Record;
     use crate::api::function::{
-        Context, Function, KeySelectorFunction, MapFunction, ReduceFunction,
+        Context, Function, InputFormat, InputSplit, InputSplitAssigner, InputSplitSource,
+        KeySelectorFunction, MapFunction, OutputFormat, ReduceFunction,
     };
-    use crate::api::input::{InputFormat, InputSplitSource};
-    use crate::api::output::OutputFormat;
     use crate::api::properties::Properties;
-    use crate::api::split::{InputSplit, InputSplitAssigner};
     use crate::api::watermark::{BoundedOutOfOrdernessTimestampExtractor, TimestampAssigner};
     use crate::api::window::SlidingEventTimeWindows;
-    use std::time::Duration;
 
     #[test]
     pub fn data_stream_test() {
