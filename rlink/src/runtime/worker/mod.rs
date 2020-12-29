@@ -1,3 +1,6 @@
+use std::borrow::BorrowMut;
+use std::time::Duration;
+
 use crate::api::element::{Element, Record};
 use crate::api::env::{StreamExecutionEnvironment, StreamJob};
 use crate::api::function::KeySelectorFunction;
@@ -11,8 +14,6 @@ use crate::runtime::worker::runnable::{
 use crate::runtime::{JobDescriptor, TaskDescriptor, TaskManagerStatus};
 use crate::storage::metadata::MetadataLoader;
 use crate::utils::timer::WindowTimer;
-use std::borrow::BorrowMut;
-use std::time::Duration;
 
 pub mod checkpoint;
 pub mod heart_beat;

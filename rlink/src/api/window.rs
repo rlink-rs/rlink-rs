@@ -1,8 +1,9 @@
-use crate::api::function::Function;
-use crate::utils;
 use std::cmp::{max, min};
 use std::fmt::Debug;
 use std::time::Duration;
+
+use crate::api::function::Function;
+use crate::utils;
 
 pub trait Window: Debug + Clone {
     fn max_timestamp(&self) -> u64;

@@ -117,13 +117,15 @@ impl KafkaProducerThread {
 
 #[cfg(test)]
 mod tests {
-    use crate::sink::handover::Handover;
-    use crate::sink::producer::KafkaProducerThread;
-    use crate::{build_kafka_record, BOOTSTRAP_SERVERS};
+    use std::sync::atomic::Ordering;
+
     use rdkafka::ClientConfig;
     use rlink::api::element::Record;
     use rlink::utils::date_time::current_timestamp_millis;
-    use std::sync::atomic::Ordering;
+
+    use crate::sink::handover::Handover;
+    use crate::sink::producer::KafkaProducerThread;
+    use crate::{build_kafka_record, BOOTSTRAP_SERVERS};
 
     fn get_record() -> Record {
         build_kafka_record(
@@ -142,10 +144,7 @@ mod tests {
         let topic = "rust-demo";
 
         let mut client_config = ClientConfig::new();
-        client_config.set(
-            BOOTSTRAP_SERVERS,
-            "10.100.49.2:9092,10.100.49.3:9092,10.100.49.4:9092",
-        );
+        client_config.set(BOOTSTRAP_SERVERS, "localhost:9092");
 
         let handover = Handover::new("test", topic, 0, 0);
 

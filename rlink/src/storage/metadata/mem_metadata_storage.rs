@@ -1,8 +1,9 @@
+use std::convert::TryFrom;
+use std::sync::Mutex;
+
 use crate::runtime::{JobDescriptor, TaskManagerStatus};
 use crate::storage::metadata::MetadataStorage;
 use crate::utils;
-use std::convert::TryFrom;
-use std::sync::Mutex;
 
 lazy_static! {
     pub static ref METADATA_STORAGE: Mutex<Option<JobDescriptor>> = Mutex::new(None);

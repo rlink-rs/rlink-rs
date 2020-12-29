@@ -1,7 +1,8 @@
+use dashmap::DashMap;
+
 use crate::api::window::WindowWrap;
 use crate::runtime::ChainId;
 use crate::storage::keyed_state::mem_reducing_state::MemoryReducingState;
-use dashmap::DashMap;
 
 lazy_static! {
     static ref DROP_WINDOW_STATE_STORAGE: DashMap<StorageKey, DashMap<WindowWrap, MemoryReducingState>> =

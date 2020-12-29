@@ -6,14 +6,16 @@
 //! Awaiting on `async_run` will drive an HTTP server listening on the configured address.
 // #![deny(missing_docs)]
 
-use crate::metrics::worker_proxy;
+use std::{net::SocketAddr, sync::Arc};
+
 use hyper::server::conn::AddrIncoming;
 use hyper::{
     service::{make_service_fn, service_fn},
     {Body, Error, Response, Server},
 };
 use metrics_core::{Builder, Drain, Observe, Observer};
-use std::{net::SocketAddr, sync::Arc};
+
+use crate::metrics::worker_proxy;
 
 /// Exports metrics over HTTP.
 pub struct HttpExporter<C, B> {

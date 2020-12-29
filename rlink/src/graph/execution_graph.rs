@@ -1,5 +1,6 @@
-use crate::graph::{ChainEdge, JobGraph, OperatorChain};
 use std::collections::HashMap;
+
+use crate::graph::{ChainEdge, JobGraph, OperatorChain};
 
 pub fn build_logic_plan_group(job_graph: JobGraph) -> JobGraph {
     let mut chain_groups = Vec::new();

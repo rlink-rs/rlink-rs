@@ -1,10 +1,11 @@
+use std::net::{IpAddr, SocketAddr};
+use std::str::FromStr;
+
 use crate::channel::ElementSender;
 use crate::net::worker_client::Client;
 use crate::runtime::{JobDescriptor, TaskManagerDescriptor};
 use crate::storage::metadata::MetadataLoader;
 use crate::utils::get_runtime;
-use std::net::{IpAddr, SocketAddr};
-use std::str::FromStr;
 
 #[derive(Clone, Debug)]
 pub struct WorkerClientPool {

@@ -7,7 +7,7 @@ use std::process::Stdio;
 use crate::api::cluster::TaskResourceInfo;
 use crate::api::env::{StreamExecutionEnvironment, StreamJob};
 use crate::channel::{bounded, Receiver, Sender};
-use crate::resource::ResourceManager;
+use crate::deployment::ResourceManager;
 use crate::runtime::context::Context;
 use crate::runtime::{JobDescriptor, ManagerType};
 use crate::utils;
@@ -220,9 +220,10 @@ impl YarnCliCommand {
 
 #[cfg(test)]
 mod tests {
-    use crate::resource::yarn::Data;
-    use crate::utils;
     use std::collections::HashMap;
+
+    use crate::deployment::yarn::Data;
+    use crate::utils;
 
     #[test]
     pub fn command_json_test() {

@@ -1,10 +1,9 @@
-use crate::runtime::{JobDescriptor, TaskManagerStatus};
-// use crate::storage::metadata::etcd_metadata_storage::EtcdMetadataStorage;
-use crate::storage::metadata::mem_metadata_storage::MemoryMetadataStorage;
 use std::error::Error;
 use std::fmt::Debug;
 
-// pub mod etcd_metadata_storage;
+use crate::runtime::{JobDescriptor, TaskManagerStatus};
+use crate::storage::metadata::mem_metadata_storage::MemoryMetadataStorage;
+
 pub mod mem_metadata_storage;
 
 pub mod metadata_loader;

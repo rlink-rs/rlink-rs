@@ -1,10 +1,11 @@
+use std::ops::Deref;
+use std::sync::RwLock;
+use std::time::Duration;
+
 use crate::api::metadata::MetadataStorageMode;
 use crate::runtime::JobDescriptor;
 use crate::storage::metadata::{loop_read_job_descriptor, MetadataStorageWrap};
 use crate::utils;
-use std::ops::Deref;
-use std::sync::RwLock;
-use std::time::Duration;
 
 lazy_static! {
     pub(crate) static ref JOB_DESCRIPTOR: RwLock<Option<JobDescriptor>> = RwLock::new(None);

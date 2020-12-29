@@ -1,9 +1,10 @@
-use metrics::counter;
-use metrics::gauge;
 use std::sync::atomic::Ordering;
 use std::sync::atomic::{AtomicI64, AtomicU64};
 use std::sync::Arc;
 use std::sync::RwLock;
+
+use metrics::counter;
+use metrics::gauge;
 
 #[derive(Clone, Debug)]
 pub struct Tag(pub String, pub String);

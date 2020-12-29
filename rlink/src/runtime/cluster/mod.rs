@@ -1,5 +1,5 @@
 use crate::api::env::{StreamExecutionEnvironment, StreamJob};
-use crate::resource::ResourceManagerWrap;
+use crate::deployment::ResourceManagerWrap;
 use crate::runtime::context::Context;
 use crate::runtime::ManagerType;
 

@@ -1,3 +1,9 @@
+use std::borrow::BorrowMut;
+use std::collections::HashMap;
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
+
 use crate::api::backend::KeyedStateBackend;
 use crate::api::element::{Barrier, Element, Record, Watermark};
 use crate::api::function::{KeySelectorFunction, ReduceFunction};
@@ -8,11 +14,6 @@ use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 use crate::storage::keyed_state::{WindowState, WindowStateWrap};
 use crate::utils::date_time::timestamp_str;
-use std::borrow::BorrowMut;
-use std::collections::HashMap;
-use std::sync::atomic::AtomicU64;
-use std::sync::atomic::Ordering;
-use std::sync::Arc;
 
 #[derive(Debug)]
 pub(crate) struct ReduceRunnable {

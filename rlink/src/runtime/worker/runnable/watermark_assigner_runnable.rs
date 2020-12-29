@@ -1,11 +1,12 @@
+use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
+use std::sync::Arc;
+
 use crate::api::element::Element;
 use crate::api::operator::StreamOperator;
 use crate::api::watermark::{Watermark, WatermarkAssigner, MAX_WATERMARK, MIN_WATERMARK};
 use crate::metrics::{register_counter, register_gauge, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 use crate::utils::date_time::timestamp_str;
-use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
-use std::sync::Arc;
 
 #[derive(Debug)]
 pub(crate) struct WatermarkAssignerRunnable {

@@ -1,8 +1,6 @@
 use rdkafka::ClientConfig;
 use rlink::api::element::Record;
-use rlink::api::function::Context;
-use rlink::api::function::Function;
-use rlink::api::output::OutputFormat;
+use rlink::api::function::{Context, Function, OutputFormat};
 use rlink::utils;
 use rlink::utils::get_runtime;
 

@@ -6,10 +6,10 @@ use rdkafka::{ClientConfig, Offset};
 use rlink::api::backend::OperatorStateBackend;
 use rlink::api::checkpoint::CheckpointedFunction;
 use rlink::api::element::Record;
-use rlink::api::function::Context;
-use rlink::api::input::{InputFormat, InputSplitSource};
+use rlink::api::function::{
+    Context, InputFormat, InputSplit, InputSplitAssigner, InputSplitSource,
+};
 use rlink::api::properties::{Properties, SystemProperties};
-use rlink::api::split::{InputSplit, InputSplitAssigner};
 use rlink::channel::TryRecvError;
 
 use crate::source::checkpoint::KafkaCheckpointed;
