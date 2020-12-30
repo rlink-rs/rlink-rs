@@ -7,6 +7,7 @@ use crate::api::function::KeySelectorFunction;
 use crate::api::operator::{StreamOperator, StreamOperatorWrap};
 use crate::graph::{build_logic_plan, JobGraph, OperatorChain};
 use crate::runtime::context::Context;
+use crate::runtime::worker::runnable::co_process_runnable::CoProcessRunnable;
 use crate::runtime::worker::runnable::{
     FilterRunnable, KeyByRunnable, MapRunnable, ReduceRunnable, Runnable, RunnableContext,
     SinkRunnable, SourceRunnable, WatermarkAssignerRunnable, WindowAssignerRunnable,
@@ -162,6 +163,11 @@ where
                 }
                 StreamOperatorWrap::StreamFilter(stream_operator) => {
                     let op = FilterRunnable::new(stream_operator, None);
+                    let op: Box<dyn Runnable> = Box::new(op);
+                    op
+                }
+                StreamOperatorWrap::StreamCoProcess(stream_operator) => {
+                    let op = CoProcessRunnable::new(stream_operator, None);
                     let op: Box<dyn Runnable> = Box::new(op);
                     op
                 }

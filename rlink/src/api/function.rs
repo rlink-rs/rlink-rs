@@ -148,7 +148,7 @@ where
     Self: Function,
 {
     fn open(&mut self, context: &Context);
-    fn filter(&self, t: &mut Record) -> bool;
+    fn filter(&self, record: &mut Record) -> bool;
     fn close(&mut self);
 }
 
@@ -168,5 +168,17 @@ where
     fn open(&mut self, context: &Context);
     ///
     fn reduce(&self, value: Option<&mut Record>, record: &mut Record) -> Record;
+    fn close(&mut self);
+}
+
+pub trait CoProcessFunction
+where
+    Self: Function,
+{
+    fn open(&mut self, context: &Context);
+    /// This method is called for each element in the first of the connected streams.
+    ///
+    /// `stream_seq` is the `DataStream` index
+    fn process(&self, stream_seq: usize, record: Record) -> Record;
     fn close(&mut self);
 }

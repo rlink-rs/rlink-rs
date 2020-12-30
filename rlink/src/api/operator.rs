@@ -1,15 +1,15 @@
 use std::fmt::Debug;
 
 use crate::api::function::{
-    FilterFunction, Function, InputFormat, KeySelectorFunction, MapFunction, OutputFormat,
-    ReduceFunction,
+    CoProcessFunction, FilterFunction, Function, InputFormat, KeySelectorFunction, MapFunction,
+    OutputFormat, ReduceFunction,
 };
 use crate::api::watermark::WatermarkAssigner;
 use crate::api::window::WindowAssigner;
 
 pub const DEFAULT_PARALLELISM: u32 = 0;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum FunctionCreator {
     System = 0,
     User = 1,
@@ -100,6 +100,7 @@ pub enum StreamOperatorWrap {
     StreamSource(StreamOperator<dyn InputFormat>),
     StreamMap(StreamOperator<dyn MapFunction>),
     StreamFilter(StreamOperator<dyn FilterFunction>),
+    StreamCoProcess(StreamOperator<dyn CoProcessFunction>),
     StreamKeyBy(StreamOperator<dyn KeySelectorFunction>),
     StreamReduce(StreamOperator<dyn ReduceFunction>),
     StreamWatermarkAssigner(StreamOperator<dyn WatermarkAssigner>),
@@ -139,6 +140,21 @@ impl StreamOperatorWrap {
             filter_fn,
         );
         StreamOperatorWrap::StreamFilter(operator)
+    }
+
+    pub fn new_co_process(
+        id: u32,
+        parent_id: u32,
+        co_process_fn: Box<dyn CoProcessFunction>,
+    ) -> Self {
+        let operator = StreamOperator::new(
+            id,
+            parent_id,
+            DEFAULT_PARALLELISM,
+            FunctionCreator::User,
+            co_process_fn,
+        );
+        StreamOperatorWrap::StreamCoProcess(operator)
     }
 
     pub fn new_key_by(id: u32, parent_id: u32, key_by_fn: Box<dyn KeySelectorFunction>) -> Self {
@@ -251,6 +267,13 @@ impl StreamOperatorWrap {
         }
         false
     }
+
+    pub fn is_connect(&self) -> bool {
+        if let StreamOperatorWrap::StreamCoProcess(_stream_source) = self {
+            return true;
+        }
+        false
+    }
 }
 
 impl TStreamOperator for StreamOperatorWrap {
@@ -259,6 +282,7 @@ impl TStreamOperator for StreamOperatorWrap {
             StreamOperatorWrap::StreamSource(op) => op.get_operator_name(),
             StreamOperatorWrap::StreamMap(op) => op.get_operator_name(),
             StreamOperatorWrap::StreamFilter(op) => op.get_operator_name(),
+            StreamOperatorWrap::StreamCoProcess(op) => op.get_operator_name(),
             StreamOperatorWrap::StreamKeyBy(op) => op.get_operator_name(),
             StreamOperatorWrap::StreamReduce(op) => op.get_operator_name(),
             StreamOperatorWrap::StreamWatermarkAssigner(op) => op.get_operator_name(),
@@ -272,6 +296,7 @@ impl TStreamOperator for StreamOperatorWrap {
             StreamOperatorWrap::StreamSource(op) => op.get_operator_id(),
             StreamOperatorWrap::StreamMap(op) => op.get_operator_id(),
             StreamOperatorWrap::StreamFilter(op) => op.get_operator_id(),
+            StreamOperatorWrap::StreamCoProcess(op) => op.get_operator_id(),
             StreamOperatorWrap::StreamKeyBy(op) => op.get_operator_id(),
             StreamOperatorWrap::StreamReduce(op) => op.get_operator_id(),
             StreamOperatorWrap::StreamWatermarkAssigner(op) => op.get_operator_id(),
@@ -285,6 +310,7 @@ impl TStreamOperator for StreamOperatorWrap {
             StreamOperatorWrap::StreamSource(op) => op.get_parent_operator_id(),
             StreamOperatorWrap::StreamMap(op) => op.get_parent_operator_id(),
             StreamOperatorWrap::StreamFilter(op) => op.get_parent_operator_id(),
+            StreamOperatorWrap::StreamCoProcess(op) => op.get_parent_operator_id(),
             StreamOperatorWrap::StreamKeyBy(op) => op.get_parent_operator_id(),
             StreamOperatorWrap::StreamReduce(op) => op.get_parent_operator_id(),
             StreamOperatorWrap::StreamWatermarkAssigner(op) => op.get_parent_operator_id(),
@@ -298,6 +324,7 @@ impl TStreamOperator for StreamOperatorWrap {
             StreamOperatorWrap::StreamSource(op) => op.get_parallelism(),
             StreamOperatorWrap::StreamMap(op) => op.get_parallelism(),
             StreamOperatorWrap::StreamFilter(op) => op.get_parallelism(),
+            StreamOperatorWrap::StreamCoProcess(op) => op.get_parallelism(),
             StreamOperatorWrap::StreamKeyBy(op) => op.get_parallelism(),
             StreamOperatorWrap::StreamReduce(op) => op.get_parallelism(),
             StreamOperatorWrap::StreamWatermarkAssigner(op) => op.get_parallelism(),
@@ -311,6 +338,7 @@ impl TStreamOperator for StreamOperatorWrap {
             StreamOperatorWrap::StreamSource(op) => op.get_fn_creator(),
             StreamOperatorWrap::StreamMap(op) => op.get_fn_creator(),
             StreamOperatorWrap::StreamFilter(op) => op.get_fn_creator(),
+            StreamOperatorWrap::StreamCoProcess(op) => op.get_fn_creator(),
             StreamOperatorWrap::StreamKeyBy(op) => op.get_fn_creator(),
             StreamOperatorWrap::StreamReduce(op) => op.get_fn_creator(),
             StreamOperatorWrap::StreamWatermarkAssigner(op) => op.get_fn_creator(),
