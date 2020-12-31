@@ -1,6 +1,8 @@
 use crate::api::data_stream_v2::{DataStream, StreamBuilder};
 use crate::api::function::InputFormat;
+use crate::api::operator::StreamOperatorWrap;
 use crate::api::properties::Properties;
+use crate::dag::StreamGraph;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -21,14 +23,14 @@ pub trait StreamJob: Send + Sync + Clone {
 pub struct StreamExecutionEnvironment {
     pub(crate) job_name: String,
 
-    pub(crate) stream_builder_manager: Rc<PipelineStreamManager>,
+    pub(crate) stream_manager: Rc<StreamManager>,
 }
 
 impl StreamExecutionEnvironment {
-    fn new(job_name: String) -> Self {
+    pub(crate) fn new(job_name: String) -> Self {
         StreamExecutionEnvironment {
-            job_name,
-            stream_builder_manager: Rc::new(PipelineStreamManager::new()),
+            job_name: job_name.clone(),
+            stream_manager: Rc::new(StreamManager::new(job_name)),
         }
     }
 
@@ -37,19 +39,19 @@ impl StreamExecutionEnvironment {
         I: InputFormat + 'static,
     {
         let stream_builder = StreamBuilder::with_source(
-            self.stream_builder_manager.clone(),
+            self.stream_manager.clone(),
             Box::new(input_format),
             parallelism,
         );
         DataStream::new(stream_builder)
     }
 
-    pub(crate) fn build_stream<S>(&self, stream_job: S, job_properties: &Properties)
-    where
-        S: StreamJob + 'static,
-    {
-        stream_job.build_stream(job_properties, self);
-    }
+    // pub(crate) fn build_stream<S>(&self, stream_job: S, job_properties: &Properties)
+    // where
+    //     S: StreamJob + 'static,
+    // {
+    //     stream_job.build_stream(job_properties, self);
+    // }
 }
 
 pub(crate) const ROOT_ID: u32 = 100;
@@ -75,30 +77,27 @@ impl IdGen {
 }
 
 #[derive(Debug)]
-pub(crate) struct PipelineStreamManager {
+pub(crate) struct StreamManager {
     pub(crate) id_gen: RefCell<IdGen>,
-    pub(crate) pipeline_stream_operators: RefCell<Vec<StreamBuilder>>,
+    pub(crate) stream_graph: RefCell<StreamGraph>,
 }
 
-impl PipelineStreamManager {
-    pub fn new() -> Self {
-        PipelineStreamManager {
+impl StreamManager {
+    pub fn new(job_name: String) -> Self {
+        StreamManager {
             id_gen: RefCell::new(IdGen::new()),
-            pipeline_stream_operators: RefCell::new(Vec::new()),
+            stream_graph: RefCell::new(StreamGraph::new(job_name)),
         }
-    }
-
-    pub fn get(&self) -> u32 {
-        self.id_gen.borrow().get()
     }
 
     pub fn next(&self) -> u32 {
         self.id_gen.borrow_mut().next()
     }
 
-    pub fn add_pipeline(&self, stream_builder: StreamBuilder) {
-        self.pipeline_stream_operators
+    pub fn add_operator(&self, operator: StreamOperatorWrap) {
+        self.stream_graph
             .borrow_mut()
-            .push(stream_builder);
+            .add_operator(operator)
+            .unwrap();
     }
 }

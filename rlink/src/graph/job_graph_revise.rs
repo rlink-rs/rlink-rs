@@ -137,7 +137,7 @@ fn create_net_source(
 
     let stream_source = StreamOperatorWrap::new_source(
         id,
-        parent_id,
+        vec![parent_id],
         chain_parallelism,
         FunctionCreator::System,
         source_func,
@@ -157,7 +157,7 @@ fn create_mem_source(
 
     let stream_source = StreamOperatorWrap::new_source(
         id,
-        parent_id,
+        vec![parent_id],
         chain_parallelism,
         FunctionCreator::System,
         source_func,
@@ -188,7 +188,7 @@ fn create_net_sink(
     let sink_func: Box<dyn OutputFormat> = Box::new(output_func);
 
     let stream_sink =
-        StreamOperatorWrap::new_sink(id, parent_id, FunctionCreator::System, sink_func);
+        StreamOperatorWrap::new_sink(id, vec![parent_id], FunctionCreator::System, sink_func);
     stream_sink
 }
 
@@ -197,7 +197,7 @@ fn create_mem_sink(id: u32, parent_id: u32, chain_id: u32) -> StreamOperatorWrap
     let sink_func: Box<dyn OutputFormat> = Box::new(output_func);
 
     let stream_sink =
-        StreamOperatorWrap::new_sink(id, parent_id, FunctionCreator::System, sink_func);
+        StreamOperatorWrap::new_sink(id, vec![parent_id], FunctionCreator::System, sink_func);
     stream_sink
 }
 

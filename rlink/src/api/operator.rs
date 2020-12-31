@@ -19,6 +19,7 @@ pub trait TStreamOperator: Debug {
     fn get_operator_name(&self) -> &str;
     fn get_operator_id(&self) -> u32;
     fn get_parent_operator_id(&self) -> u32;
+    fn get_parent_operator_ids(&self) -> Vec<u32>;
     fn get_parallelism(&self) -> u32;
     fn get_fn_creator(&self) -> FunctionCreator;
 }
@@ -28,7 +29,7 @@ where
     T: ?Sized + Function,
 {
     id: u32,
-    parent_id: u32,
+    parent_ids: Vec<u32>,
     parallelism: u32,
     fn_creator: FunctionCreator,
     pub(crate) operator_fn: Box<T>,
@@ -40,14 +41,14 @@ where
 {
     pub fn new(
         id: u32,
-        parent_id: u32,
+        parent_ids: Vec<u32>,
         parallelism: u32,
         fn_creator: FunctionCreator,
         operator_fn: Box<T>,
     ) -> Self {
         StreamOperator {
             id,
-            parent_id,
+            parent_ids,
             parallelism,
             fn_creator,
             operator_fn,
@@ -68,7 +69,11 @@ where
     }
 
     fn get_parent_operator_id(&self) -> u32 {
-        self.parent_id
+        self.parent_ids[0]
+    }
+
+    fn get_parent_operator_ids(&self) -> Vec<u32> {
+        self.parent_ids.clone()
     }
 
     fn get_parallelism(&self) -> u32 {
@@ -87,7 +92,7 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("BaseStreamOperator")
             .field("id", &self.id)
-            .field("parent_id", &self.parent_id)
+            .field("parent_id", &self.parent_ids)
             .field("parallelism", &self.parallelism)
             .field("fn_creator", &self.fn_creator)
             .field("operator_fn", &self.operator_fn.get_name())
@@ -111,19 +116,19 @@ pub enum StreamOperatorWrap {
 impl StreamOperatorWrap {
     pub fn new_source(
         id: u32,
-        parent_id: u32,
+        parent_ids: Vec<u32>,
         parallelism: u32,
         fn_creator: FunctionCreator,
         source_fn: Box<dyn InputFormat>,
     ) -> Self {
-        let operator = StreamOperator::new(id, parent_id, parallelism, fn_creator, source_fn);
+        let operator = StreamOperator::new(id, parent_ids, parallelism, fn_creator, source_fn);
         StreamOperatorWrap::StreamSource(operator)
     }
 
-    pub fn new_map(id: u32, parent_id: u32, map_fn: Box<dyn MapFunction>) -> Self {
+    pub fn new_map(id: u32, parent_ids: Vec<u32>, map_fn: Box<dyn MapFunction>) -> Self {
         let operator = StreamOperator::new(
             id,
-            parent_id,
+            parent_ids,
             DEFAULT_PARALLELISM,
             FunctionCreator::User,
             map_fn,
@@ -131,10 +136,10 @@ impl StreamOperatorWrap {
         StreamOperatorWrap::StreamMap(operator)
     }
 
-    pub fn new_filter(id: u32, parent_id: u32, filter_fn: Box<dyn FilterFunction>) -> Self {
+    pub fn new_filter(id: u32, parent_ids: Vec<u32>, filter_fn: Box<dyn FilterFunction>) -> Self {
         let operator = StreamOperator::new(
             id,
-            parent_id,
+            parent_ids,
             DEFAULT_PARALLELISM,
             FunctionCreator::User,
             filter_fn,
@@ -144,12 +149,12 @@ impl StreamOperatorWrap {
 
     pub fn new_co_process(
         id: u32,
-        parent_id: u32,
+        parent_ids: Vec<u32>,
         co_process_fn: Box<dyn CoProcessFunction>,
     ) -> Self {
         let operator = StreamOperator::new(
             id,
-            parent_id,
+            parent_ids,
             DEFAULT_PARALLELISM,
             FunctionCreator::User,
             co_process_fn,
@@ -157,10 +162,14 @@ impl StreamOperatorWrap {
         StreamOperatorWrap::StreamCoProcess(operator)
     }
 
-    pub fn new_key_by(id: u32, parent_id: u32, key_by_fn: Box<dyn KeySelectorFunction>) -> Self {
+    pub fn new_key_by(
+        id: u32,
+        parent_ids: Vec<u32>,
+        key_by_fn: Box<dyn KeySelectorFunction>,
+    ) -> Self {
         let operator = StreamOperator::new(
             id,
-            parent_id,
+            parent_ids,
             DEFAULT_PARALLELISM,
             FunctionCreator::User,
             key_by_fn,
@@ -170,23 +179,28 @@ impl StreamOperatorWrap {
 
     pub fn new_reduce(
         id: u32,
-        parent_id: u32,
+        parent_ids: Vec<u32>,
         parallelism: u32,
         reduce_fn: Box<dyn ReduceFunction>,
     ) -> Self {
-        let operator =
-            StreamOperator::new(id, parent_id, parallelism, FunctionCreator::User, reduce_fn);
+        let operator = StreamOperator::new(
+            id,
+            parent_ids,
+            parallelism,
+            FunctionCreator::User,
+            reduce_fn,
+        );
         StreamOperatorWrap::StreamReduce(operator)
     }
 
     pub fn new_watermark_assigner(
         id: u32,
-        parent_id: u32,
+        parent_ids: Vec<u32>,
         watermark_assigner: Box<dyn WatermarkAssigner>,
     ) -> Self {
         let operator = StreamOperator::new(
             id,
-            parent_id,
+            parent_ids,
             DEFAULT_PARALLELISM,
             FunctionCreator::User,
             watermark_assigner,
@@ -196,12 +210,12 @@ impl StreamOperatorWrap {
 
     pub fn new_window_assigner(
         id: u32,
-        parent_id: u32,
+        parent_ids: Vec<u32>,
         window_assigner: Box<dyn WindowAssigner>,
     ) -> Self {
         let operator = StreamOperator::new(
             id,
-            parent_id,
+            parent_ids,
             DEFAULT_PARALLELISM,
             FunctionCreator::User,
             window_assigner,
@@ -211,11 +225,12 @@ impl StreamOperatorWrap {
 
     pub fn new_sink(
         id: u32,
-        parent_id: u32,
+        parent_ids: Vec<u32>,
         fn_creator: FunctionCreator,
         sink_fn: Box<dyn OutputFormat>,
     ) -> Self {
-        let operator = StreamOperator::new(id, parent_id, DEFAULT_PARALLELISM, fn_creator, sink_fn);
+        let operator =
+            StreamOperator::new(id, parent_ids, DEFAULT_PARALLELISM, fn_creator, sink_fn);
         StreamOperatorWrap::StreamSink(operator)
     }
 
@@ -316,6 +331,20 @@ impl TStreamOperator for StreamOperatorWrap {
             StreamOperatorWrap::StreamWatermarkAssigner(op) => op.get_parent_operator_id(),
             StreamOperatorWrap::StreamWindowAssigner(op) => op.get_parent_operator_id(),
             StreamOperatorWrap::StreamSink(op) => op.get_parent_operator_id(),
+        }
+    }
+
+    fn get_parent_operator_ids(&self) -> Vec<u32> {
+        match self {
+            StreamOperatorWrap::StreamSource(op) => op.get_parent_operator_ids(),
+            StreamOperatorWrap::StreamMap(op) => op.get_parent_operator_ids(),
+            StreamOperatorWrap::StreamFilter(op) => op.get_parent_operator_ids(),
+            StreamOperatorWrap::StreamCoProcess(op) => op.get_parent_operator_ids(),
+            StreamOperatorWrap::StreamKeyBy(op) => op.get_parent_operator_ids(),
+            StreamOperatorWrap::StreamReduce(op) => op.get_parent_operator_ids(),
+            StreamOperatorWrap::StreamWatermarkAssigner(op) => op.get_parent_operator_ids(),
+            StreamOperatorWrap::StreamWindowAssigner(op) => op.get_parent_operator_ids(),
+            StreamOperatorWrap::StreamSink(op) => op.get_parent_operator_ids(),
         }
     }
 

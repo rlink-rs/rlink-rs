@@ -180,7 +180,7 @@ impl DataStreamSource {
         let id = parent_id + 1;
         let source_operator = StreamOperatorWrap::new_source(
             id,
-            parent_id,
+            vec![parent_id],
             parallelism,
             FunctionCreator::User,
             source_func,
@@ -209,7 +209,7 @@ impl TDataStream for DataStreamSource {
         let id = self.current_id;
 
         let map_func = Box::new(map);
-        let stream_map = StreamOperatorWrap::new_map(id, parent_id, map_func);
+        let stream_map = StreamOperatorWrap::new_map(id, vec![parent_id], map_func);
 
         self.operators.push(stream_map);
 
@@ -225,7 +225,7 @@ impl TDataStream for DataStreamSource {
         let id = self.current_id;
 
         let filter_func = Box::new(filter);
-        let stream_filter = StreamOperatorWrap::new_filter(id, parent_id, filter_func);
+        let stream_filter = StreamOperatorWrap::new_filter(id, vec![parent_id], filter_func);
 
         self.operators.push(stream_filter);
 
@@ -241,7 +241,7 @@ impl TDataStream for DataStreamSource {
         let id = self.current_id;
 
         let key_by_func = Box::new(key_by);
-        let stream_key_by = StreamOperatorWrap::new_key_by(id, parent_id, key_by_func);
+        let stream_key_by = StreamOperatorWrap::new_key_by(id, vec![parent_id], key_by_func);
 
         self.operators.push(stream_key_by);
 
@@ -261,7 +261,7 @@ impl TDataStream for DataStreamSource {
 
         let time_assigner_func = Box::new(timestamp_and_watermark_assigner);
         let stream_watermark_assigner =
-            StreamOperatorWrap::new_watermark_assigner(id, parent_id, time_assigner_func);
+            StreamOperatorWrap::new_watermark_assigner(id, vec![parent_id], time_assigner_func);
 
         self.operators.push(stream_watermark_assigner);
 
@@ -278,7 +278,7 @@ impl TDataStream for DataStreamSource {
 
         let sink_func = Box::new(output_format);
         let stream_sink =
-            StreamOperatorWrap::new_sink(id, parent_id, FunctionCreator::User, sink_func);
+            StreamOperatorWrap::new_sink(id, vec![parent_id], FunctionCreator::User, sink_func);
 
         self.operators.push(stream_sink);
 
@@ -297,7 +297,7 @@ impl TKeyedStream for DataStreamSource {
 
         let window_assigner_func = Box::new(window_assigner);
         let stream_window_assigner =
-            StreamOperatorWrap::new_window_assigner(id, parent_id, window_assigner_func);
+            StreamOperatorWrap::new_window_assigner(id, vec![parent_id], window_assigner_func);
 
         self.operators.push(stream_window_assigner);
 
@@ -314,7 +314,7 @@ impl TKeyedStream for DataStreamSource {
 
         let sink_func = Box::new(output_format);
         let stream_sink =
-            StreamOperatorWrap::new_sink(id, parent_id, FunctionCreator::User, sink_func);
+            StreamOperatorWrap::new_sink(id, vec![parent_id], FunctionCreator::User, sink_func);
 
         self.operators.push(stream_sink);
 
@@ -332,7 +332,8 @@ impl TWindowedStream for DataStreamSource {
         let id = self.current_id;
 
         let reduce_func = Box::new(reduce);
-        let stream_reduce = StreamOperatorWrap::new_reduce(id, parent_id, parallelism, reduce_func);
+        let stream_reduce =
+            StreamOperatorWrap::new_reduce(id, vec![parent_id], parallelism, reduce_func);
 
         self.operators.push(stream_reduce);
 
