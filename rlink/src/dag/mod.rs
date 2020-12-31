@@ -41,7 +41,7 @@ pub struct StreamEdge {
 }
 
 #[derive(Debug)]
-pub struct StreamGraph {
+pub(crate) struct StreamGraph {
     job_name: String,
 
     stream_nodes: Vec<NodeIndex>,

@@ -1,8 +1,8 @@
 use crate::api::data_stream_v2::{DataStream, StreamBuilder};
 use crate::api::function::InputFormat;
+use crate::api::operator::StreamOperatorWrap;
 use crate::api::properties::Properties;
-use crate::runtime;
-use std::ops::Add;
+use std::cell::RefCell;
 use std::rc::Rc;
 
 /// define a stream job
@@ -21,17 +21,15 @@ pub trait StreamJob: Send + Sync + Clone {
 #[derive(Debug)]
 pub struct StreamExecutionEnvironment {
     pub(crate) job_name: String,
-    pub(crate) id_gen: IdGen,
 
-    pub(crate) pipeline_stream_builders: Vec<StreamBuilder>,
+    pub(crate) stream_builder_manager: Rc<PipelineStreamManager>,
 }
 
 impl StreamExecutionEnvironment {
     fn new(job_name: String) -> Self {
         StreamExecutionEnvironment {
             job_name,
-            id_gen: IdGen::new(),
-            pipeline_stream_builders: Vec::new(),
+            stream_builder_manager: Rc::new(PipelineStreamManager::new()),
         }
     }
 
@@ -39,8 +37,11 @@ impl StreamExecutionEnvironment {
     where
         I: InputFormat + 'static,
     {
-        let stream_builder =
-            StreamBuilder::with_source(self.id_gen.clone(), Box::new(input_format), parallelism);
+        let stream_builder = StreamBuilder::with_source(
+            self.stream_builder_manager.clone(),
+            Box::new(input_format),
+            parallelism,
+        );
         DataStream::new(stream_builder)
     }
 
@@ -56,21 +57,49 @@ pub(crate) const ROOT_ID: u32 = 100;
 
 #[derive(Debug, Clone)]
 pub struct IdGen {
-    id: Rc<u32>,
+    id: u32,
 }
 
 impl IdGen {
     pub fn new() -> Self {
-        IdGen {
-            id: Rc::new(ROOT_ID),
+        IdGen { id: ROOT_ID }
+    }
+
+    pub fn get(&self) -> u32 {
+        self.id
+    }
+
+    pub fn next(&mut self) -> u32 {
+        self.id += 1;
+        self.id
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct PipelineStreamManager {
+    pub(crate) id_gen: RefCell<IdGen>,
+    pub(crate) pipeline_stream_operators: RefCell<Vec<Vec<StreamOperatorWrap>>>,
+}
+
+impl PipelineStreamManager {
+    pub fn new() -> Self {
+        PipelineStreamManager {
+            id_gen: RefCell::new(IdGen::new()),
+            pipeline_stream_operators: RefCell::new(Vec::new()),
         }
     }
 
     pub fn get(&self) -> u32 {
-        *self.id
+        self.id_gen.borrow().get()
     }
 
     pub fn next(&self) -> u32 {
-        self.id.add(1)
+        self.id_gen.borrow_mut().next()
+    }
+
+    pub fn add_pipeline(&self, stream_operators: Vec<StreamOperatorWrap>) {
+        self.pipeline_stream_operators
+            .borrow_mut()
+            .push(stream_operators);
     }
 }
