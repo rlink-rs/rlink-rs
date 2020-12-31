@@ -127,14 +127,14 @@ impl TDataStream for DataStream {
 #[derive(Debug)]
 pub struct ConnectedStreams {
     co_stream: StreamBuilder,
-    dependency_streams: Vec<StreamBuilder>,
+    dependency_pipeline_ids: Vec<u32>,
 }
 
 impl ConnectedStreams {
-    pub(crate) fn new(co_stream: StreamBuilder, dependency_streams: Vec<StreamBuilder>) -> Self {
+    pub(crate) fn new(co_stream: StreamBuilder, dependency_pipeline_ids: Vec<u32>) -> Self {
         ConnectedStreams {
             co_stream,
-            dependency_streams,
+            dependency_pipeline_ids,
         }
     }
 }
@@ -220,6 +220,8 @@ impl PipelineStream for SinkStream {
 #[derive(Debug)]
 pub(crate) struct StreamBuilder {
     current_id: u32,
+
+    pipeline_id: u32,
     pipeline_stream_manager: Rc<PipelineStreamManager>,
 
     operators: Vec<StreamOperatorWrap>,
@@ -227,23 +229,17 @@ pub(crate) struct StreamBuilder {
 
 impl StreamBuilder {
     pub fn with_source(
-        stream_builder_manager: Rc<PipelineStreamManager>,
+        pipeline_stream_manager: Rc<PipelineStreamManager>,
         source_func: Box<dyn InputFormat>,
         parallelism: u32,
     ) -> Self {
-        let parent_id = stream_builder_manager.get();
-        let id = stream_builder_manager.next();
-        let source_operator = StreamOperatorWrap::new_source(
-            id,
-            parent_id,
-            parallelism,
-            FunctionCreator::User,
-            source_func,
-        );
+        let source_operator =
+            StreamOperatorWrap::new_source(0, 0, parallelism, FunctionCreator::User, source_func);
 
         StreamBuilder {
-            current_id: id,
-            pipeline_stream_manager: stream_builder_manager,
+            current_id: 0,
+            pipeline_id: pipeline_stream_manager.next(),
+            pipeline_stream_manager,
             operators: vec![source_operator],
         }
     }
@@ -252,12 +248,11 @@ impl StreamBuilder {
         pipeline_stream_manager: Rc<PipelineStreamManager>,
         co_process_func: Box<dyn CoProcessFunction>,
     ) -> Self {
-        let parent_id = pipeline_stream_manager.get();
-        let id = pipeline_stream_manager.next();
-        let co_operator = StreamOperatorWrap::new_co_process(id, parent_id, co_process_func);
+        let co_operator = StreamOperatorWrap::new_co_process(0, 0, co_process_func);
 
         StreamBuilder {
-            current_id: id,
+            current_id: 0,
+            pipeline_id: pipeline_stream_manager.next(),
             pipeline_stream_manager,
             operators: vec![co_operator],
         }
@@ -343,6 +338,8 @@ impl TDataStream for StreamBuilder {
     where
         F: CoProcessFunction + 'static,
     {
+        let pipeline_stream_manager = self.pipeline_stream_manager.clone();
+
         let co_stream =
             StreamBuilder::with_connect(self.pipeline_stream_manager.clone(), Box::new(co_process));
 
@@ -350,7 +347,14 @@ impl TDataStream for StreamBuilder {
             data_streams.into_iter().map(|x| x.data_stream).collect();
         dependency_streams.push(self);
 
-        ConnectedStreams::new(co_stream, dependency_streams)
+        let dependency_pipeline_ids: Vec<u32> =
+            dependency_streams.iter().map(|x| x.pipeline_id).collect();
+
+        dependency_streams
+            .into_iter()
+            .for_each(|x| pipeline_stream_manager.add_pipeline(x));
+
+        ConnectedStreams::new(co_stream, dependency_pipeline_ids)
     }
 
     fn add_sink<O>(mut self, output_format: O)
@@ -367,7 +371,7 @@ impl TDataStream for StreamBuilder {
 
         let pipeline_stream_manager = self.pipeline_stream_manager.clone();
 
-        pipeline_stream_manager.add_pipeline(self.into_operators());
+        pipeline_stream_manager.add_pipeline(self);
     }
 }
 

@@ -1,6 +1,5 @@
 use crate::api::data_stream_v2::{DataStream, StreamBuilder};
 use crate::api::function::InputFormat;
-use crate::api::operator::StreamOperatorWrap;
 use crate::api::properties::Properties;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -78,7 +77,7 @@ impl IdGen {
 #[derive(Debug)]
 pub(crate) struct PipelineStreamManager {
     pub(crate) id_gen: RefCell<IdGen>,
-    pub(crate) pipeline_stream_operators: RefCell<Vec<Vec<StreamOperatorWrap>>>,
+    pub(crate) pipeline_stream_operators: RefCell<Vec<StreamBuilder>>,
 }
 
 impl PipelineStreamManager {
@@ -97,9 +96,9 @@ impl PipelineStreamManager {
         self.id_gen.borrow_mut().next()
     }
 
-    pub fn add_pipeline(&self, stream_operators: Vec<StreamOperatorWrap>) {
+    pub fn add_pipeline(&self, stream_builder: StreamBuilder) {
         self.pipeline_stream_operators
             .borrow_mut()
-            .push(stream_operators);
+            .push(stream_builder);
     }
 }
