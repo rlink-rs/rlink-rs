@@ -1,14 +1,31 @@
+//! DAG builder
+//! stream_graph -> job_graph -> execution_graph
+
 use std::error::Error;
 
 use crate::api::operator::FunctionCreator;
 
+pub(crate) mod execution_graph;
+pub(crate) mod job_graph;
 pub(crate) mod stream_graph;
 
 pub(crate) use stream_graph::StreamGraph;
 
+pub(crate) enum OperatorType {
+    Source,
+    Map,
+    Filter,
+    CoProcess,
+    KeyBy,
+    Reduce,
+    WatermarkAssigner,
+    WindowAssigner,
+    Sink,
+}
+
 #[derive(Debug)]
 pub enum DagError {
-    // OperatorsNotEnough,
+    ChildNodeNotFound(String),
     ParentOperatorNotFound,
 }
 
@@ -17,7 +34,7 @@ impl Error for DagError {}
 impl std::fmt::Display for DagError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            // DagError::OperatorsNotEnough => write!(f, "OperatorsNotEnough"),
+            DagError::ChildNodeNotFound(s) => write!(f, "ChildNodeNotFound({})", s),
             DagError::ParentOperatorNotFound => write!(f, "ParentOperatorNotFound"),
         }
     }
