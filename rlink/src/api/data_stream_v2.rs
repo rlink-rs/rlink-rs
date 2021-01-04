@@ -35,6 +35,8 @@ pub trait TDataStream {
     where
         F: CoProcessFunction + 'static;
 
+    // fn multiplexing(self) -> MultiplexingStream;
+
     fn add_sink<O>(self, output_format: O)
     where
         O: OutputFormat + 'static;
