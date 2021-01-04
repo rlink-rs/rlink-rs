@@ -2,6 +2,7 @@ use crate::api::data_stream_v2::{DataStream, StreamBuilder};
 use crate::api::function::InputFormat;
 use crate::api::operator::StreamOperatorWrap;
 use crate::api::properties::Properties;
+use crate::dag::stream_graph::OperatorId;
 use crate::dag::StreamGraph;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -78,26 +79,24 @@ impl IdGen {
 
 #[derive(Debug)]
 pub(crate) struct StreamManager {
-    pub(crate) id_gen: RefCell<IdGen>,
     pub(crate) stream_graph: RefCell<StreamGraph>,
 }
 
 impl StreamManager {
     pub fn new(job_name: String) -> Self {
         StreamManager {
-            id_gen: RefCell::new(IdGen::new()),
             stream_graph: RefCell::new(StreamGraph::new(job_name)),
         }
     }
 
-    pub fn next(&self) -> u32 {
-        self.id_gen.borrow_mut().next()
-    }
-
-    pub fn add_operator(&self, operator: StreamOperatorWrap) {
+    pub fn add_operator(
+        &self,
+        operator: StreamOperatorWrap,
+        parent_operator_ids: Vec<OperatorId>,
+    ) -> OperatorId {
         self.stream_graph
             .borrow_mut()
-            .add_operator(operator)
-            .unwrap();
+            .add_operator(operator, parent_operator_ids)
+            .expect("add operator error")
     }
 }

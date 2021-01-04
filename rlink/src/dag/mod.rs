@@ -10,50 +10,9 @@ use crate::api::operator::{FunctionCreator, StreamOperatorWrap};
 pub(crate) mod stream_graph;
 pub(crate) mod virtual_io;
 
-use std::borrow::BorrowMut;
-use std::ops::{Deref, DerefMut};
 pub(crate) use stream_graph::StreamGraph;
 
-#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
-pub(crate) enum ParValueType {
-    /// by user custom
-    Custom,
-    /// inherit from parent node
-    Inherit,
-}
-
-#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
-pub(crate) struct Parallelism {
-    value: u32,
-    value_type: ParValueType,
-}
-
-impl Parallelism {
-    pub fn new(value: u32) -> Self {
-        let value_type = if value == 0 {
-            ParValueType::Inherit
-        } else {
-            ParValueType::Custom
-        };
-        Parallelism { value, value_type }
-    }
-}
-
-impl Deref for Parallelism {
-    type Target = u32;
-
-    fn deref(&self) -> &Self::Target {
-        &self.value
-    }
-}
-
-impl DerefMut for Parallelism {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.value.borrow_mut()
-    }
-}
-
-#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub enum OperatorType {
     Source,
     Map,
@@ -102,6 +61,7 @@ impl std::fmt::Display for OperatorType {
 pub enum DagError {
     SourceNotFound,
     SinkNotFound,
+    NotCombineOperator,
     ChildNodeNotFound(OperatorType),
     ParentOperatorNotFound,
     ParallelismInheritUnsupported(OperatorType),
@@ -114,6 +74,7 @@ impl std::fmt::Display for DagError {
         match self {
             DagError::SourceNotFound => write!(f, "SourceNotFound"),
             DagError::SinkNotFound => write!(f, "SinkNotFound"),
+            DagError::NotCombineOperator => write!(f, "NotCombineOperator"),
             DagError::ChildNodeNotFound(s) => write!(f, "ChildNodeNotFound({})", s),
             DagError::ParentOperatorNotFound => write!(f, "ParentOperatorNotFound"),
             DagError::ParallelismInheritUnsupported(s) => {
@@ -126,7 +87,7 @@ impl std::fmt::Display for DagError {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct StreamNode {
     id: u32,
-    parallelism: Parallelism,
+    parallelism: u32,
 
     operator_name: String,
     operator_type: OperatorType,
