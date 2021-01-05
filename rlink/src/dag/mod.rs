@@ -6,7 +6,7 @@ use std::error::Error;
 use crate::api::operator::{FunctionCreator, StreamOperatorWrap};
 
 // pub(crate) mod execution_graph;
-// pub(crate) mod job_graph;
+pub(crate) mod job_graph;
 pub(crate) mod stream_graph;
 pub(crate) mod virtual_io;
 
@@ -65,6 +65,8 @@ pub enum DagError {
     ChildNodeNotFound(OperatorType),
     ParentOperatorNotFound,
     ParallelismInheritUnsupported(OperatorType),
+    ChildNotFoundInPipeline,
+    MultiChildrenInPipeline,
 }
 
 impl Error for DagError {}
@@ -80,6 +82,8 @@ impl std::fmt::Display for DagError {
             DagError::ParallelismInheritUnsupported(s) => {
                 write!(f, "ParallelismInheritUnsupported({})", s)
             }
+            DagError::ChildNotFoundInPipeline => write!(f, "ChildNotFoundInPipeline"),
+            DagError::MultiChildrenInPipeline => write!(f, "MultiChildrenInPipeline"),
         }
     }
 }

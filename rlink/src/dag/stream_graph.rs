@@ -1,3 +1,4 @@
+use std::cmp::max;
 use std::collections::HashMap;
 use std::ops::Index;
 
@@ -8,7 +9,6 @@ use crate::api::operator::{
 };
 use crate::dag::virtual_io::{VirtualInputFormat, VirtualOutputFormat};
 use crate::dag::{DagError, OperatorType, StreamEdge, StreamNode};
-use std::cmp::max;
 
 pub type OperatorId = u32;
 
@@ -22,7 +22,9 @@ pub(crate) struct StreamGraph {
     id_gen: OperatorId,
     operators: HashMap<u32, (NodeIndex, StreamOperatorWrap)>,
 
-    sources: Vec<NodeIndex>,
+    pub(crate) sources: Vec<NodeIndex>,
+    pub(crate) user_sources: Vec<NodeIndex>,
+
     sinks: Vec<NodeIndex>,
 
     dag: Dag<StreamNode, StreamEdge>,
@@ -37,6 +39,7 @@ impl StreamGraph {
             id_gen: 0,
             operators: HashMap::new(),
             sources: Vec::new(),
+            user_sources: Vec::new(),
             sinks: Vec::new(),
             dag: Dag::new(),
         }
@@ -44,6 +47,10 @@ impl StreamGraph {
 
     pub fn get_dag(&self) -> &Dag<StreamNode, StreamEdge> {
         &self.dag
+    }
+
+    pub fn get_stream_node(&self, node_index: NodeIndex) -> &StreamNode {
+        self.dag.index(node_index)
     }
 
     fn create_virtual_source(
@@ -119,7 +126,10 @@ impl StreamGraph {
             self.stream_edges.push(edge_index);
         }
 
-        if operator.is_source() && parent_operator_ids.len() == 0 {
+        if operator.is_source() {
+            if parent_operator_ids.len() == 0 {
+                self.user_sources.push(node_index);
+            }
             self.sources.push(node_index);
         }
         self.operators.insert(operator_id, (node_index, operator));
