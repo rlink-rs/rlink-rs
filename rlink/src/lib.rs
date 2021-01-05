@@ -10,6 +10,7 @@ mod macros;
 mod dag;
 mod deployment;
 mod graph;
+mod io;
 mod net;
 mod runtime;
 mod storage;

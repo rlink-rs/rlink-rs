@@ -434,7 +434,9 @@ mod tests {
     use crate::api::properties::Properties;
     use crate::api::watermark::{BoundedOutOfOrdernessTimestampExtractor, TimestampAssigner};
     use crate::api::window::SlidingEventTimeWindows;
+    use crate::dag::execution_graph::ExecutionGraph;
     use crate::dag::job_graph::JobGraph;
+    use std::borrow::BorrowMut;
     use std::ops::Deref;
 
     #[test]
@@ -464,14 +466,14 @@ mod tests {
         let mut env = StreamExecutionEnvironment::new("job_name".to_string());
 
         let ds = env
-            .register_source(MyInputFormat::new(), 100)
+            .register_source(MyInputFormat::new(), 1)
             .map(MyMapFunction::new())
             .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
                 Duration::from_secs(1),
                 MyTimestampAssigner::new(),
             ));
 
-        env.register_source(MyInputFormat::new(), 100)
+        env.register_source(MyInputFormat::new(), 2)
             .map(MyMapFunction::new())
             .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
                 Duration::from_secs(1),
@@ -484,7 +486,7 @@ mod tests {
                 Duration::from_secs(20),
                 None,
             ))
-            .reduce(MyReduceFunction::new(), 10)
+            .reduce(MyReduceFunction::new(), 3)
             .map(MyMapFunction::new())
             .add_sink(MyOutputFormat::new(Properties::new()));
 
@@ -496,6 +498,14 @@ mod tests {
             .unwrap();
 
         println!("{:?}", job_graph.get_dag());
+
+        let mut operators = env.stream_manager.pop_operators();
+        let mut execution_graph = ExecutionGraph::new();
+        execution_graph
+            .build(&job_graph, operators.borrow_mut())
+            .unwrap();
+
+        println!("{:?}", &execution_graph.dag);
     }
 
     #[derive(Serialize, Deserialize, Debug)]
@@ -508,8 +518,12 @@ mod tests {
     }
 
     impl InputSplitSource for MyInputFormat {
-        fn create_input_splits(&self, _min_num_splits: u32) -> Vec<InputSplit> {
-            vec![]
+        fn create_input_splits(&self, min_num_splits: u32) -> Vec<InputSplit> {
+            let mut input_splits = Vec::with_capacity(min_num_splits as usize);
+            for partition_num in 0..min_num_splits {
+                input_splits.push(InputSplit::new(partition_num, Properties::new()));
+            }
+            input_splits
         }
 
         fn get_input_split_assigner(&self, input_splits: Vec<InputSplit>) -> InputSplitAssigner {

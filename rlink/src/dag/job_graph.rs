@@ -1,6 +1,6 @@
 use crate::api::operator::DEFAULT_PARALLELISM;
-use crate::dag::stream_graph::OperatorId;
-use crate::dag::{DagError, OperatorType, StreamGraph, StreamNode};
+use crate::dag::stream_graph::{OperatorId, StreamNode};
+use crate::dag::{DagError, OperatorType, StreamGraph};
 use daggy::{Dag, EdgeIndex, NodeIndex, Walker};
 use std::cmp::max;
 use std::collections::HashMap;
@@ -40,14 +40,14 @@ impl JobNode {
 
 #[derive(Debug)]
 pub(crate) struct JobGraph {
-    job_node_indies: Vec<NodeIndex>,
-    dag: Dag<JobNode, JobEdge>,
+    pub(crate) job_node_indies: HashMap<u32, NodeIndex>,
+    pub(crate) dag: Dag<JobNode, JobEdge>,
 }
 
 impl JobGraph {
     pub fn new() -> Self {
         JobGraph {
-            job_node_indies: Vec::new(),
+            job_node_indies: HashMap::new(),
             dag: Dag::new(),
         }
     }
@@ -57,20 +57,21 @@ impl JobGraph {
     }
 
     pub fn build(&mut self, stream_graph: &StreamGraph) -> Result<(), DagError> {
-        let job_nodes = self.build_job_nodes(stream_graph)?;
+        self.build_job_nodes(stream_graph)?;
         debug!("{:?}", self.dag);
-        self.build_job_edges(job_nodes)
+        self.build_job_edges()
     }
 
-    pub fn build_job_edges(&mut self, job_nodes: HashMap<u32, NodeIndex>) -> Result<(), DagError> {
-        job_nodes.values().map(|x| *x).for_each(|job_node_index| {
-            self.build_job_edge(job_node_index, &job_nodes);
+    pub fn build_job_edges(&mut self) -> Result<(), DagError> {
+        let node_indies: Vec<NodeIndex> = self.job_node_indies.values().map(|x| *x).collect();
+        node_indies.into_iter().for_each(|job_node_index| {
+            self.build_job_edge(job_node_index);
         });
 
         Ok(())
     }
 
-    fn build_job_edge(&mut self, job_node_index: NodeIndex, job_nodes: &HashMap<u32, NodeIndex>) {
+    fn build_job_edge(&mut self, job_node_index: NodeIndex) {
         let job_node = self.dag.index(job_node_index).clone();
         if job_node.follower_job_ids.len() == 0 {
             return;
@@ -78,10 +79,7 @@ impl JobGraph {
 
         for follower_job_id in &job_node.follower_job_ids {
             // update `dependency_job_ids`
-            let follower_node_index = job_nodes.get(follower_job_id).unwrap();
-            let follower_job_node = self.dag.index_mut(*follower_node_index);
-            follower_job_node.dependency_job_ids.push(job_node.job_id);
-
+            let follower_node_index = self.job_node_indies.get(follower_job_id).unwrap();
             let follower_job_node = self.dag.index(*follower_node_index);
 
             let job_edge = if job_node.is_reduce_job() {
@@ -104,12 +102,8 @@ impl JobGraph {
         }
     }
 
-    pub fn build_job_nodes(
-        &mut self,
-        stream_graph: &StreamGraph,
-    ) -> Result<HashMap<u32, NodeIndex>, DagError> {
+    pub fn build_job_nodes(&mut self, stream_graph: &StreamGraph) -> Result<(), DagError> {
         let sources = stream_graph.sources.clone();
-        let mut job_nodes = HashMap::new();
         let mut job_id_map = HashMap::new();
         for source_node_index in sources {
             let job_node = self.build_job_node(source_node_index, stream_graph)?;
@@ -123,12 +117,12 @@ impl JobGraph {
             // build map: job_id -> NodeIndex
             let job_id = job_node.job_id;
             let node_index = self.dag.add_node(job_node);
-            job_nodes.insert(job_id, node_index);
+            self.job_node_indies.insert(job_id, node_index);
         }
 
         for (follower_job_id, dependency_job_ids) in job_id_map {
             // update `dependency_job_ids`
-            let node_index = job_nodes.get(&follower_job_id).unwrap();
+            let node_index = self.job_node_indies.get(&follower_job_id).unwrap();
             let job_node = self.dag.index_mut(*node_index);
             job_node.dependency_job_ids = dependency_job_ids;
 
@@ -139,7 +133,7 @@ impl JobGraph {
                     .dependency_job_ids
                     .iter()
                     .map(|dep_job_id| {
-                        let dep_node_index = job_nodes.get(dep_job_id).unwrap();
+                        let dep_node_index = self.job_node_indies.get(dep_job_id).unwrap();
                         let dep_node_stream = self.dag.index(*dep_node_index);
                         dep_node_stream.parallelism
                     })
@@ -159,14 +153,15 @@ impl JobGraph {
                     .follower_job_ids
                     .iter()
                     .for_each(|follower_job_id| {
-                        let follower_node_index = job_nodes.get(follower_job_id).unwrap();
+                        let follower_node_index =
+                            self.job_node_indies.get(follower_job_id).unwrap();
                         let follower_node_stream = self.dag.index_mut(*follower_node_index);
                         follower_node_stream.parallelism = job_node.parallelism;
                     })
             }
         }
 
-        Ok(job_nodes)
+        Ok(())
     }
 
     pub fn build_job_node(
@@ -222,98 +217,4 @@ impl JobGraph {
             dependency_job_ids: vec![],
         })
     }
-
-    // pub fn build_source_jobs(&self, source_node_indies: Vec<NodeIndex>) -> Result<(), DagError> {
-    //     if source_node_indies.len() == 0 {
-    //         return Err(DagError::SourceNotFound);
-    //     }
-    //
-    //     for source_node_index in source_node_indies {}
-    //
-    //     Ok(())
-    // }
-
-    // pub fn build_source_job(&self, source_node_index: NodeIndex) -> Result<(), DagError> {
-    //     let stream_node = self.stream_graph.get_dag().index(source_node_index);
-    //     let children: Vec<(EdgeIndex, NodeIndex)> = self
-    //         .stream_graph
-    //         .get_dag()
-    //         .children(source_node_index)
-    //         .iter(self.stream_graph.get_dag())
-    //         .collect();
-    //
-    //     if children.len() == 0 {
-    //         return Err(DagError::ChildNodeNotFound(stream_node.operator_type));
-    //     }
-    //
-    //     if children.len() == 1 {}
-    //
-    //     Ok(())
-    // }
-    //
-    // pub fn build_source_job0(
-    //     &mut self,
-    //     source_node_index: NodeIndex,
-    // ) -> Result<NodeIndex, DagError> {
-    //     let stream_node = self.stream_graph.get_dag().index(source_node_index);
-    //     let parallelism = stream_node.parallelism;
-    //     let children: Vec<(EdgeIndex, NodeIndex)> = self
-    //         .stream_graph
-    //         .get_dag()
-    //         .children(source_node_index)
-    //         .iter(self.stream_graph.get_dag())
-    //         .collect();
-    //
-    //     if parallelism.value_type == ParValueType::Inherit {
-    //         return Err(DagError::ParallelismInheritUnsupported(
-    //             stream_node.operator_type,
-    //         ));
-    //     }
-    //
-    //     if children.len() == 0 {
-    //         return Err(DagError::ChildNodeNotFound(stream_node.operator_type));
-    //     }
-    //
-    //     let mut job_node = JobNode {
-    //         job_id: self.job_id_gen,
-    //         parallelism: parallelism.value,
-    //         operator_ids: vec![stream_node.id],
-    //     };
-    //
-    //     if children.len() > 0 {
-    //         let source_index = self.dag.add_node(job_node);
-    //         self.sources.push(source_index);
-    //         return Ok(source_index);
-    //     }
-    //
-    //     let child = *children.get(0).unwrap();
-    //     let node_index = child.1;
-    //     loop {
-    //         let stream_node = self.stream_graph.get_dag().index(node_index);
-    //         let children: Vec<(EdgeIndex, NodeIndex)> = self
-    //             .stream_graph
-    //             .get_dag()
-    //             .children(node_index)
-    //             .iter(self.stream_graph.get_dag())
-    //             .collect();
-    //
-    //         job_node.operator_ids.push(stream_node.id);
-    //
-    //         if children.len() == 0 {
-    //             return if stream_node.operator_type == OperatorType::Sink {
-    //                 let source_index = self.dag.add_node(job_node);
-    //                 self.sources.push(source_index);
-    //                 Ok(source_index)
-    //             } else {
-    //                 Err(DagError::SinkNotFound)
-    //             };
-    //         } else if children.len() > 1 {
-    //             let source_index = self.dag.add_node(job_node);
-    //             self.sources.push(source_index);
-    //             Ok(source_index)
-    //         }
-    //     }
-    //
-    //     Ok(())
-    // }
 }

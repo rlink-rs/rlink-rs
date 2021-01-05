@@ -7,10 +7,29 @@ use daggy::{Dag, EdgeIndex, NodeIndex};
 use crate::api::operator::{
     FunctionCreator, StreamOperator, StreamOperatorWrap, TStreamOperator, DEFAULT_PARALLELISM,
 };
-use crate::dag::virtual_io::{VirtualInputFormat, VirtualOutputFormat};
-use crate::dag::{DagError, OperatorType, StreamEdge, StreamNode};
+use crate::dag::{DagError, OperatorType};
+use crate::io::system_input_format::SystemInputFormat;
+use crate::io::system_output_format::SystemOutputFormat;
 
 pub type OperatorId = u32;
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct StreamNode {
+    pub(crate) id: u32,
+    pub(crate) parallelism: u32,
+
+    pub(crate) operator_name: String,
+    pub(crate) operator_type: OperatorType,
+    pub(crate) fn_creator: FunctionCreator,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct StreamEdge {
+    edge_id: String,
+
+    source_id: u32,
+    target_id: u32,
+}
 
 #[derive(Debug)]
 pub(crate) struct StreamGraph {
@@ -20,7 +39,7 @@ pub(crate) struct StreamGraph {
     stream_edges: Vec<EdgeIndex>,
 
     id_gen: OperatorId,
-    operators: HashMap<u32, (NodeIndex, StreamOperatorWrap)>,
+    operators: HashMap<OperatorId, (NodeIndex, StreamOperatorWrap)>,
 
     pub(crate) sources: Vec<NodeIndex>,
     pub(crate) user_sources: Vec<NodeIndex>,
@@ -53,13 +72,25 @@ impl StreamGraph {
         self.dag.index(node_index)
     }
 
+    pub fn pop_operators(&mut self) -> HashMap<OperatorId, StreamOperatorWrap> {
+        let operator_ids: Vec<OperatorId> = self.operators.iter().map(|(x, _)| *x).collect();
+
+        let mut operators = HashMap::new();
+        operator_ids.iter().for_each(|operator_id| {
+            let (_, op) = self.operators.remove(operator_id).unwrap();
+            operators.insert(*operator_id, op);
+        });
+
+        operators
+    }
+
     fn create_virtual_source(
         &mut self,
         id: u32,
         parent_id: u32,
         parallelism: u32,
     ) -> StreamOperatorWrap {
-        let input_format = Box::new(VirtualInputFormat {});
+        let input_format = Box::new(SystemInputFormat {});
         StreamOperatorWrap::StreamSource(StreamOperator::new(
             id,
             vec![parent_id],
@@ -75,7 +106,7 @@ impl StreamGraph {
         parent_id: OperatorId,
         parallelism: u32,
     ) -> StreamOperatorWrap {
-        let output_format = Box::new(VirtualOutputFormat {});
+        let output_format = Box::new(SystemOutputFormat {});
         StreamOperatorWrap::StreamSink(StreamOperator::new(
             id,
             vec![parent_id],

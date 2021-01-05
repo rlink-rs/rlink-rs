@@ -5,6 +5,7 @@ use crate::api::properties::Properties;
 use crate::dag::stream_graph::OperatorId;
 use crate::dag::StreamGraph;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 /// define a stream job
@@ -98,5 +99,9 @@ impl StreamManager {
             .borrow_mut()
             .add_operator(operator, parent_operator_ids)
             .expect("add operator error")
+    }
+
+    pub fn pop_operators(&self) -> HashMap<OperatorId, StreamOperatorWrap> {
+        self.stream_graph.borrow_mut().pop_operators()
     }
 }
