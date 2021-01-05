@@ -62,9 +62,9 @@ pub enum DagError {
     SourceNotFound,
     SinkNotFound,
     NotCombineOperator,
-    ChildNodeNotFound(OperatorType),
+    // ChildNodeNotFound(OperatorType),
     ParentOperatorNotFound,
-    ParallelismInheritUnsupported(OperatorType),
+    // ParallelismInheritUnsupported(OperatorType),
     ChildNotFoundInPipeline,
     MultiChildrenInPipeline,
 }
@@ -77,11 +77,11 @@ impl std::fmt::Display for DagError {
             DagError::SourceNotFound => write!(f, "SourceNotFound"),
             DagError::SinkNotFound => write!(f, "SinkNotFound"),
             DagError::NotCombineOperator => write!(f, "NotCombineOperator"),
-            DagError::ChildNodeNotFound(s) => write!(f, "ChildNodeNotFound({})", s),
+            // DagError::ChildNodeNotFound(s) => write!(f, "ChildNodeNotFound({})", s),
             DagError::ParentOperatorNotFound => write!(f, "ParentOperatorNotFound"),
-            DagError::ParallelismInheritUnsupported(s) => {
-                write!(f, "ParallelismInheritUnsupported({})", s)
-            }
+            // DagError::ParallelismInheritUnsupported(s) => {
+            //     write!(f, "ParallelismInheritUnsupported({})", s)
+            // }
             DagError::ChildNotFoundInPipeline => write!(f, "ChildNotFoundInPipeline"),
             DagError::MultiChildrenInPipeline => write!(f, "MultiChildrenInPipeline"),
         }

@@ -434,6 +434,8 @@ mod tests {
     use crate::api::properties::Properties;
     use crate::api::watermark::{BoundedOutOfOrdernessTimestampExtractor, TimestampAssigner};
     use crate::api::window::SlidingEventTimeWindows;
+    use crate::dag::job_graph::JobGraph;
+    use std::ops::Deref;
 
     #[test]
     pub fn data_stream_test() {
@@ -487,6 +489,13 @@ mod tests {
             .add_sink(MyOutputFormat::new(Properties::new()));
 
         println!("{:?}", env.stream_manager.stream_graph.borrow().get_dag());
+
+        let mut job_graph = JobGraph::new();
+        job_graph
+            .build(env.stream_manager.stream_graph.borrow().deref())
+            .unwrap();
+
+        println!("{:?}", job_graph.get_dag());
     }
 
     #[derive(Serialize, Deserialize, Debug)]

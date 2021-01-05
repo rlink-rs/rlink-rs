@@ -146,7 +146,11 @@ impl StreamGraph {
         let operator_type = OperatorType::from(&operator);
 
         return if parent_operator_ids.len() == 0 {
-            self.add_operator0(operator, parent_operator_ids, parallelism)
+            if operator_type != OperatorType::Source {
+                Err(DagError::SourceNotFound)
+            } else {
+                self.add_operator0(operator, parent_operator_ids, parallelism)
+            }
         } else if parent_operator_ids.len() == 1 {
             let p_operator_id = parent_operator_ids[0];
             let (p_node_index, _) = self.operators.get(&p_operator_id).unwrap();
