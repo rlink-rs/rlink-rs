@@ -1,6 +1,6 @@
 use crate::api::operator::DEFAULT_PARALLELISM;
 use crate::dag::stream_graph::{OperatorId, StreamNode};
-use crate::dag::{DagError, OperatorType, StreamGraph};
+use crate::dag::{DagError, Label, OperatorType, StreamGraph};
 use daggy::{Dag, EdgeIndex, NodeIndex, Walker};
 use std::cmp::max;
 use std::collections::HashMap;
@@ -12,6 +12,12 @@ pub enum JobEdge {
     CrossTask = 2,
 }
 
+impl Label for JobEdge {
+    fn get_label(&self) -> String {
+        format!("{:?}", self)
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct JobNode {
     /// the first operator id in a pipeline as job_id
@@ -20,6 +26,12 @@ pub struct JobNode {
     pub(crate) stream_nodes: Vec<StreamNode>,
     pub(crate) follower_job_ids: Vec<u32>,
     pub(crate) dependency_job_ids: Vec<u32>,
+}
+
+impl Label for JobNode {
+    fn get_label(&self) -> String {
+        format!("job:{}(p{})", self.job_id, self.parallelism)
+    }
 }
 
 impl JobNode {

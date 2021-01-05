@@ -7,7 +7,7 @@ use daggy::{Dag, EdgeIndex, NodeIndex};
 use crate::api::operator::{
     FunctionCreator, StreamOperator, StreamOperatorWrap, TStreamOperator, DEFAULT_PARALLELISM,
 };
-use crate::dag::{DagError, OperatorType};
+use crate::dag::{DagError, Label, OperatorType};
 use crate::io::system_input_format::SystemInputFormat;
 use crate::io::system_output_format::SystemOutputFormat;
 
@@ -23,12 +23,24 @@ pub struct StreamNode {
     pub(crate) fn_creator: FunctionCreator,
 }
 
+impl Label for StreamNode {
+    fn get_label(&self) -> String {
+        self.operator_name.clone()
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct StreamEdge {
     edge_id: String,
 
     source_id: u32,
     target_id: u32,
+}
+
+impl Label for StreamEdge {
+    fn get_label(&self) -> String {
+        self.edge_id.clone()
+    }
 }
 
 #[derive(Debug)]

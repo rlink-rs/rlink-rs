@@ -3,7 +3,7 @@ use daggy::{Dag, EdgeIndex, NodeIndex, Walker};
 use crate::api::function::InputSplit;
 use crate::api::operator::StreamOperatorWrap;
 use crate::dag::job_graph::{JobEdge, JobGraph};
-use crate::dag::DagError;
+use crate::dag::{DagError, Label};
 use std::collections::HashMap;
 use std::ops::Index;
 
@@ -13,6 +13,12 @@ pub(crate) enum ExecutionEdge {
     Memory,
 }
 
+impl Label for ExecutionEdge {
+    fn get_label(&self) -> String {
+        format!("{:?}", self)
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub(crate) struct ExecutionNode {
     pub job_id: u32,
@@ -20,6 +26,15 @@ pub(crate) struct ExecutionNode {
     /// total number tasks in the chain. same as `parallelism`
     pub num_tasks: u16,
     pub input_split: InputSplit,
+}
+
+impl Label for ExecutionNode {
+    fn get_label(&self) -> String {
+        format!(
+            "job:{}({}/{})",
+            self.job_id, self.task_number, self.num_tasks
+        )
+    }
 }
 
 pub(crate) struct ExecutionGraph {

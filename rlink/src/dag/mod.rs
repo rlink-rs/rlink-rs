@@ -92,31 +92,47 @@ impl std::fmt::Display for DagError {
     }
 }
 
+pub(crate) trait Label {
+    fn get_label(&self) -> String;
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub(crate) struct JsonNode {
+pub(crate) struct JsonNode<N>
+where
+    N: Serialize,
+{
     id: String,
     label: String,
     #[serde(rename = "type")]
     ty: String,
+    detail: N,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub(crate) struct JsonEdge {
+pub(crate) struct JsonEdge<E>
+where
+    E: Serialize,
+{
     source: String,
     target: String,
     label: String,
+    detail: E,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub(crate) struct JsonDag {
-    nodes: Vec<JsonNode>,
-    edges: Vec<JsonEdge>,
+pub(crate) struct JsonDag<N, E>
+where
+    N: Clone + Label + Serialize,
+    E: Clone + Label + Serialize,
+{
+    nodes: Vec<JsonNode<N>>,
+    edges: Vec<JsonEdge<E>>,
 }
 
-pub(crate) fn dag_json<N, E>(dag: &Dag<N, E>) -> JsonDag
+pub(crate) fn dag_json<N, E>(dag: &Dag<N, E>) -> JsonDag<N, E>
 where
-    N: Debug + Serialize,
-    E: Debug + Serialize,
+    N: Clone + Label + Serialize,
+    E: Clone + Label + Serialize,
 {
     let mut node_map = HashMap::new();
     let mut edges = Vec::new();
@@ -126,7 +142,7 @@ where
             let source = edge.source();
 
             let n = dag.index(source);
-            let label = format!("{:?}", n);
+            let label = n.get_label();
 
             let id = source.index().to_string();
 
@@ -146,6 +162,7 @@ where
                 id,
                 label,
                 ty: ty.to_string(),
+                detail: n.clone(),
             }
         };
 
@@ -153,7 +170,7 @@ where
             let target = edge.target();
 
             let n = dag.index(target);
-            let label = format!("{:?}", n);
+            let label = n.get_label();
 
             let id = target.index().to_string();
 
@@ -173,15 +190,17 @@ where
                 id,
                 label,
                 ty: ty.to_string(),
+                detail: n.clone(),
             }
         };
 
         let json_edge = {
-            let label = format!("{:?}", edge.weight);
+            let label = edge.weight.get_label();
             JsonEdge {
                 source: source_json_node.id.clone(),
                 target: target_json_node.id.clone(),
                 label,
+                detail: edge.weight.clone(),
             }
         };
 
