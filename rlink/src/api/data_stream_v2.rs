@@ -434,9 +434,10 @@ mod tests {
     use crate::api::properties::Properties;
     use crate::api::watermark::{BoundedOutOfOrdernessTimestampExtractor, TimestampAssigner};
     use crate::api::window::SlidingEventTimeWindows;
+    use crate::dag::dag_json;
     use crate::dag::execution_graph::ExecutionGraph;
     use crate::dag::job_graph::JobGraph;
-    use std::borrow::BorrowMut;
+    use std::borrow::{Borrow, BorrowMut};
     use std::ops::Deref;
 
     #[test]
@@ -458,7 +459,7 @@ mod tests {
             .reduce(MyReduceFunction::new(), 10)
             .add_sink(MyOutputFormat::new(Properties::new()));
 
-        println!("{:?}", env.stream_manager.stream_graph.borrow().get_dag());
+        println!("{:?}", env.stream_manager.stream_graph.borrow().dag);
     }
 
     #[test]
@@ -490,22 +491,32 @@ mod tests {
             .map(MyMapFunction::new())
             .add_sink(MyOutputFormat::new(Properties::new()));
 
-        println!("{:?}", env.stream_manager.stream_graph.borrow().get_dag());
+        {
+            let dag = &env.stream_manager.stream_graph.borrow().dag;
+            println!("{:?}", dag);
+            println!("{}", serde_json::to_string(dag_json(dag).borrow()).unwrap())
+        }
 
         let mut job_graph = JobGraph::new();
         job_graph
             .build(env.stream_manager.stream_graph.borrow().deref())
             .unwrap();
-
-        println!("{:?}", job_graph.get_dag());
+        {
+            let dag = &job_graph.dag;
+            println!("{:?}", dag);
+            println!("{}", serde_json::to_string(dag_json(dag).borrow()).unwrap())
+        }
 
         let mut operators = env.stream_manager.pop_operators();
         let mut execution_graph = ExecutionGraph::new();
         execution_graph
             .build(&job_graph, operators.borrow_mut())
             .unwrap();
-
-        println!("{:?}", &execution_graph.dag);
+        {
+            let dag = &execution_graph.dag;
+            println!("{:?}", dag);
+            println!("{}", serde_json::to_string(dag_json(dag).borrow()).unwrap())
+        }
     }
 
     #[derive(Serialize, Deserialize, Debug)]

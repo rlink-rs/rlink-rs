@@ -9,6 +9,11 @@ pub(crate) mod execution_graph;
 pub(crate) mod job_graph;
 pub(crate) mod stream_graph;
 
+use daggy::{Dag, Walker};
+use serde::Serialize;
+use std::collections::HashMap;
+use std::fmt::Debug;
+use std::ops::Index;
 pub(crate) use stream_graph::StreamGraph;
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -85,4 +90,108 @@ impl std::fmt::Display for DagError {
             DagError::MultiChildrenInPipeline => write!(f, "MultiChildrenInPipeline"),
         }
     }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub(crate) struct JsonNode {
+    id: String,
+    label: String,
+    #[serde(rename = "type")]
+    ty: String,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub(crate) struct JsonEdge {
+    source: String,
+    target: String,
+    label: String,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub(crate) struct JsonDag {
+    nodes: Vec<JsonNode>,
+    edges: Vec<JsonEdge>,
+}
+
+pub(crate) fn dag_json<N, E>(dag: &Dag<N, E>) -> JsonDag
+where
+    N: Debug + Serialize,
+    E: Debug + Serialize,
+{
+    let mut node_map = HashMap::new();
+    let mut edges = Vec::new();
+
+    for edge in dag.raw_edges() {
+        let source_json_node = {
+            let source = edge.source();
+
+            let n = dag.index(source);
+            let label = format!("{:?}", n);
+
+            let id = source.index().to_string();
+
+            let parent_count = dag.parents(source).iter(dag).count();
+            let ty = if parent_count == 0 {
+                "begin"
+            } else {
+                let child_count = dag.children(source).iter(dag).count();
+                if child_count == 0 {
+                    "end"
+                } else {
+                    ""
+                }
+            };
+
+            JsonNode {
+                id,
+                label,
+                ty: ty.to_string(),
+            }
+        };
+
+        let target_json_node = {
+            let target = edge.target();
+
+            let n = dag.index(target);
+            let label = format!("{:?}", n);
+
+            let id = target.index().to_string();
+
+            let parent_count = dag.parents(target).iter(dag).count();
+            let ty = if parent_count == 0 {
+                "begin"
+            } else {
+                let child_count = dag.children(target).iter(dag).count();
+                if child_count == 0 {
+                    "end"
+                } else {
+                    ""
+                }
+            };
+
+            JsonNode {
+                id,
+                label,
+                ty: ty.to_string(),
+            }
+        };
+
+        let json_edge = {
+            let label = format!("{:?}", edge.weight);
+            JsonEdge {
+                source: source_json_node.id.clone(),
+                target: target_json_node.id.clone(),
+                label,
+            }
+        };
+
+        node_map.insert(source_json_node.id.clone(), source_json_node);
+        node_map.insert(target_json_node.id.clone(), target_json_node);
+
+        edges.push(json_edge);
+    }
+
+    let nodes = node_map.into_iter().map(|(_, node)| node).collect();
+
+    JsonDag { nodes, edges }
 }

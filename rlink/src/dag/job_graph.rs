@@ -52,10 +52,6 @@ impl JobGraph {
         }
     }
 
-    pub fn get_dag(&self) -> &Dag<JobNode, JobEdge> {
-        &self.dag
-    }
-
     pub fn build(&mut self, stream_graph: &StreamGraph) -> Result<(), DagError> {
         self.build_job_nodes(stream_graph)?;
         debug!("{:?}", self.dag);
@@ -175,7 +171,7 @@ impl JobGraph {
         let mut follower_job_ids: Vec<OperatorId> = Vec::new();
 
         let mut node_index = source_node_index;
-        let stream_dag = stream_graph.get_dag();
+        let stream_dag = &stream_graph.dag;
         loop {
             let stream_node = stream_graph.get_stream_node(node_index);
             let children: Vec<(EdgeIndex, NodeIndex)> =

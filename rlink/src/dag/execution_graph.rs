@@ -7,13 +7,13 @@ use crate::dag::DagError;
 use std::collections::HashMap;
 use std::ops::Index;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
 pub(crate) enum ExecutionEdge {
     Network,
     Memory,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub(crate) struct ExecutionNode {
     pub job_id: u32,
     pub task_number: u16,

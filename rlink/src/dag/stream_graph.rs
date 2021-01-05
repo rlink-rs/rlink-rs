@@ -46,7 +46,7 @@ pub(crate) struct StreamGraph {
 
     sinks: Vec<NodeIndex>,
 
-    dag: Dag<StreamNode, StreamEdge>,
+    pub(crate) dag: Dag<StreamNode, StreamEdge>,
 }
 
 impl StreamGraph {
@@ -62,10 +62,6 @@ impl StreamGraph {
             sinks: Vec::new(),
             dag: Dag::new(),
         }
-    }
-
-    pub fn get_dag(&self) -> &Dag<StreamNode, StreamEdge> {
-        &self.dag
     }
 
     pub fn get_stream_node(&self, node_index: NodeIndex) -> &StreamNode {
