@@ -421,6 +421,8 @@ impl TEndStream for StreamBuilder {}
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::BorrowMut;
+    use std::ops::Deref;
     use std::time::Duration;
 
     use crate::api::data_stream_v2::{TConnectedStreams, TKeyedStream};
@@ -434,11 +436,9 @@ mod tests {
     use crate::api::properties::Properties;
     use crate::api::watermark::{BoundedOutOfOrdernessTimestampExtractor, TimestampAssigner};
     use crate::api::window::SlidingEventTimeWindows;
-    use crate::dag::dag_json;
     use crate::dag::execution_graph::ExecutionGraph;
     use crate::dag::job_graph::JobGraph;
-    use std::borrow::{Borrow, BorrowMut};
-    use std::ops::Deref;
+    use crate::dag::JsonDag;
 
     #[test]
     pub fn data_stream_test() {
@@ -494,7 +494,10 @@ mod tests {
         {
             let dag = &env.stream_manager.stream_graph.borrow().dag;
             println!("{:?}", dag);
-            println!("{}", serde_json::to_string(dag_json(dag).borrow()).unwrap())
+            println!(
+                "{}",
+                JsonDag::dag_json(dag).fill_begin_end_node().to_string()
+            )
         }
 
         let mut job_graph = JobGraph::new();
@@ -504,7 +507,10 @@ mod tests {
         {
             let dag = &job_graph.dag;
             println!("{:?}", dag);
-            println!("{}", serde_json::to_string(dag_json(dag).borrow()).unwrap())
+            println!(
+                "{}",
+                JsonDag::dag_json(dag).fill_begin_end_node().to_string()
+            )
         }
 
         let mut operators = env.stream_manager.pop_operators();
@@ -515,7 +521,10 @@ mod tests {
         {
             let dag = &execution_graph.dag;
             println!("{:?}", dag);
-            println!("{}", serde_json::to_string(dag_json(dag).borrow()).unwrap())
+            println!(
+                "{}",
+                JsonDag::dag_json(dag).fill_begin_end_node().to_string()
+            )
         }
     }
 

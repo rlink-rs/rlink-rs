@@ -9,7 +9,7 @@ pub(crate) mod execution_graph;
 pub(crate) mod job_graph;
 pub(crate) mod stream_graph;
 
-use daggy::{Dag, Walker};
+use daggy::{Dag, NodeIndex, Walker};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -64,7 +64,7 @@ impl std::fmt::Display for OperatorType {
 #[derive(Debug)]
 pub enum DagError {
     SourceNotFound,
-    SinkNotFound,
+    // SinkNotFound,
     NotCombineOperator,
     // ChildNodeNotFound(OperatorType),
     ParentOperatorNotFound,
@@ -79,7 +79,7 @@ impl std::fmt::Display for DagError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             DagError::SourceNotFound => write!(f, "SourceNotFound"),
-            DagError::SinkNotFound => write!(f, "SinkNotFound"),
+            // DagError::SinkNotFound => write!(f, "SinkNotFound"),
             DagError::NotCombineOperator => write!(f, "NotCombineOperator"),
             // DagError::ChildNodeNotFound(s) => write!(f, "ChildNodeNotFound({})", s),
             DagError::ParentOperatorNotFound => write!(f, "ParentOperatorNotFound"),
@@ -105,7 +105,7 @@ where
     label: String,
     #[serde(rename = "type")]
     ty: String,
-    detail: N,
+    detail: Option<N>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -116,7 +116,7 @@ where
     source: String,
     target: String,
     label: String,
-    detail: E,
+    detail: Option<E>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -129,88 +129,120 @@ where
     edges: Vec<JsonEdge<E>>,
 }
 
-pub(crate) fn dag_json<N, E>(dag: &Dag<N, E>) -> JsonDag<N, E>
+impl<N, E> JsonDag<N, E>
 where
     N: Clone + Label + Serialize,
     E: Clone + Label + Serialize,
 {
-    let mut node_map = HashMap::new();
-    let mut edges = Vec::new();
-
-    for edge in dag.raw_edges() {
-        let source_json_node = {
-            let source = edge.source();
-
-            let n = dag.index(source);
-            let label = n.get_label();
-
-            let id = source.index().to_string();
-
-            let parent_count = dag.parents(source).iter(dag).count();
-            let ty = if parent_count == 0 {
-                "begin"
+    fn get_node_type(dag: &Dag<N, E>, node_index: NodeIndex) -> &str {
+        let parent_count = dag.parents(node_index).iter(dag).count();
+        if parent_count == 0 {
+            "begin"
+        } else {
+            let child_count = dag.children(node_index).iter(dag).count();
+            if child_count == 0 {
+                "end"
             } else {
-                let child_count = dag.children(source).iter(dag).count();
-                if child_count == 0 {
-                    "end"
-                } else {
-                    ""
-                }
-            };
-
-            JsonNode {
-                id,
-                label,
-                ty: ty.to_string(),
-                detail: n.clone(),
+                ""
             }
-        };
-
-        let target_json_node = {
-            let target = edge.target();
-
-            let n = dag.index(target);
-            let label = n.get_label();
-
-            let id = target.index().to_string();
-
-            let parent_count = dag.parents(target).iter(dag).count();
-            let ty = if parent_count == 0 {
-                "begin"
-            } else {
-                let child_count = dag.children(target).iter(dag).count();
-                if child_count == 0 {
-                    "end"
-                } else {
-                    ""
-                }
-            };
-
-            JsonNode {
-                id,
-                label,
-                ty: ty.to_string(),
-                detail: n.clone(),
-            }
-        };
-
-        let json_edge = {
-            let label = edge.weight.get_label();
-            JsonEdge {
-                source: source_json_node.id.clone(),
-                target: target_json_node.id.clone(),
-                label,
-                detail: edge.weight.clone(),
-            }
-        };
-
-        node_map.insert(source_json_node.id.clone(), source_json_node);
-        node_map.insert(target_json_node.id.clone(), target_json_node);
-
-        edges.push(json_edge);
+        }
     }
 
-    let nodes = node_map.into_iter().map(|(_, node)| node).collect();
+    fn crate_json_node(dag: &Dag<N, E>, node_index: NodeIndex) -> JsonNode<N> {
+        let n = dag.index(node_index);
+        let label = n.get_label();
+        let id = node_index.index().to_string();
+        let ty = JsonDag::get_node_type(dag, node_index);
 
-    JsonDag { nodes, edges }
+        JsonNode {
+            id,
+            label,
+            ty: ty.to_string(),
+            detail: Some(n.clone()),
+        }
+    }
+
+    pub(crate) fn dag_json(dag: &Dag<N, E>) -> Self {
+        let mut node_map = HashMap::new();
+        let mut edges = Vec::new();
+
+        for edge in dag.raw_edges() {
+            let source_json_node = JsonDag::crate_json_node(dag, edge.source());
+            let target_json_node = JsonDag::crate_json_node(dag, edge.target());
+
+            let json_edge = {
+                let label = edge.weight.get_label();
+                JsonEdge {
+                    source: source_json_node.id.clone(),
+                    target: target_json_node.id.clone(),
+                    label,
+                    detail: Some(edge.weight.clone()),
+                }
+            };
+
+            node_map.insert(source_json_node.id.clone(), source_json_node);
+            node_map.insert(target_json_node.id.clone(), target_json_node);
+
+            edges.push(json_edge);
+        }
+
+        let nodes = node_map.into_iter().map(|(_, node)| node).collect();
+
+        JsonDag { nodes, edges }
+    }
+
+    pub(crate) fn fill_begin_end_node(mut self) -> Self {
+        let begin_node: JsonNode<N> = JsonNode {
+            id: "Begin".to_string(),
+            label: "Begin".to_string(),
+            ty: "begin".to_string(),
+            detail: None,
+        };
+        let end_node: JsonNode<N> = JsonNode {
+            id: "End".to_string(),
+            label: "End".to_string(),
+            ty: "end".to_string(),
+            detail: None,
+        };
+        let begin_edges: Vec<JsonEdge<E>> = self
+            .nodes
+            .iter_mut()
+            .filter(|node| node.ty.eq("begin"))
+            .map(|node| {
+                node.ty = "".to_string();
+                let edge: JsonEdge<E> = JsonEdge {
+                    source: begin_node.id.clone(),
+                    target: node.id.clone(),
+                    label: "".to_string(),
+                    detail: None,
+                };
+                edge
+            })
+            .collect();
+        let end_edges: Vec<JsonEdge<E>> = self
+            .nodes
+            .iter_mut()
+            .filter(|node| node.ty.eq("end"))
+            .map(|node| {
+                node.ty = "".to_string();
+                let edge: JsonEdge<E> = JsonEdge {
+                    source: node.id.clone(),
+                    target: end_node.id.clone(),
+                    label: "".to_string(),
+                    detail: None,
+                };
+                edge
+            })
+            .collect();
+        self.edges.extend_from_slice(begin_edges.as_slice());
+        self.edges.extend_from_slice(end_edges.as_slice());
+        self.nodes.push(begin_node);
+        self.nodes.push(end_node);
+
+        self
+    }
+
+    pub(crate) fn to_string(&self) -> String {
+        serde_json::to_string(self).unwrap_or("".to_string())
+    }
 }
