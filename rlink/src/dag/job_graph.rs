@@ -8,7 +8,9 @@ use std::ops::{Index, IndexMut};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum JobEdge {
+    /// Forward
     InSameTask = 1,
+    /// Hash
     CrossTask = 2,
 }
 

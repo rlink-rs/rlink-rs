@@ -9,8 +9,10 @@ use std::ops::Index;
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug)]
 pub(crate) enum ExecutionEdge {
-    Network,
-    Memory,
+    /// Forward
+    Memory = 1,
+    /// Hash
+    Network = 2,
 }
 
 impl Label for ExecutionEdge {
