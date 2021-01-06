@@ -3,11 +3,11 @@ use daggy::{Dag, EdgeIndex, NodeIndex, Walker};
 use crate::api::function::InputSplit;
 use crate::api::operator::StreamOperatorWrap;
 use crate::dag::job_graph::{JobEdge, JobGraph};
-use crate::dag::{DagError, Label};
+use crate::dag::{DagError, Label, TaskId};
 use std::collections::HashMap;
 use std::ops::Index;
 
-#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
+#[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub(crate) enum ExecutionEdge {
     /// Forward
     Memory = 1,
@@ -23,10 +23,11 @@ impl Label for ExecutionEdge {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub(crate) struct ExecutionNode {
-    pub job_id: u32,
-    pub task_number: u16,
-    /// total number tasks in the chain. same as `parallelism`
-    pub num_tasks: u16,
+    // pub job_id: u32,
+    // pub task_number: u16,
+    // /// total number tasks in the chain. same as `parallelism`
+    // pub num_tasks: u16,
+    pub task_id: TaskId,
     pub input_split: InputSplit,
 }
 
@@ -34,7 +35,7 @@ impl Label for ExecutionNode {
     fn get_label(&self) -> String {
         format!(
             "job:{}({}/{})",
-            self.job_id, self.task_number, self.num_tasks
+            self.task_id.job_id, self.task_id.task_number, self.task_id.num_tasks
         )
     }
 }
@@ -79,9 +80,11 @@ impl ExecutionGraph {
 
                 for task_number in 0..job_node.parallelism {
                     let execution_node = ExecutionNode {
-                        job_id: job_node.job_id,
-                        task_number: task_number as u16,
-                        num_tasks: job_node.parallelism as u16,
+                        task_id: TaskId {
+                            job_id: job_node.job_id,
+                            task_number: task_number as u16,
+                            num_tasks: job_node.parallelism as u16,
+                        },
                         input_split: input_splits[task_number as usize].clone(),
                     };
 

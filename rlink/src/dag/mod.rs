@@ -7,6 +7,7 @@ use crate::api::operator::StreamOperatorWrap;
 
 pub(crate) mod execution_graph;
 pub(crate) mod job_graph;
+pub(crate) mod physic_graph;
 pub(crate) mod stream_graph;
 
 use daggy::{Dag, NodeIndex, Walker};
@@ -15,6 +16,14 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::ops::Index;
 pub(crate) use stream_graph::StreamGraph;
+
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+pub(crate) struct TaskId {
+    pub(crate) job_id: u32,
+    /// total number tasks in the chain. same as `parallelism`
+    pub(crate) task_number: u16,
+    pub(crate) num_tasks: u16,
+}
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub enum OperatorType {

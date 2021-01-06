@@ -438,6 +438,7 @@ mod tests {
     use crate::api::window::SlidingEventTimeWindows;
     use crate::dag::execution_graph::ExecutionGraph;
     use crate::dag::job_graph::JobGraph;
+    use crate::dag::physic_graph::PhysicGraph;
     use crate::dag::JsonDag;
 
     #[test]
@@ -526,6 +527,10 @@ mod tests {
                 JsonDag::dag_json(dag).fill_begin_end_node().to_string()
             )
         }
+
+        let mut physic_graph = PhysicGraph::new();
+        let n = physic_graph.build(&execution_graph);
+        println!("{}", serde_json::to_string(&n).unwrap());
     }
 
     #[derive(Serialize, Deserialize, Debug)]
