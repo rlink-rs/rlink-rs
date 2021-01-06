@@ -109,23 +109,36 @@ impl ExecutionGraph {
                 job_dag.children(*job_node_index).iter(job_dag).collect();
 
             for (edge_index, child_node_index) in children {
-                let job_edge = job_dag.index(edge_index);
-                let execution_edge = match job_edge {
-                    JobEdge::InSameTask => ExecutionEdge::Memory,
-                    JobEdge::CrossTask => ExecutionEdge::Network,
-                };
-
                 let child_job_node = job_dag.index(child_node_index);
                 let child_execution_node_indies = execution_node_index_map
                     .get(&child_job_node.job_id)
                     .unwrap();
 
-                // build execution edge, parent->child cartesian product
-                for node_index in execution_node_indies {
-                    for child_node_index in child_execution_node_indies {
-                        self.dag
-                            .add_edge(*node_index, *child_node_index, execution_edge)
-                            .unwrap();
+                let job_edge = job_dag.index(edge_index);
+                match job_edge {
+                    JobEdge::InSameTask => {
+                        // build pipeline execution edge
+                        for number in 0..execution_node_indies.len() {
+                            let node_index = execution_node_indies[number];
+                            let child_node_index = child_execution_node_indies[number];
+                            self.dag
+                                .add_edge(node_index, child_node_index, ExecutionEdge::Memory)
+                                .unwrap();
+                        }
+                    }
+                    JobEdge::CrossTask => {
+                        // build cartesian product execution edge
+                        for node_index in execution_node_indies {
+                            for child_node_index in child_execution_node_indies {
+                                self.dag
+                                    .add_edge(
+                                        *node_index,
+                                        *child_node_index,
+                                        ExecutionEdge::Network,
+                                    )
+                                    .unwrap();
+                            }
+                        }
                     }
                 }
             }
