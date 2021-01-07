@@ -5,7 +5,7 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
-use bytes::{Buf, BufMut, BytesMut};
+use bytes::{Buf, BytesMut};
 use futures_util::sink::SinkExt;
 use tokio::net::tcp::ReadHalf;
 use tokio::net::TcpStream;
@@ -16,13 +16,13 @@ use tokio_util::codec::{BytesCodec, FramedWrite};
 
 use crate::api::element::{Element, Serde};
 use crate::channel::{ElementSender, TrySendError};
-use crate::dag::TaskId;
+use crate::io::network::ElementRequest;
+use crate::io::pub_sub::ChannelKey;
 use crate::metrics::{register_counter, Tag};
 use crate::net::ResponseCode;
 
 pub(crate) struct Client {
-    task_id: TaskId,
-    source_task_id: TaskId,
+    channel_key: ChannelKey,
     sender: ElementSender,
 
     pub(crate) addr: SocketAddr,
@@ -32,16 +32,14 @@ pub(crate) struct Client {
 
 impl Client {
     pub async fn new(
-        task_id: TaskId,
-        source_task_id: TaskId,
+        channel_key: ChannelKey,
         sender: ElementSender,
         addr: SocketAddr,
         batch_pull_size: u16,
     ) -> anyhow::Result<Self> {
         match TcpStream::connect(addr).await {
             Ok(stream) => Ok(Client {
-                task_id,
-                source_task_id,
+                channel_key,
                 sender,
                 addr,
                 batch_pull_size,
@@ -53,10 +51,8 @@ impl Client {
 
     pub async fn send(&mut self) -> anyhow::Result<()> {
         info!(
-            "Pull remote={}, source={:?}, target={:?}",
-            self.addr.to_string(),
-            self.source_task_id,
-            self.task_id,
+            "Pull remote={}, channel_key={:?}",
+            self.addr, self.channel_key
         );
 
         let (r, w) = self.stream.split();
@@ -68,27 +64,33 @@ impl Client {
                 .new_read(r);
 
         let tags = vec![
-            Tag("job_id".to_string(), self.task_id.job_id.to_string()),
-            Tag(
-                "partition_num".to_string(),
-                self.task_id.task_number.to_string(),
-            ),
             Tag(
                 "source_job_id".to_string(),
-                self.source_task_id.job_id.to_string(),
+                self.channel_key.source_task_id.job_id.to_string(),
+            ),
+            Tag(
+                "source_task_number".to_string(),
+                self.channel_key.source_task_id.task_number.to_string(),
+            ),
+            Tag(
+                "target_job_id".to_string(),
+                self.channel_key.target_task_id.job_id.to_string(),
+            ),
+            Tag(
+                "target_task_number".to_string(),
+                self.channel_key.target_task_id.task_number.to_string(),
             ),
         ];
         let counter = Arc::new(AtomicU64::new(0));
         register_counter("NetWorkClient", tags, counter.clone());
 
         loop {
-            let mut buffer = BytesMut::with_capacity(4 + 4 + 4 + 2 + 2);
-            buffer.put_u32(12); // 4 + 4 + 2 + 2
-            buffer.put_u32(self.source_task_id.job_id);
-            buffer.put_u32(self.task_id.job_id);
-            buffer.put_u16(self.task_id.task_number);
-            buffer.put_u16(self.batch_pull_size);
+            let request = ElementRequest {
+                channel_key: self.channel_key.clone(),
+                batch_pull_size: self.batch_pull_size,
+            };
 
+            let mut buffer: BytesMut = request.into();
             sink.send(buffer.to_bytes()).await?;
 
             loop {

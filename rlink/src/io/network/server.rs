@@ -1,5 +1,4 @@
 use std::borrow::BorrowMut;
-use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -14,7 +13,9 @@ use tokio::sync::RwLock;
 use tokio_util::codec::LengthDelimitedCodec;
 
 use crate::api::element::{Element, Serde};
-use crate::channel::ElementReceiver;
+use crate::channel::TryRecvError;
+use crate::io::network::ElementRequest;
+use crate::io::pub_sub::publisher;
 use crate::net::ResponseCode;
 use crate::utils::get_runtime;
 
@@ -23,7 +24,6 @@ pub(crate) struct Server {
     ip: String,
     bind_addr: Arc<RwLock<Option<SocketAddr>>>,
     tcp_frame_max_size: u32,
-    chain_receivers: Arc<RwLock<HashMap<u32, Vec<ElementReceiver>>>>,
 }
 
 impl Server {
@@ -32,18 +32,7 @@ impl Server {
             ip,
             bind_addr: Arc::new(RwLock::new(None)),
             tcp_frame_max_size: 1024 * 1024,
-            chain_receivers: Arc::new(RwLock::new(HashMap::new())),
         }
-    }
-
-    pub fn add_receivers_sync(&mut self, receivers: HashMap<u32, Vec<ElementReceiver>>) {
-        let mut self_clone = self.clone();
-        get_runtime().block_on(self_clone.add_receivers(receivers));
-    }
-
-    pub async fn add_receivers(&mut self, receivers: HashMap<u32, Vec<ElementReceiver>>) {
-        let mut chain_receivers = self.chain_receivers.write().await;
-        *chain_receivers = receivers;
     }
 
     pub fn get_bind_addr_sync(&self) -> Option<SocketAddr> {
@@ -137,17 +126,10 @@ impl Server {
                         debug!("tcp bytes: {:?}", bytes);
                     }
 
-                    let (job_id, target_job_id, target_task_number, batch_size) =
-                        self.frame_parse(bytes, remote_addr.ip().to_string());
+                    let batch_request = self.frame_parse(bytes, remote_addr.ip().to_string());
                     let code = ResponseCode::Ok;
                     match self
-                        .response(
-                            code,
-                            job_id,
-                            target_task_number,
-                            batch_size,
-                            codec_framed.get_mut(),
-                        )
+                        .response(code, batch_request, codec_framed.get_mut())
                         .await
                     {
                         Ok(_) => {}
@@ -180,27 +162,31 @@ impl Server {
     async fn response(
         &self,
         response_code: ResponseCode,
-        chain_id: u32,
-        partition_num: u16,
-        batch_size: u16,
+        batch_request: ElementRequest,
         framed_read: &mut tokio::net::TcpStream,
     ) -> Result<(), std::io::Error> {
         if response_code == ResponseCode::ParseErr {
             self.send(response_code, None, framed_read).await
         } else {
-            let chain_receivers = self.chain_receivers.read().await;
-            match chain_receivers.get(&chain_id) {
-                Some(receivers) => {
-                    let receiver: &ElementReceiver = receivers.get(partition_num as usize).unwrap();
-                    for _ in 0..batch_size {
+            let ElementRequest {
+                channel_key,
+                batch_pull_size,
+            } = batch_request;
+
+            match publisher::get_network_channel(&channel_key) {
+                Some(receiver) => {
+                    for _ in 0..batch_pull_size {
                         match receiver.try_recv() {
                             Ok(element) => {
                                 self.send(ResponseCode::Ok, Some(element), framed_read)
                                     .await?
                             }
-                            Err(e) => {
-                                debug!("try recv(partition_num={}) row: {}", partition_num, e);
+                            Err(TryRecvError::Empty) => {
+                                debug!("try recv channel_key({:?}) empty", channel_key);
                                 return self.send(ResponseCode::Empty, None, framed_read).await;
+                            }
+                            Err(TryRecvError::Disconnected) => {
+                                panic!(format!("channel_key({:?}) close", channel_key))
                             }
                         }
                     }
@@ -208,7 +194,7 @@ impl Server {
                         .await
                 }
                 None => {
-                    error!("chain_id({}) not found", chain_id);
+                    error!("channel_key({:?}) not found", channel_key);
                     self.send(ResponseCode::ReadErr, None, framed_read).await
                 }
             }
@@ -218,7 +204,6 @@ impl Server {
     async fn send(
         &self,
         code: ResponseCode,
-        // data: &[u8],
         element: Option<Element>,
         framed_read: &mut tokio::net::TcpStream,
     ) -> Result<(), std::io::Error> {
@@ -248,13 +233,9 @@ impl Server {
     }
 
     /// Return the `partition_num`
-    fn frame_parse(&self, mut data: BytesMut, _peer_addr: String) -> (u32, u32, u16, u16) {
-        data.advance(4); // skip header length
-        let job_id = data.get_u32();
-        let target_job_id = data.get_u32();
-        let target_task_number = data.get_u16();
-        let batch_pull_size = data.get_u16();
-        (job_id, target_job_id, target_task_number, batch_pull_size)
+    fn frame_parse(&self, mut buffer: BytesMut, _peer_addr: String) -> ElementRequest {
+        buffer.advance(4); // skip header length
+        ElementRequest::from(buffer)
     }
 
     fn sock_addr_to_str(&self, addr: &std::net::SocketAddr) -> String {
