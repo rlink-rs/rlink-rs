@@ -8,10 +8,12 @@ use std::ops::{Index, IndexMut};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum JobEdge {
+    // TODO support
+    // ReBalance = 0
     /// Forward
-    InSameTask = 1,
+    Forward = 1,
     /// Hash
-    CrossTask = 2,
+    Hash = 2,
 }
 
 impl Label for JobEdge {
@@ -97,12 +99,12 @@ impl JobGraph {
                     unimplemented!("unsupported")
                 }
 
-                JobEdge::InSameTask
+                JobEdge::Forward
             } else {
                 if job_node.parallelism == follower_job_node.parallelism {
-                    JobEdge::InSameTask
+                    JobEdge::Forward
                 } else {
-                    JobEdge::CrossTask
+                    JobEdge::Hash
                 }
             };
 

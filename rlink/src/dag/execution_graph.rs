@@ -121,7 +121,7 @@ impl ExecutionGraph {
 
                 let job_edge = job_dag.index(edge_index);
                 match job_edge {
-                    JobEdge::InSameTask => {
+                    JobEdge::Forward => {
                         // build pipeline execution edge
                         for number in 0..execution_node_indies.len() {
                             let node_index = execution_node_indies[number];
@@ -131,7 +131,7 @@ impl ExecutionGraph {
                                 .unwrap();
                         }
                     }
-                    JobEdge::CrossTask => {
+                    JobEdge::Hash => {
                         // build cartesian product execution edge
                         for node_index in execution_node_indies {
                             for child_node_index in child_execution_node_indies {
