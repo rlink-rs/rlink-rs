@@ -233,31 +233,27 @@ where
         operators: &mut HashMap<u32, StreamOperatorWrap>,
         job_id: u32,
     ) -> Option<StreamOperator<dyn KeySelectorFunction>> {
-        match dag_manager.get_parents(job_id) {
-            Some(job_nodes) => {
-                if job_nodes.len() == 0 {
-                    error!("key by not found");
-                    None
-                } else if job_nodes.len() > 1 {
-                    error!("multi key by parents");
-                    None
-                } else {
-                    let job_node = &job_nodes[0];
-                    let stream_node = job_node
-                        .stream_nodes
-                        .iter()
-                        .find(|x| x.operator_type == OperatorType::KeyBy)
-                        .unwrap();
-                    let key_by_operator = operators.remove(&stream_node.id).unwrap();
-                    if let StreamOperatorWrap::StreamKeyBy(stream_operator) = key_by_operator {
-                        Some(stream_operator)
-                    } else {
-                        error!("dependency StreamKeyBy not found");
-                        None
-                    }
-                }
+        let job_parents = dag_manager.get_job_parents(job_id);
+        if job_parents.len() == 0 {
+            error!("key by not found");
+            None
+        } else if job_parents.len() > 1 {
+            error!("multi key by parents");
+            None
+        } else {
+            let (job_node, _) = &job_parents[0];
+            let stream_node = job_node
+                .stream_nodes
+                .iter()
+                .find(|x| x.operator_type == OperatorType::KeyBy)
+                .unwrap();
+            let key_by_operator = operators.remove(&stream_node.id).unwrap();
+            if let StreamOperatorWrap::StreamKeyBy(stream_operator) = key_by_operator {
+                Some(stream_operator)
+            } else {
+                error!("dependency StreamKeyBy not found");
+                None
             }
-            None => None,
         }
     }
 }

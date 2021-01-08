@@ -27,14 +27,9 @@ where
     // info!("ExecutionGraph: {:?}", dag_manager.execution_graph().dag);
 
     let task_manager_id = context.task_manager_id.as_str();
+    // todo error check
     let task_manager_descriptors =
-        get_task_manager_descriptor(task_manager_id, &application_descriptor).expect(
-            format!(
-                "TaskManagerDescriptor(task_manager_id={}) is not found",
-                task_manager_id
-            )
-            .as_str(),
-        );
+        get_task_manager_descriptor(task_manager_id, &application_descriptor).unwrap();
 
     // todo bootstrap server
     let worker_service = network::Server::new(context.bind_ip.to_string());

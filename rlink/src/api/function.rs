@@ -4,6 +4,7 @@ use crate::api::checkpoint::{CheckpointHandle, CheckpointedFunction, FunctionSna
 use crate::api::element::{Element, Record};
 use crate::api::properties::Properties;
 use crate::api::runtime::TaskId;
+use crate::dag::execution_graph::{ExecutionEdge, ExecutionNode};
 
 /// Base class of all operators in the Rust API.
 pub trait Function {
@@ -18,6 +19,9 @@ pub struct Context {
 
     pub checkpoint_id: u64,
     pub checkpoint_handle: Option<CheckpointHandle>,
+
+    pub(crate) children: Vec<(ExecutionNode, ExecutionEdge)>,
+    pub(crate) parents: Vec<(ExecutionNode, ExecutionEdge)>,
 }
 
 impl Context {

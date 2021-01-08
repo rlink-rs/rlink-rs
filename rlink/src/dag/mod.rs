@@ -13,8 +13,8 @@ use serde::Serialize;
 use crate::api::function::InputSplit;
 use crate::api::operator::StreamOperatorWrap;
 use crate::api::runtime::TaskId;
-use crate::dag::execution_graph::ExecutionGraph;
-use crate::dag::job_graph::{JobGraph, JobNode};
+use crate::dag::execution_graph::{ExecutionEdge, ExecutionGraph, ExecutionNode};
+use crate::dag::job_graph::{JobEdge, JobGraph, JobNode};
 use crate::dag::physic_graph::PhysicGraph;
 use crate::dag::stream_graph::StreamGraph;
 
@@ -176,52 +176,22 @@ impl DagManager {
     }
 
     #[inline]
-    pub(crate) fn get_parents(&self, job_id: u32) -> Option<Vec<JobNode>> {
-        self.job_graph.get_parents(job_id)
+    pub(crate) fn get_job_parents(&self, job_id: u32) -> Vec<(JobNode, JobEdge)> {
+        self.job_graph.get_parents(job_id).unwrap_or(vec![])
     }
 
     #[inline]
-    pub(crate) fn get_children(&self, job_id: u32) -> Option<Vec<JobNode>> {
-        self.job_graph.get_children(job_id)
+    pub(crate) fn get_job_children(&self, job_id: u32) -> Vec<(JobNode, JobEdge)> {
+        self.job_graph.get_children(job_id).unwrap_or(vec![])
     }
 
-    // pub fn get_task_parents(&self, task_id: &TaskId) -> Vec<(ExecutionNode, ExecutionEdge)> {
-    //     let execution_dag = &self.execution_graph.dag;
-    //     execution_dag
-    //         .raw_edges()
-    //         .iter()
-    //         .filter_map(|edge| {
-    //             let execution_node = execution_dag.index(edge.target());
-    //             if execution_node.task_id.eq(task_id) {
-    //                 Some((
-    //                     execution_dag.index(edge.source()).clone(),
-    //                     edge.weight.clone(),
-    //                 ))
-    //             } else {
-    //                 None
-    //             }
-    //         })
-    //         .collect()
-    // }
-    //
-    // pub fn get_task_children(&self, task_id: &TaskId) -> Vec<(ExecutionNode, ExecutionEdge)> {
-    //     let execution_dag = &self.execution_graph.dag;
-    //     execution_dag
-    //         .raw_edges()
-    //         .iter()
-    //         .filter_map(|edge| {
-    //             let execution_node = execution_dag.index(edge.source());
-    //             if execution_node.task_id.eq(task_id) {
-    //                 Some((
-    //                     execution_dag.index(edge.target()).clone(),
-    //                     edge.weight.clone(),
-    //                 ))
-    //             } else {
-    //                 None
-    //             }
-    //         })
-    //         .collect()
-    // }
+    pub fn get_task_parents(&self, task_id: &TaskId) -> Vec<(ExecutionNode, ExecutionEdge)> {
+        self.execution_graph.get_parents(task_id).unwrap_or(vec![])
+    }
+
+    pub fn get_task_children(&self, task_id: &TaskId) -> Vec<(ExecutionNode, ExecutionEdge)> {
+        self.execution_graph.get_children(task_id).unwrap_or(vec![])
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

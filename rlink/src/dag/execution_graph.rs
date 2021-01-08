@@ -43,21 +43,57 @@ impl Label for ExecutionNode {
 
 #[derive(Clone, Debug)]
 pub(crate) struct ExecutionGraph {
+    pub(crate) node_indies: HashMap<TaskId, NodeIndex>,
     pub(crate) dag: Dag<ExecutionNode, ExecutionEdge>,
 }
 
 impl ExecutionGraph {
     pub fn new() -> Self {
-        ExecutionGraph { dag: Dag::new() }
+        ExecutionGraph {
+            node_indies: HashMap::new(),
+            dag: Dag::new(),
+        }
     }
 
-    // pub fn get_nodes(&self) -> Vec<ExecutionNode> {
-    //     self.dag
-    //         .raw_nodes()
-    //         .iter()
-    //         .map(|node| node.weight.clone())
-    //         .collect()
-    // }
+    pub(crate) fn get_parents(
+        &self,
+        task_id: &TaskId,
+    ) -> Option<Vec<(ExecutionNode, ExecutionEdge)>> {
+        self.node_indies.get(task_id).map(|node_index| {
+            let job_nodes: Vec<(ExecutionNode, ExecutionEdge)> = self
+                .dag
+                .parents(*node_index)
+                .iter(&self.dag)
+                .map(|(edge_index, node_index)| {
+                    (
+                        self.dag.index(node_index).clone(),
+                        self.dag.index(edge_index).clone(),
+                    )
+                })
+                .collect();
+            job_nodes
+        })
+    }
+
+    pub(crate) fn get_children(
+        &self,
+        task_id: &TaskId,
+    ) -> Option<Vec<(ExecutionNode, ExecutionEdge)>> {
+        self.node_indies.get(&task_id).map(|node_index| {
+            let job_nodes: Vec<(ExecutionNode, ExecutionEdge)> = self
+                .dag
+                .children(*node_index)
+                .iter(&self.dag)
+                .map(|(edge_index, node_index)| {
+                    (
+                        self.dag.index(node_index).clone(),
+                        self.dag.index(edge_index).clone(),
+                    )
+                })
+                .collect();
+            job_nodes
+        })
+    }
 
     pub fn build(
         &mut self,
@@ -89,16 +125,19 @@ impl ExecutionGraph {
                 }
 
                 for task_number in 0..job_node.parallelism {
+                    let task_id = TaskId {
+                        job_id: job_node.job_id,
+                        task_number: task_number as u16,
+                        num_tasks: job_node.parallelism as u16,
+                    };
                     let execution_node = ExecutionNode {
-                        task_id: TaskId {
-                            job_id: job_node.job_id,
-                            task_number: task_number as u16,
-                            num_tasks: job_node.parallelism as u16,
-                        },
+                        task_id: task_id.clone(),
                         input_split: input_splits[task_number as usize].clone(),
                     };
 
                     let node_index = self.dag.add_node(execution_node);
+                    self.node_indies.insert(task_id, node_index);
+
                     execution_node_indies
                         .entry(job_node.job_id)
                         .or_insert(Vec::new())

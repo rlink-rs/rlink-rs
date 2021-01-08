@@ -1,6 +1,7 @@
 use crate::api::runtime::TaskId;
 use crate::channel::{mb, named_bounded, ElementReceiver, ElementSender};
 use crate::metrics::Tag;
+use std::collections::HashMap;
 
 pub mod publisher;
 pub mod subscriber;
@@ -27,11 +28,11 @@ pub(crate) struct ChannelKey {
 }
 
 pub(crate) fn publish(
-    source_task_id: TaskId,
-    target_task_ids: Vec<TaskId>,
+    source_task_id: &TaskId,
+    target_task_ids: &Vec<TaskId>,
     channel_type: ChannelType,
-) -> Vec<ElementSender> {
-    let mut senders = Vec::new();
+) -> HashMap<TaskId, ElementSender> {
+    let mut senders = HashMap::new();
     for target_task_id in target_task_ids {
         let key = ChannelKey {
             source_task_id: source_task_id.clone(),
@@ -58,7 +59,7 @@ pub(crate) fn publish(
             mb(10),
         );
 
-        senders.push(sender);
+        senders.insert(target_task_id.clone(), sender);
 
         match channel_type {
             ChannelType::Memory => publisher::set_memory_channel(key, receiver),
@@ -75,8 +76,8 @@ pub(crate) struct SubKey {
 }
 
 pub(crate) fn subscribe(
-    source_task_ids: Vec<TaskId>,
-    target_task_id: TaskId,
+    source_task_ids: &Vec<TaskId>,
+    target_task_id: &TaskId,
     channel_type: ChannelType,
 ) -> ElementReceiver {
     let (sender, receiver) = named_bounded(
@@ -101,7 +102,7 @@ pub(crate) fn subscribe(
 
     for source_task_id in source_task_ids {
         let sub_key = ChannelKey {
-            source_task_id,
+            source_task_id: source_task_id.clone(),
             target_task_id: target_task_id.clone(),
         };
 

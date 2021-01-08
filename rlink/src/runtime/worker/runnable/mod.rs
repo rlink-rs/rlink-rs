@@ -26,8 +26,6 @@ pub(crate) use source_runnable::SourceRunnable;
 pub(crate) use watermark_assigner_runnable::WatermarkAssignerRunnable;
 pub(crate) use window_assigner_runnable::WindowAssignerRunnable;
 
-// pub type RunnableContext = TaskDescriptor;
-
 #[derive(Clone, Debug)]
 pub(crate) struct RunnableContext {
     pub(crate) dag_manager: DagManager,
@@ -45,6 +43,13 @@ impl RunnableContext {
             task_id: self.task_descriptor.task_id.clone(),
             checkpoint_id: self.task_descriptor.checkpoint_id,
             checkpoint_handle: self.task_descriptor.checkpoint_handle.clone(),
+
+            parents: self
+                .dag_manager
+                .get_task_parents(&self.task_descriptor.task_id),
+            children: self
+                .dag_manager
+                .get_task_children(&self.task_descriptor.task_id),
         }
     }
 
@@ -57,25 +62,29 @@ impl RunnableContext {
     }
 
     pub(crate) fn get_parent_parallelism(&self) -> u32 {
-        let ps = self.get_parents_parallelism().unwrap();
+        let ps = self.get_parents_parallelism();
         *ps.get(0).unwrap()
     }
 
-    pub(crate) fn get_parents_parallelism(&self) -> Option<Vec<u32>> {
+    pub(crate) fn get_parents_parallelism(&self) -> Vec<u32> {
         self.dag_manager
-            .get_parents(self.task_descriptor.task_id.job_id)
-            .map(|x| x.iter().map(|y| y.parallelism).collect())
+            .get_job_parents(self.task_descriptor.task_id.job_id)
+            .iter()
+            .map(|(job_node, _)| job_node.parallelism)
+            .collect()
     }
 
     pub(crate) fn get_child_parallelism(&self) -> u32 {
-        let ps = self.get_children_parallelism().unwrap();
+        let ps = self.get_children_parallelism();
         *ps.get(0).unwrap()
     }
 
-    pub(crate) fn get_children_parallelism(&self) -> Option<Vec<u32>> {
+    pub(crate) fn get_children_parallelism(&self) -> Vec<u32> {
         self.dag_manager
-            .get_children(self.task_descriptor.task_id.job_id)
-            .map(|x| x.iter().map(|y| y.parallelism).collect())
+            .get_job_children(self.task_descriptor.task_id.job_id)
+            .iter()
+            .map(|(job_node, _)| job_node.parallelism)
+            .collect()
     }
 }
 
