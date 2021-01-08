@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use crate::api::cluster::TaskResourceInfo;
-use crate::api::env_v2::{StreamExecutionEnvironment, StreamJob};
+use crate::api::env::{StreamExecutionEnvironment, StreamJob};
 use crate::deployment::local::LocalResourceManager;
 use crate::deployment::standalone::StandaloneResourceManager;
 use crate::deployment::yarn::YarnResourceManager;

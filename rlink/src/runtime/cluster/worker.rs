@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::api::env_v2::{StreamExecutionEnvironment, StreamJob};
+use crate::api::env::{StreamExecutionEnvironment, StreamJob};
 use crate::io::network;
 use crate::runtime::context::Context;
 use crate::runtime::worker::checkpoint::start_report_checkpoint;

@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use crate::api::checkpoint::CheckpointHandle;
 use crate::api::cluster::TaskResourceInfo;
-use crate::api::env_v2::{StreamExecutionEnvironment, StreamJob};
+use crate::api::env::{StreamExecutionEnvironment, StreamJob};
 use crate::api::metadata::MetadataStorageMode;
 use crate::api::properties::{Properties, SYSTEM_CLUSTER_MODE};
 use crate::dag::DagManager;

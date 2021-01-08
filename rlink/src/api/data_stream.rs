@@ -1,15 +1,17 @@
 use std::fmt::Debug;
 
+use crate::api::env::StreamManager;
 use crate::api::function::{
-    FilterFunction, InputFormat, KeySelectorFunction, MapFunction, OutputFormat, ReduceFunction,
+    CoProcessFunction, FilterFunction, InputFormat, KeySelectorFunction, MapFunction, OutputFormat,
+    ReduceFunction,
 };
 use crate::api::operator::{FunctionCreator, StreamOperatorWrap};
 use crate::api::watermark::WatermarkAssigner;
 use crate::api::window::WindowAssigner;
+use crate::dag::stream_graph::OperatorId;
+use std::rc::Rc;
 
-pub(crate) const ROOT_ID: u32 = 100;
-
-pub(crate) trait StreamGraph: Debug {
+pub(crate) trait PipelineStream: Debug {
     fn into_operators(self) -> Vec<StreamOperatorWrap>;
 }
 
@@ -22,7 +24,7 @@ pub trait TDataStream {
     where
         F: FilterFunction + 'static;
 
-    fn key_by<F>(self, key_by: F) -> KeyedStream
+    fn key_by<F>(self, key_selector: F) -> KeyedStream
     where
         F: KeySelectorFunction + 'static;
 
@@ -30,9 +32,23 @@ pub trait TDataStream {
     where
         W: WatermarkAssigner + 'static;
 
-    fn add_sink<O>(self, output_format: O) -> SinkStream
+    fn connect<F>(self, data_streams: Vec<DataStream>, f: F) -> ConnectedStreams
+    where
+        F: CoProcessFunction + 'static;
+
+    // fn multiplexing(self) -> MultiplexingStream;
+
+    fn add_sink<O>(self, output_format: O)
     where
         O: OutputFormat + 'static;
+}
+
+pub trait TConnectedStreams {
+    /// Unlike flink, the `key_by` that receives only one KeySelector,
+    /// that is, `CoProcessFunction` method output must have the same schema or with special flag.
+    fn key_by<F>(self, key_selector: F) -> KeyedStream
+    where
+        F: KeySelectorFunction + 'static;
 }
 
 pub trait TKeyedStream {
@@ -52,65 +68,98 @@ pub trait TWindowedStream {
 
 pub trait TEndStream {}
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug)]
-pub enum DataStream {
-    DefaultDataStream(DataStreamSource),
+pub struct DataStream {
+    pub(crate) data_stream: StreamBuilder,
+}
+
+impl DataStream {
+    pub(crate) fn new(data_stream: StreamBuilder) -> Self {
+        DataStream { data_stream }
+    }
 }
 
 impl TDataStream for DataStream {
-    fn map<F>(self, map: F) -> DataStream
+    fn map<F>(self, mapper: F) -> DataStream
     where
         F: MapFunction + 'static,
     {
-        match self {
-            DataStream::DefaultDataStream(data_stream) => data_stream.map(map),
-        }
+        self.data_stream.map(mapper)
     }
 
     fn filter<F>(self, filter: F) -> DataStream
     where
         F: FilterFunction + 'static,
     {
-        match self {
-            DataStream::DefaultDataStream(data_stream) => data_stream.filter(filter),
-        }
+        self.data_stream.filter(filter)
     }
 
-    fn key_by<F>(self, key_by: F) -> KeyedStream
+    fn key_by<F>(self, key_selector: F) -> KeyedStream
     where
         F: KeySelectorFunction + 'static,
     {
-        match self {
-            DataStream::DefaultDataStream(data_stream) => data_stream.key_by(key_by),
-        }
+        self.data_stream.key_by(key_selector)
     }
 
     fn assign_timestamps_and_watermarks<W>(self, timestamp_and_watermark_assigner: W) -> DataStream
     where
         W: WatermarkAssigner + 'static,
     {
-        match self {
-            DataStream::DefaultDataStream(data_stream) => {
-                data_stream.assign_timestamps_and_watermarks(timestamp_and_watermark_assigner)
-            }
-        }
+        self.data_stream
+            .assign_timestamps_and_watermarks(timestamp_and_watermark_assigner)
     }
 
-    fn add_sink<O>(self, output_format: O) -> SinkStream
+    fn connect<F>(self, data_streams: Vec<DataStream>, co_process: F) -> ConnectedStreams
+    where
+        F: CoProcessFunction + 'static,
+    {
+        self.data_stream.connect(data_streams, co_process)
+    }
+
+    fn add_sink<O>(self, output_format: O)
     where
         O: OutputFormat + 'static,
     {
-        match self {
-            DataStream::DefaultDataStream(data_stream) => {
-                TDataStream::add_sink(data_stream, output_format)
-            }
-        }
+        TDataStream::add_sink(self.data_stream, output_format)
     }
 }
 
 #[derive(Debug)]
-pub enum KeyedStream {
-    DefaultKeyedStream(DataStreamSource),
+pub struct ConnectedStreams {
+    co_stream: StreamBuilder,
+    dependency_pipeline_ids: Vec<u32>,
+}
+
+impl ConnectedStreams {
+    pub(crate) fn new(co_stream: StreamBuilder, dependency_pipeline_ids: Vec<u32>) -> Self {
+        ConnectedStreams {
+            co_stream,
+            dependency_pipeline_ids,
+        }
+    }
+}
+
+impl TConnectedStreams for ConnectedStreams {
+    fn key_by<F>(self, key_selector: F) -> KeyedStream
+    where
+        F: KeySelectorFunction + 'static,
+    {
+        self.co_stream.key_by(key_selector)
+    }
+}
+
+#[derive(Debug)]
+pub struct KeyedStream {
+    keyed_stream: StreamBuilder,
+}
+
+impl KeyedStream {
+    pub(crate) fn new(keyed_stream: StreamBuilder) -> Self {
+        KeyedStream { keyed_stream }
+    }
 }
 
 impl TKeyedStream for KeyedStream {
@@ -118,26 +167,26 @@ impl TKeyedStream for KeyedStream {
     where
         W: WindowAssigner + 'static,
     {
-        match self {
-            KeyedStream::DefaultKeyedStream(keyed_stream) => keyed_stream.window(window_assigner),
-        }
+        self.keyed_stream.window(window_assigner)
     }
 
     fn add_sink<O>(self, output_format: O) -> SinkStream
     where
         O: OutputFormat + 'static,
     {
-        match self {
-            KeyedStream::DefaultKeyedStream(keyed_stream) => {
-                TKeyedStream::add_sink(keyed_stream, output_format)
-            }
-        }
+        TKeyedStream::add_sink(self.keyed_stream, output_format)
     }
 }
 
 #[derive(Debug)]
-pub enum WindowedStream {
-    DefaultWindowedStream(DataStreamSource),
+pub struct WindowedStream {
+    windowed_stream: StreamBuilder,
+}
+
+impl WindowedStream {
+    pub(crate) fn new(windowed_stream: StreamBuilder) -> Self {
+        WindowedStream { windowed_stream }
+    }
 }
 
 impl TWindowedStream for WindowedStream {
@@ -145,107 +194,125 @@ impl TWindowedStream for WindowedStream {
     where
         F: ReduceFunction + 'static,
     {
-        match self {
-            WindowedStream::DefaultWindowedStream(windowed_stream) => {
-                windowed_stream.reduce(reduce, parallelism)
-            }
-        }
+        self.windowed_stream.reduce(reduce, parallelism)
     }
 }
 
 #[derive(Debug)]
-pub enum SinkStream {
-    DefaultEndStream(DataStreamSource),
+pub struct SinkStream {
+    end_stream: StreamBuilder,
+}
+
+impl SinkStream {
+    pub(crate) fn new(end_stream: StreamBuilder) -> Self {
+        SinkStream { end_stream }
+    }
 }
 
 impl TEndStream for SinkStream {}
 
-impl StreamGraph for SinkStream {
+impl PipelineStream for SinkStream {
     fn into_operators(self) -> Vec<StreamOperatorWrap> {
-        match self {
-            SinkStream::DefaultEndStream(end_stream) => end_stream.into_operators(),
-        }
+        self.end_stream.into_operators()
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug)]
-pub struct DataStreamSource {
+pub(crate) struct StreamBuilder {
     current_id: u32,
-    operators: Vec<StreamOperatorWrap>,
+
+    cur_operator_id: OperatorId,
+    stream_manager: Rc<StreamManager>,
 }
 
-impl DataStreamSource {
-    pub fn new(source_func: Box<dyn InputFormat>, parallelism: u32) -> Self {
-        let parent_id = ROOT_ID;
-        let id = parent_id + 1;
+impl StreamBuilder {
+    pub fn with_source(
+        stream_manager: Rc<StreamManager>,
+        source_func: Box<dyn InputFormat>,
+        parallelism: u32,
+    ) -> Self {
         let source_operator = StreamOperatorWrap::new_source(
-            id,
-            vec![parent_id],
+            0,
+            vec![],
             parallelism,
             FunctionCreator::User,
             source_func,
         );
+        let operator_id = stream_manager.add_operator(source_operator, vec![]);
 
-        DataStreamSource {
-            current_id: id,
-            operators: vec![source_operator],
+        StreamBuilder {
+            current_id: 0,
+            cur_operator_id: operator_id,
+            stream_manager,
+        }
+    }
+
+    pub fn with_connect(
+        stream_manager: Rc<StreamManager>,
+        co_process_func: Box<dyn CoProcessFunction>,
+        parent_ids: Vec<u32>,
+    ) -> Self {
+        let co_operator = StreamOperatorWrap::new_co_process(0, vec![], co_process_func);
+        let operator_id = stream_manager.add_operator(co_operator, parent_ids);
+
+        StreamBuilder {
+            current_id: 0,
+            cur_operator_id: operator_id,
+            stream_manager,
         }
     }
 }
 
-impl StreamGraph for DataStreamSource {
+impl PipelineStream for StreamBuilder {
     fn into_operators(self) -> Vec<StreamOperatorWrap> {
-        self.operators
+        unimplemented!()
     }
 }
 
-impl TDataStream for DataStreamSource {
-    fn map<F>(mut self, map: F) -> DataStream
+impl TDataStream for StreamBuilder {
+    fn map<F>(mut self, mapper: F) -> DataStream
     where
         F: MapFunction + 'static,
     {
-        let parent_id = self.current_id;
-        self.current_id += 1;
-        let id = self.current_id;
+        let map_func = Box::new(mapper);
+        let stream_map = StreamOperatorWrap::new_map(0, vec![], map_func);
 
-        let map_func = Box::new(map);
-        let stream_map = StreamOperatorWrap::new_map(id, vec![parent_id], map_func);
+        self.cur_operator_id = self
+            .stream_manager
+            .add_operator(stream_map, vec![self.cur_operator_id]);
 
-        self.operators.push(stream_map);
-
-        DataStream::DefaultDataStream(self)
+        DataStream::new(self)
     }
 
     fn filter<F>(mut self, filter: F) -> DataStream
     where
         F: FilterFunction + 'static,
     {
-        let parent_id = self.current_id;
-        self.current_id += 1;
-        let id = self.current_id;
-
         let filter_func = Box::new(filter);
-        let stream_filter = StreamOperatorWrap::new_filter(id, vec![parent_id], filter_func);
+        let stream_filter = StreamOperatorWrap::new_filter(0, vec![], filter_func);
 
-        self.operators.push(stream_filter);
+        self.cur_operator_id = self
+            .stream_manager
+            .add_operator(stream_filter, vec![self.cur_operator_id]);
 
-        DataStream::DefaultDataStream(self)
+        DataStream::new(self)
     }
 
-    fn key_by<F>(mut self, key_by: F) -> KeyedStream
+    fn key_by<F>(mut self, key_selector: F) -> KeyedStream
     where
         F: KeySelectorFunction + 'static,
     {
-        let parent_id = self.current_id;
-        self.current_id += 1;
-        let id = self.current_id;
+        let key_selector_func = Box::new(key_selector);
+        let stream_key_by = StreamOperatorWrap::new_key_by(0, vec![], key_selector_func);
 
-        let key_by_func = Box::new(key_by);
-        let stream_key_by = StreamOperatorWrap::new_key_by(id, vec![parent_id], key_by_func);
+        self.cur_operator_id = self
+            .stream_manager
+            .add_operator(stream_key_by, vec![self.cur_operator_id]);
 
-        self.operators.push(stream_key_by);
-
-        KeyedStream::DefaultKeyedStream(self)
+        KeyedStream::new(self)
     }
 
     fn assign_timestamps_and_watermarks<W>(
@@ -255,115 +322,125 @@ impl TDataStream for DataStreamSource {
     where
         W: WatermarkAssigner + 'static,
     {
-        let parent_id = self.current_id;
-        self.current_id += 1;
-        let id = self.current_id;
-
         let time_assigner_func = Box::new(timestamp_and_watermark_assigner);
         let stream_watermark_assigner =
-            StreamOperatorWrap::new_watermark_assigner(id, vec![parent_id], time_assigner_func);
+            StreamOperatorWrap::new_watermark_assigner(0, vec![], time_assigner_func);
 
-        self.operators.push(stream_watermark_assigner);
+        self.cur_operator_id = self
+            .stream_manager
+            .add_operator(stream_watermark_assigner, vec![self.cur_operator_id]);
 
-        DataStream::DefaultDataStream(self)
+        DataStream::new(self)
     }
 
-    fn add_sink<O>(mut self, output_format: O) -> SinkStream
+    fn connect<F>(self, data_streams: Vec<DataStream>, co_process: F) -> ConnectedStreams
+    where
+        F: CoProcessFunction + 'static,
+    {
+        let pipeline_stream_manager = self.stream_manager.clone();
+
+        let mut dependency_streams: Vec<StreamBuilder> =
+            data_streams.into_iter().map(|x| x.data_stream).collect();
+        dependency_streams.push(self);
+
+        let parent_ids: Vec<u32> = dependency_streams
+            .iter()
+            .map(|x| x.cur_operator_id)
+            .collect();
+
+        let co_stream = StreamBuilder::with_connect(
+            pipeline_stream_manager,
+            Box::new(co_process),
+            parent_ids.clone(),
+        );
+
+        ConnectedStreams::new(co_stream, parent_ids)
+    }
+
+    fn add_sink<O>(mut self, output_format: O)
     where
         O: OutputFormat + 'static,
     {
-        let parent_id = self.current_id;
-        self.current_id += 1;
-        let id = self.current_id;
-
         let sink_func = Box::new(output_format);
-        let stream_sink =
-            StreamOperatorWrap::new_sink(id, vec![parent_id], FunctionCreator::User, sink_func);
+        let stream_sink = StreamOperatorWrap::new_sink(0, vec![], FunctionCreator::User, sink_func);
 
-        self.operators.push(stream_sink);
-
-        SinkStream::DefaultEndStream(self)
+        self.cur_operator_id = self
+            .stream_manager
+            .add_operator(stream_sink, vec![self.cur_operator_id]);
     }
 }
 
-impl TKeyedStream for DataStreamSource {
+impl TKeyedStream for StreamBuilder {
     fn window<W>(mut self, window_assigner: W) -> WindowedStream
     where
         W: WindowAssigner + 'static,
     {
-        let parent_id = self.current_id;
-        self.current_id += 1;
-        let id = self.current_id;
-
         let window_assigner_func = Box::new(window_assigner);
         let stream_window_assigner =
-            StreamOperatorWrap::new_window_assigner(id, vec![parent_id], window_assigner_func);
+            StreamOperatorWrap::new_window_assigner(0, vec![], window_assigner_func);
 
-        self.operators.push(stream_window_assigner);
+        self.cur_operator_id = self
+            .stream_manager
+            .add_operator(stream_window_assigner, vec![self.cur_operator_id]);
 
-        WindowedStream::DefaultWindowedStream(self)
+        WindowedStream::new(self)
     }
 
     fn add_sink<O>(mut self, output_format: O) -> SinkStream
     where
         O: OutputFormat + 'static,
     {
-        let parent_id = self.current_id;
-        self.current_id += 1;
-        let id = self.current_id;
-
         let sink_func = Box::new(output_format);
-        let stream_sink =
-            StreamOperatorWrap::new_sink(id, vec![parent_id], FunctionCreator::User, sink_func);
+        let stream_sink = StreamOperatorWrap::new_sink(0, vec![], FunctionCreator::User, sink_func);
 
-        self.operators.push(stream_sink);
+        self.cur_operator_id = self
+            .stream_manager
+            .add_operator(stream_sink, vec![self.cur_operator_id]);
 
-        SinkStream::DefaultEndStream(self)
+        SinkStream::new(self)
     }
 }
 
-impl TWindowedStream for DataStreamSource {
+impl TWindowedStream for StreamBuilder {
     fn reduce<F>(mut self, reduce: F, parallelism: u32) -> DataStream
     where
         F: ReduceFunction + 'static,
     {
-        let parent_id = self.current_id;
-        self.current_id += 1;
-        let id = self.current_id;
-
         let reduce_func = Box::new(reduce);
-        let stream_reduce =
-            StreamOperatorWrap::new_reduce(id, vec![parent_id], parallelism, reduce_func);
+        let stream_reduce = StreamOperatorWrap::new_reduce(0, vec![], parallelism, reduce_func);
 
-        self.operators.push(stream_reduce);
+        self.cur_operator_id = self
+            .stream_manager
+            .add_operator(stream_reduce, vec![self.cur_operator_id]);
 
-        DataStream::DefaultDataStream(self)
+        DataStream::new(self)
     }
 }
 
-impl TEndStream for DataStreamSource {}
+impl TEndStream for StreamBuilder {}
 
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
 
-    use crate::api::data_stream::{DataStream, TDataStream, TWindowedStream};
-    use crate::api::data_stream::{DataStreamSource, TKeyedStream};
+    use crate::api::data_stream::{TConnectedStreams, TKeyedStream};
+    use crate::api::data_stream::{TDataStream, TWindowedStream};
     use crate::api::element::Record;
+    use crate::api::env::StreamExecutionEnvironment;
     use crate::api::function::{
-        Context, Function, InputFormat, InputSplit, InputSplitAssigner, InputSplitSource,
-        KeySelectorFunction, MapFunction, OutputFormat, ReduceFunction,
+        CoProcessFunction, Context, Function, InputFormat, InputSplit, InputSplitAssigner,
+        InputSplitSource, KeySelectorFunction, MapFunction, OutputFormat, ReduceFunction,
     };
     use crate::api::properties::Properties;
     use crate::api::watermark::{BoundedOutOfOrdernessTimestampExtractor, TimestampAssigner};
     use crate::api::window::SlidingEventTimeWindows;
+    use crate::dag::{DagManager, JsonDag};
 
     #[test]
     pub fn data_stream_test() {
-        let n = DataStreamSource::new(Box::new(MyInputFormat::new()), 10);
-        let data_stream = DataStream::DefaultDataStream(n);
+        let mut env = StreamExecutionEnvironment::new("job_name".to_string());
 
-        let end_stream = data_stream
+        env.register_source(MyInputFormat::new(), 100)
             .map(MyMapFunction::new())
             .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
                 Duration::from_secs(1),
@@ -378,7 +455,66 @@ mod tests {
             .reduce(MyReduceFunction::new(), 10)
             .add_sink(MyOutputFormat::new(Properties::new()));
 
-        println!("{:?}", end_stream);
+        println!("{:?}", env.stream_manager.stream_graph.borrow().dag);
+    }
+
+    #[test]
+    pub fn data_stream_connect_test() {
+        let mut env = StreamExecutionEnvironment::new("job_name".to_string());
+
+        let ds = env
+            .register_source(MyInputFormat::new(), 1)
+            .map(MyMapFunction::new())
+            .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
+                Duration::from_secs(1),
+                MyTimestampAssigner::new(),
+            ));
+
+        env.register_source(MyInputFormat::new(), 2)
+            .map(MyMapFunction::new())
+            .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
+                Duration::from_secs(1),
+                MyTimestampAssigner::new(),
+            ))
+            .connect(vec![ds], MyCoProcessFunction {})
+            .key_by(MyKeySelectorFunction::new())
+            .window(SlidingEventTimeWindows::new(
+                Duration::from_secs(60),
+                Duration::from_secs(20),
+                None,
+            ))
+            .reduce(MyReduceFunction::new(), 3)
+            .map(MyMapFunction::new())
+            .add_sink(MyOutputFormat::new(Properties::new()));
+
+        let dag_manager = DagManager::new(&env.stream_manager.stream_graph.borrow());
+        {
+            let dag = &dag_manager.stream_graph().dag;
+            println!("{:?}", dag);
+            println!(
+                "{}",
+                JsonDag::dag_json(dag).fill_begin_end_node().to_string()
+            )
+        }
+        {
+            let dag = &dag_manager.job_graph().dag;
+            println!("{:?}", dag);
+            println!(
+                "{}",
+                JsonDag::dag_json(dag).fill_begin_end_node().to_string()
+            )
+        }
+
+        {
+            let dag = &dag_manager.execution_graph().dag;
+            println!("{:?}", dag);
+            println!(
+                "{}",
+                JsonDag::dag_json(dag).fill_begin_end_node().to_string()
+            )
+        }
+
+        println!("{:?}", &dag_manager.physic_graph());
     }
 
     #[derive(Serialize, Deserialize, Debug)]
@@ -391,8 +527,12 @@ mod tests {
     }
 
     impl InputSplitSource for MyInputFormat {
-        fn create_input_splits(&self, _min_num_splits: u32) -> Vec<InputSplit> {
-            vec![]
+        fn create_input_splits(&self, min_num_splits: u32) -> Vec<InputSplit> {
+            let mut input_splits = Vec::with_capacity(min_num_splits as usize);
+            for partition_num in 0..min_num_splits {
+                input_splits.push(InputSplit::new(partition_num, Properties::new()));
+            }
+            input_splits
         }
 
         fn get_input_split_assigner(&self, input_splits: Vec<InputSplit>) -> InputSplitAssigner {
@@ -543,6 +683,24 @@ mod tests {
     impl Function for MyOutputFormat {
         fn get_name(&self) -> &str {
             "MyOutputFormat"
+        }
+    }
+
+    pub struct MyCoProcessFunction {}
+
+    impl CoProcessFunction for MyCoProcessFunction {
+        fn open(&mut self, _context: &Context) {}
+
+        fn process(&self, _stream_seq: usize, record: Record) -> Record {
+            record
+        }
+
+        fn close(&mut self) {}
+    }
+
+    impl Function for MyCoProcessFunction {
+        fn get_name(&self) -> &str {
+            "MyCoProcessFunction"
         }
     }
 }

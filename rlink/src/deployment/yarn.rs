@@ -5,7 +5,7 @@ use std::io::{BufRead, Write};
 use std::process::Stdio;
 
 use crate::api::cluster::TaskResourceInfo;
-use crate::api::env_v2::{StreamExecutionEnvironment, StreamJob};
+use crate::api::env::{StreamExecutionEnvironment, StreamJob};
 use crate::channel::{bounded, Receiver, Sender};
 use crate::deployment::ResourceManager;
 use crate::runtime::context::Context;

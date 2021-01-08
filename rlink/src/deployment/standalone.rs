@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::api::cluster::{BatchExecuteRequest, ResponseCode, StdResponse, TaskResourceInfo};
-use crate::api::env_v2::{StreamExecutionEnvironment, StreamJob};
+use crate::api::env::{StreamExecutionEnvironment, StreamJob};
 use crate::deployment::{Resource, ResourceManager};
 use crate::runtime::context::Context;
 use crate::runtime::{ApplicationDescriptor, ManagerType};

@@ -2,7 +2,7 @@ use std::borrow::BorrowMut;
 use std::time::Duration;
 
 use crate::api::element::{Element, Record};
-use crate::api::env_v2::{StreamExecutionEnvironment, StreamJob};
+use crate::api::env::{StreamExecutionEnvironment, StreamJob};
 use crate::api::function::KeySelectorFunction;
 use crate::api::operator::{StreamOperator, StreamOperatorWrap};
 use crate::dag::{DagManager, OperatorType};

@@ -3,7 +3,7 @@ use std::fmt::Display;
 use serde::export::Formatter;
 
 use crate::api::checkpoint::CheckpointHandle;
-use crate::api::env_v2::{StreamExecutionEnvironment, StreamJob};
+use crate::api::env::{StreamExecutionEnvironment, StreamJob};
 use crate::api::function::InputSplit;
 use crate::api::properties::Properties;
 use crate::dag::TaskId;
