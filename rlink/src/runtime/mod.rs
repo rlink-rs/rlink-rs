@@ -6,7 +6,7 @@ use crate::api::checkpoint::CheckpointHandle;
 use crate::api::env::{StreamExecutionEnvironment, StreamJob};
 use crate::api::function::InputSplit;
 use crate::api::properties::Properties;
-use crate::dag::TaskId;
+use crate::api::runtime::TaskId;
 use crate::utils::panic::panic_notify;
 
 pub mod cluster;

@@ -1,6 +1,7 @@
 //! DAG builder
 //! stream_graph -> job_graph -> execution_graph
 
+use std::borrow::BorrowMut;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::Debug;
@@ -9,7 +10,9 @@ use std::ops::Index;
 use daggy::{Dag, NodeIndex, Walker};
 use serde::Serialize;
 
+use crate::api::function::InputSplit;
 use crate::api::operator::StreamOperatorWrap;
+use crate::api::runtime::TaskId;
 use crate::dag::execution_graph::ExecutionGraph;
 use crate::dag::job_graph::{JobGraph, JobNode};
 use crate::dag::physic_graph::PhysicGraph;
@@ -21,17 +24,7 @@ pub(crate) mod physic_graph;
 pub(crate) mod stream_graph;
 pub(crate) mod utils;
 
-use crate::api::function::InputSplit;
-use std::borrow::BorrowMut;
 pub(crate) use stream_graph::RawStreamGraph;
-
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
-pub struct TaskId {
-    pub(crate) job_id: u32,
-    /// total number tasks in the chain. same as `parallelism`
-    pub(crate) task_number: u16,
-    pub(crate) num_tasks: u16,
-}
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub(crate) struct TaskInstance {

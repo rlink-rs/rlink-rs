@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use crate::api::checkpoint::{CheckpointHandle, CheckpointedFunction, FunctionSnapshotContext};
 use crate::api::element::{Element, Record};
 use crate::api::properties::Properties;
-use crate::dag::TaskId;
+use crate::api::runtime::TaskId;
 
 /// Base class of all operators in the Rust API.
 pub trait Function {

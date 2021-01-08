@@ -99,7 +99,6 @@ impl JobCheckpoint {
             self.latest_finish_cks
                 .extend_from_slice(finish_cks.as_slice());
 
-            // todo save checkpoint
             self.storage_checkpoint(finish_cks);
         }
     }
