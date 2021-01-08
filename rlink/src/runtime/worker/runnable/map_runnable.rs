@@ -39,12 +39,12 @@ impl Runnable for MapRunnable {
 
         let tags = vec![
             Tag(
-                "chain_id".to_string(),
-                context.task_descriptor.chain_id.to_string(),
+                "job_id".to_string(),
+                context.task_descriptor.task_id.job_id.to_string(),
             ),
             Tag(
-                "partition_num".to_string(),
-                context.task_descriptor.task_number.to_string(),
+                "task_number".to_string(),
+                context.task_descriptor.task_id.task_number.to_string(),
             ),
         ];
         let metric_name = format!("Map_{}", self.stream_map.operator_fn.as_ref().get_name());

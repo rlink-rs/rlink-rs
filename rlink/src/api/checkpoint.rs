@@ -44,7 +44,7 @@ pub struct CheckpointHandle {
 /// use for network communication between `Coordinator` and `Worker`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Checkpoint {
-    pub chain_id: ChainId,
+    pub job_id: ChainId,
     pub task_num: u16,
     pub checkpoint_id: u64,
     pub handle: CheckpointHandle,

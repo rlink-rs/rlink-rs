@@ -1,11 +1,12 @@
+use std::collections::HashMap;
+use std::ops::Index;
+
 use daggy::{Dag, EdgeIndex, NodeIndex, Walker};
 
 use crate::api::function::InputSplit;
 use crate::api::operator::StreamOperatorWrap;
 use crate::dag::job_graph::{JobEdge, JobGraph};
 use crate::dag::{DagError, Label, TaskId};
-use std::collections::HashMap;
-use std::ops::Index;
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub(crate) enum ExecutionEdge {
@@ -40,6 +41,7 @@ impl Label for ExecutionNode {
     }
 }
 
+#[derive(Clone, Debug)]
 pub(crate) struct ExecutionGraph {
     pub(crate) dag: Dag<ExecutionNode, ExecutionEdge>,
 }
@@ -49,10 +51,18 @@ impl ExecutionGraph {
         ExecutionGraph { dag: Dag::new() }
     }
 
+    // pub fn get_nodes(&self) -> Vec<ExecutionNode> {
+    //     self.dag
+    //         .raw_nodes()
+    //         .iter()
+    //         .map(|node| node.weight.clone())
+    //         .collect()
+    // }
+
     pub fn build(
         &mut self,
         job_graph: &JobGraph,
-        operators: &mut HashMap<u32, StreamOperatorWrap>,
+        operators: &mut HashMap<u32, &StreamOperatorWrap>,
     ) -> Result<(), DagError> {
         let execution_node_indies = self.build_nodes(job_graph, operators)?;
         self.build_edges(job_graph, execution_node_indies)
@@ -61,7 +71,7 @@ impl ExecutionGraph {
     pub fn build_nodes(
         &mut self,
         job_graph: &JobGraph,
-        operators: &mut HashMap<u32, StreamOperatorWrap>,
+        operators: &mut HashMap<u32, &StreamOperatorWrap>,
     ) -> Result<HashMap<u32, Vec<NodeIndex>>, DagError> {
         let job_dag = &job_graph.dag;
 

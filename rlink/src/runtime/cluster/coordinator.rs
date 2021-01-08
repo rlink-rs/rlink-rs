@@ -1,4 +1,4 @@
-use crate::api::env::{StreamExecutionEnvironment, StreamJob};
+use crate::api::env_v2::{StreamExecutionEnvironment, StreamJob};
 use crate::deployment::ResourceManager;
 use crate::runtime::context::Context;
 use crate::runtime::coordinator::CoordinatorTask;

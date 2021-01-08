@@ -1,6 +1,6 @@
 use crate::api::operator::DEFAULT_PARALLELISM;
-use crate::dag::stream_graph::{OperatorId, StreamNode};
-use crate::dag::{DagError, Label, OperatorType, StreamGraph};
+use crate::dag::stream_graph::{OperatorId, StreamGraph, StreamNode};
+use crate::dag::{utils, DagError, Label, OperatorType};
 use daggy::{Dag, EdgeIndex, NodeIndex, Walker};
 use std::cmp::max;
 use std::collections::HashMap;
@@ -54,7 +54,7 @@ impl JobNode {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct JobGraph {
     pub(crate) job_node_indies: HashMap<u32, NodeIndex>,
     pub(crate) dag: Dag<JobNode, JobEdge>,
@@ -66,6 +66,41 @@ impl JobGraph {
             job_node_indies: HashMap::new(),
             dag: Dag::new(),
         }
+    }
+
+    pub(crate) fn get_nodes(&self) -> Vec<JobNode> {
+        utils::get_nodes(&self.dag)
+    }
+
+    pub(crate) fn get_job_node(&self, job_id: u32) -> Option<JobNode> {
+        self.job_node_indies.get(&job_id).map(|node_index| {
+            let job_node = self.dag.index(*node_index);
+            job_node.clone()
+        })
+    }
+
+    pub(crate) fn get_parents(&self, job_id: u32) -> Option<Vec<JobNode>> {
+        self.job_node_indies.get(&job_id).map(|node_index| {
+            let job_nodes: Vec<JobNode> = self
+                .dag
+                .parents(*node_index)
+                .iter(&self.dag)
+                .map(|(_edge_index, node_index)| self.dag.index(node_index).clone())
+                .collect();
+            job_nodes
+        })
+    }
+
+    pub(crate) fn get_children(&self, job_id: u32) -> Option<Vec<JobNode>> {
+        self.job_node_indies.get(&job_id).map(|node_index| {
+            let job_nodes: Vec<JobNode> = self
+                .dag
+                .children(*node_index)
+                .iter(&self.dag)
+                .map(|(_edge_index, node_index)| self.dag.index(node_index).clone())
+                .collect();
+            job_nodes
+        })
     }
 
     pub fn build(&mut self, stream_graph: &StreamGraph) -> Result<(), DagError> {

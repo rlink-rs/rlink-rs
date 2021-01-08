@@ -43,9 +43,25 @@ impl Label for StreamEdge {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct StreamGraph {
-    job_name: String,
+    pub(crate) sources: Vec<NodeIndex>,
+    pub(crate) dag: Dag<StreamNode, StreamEdge>,
+}
+
+impl StreamGraph {
+    pub fn new(sources: Vec<NodeIndex>, dag: Dag<StreamNode, StreamEdge>) -> Self {
+        StreamGraph { sources, dag }
+    }
+
+    pub fn get_stream_node(&self, node_index: NodeIndex) -> &StreamNode {
+        self.dag.index(node_index)
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct RawStreamGraph {
+    application_name: String,
 
     stream_nodes: Vec<NodeIndex>,
     stream_edges: Vec<EdgeIndex>,
@@ -61,10 +77,10 @@ pub(crate) struct StreamGraph {
     pub(crate) dag: Dag<StreamNode, StreamEdge>,
 }
 
-impl StreamGraph {
-    pub fn new(job_name: String) -> Self {
-        StreamGraph {
-            job_name,
+impl RawStreamGraph {
+    pub fn new(application_name: String) -> Self {
+        RawStreamGraph {
+            application_name,
             stream_nodes: Vec::new(),
             stream_edges: Vec::new(),
             id_gen: 0,
@@ -76,9 +92,9 @@ impl StreamGraph {
         }
     }
 
-    pub fn get_stream_node(&self, node_index: NodeIndex) -> &StreamNode {
-        self.dag.index(node_index)
-    }
+    // pub fn get_stream_node(&self, node_index: NodeIndex) -> &StreamNode {
+    //     self.dag.index(node_index)
+    // }
 
     pub fn pop_operators(&mut self) -> HashMap<OperatorId, StreamOperatorWrap> {
         let operator_ids: Vec<OperatorId> = self.operators.iter().map(|(x, _)| *x).collect();
@@ -86,6 +102,18 @@ impl StreamGraph {
         let mut operators = HashMap::new();
         operator_ids.iter().for_each(|operator_id| {
             let (_, op) = self.operators.remove(operator_id).unwrap();
+            operators.insert(*operator_id, op);
+        });
+
+        operators
+    }
+
+    pub fn get_operators(&self) -> HashMap<OperatorId, &StreamOperatorWrap> {
+        let operator_ids: Vec<OperatorId> = self.operators.iter().map(|(x, _)| *x).collect();
+
+        let mut operators = HashMap::new();
+        operator_ids.iter().for_each(|operator_id| {
+            let (_, op) = self.operators.get(operator_id).unwrap();
             operators.insert(*operator_id, op);
         });
 

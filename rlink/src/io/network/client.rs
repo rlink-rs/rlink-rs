@@ -16,10 +16,9 @@ use tokio_util::codec::{BytesCodec, FramedWrite};
 
 use crate::api::element::{Element, Serde};
 use crate::channel::{ElementSender, TrySendError};
-use crate::io::network::ElementRequest;
+use crate::io::network::{ElementRequest, ResponseCode};
 use crate::io::pub_sub::ChannelKey;
 use crate::metrics::{register_counter, Tag};
-use crate::net::ResponseCode;
 
 pub(crate) struct Client {
     channel_key: ChannelKey,

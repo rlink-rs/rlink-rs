@@ -1,6 +1,10 @@
 use std::fmt::Debug;
 
+use crate::api::checkpoint::FunctionSnapshotContext;
 use crate::api::element::Element;
+use crate::runtime::worker::FunctionContext;
+use crate::runtime::{ApplicationDescriptor, TaskDescriptor};
+use crate::utils::timer::WindowTimer;
 
 pub mod co_process_runnable;
 pub mod filter_runnable;
@@ -12,11 +16,7 @@ pub mod source_runnable;
 pub mod watermark_assigner_runnable;
 pub mod window_assigner_runnable;
 
-use crate::runtime::worker::FunctionContext;
-use crate::runtime::{JobDescriptor, TaskDescriptor};
-use crate::utils::timer::WindowTimer;
-
-use crate::api::checkpoint::FunctionSnapshotContext;
+use crate::dag::DagManager;
 pub(crate) use filter_runnable::FilterRunnable;
 pub(crate) use key_by_runnable::KeyByRunnable;
 pub(crate) use map_runnable::MapRunnable;
@@ -30,22 +30,19 @@ pub(crate) use window_assigner_runnable::WindowAssignerRunnable;
 
 #[derive(Clone, Debug)]
 pub(crate) struct RunnableContext {
-    pub(crate) task_manager_id: String,
-    pub(crate) job_descriptor: JobDescriptor,
+    pub(crate) dag_manager: DagManager,
+    pub(crate) application_descriptor: ApplicationDescriptor,
     pub(crate) task_descriptor: TaskDescriptor,
     pub(crate) window_timer: WindowTimer,
 }
 
 impl RunnableContext {
     pub(crate) fn to_fun_context(&self) -> FunctionContext {
+        let coordinator_manager = &self.application_descriptor.coordinator_manager;
         FunctionContext {
-            job_id: self.job_descriptor.job_manager.job_id.clone(),
-            job_properties: self.job_descriptor.job_manager.job_properties.clone(),
+            application_id: coordinator_manager.application_id.clone(),
+            application_properties: coordinator_manager.application_properties.clone(),
             task_id: self.task_descriptor.task_id.clone(),
-            task_number: self.task_descriptor.task_number,
-            num_tasks: self.task_descriptor.num_tasks,
-            chain_id: self.task_descriptor.chain_id,
-            dependency_chain_id: self.task_descriptor.dependency_chain_id,
             checkpoint_id: self.task_descriptor.checkpoint_id,
             checkpoint_handle: self.task_descriptor.checkpoint_handle.clone(),
         }
@@ -53,10 +50,32 @@ impl RunnableContext {
 
     pub(crate) fn get_checkpoint_context(&self, checkpoint_id: u64) -> FunctionSnapshotContext {
         FunctionSnapshotContext::new(
-            self.task_descriptor.chain_id,
-            self.task_descriptor.task_number,
+            self.task_descriptor.task_id.job_id,
+            self.task_descriptor.task_id.task_number,
             checkpoint_id,
         )
+    }
+
+    pub(crate) fn get_parent_parallelism(&self) -> u32 {
+        let ps = self.get_parents_parallelism().unwrap();
+        *ps.get(0).unwrap()
+    }
+
+    pub(crate) fn get_parents_parallelism(&self) -> Option<Vec<u32>> {
+        self.dag_manager
+            .get_parents(self.task_descriptor.task_id.job_id)
+            .map(|x| x.iter().map(|y| y.parallelism).collect())
+    }
+
+    pub(crate) fn get_child_parallelism(&self) -> u32 {
+        let ps = self.get_children_parallelism().unwrap();
+        *ps.get(0).unwrap()
+    }
+
+    pub(crate) fn get_children_parallelism(&self) -> Option<Vec<u32>> {
+        self.dag_manager
+            .get_children(self.task_descriptor.task_id.job_id)
+            .map(|x| x.iter().map(|y| y.parallelism).collect())
     }
 }
 

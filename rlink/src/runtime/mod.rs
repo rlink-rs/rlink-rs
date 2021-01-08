@@ -1,12 +1,12 @@
-use std::collections::HashMap;
 use std::fmt::Display;
 
 use serde::export::Formatter;
 
 use crate::api::checkpoint::CheckpointHandle;
-use crate::api::env::{StreamExecutionEnvironment, StreamJob};
+use crate::api::env_v2::{StreamExecutionEnvironment, StreamJob};
 use crate::api::function::InputSplit;
 use crate::api::properties::Properties;
+use crate::dag::TaskId;
 use crate::utils::panic::panic_notify;
 
 pub mod cluster;
@@ -90,25 +90,17 @@ pub enum TaskManagerStatus {
     Migration = 2,
 }
 
+// todo rename to TaskDescriptor
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct TaskDescriptor {
-    pub task_id: String,
-    /// task sequence number. each chain，task sequence number start at 0.
-    pub task_number: u16,
-    /// total number tasks in the chain.
-    pub num_tasks: u16,
-    pub chain_id: u32,
-    pub dependency_chain_id: u32,
-    pub follower_chain_id: u32,
-    pub dependency_parallelism: u32,
-    pub follower_parallelism: u32,
+    pub task_id: TaskId,
     pub input_split: InputSplit,
     pub checkpoint_id: u64,
     pub checkpoint_handle: Option<CheckpointHandle>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct TaskManagerDescriptor {
+pub struct WorkerManagerDescriptor {
     pub task_status: TaskManagerStatus,
     pub latest_heart_beat_ts: u64,
     pub task_manager_id: String,
@@ -116,23 +108,23 @@ pub struct TaskManagerDescriptor {
     pub metrics_address: String,
     pub cpu_cores: u32,
     pub physical_memory: u32,
-    /// chain tasks map: <chain_id, Vec<TaskDescriptor>>
-    pub chain_tasks: HashMap<u32, Vec<TaskDescriptor>>,
+    /// job tasks map: <job_id, Vec<TaskDescriptor>>
+    pub task_descriptors: Vec<TaskDescriptor>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct JobManagerDescriptor {
-    pub job_id: String,
-    pub job_name: String,
-    pub job_properties: Properties,
+pub struct CoordinatorManagerDescriptor {
+    pub application_id: String,
+    pub application_name: String,
+    pub application_properties: Properties,
     pub coordinator_address: String,
-    pub job_status: TaskManagerStatus,
+    pub coordinator_status: TaskManagerStatus,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct JobDescriptor {
-    pub job_manager: JobManagerDescriptor,
-    pub task_managers: Vec<TaskManagerDescriptor>,
+pub struct ApplicationDescriptor {
+    pub coordinator_manager: CoordinatorManagerDescriptor,
+    pub worker_managers: Vec<WorkerManagerDescriptor>,
 }
 
 pub fn run<S>(stream_env: StreamExecutionEnvironment, stream_job: S)
@@ -141,7 +133,7 @@ where
 {
     panic_notify();
 
-    let context = context::Context::parse_node_arg(stream_env.job_name.as_str());
+    let context = context::Context::parse_node_arg(stream_env.application_name.as_str());
     info!("Context: {:?}", context);
 
     cluster::run_task(context, stream_env, stream_job);

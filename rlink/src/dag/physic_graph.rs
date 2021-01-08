@@ -1,36 +1,64 @@
 use crate::dag::execution_graph::{ExecutionEdge, ExecutionGraph, ExecutionNode};
-use crate::dag::TaskId;
+use crate::dag::{TaskId, TaskInstance, WorkerManagerInstance};
 use daggy::{EdgeIndex, NodeIndex, Walker};
 use std::collections::{HashMap, HashSet};
 use std::ops::Index;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub(crate) struct TaskGroup {
+pub(crate) struct ForwardTaskChain {
     tasks: Vec<ExecutionNode>,
 }
 
-pub(crate) struct PhysicGraph {}
+#[derive(Debug, Clone)]
+pub(crate) struct PhysicGraph {
+    /// Map key: first JobId
+    task_groups: HashMap<u32, Vec<ForwardTaskChain>>,
+}
 
 impl PhysicGraph {
     pub fn new() -> Self {
-        PhysicGraph {}
+        PhysicGraph {
+            task_groups: HashMap::new(),
+        }
     }
 
-    pub(crate) fn build(
-        &mut self,
-        execution_graph: &ExecutionGraph,
-    ) -> HashMap<u32, Vec<TaskGroup>> {
+    pub(crate) fn alloc_by_instance(&self, num_task_managers: u32) -> Vec<WorkerManagerInstance> {
+        let mut task_managers = Vec::with_capacity(num_task_managers as usize);
+        for index in 0..task_managers.capacity() {
+            task_managers.push(WorkerManagerInstance {
+                worker_manager_id: format!("worker_manager_{}", index),
+                task_instances: Vec::new(),
+            })
+        }
+
+        let mut i = 0;
+        for (_first_job_id, forward_task_chain) in &self.task_groups {
+            for chain in forward_task_chain {
+                let index = i % task_managers.len();
+                i += 1;
+                let task_manager = &mut task_managers[index];
+
+                for execution_node in &chain.tasks {
+                    task_manager.task_instances.push(TaskInstance {
+                        task_id: execution_node.task_id.clone(),
+                        input_split: execution_node.input_split.clone(),
+                    });
+                }
+            }
+        }
+
+        task_managers
+    }
+
+    pub(crate) fn build(&mut self, execution_graph: &ExecutionGraph) {
         let merge_tasks = self.merge_forward_task(execution_graph);
 
-        let mut task_groups = HashMap::new();
         for (task_id, execution_nodes) in merge_tasks {
-            let task_groups = task_groups.entry(task_id.job_id).or_insert(vec![]);
-            task_groups.push(TaskGroup {
+            let task_groups = self.task_groups.entry(task_id.job_id).or_insert(vec![]);
+            task_groups.push(ForwardTaskChain {
                 tasks: execution_nodes,
             });
         }
-
-        task_groups
     }
 
     fn merge_forward_task(

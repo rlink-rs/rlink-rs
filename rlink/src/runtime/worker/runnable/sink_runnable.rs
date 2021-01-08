@@ -31,8 +31,8 @@ impl SinkRunnable {
 
 impl Runnable for SinkRunnable {
     fn open(&mut self, context: &RunnableContext) {
-        self.task_number = context.task_descriptor.task_number;
-        self.num_tasks = context.task_descriptor.num_tasks;
+        self.task_number = context.task_descriptor.task_id.task_number;
+        self.num_tasks = context.task_descriptor.task_id.num_tasks;
 
         info!(
             "SinkRunnable Opened. task_number={}, num_tasks={}",
@@ -44,12 +44,12 @@ impl Runnable for SinkRunnable {
 
         let tags = vec![
             Tag(
-                "chain_id".to_string(),
-                context.task_descriptor.chain_id.to_string(),
+                "job_id".to_string(),
+                context.task_descriptor.task_id.job_id.to_string(),
             ),
             Tag(
-                "partition_num".to_string(),
-                context.task_descriptor.task_number.to_string(),
+                "task_number".to_string(),
+                context.task_descriptor.task_id.task_number.to_string(),
             ),
         ];
         let metric_name = format!("Sink_{}", self.stream_sink.operator_fn.as_ref().get_name());

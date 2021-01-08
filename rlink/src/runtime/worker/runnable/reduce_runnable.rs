@@ -17,7 +17,6 @@ use crate::utils::date_time::timestamp_str;
 
 #[derive(Debug)]
 pub(crate) struct ReduceRunnable {
-    task_id: Option<String>,
     task_number: u16,
     dependency_parallelism: u32,
 
@@ -46,7 +45,6 @@ impl ReduceRunnable {
         next_runnable: Option<Box<dyn Runnable>>,
     ) -> Self {
         ReduceRunnable {
-            task_id: None,
             task_number: 0,
             dependency_parallelism: 0,
             stream_key_by,
@@ -66,7 +64,6 @@ impl ReduceRunnable {
 
 impl Runnable for ReduceRunnable {
     fn open(&mut self, context: &RunnableContext) {
-        self.task_id = Some(context.task_descriptor.task_id.clone());
         self.next_runnable.as_mut().unwrap().open(context);
 
         let fun_context = context.to_fun_context();
@@ -75,38 +72,42 @@ impl Runnable for ReduceRunnable {
             .as_mut()
             .map(|s| s.operator_fn.open(&fun_context));
 
-        self.task_number = context.task_descriptor.task_number;
-        self.dependency_parallelism = context.task_descriptor.dependency_parallelism;
+        self.task_number = context.task_descriptor.task_id.task_number;
+        self.dependency_parallelism = context.get_parent_parallelism();
 
         self.watermark_align = Some(WatermarkAlign::new());
 
         info!(
             "ReduceRunnable Opened. task_number={}, num_tasks={}",
-            self.task_number, context.task_descriptor.num_tasks
+            self.task_number, context.task_descriptor.task_id.num_tasks
         );
 
         let state_mode = context
-            .job_descriptor
-            .job_manager
-            .job_properties
+            .application_descriptor
+            .coordinator_manager
+            .application_properties
             .get_keyed_state_backend()
             .unwrap_or(KeyedStateBackend::Memory);
 
         self.state = Some(WindowStateWrap::new(
-            context.job_descriptor.job_manager.job_id.clone(),
-            context.task_descriptor.chain_id,
-            context.task_descriptor.task_number,
+            context
+                .application_descriptor
+                .coordinator_manager
+                .application_id
+                .clone(),
+            context.task_descriptor.task_id.job_id,
+            context.task_descriptor.task_id.task_number,
             state_mode,
         ));
 
         let tags = vec![
             Tag(
-                "chain_id".to_string(),
-                context.task_descriptor.chain_id.to_string(),
+                "job_id".to_string(),
+                context.task_descriptor.task_id.job_id.to_string(),
             ),
             Tag(
-                "partition_num".to_string(),
-                context.task_descriptor.task_number.to_string(),
+                "task_number".to_string(),
+                context.task_descriptor.task_id.task_number.to_string(),
             ),
         ];
         let fn_name = self.stream_reduce.operator_fn.as_ref().get_name();

@@ -1,66 +1,57 @@
-use std::collections::HashMap;
-
 use crate::api::properties::Properties;
-use crate::graph::{build_physic_graph, JobGraph};
+use crate::dag::DagManager;
 use crate::runtime::context::Context;
 use crate::runtime::{
-    JobDescriptor, JobManagerDescriptor, TaskDescriptor, TaskManagerDescriptor, TaskManagerStatus,
+    ApplicationDescriptor, CoordinatorManagerDescriptor, TaskDescriptor, TaskManagerStatus,
+    WorkerManagerDescriptor,
 };
 
 pub(crate) fn build_job_descriptor(
     job_name: &str,
-    logic_plan: &JobGraph,
-    job_properties: &Properties,
+    dag_manager: &DagManager,
+    application_properties: &Properties,
     context: &Context,
-) -> JobDescriptor {
-    let physic_plan = build_physic_graph(logic_plan, context.num_task_managers);
+) -> ApplicationDescriptor {
+    let worker_instances = dag_manager
+        .physic_graph()
+        .alloc_by_instance(context.num_task_managers);
 
-    let mut task_managers = Vec::new();
-    for task_manager_instance in &physic_plan.task_manager_instances {
-        let mut chain_tasks = HashMap::new();
-        for (chain_id, task_instances) in &task_manager_instance.chain_tasks {
-            let task_descriptors: Vec<TaskDescriptor> = task_instances
-                .iter()
-                .map(|task_instance| TaskDescriptor {
-                    task_id: task_instance.task_id.clone(),
-                    task_number: task_instance.task_number,
-                    num_tasks: task_instance.num_tasks,
-                    chain_id: task_instance.chain_id,
-                    dependency_chain_id: task_instance.dependency_chain_id,
-                    follower_chain_id: task_instance.follower_chain_id,
-                    dependency_parallelism: task_instance.dependency_parallelism,
-                    follower_parallelism: task_instance.follower_parallelism,
-                    input_split: task_instance.input_split.clone(),
-                    checkpoint_id: 0,
-                    checkpoint_handle: None,
-                })
-                .collect();
-            chain_tasks.insert(chain_id.clone(), task_descriptors);
+    let mut worker_managers = Vec::new();
+    for task_manager_instance in worker_instances {
+        let mut task_descriptors = Vec::new();
+        for task_instance in &task_manager_instance.task_instances {
+            let task_descriptor = TaskDescriptor {
+                task_id: task_instance.task_id.clone(),
+                input_split: task_instance.input_split.clone(),
+                checkpoint_id: 0,
+                checkpoint_handle: None,
+            };
+            task_descriptors.push(task_descriptor);
         }
 
-        let task_manager_descriptor = TaskManagerDescriptor {
+        let task_manager_descriptor = WorkerManagerDescriptor {
             task_status: TaskManagerStatus::Pending,
             latest_heart_beat_ts: 0,
-            task_manager_id: task_manager_instance.task_manager_id.clone(),
+            task_manager_id: task_manager_instance.worker_manager_id.clone(),
             task_manager_address: "".to_string(),
             metrics_address: "".to_string(),
             cpu_cores: 0,
             physical_memory: 0,
-            chain_tasks,
+            task_descriptors,
         };
-        task_managers.push(task_manager_descriptor);
+        worker_managers.push(task_manager_descriptor);
     }
 
-    let job_manager = JobManagerDescriptor {
-        job_id: context.job_id.clone(),
-        job_name: job_name.to_string(),
-        job_properties: job_properties.clone(),
+    let job_manager = CoordinatorManagerDescriptor {
+        application_id: context.job_id.clone(),
+        application_name: job_name.to_string(),
+        application_properties: application_properties.clone(),
         coordinator_address: "".to_string(),
-        job_status: TaskManagerStatus::Pending,
+        coordinator_status: TaskManagerStatus::Pending,
     };
 
-    JobDescriptor {
-        job_manager,
-        task_managers,
+    ApplicationDescriptor {
+        coordinator_manager: job_manager,
+        worker_managers,
     }
 }

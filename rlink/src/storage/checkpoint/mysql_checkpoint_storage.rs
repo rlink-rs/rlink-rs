@@ -101,7 +101,7 @@ where cks.job_name = :job_name
             &stmt,
             params! { "job_name" => job_name, "chain_id" => chain_id },
             |(chain_id, checkpoint_id, task_num, handle)| Checkpoint {
-                chain_id,
+                job_id: chain_id,
                 task_num,
                 checkpoint_id,
                 handle: CheckpointHandle { handle },
@@ -123,9 +123,8 @@ mod tests {
     pub fn mysql_storage_test() {
         let checkpoint_id = crate::utils::date_time::current_timestamp_millis();
 
-        let mut mysql_storage = MySqlCheckpointStorage::new(
-            "mysql://rlink:123456@localhost:3304/rlink",
-        );
+        let mut mysql_storage =
+            MySqlCheckpointStorage::new("mysql://rlink:123456@localhost:3304/rlink");
         mysql_storage
             .save(
                 "abc",
@@ -134,7 +133,7 @@ mod tests {
                 checkpoint_id,
                 vec![
                     Checkpoint {
-                        chain_id: 5u32,
+                        job_id: 5u32,
                         task_num: 1,
                         checkpoint_id,
                         handle: CheckpointHandle {
@@ -142,7 +141,7 @@ mod tests {
                         },
                     },
                     Checkpoint {
-                        chain_id: 5u32,
+                        job_id: 5u32,
                         task_num: 2,
                         checkpoint_id,
                         handle: CheckpointHandle {

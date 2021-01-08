@@ -7,7 +7,9 @@ use crate::api::properties::Properties;
 pub struct SystemInputFormat {}
 
 impl InputFormat for SystemInputFormat {
-    fn open(&mut self, _input_split: InputSplit, _context: &Context) {}
+    fn open(&mut self, input_split: InputSplit, _context: &Context) {
+        let _task_number = input_split.get_split_number();
+    }
 
     fn reached_end(&self) -> bool {
         true
@@ -23,8 +25,8 @@ impl InputFormat for SystemInputFormat {
 impl InputSplitSource for SystemInputFormat {
     fn create_input_splits(&self, min_num_splits: u32) -> Vec<InputSplit> {
         let mut input_splits = Vec::with_capacity(min_num_splits as usize);
-        for partition_num in 0..min_num_splits {
-            input_splits.push(InputSplit::new(partition_num, Properties::new()));
+        for task_number in 0..min_num_splits {
+            input_splits.push(InputSplit::new(task_number, Properties::new()));
         }
         input_splits
     }

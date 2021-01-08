@@ -1,32 +1,54 @@
 //! DAG builder
 //! stream_graph -> job_graph -> execution_graph
 
+use std::collections::HashMap;
 use std::error::Error;
+use std::fmt::Debug;
+use std::ops::Index;
+
+use daggy::{Dag, NodeIndex, Walker};
+use serde::Serialize;
 
 use crate::api::operator::StreamOperatorWrap;
+use crate::dag::execution_graph::ExecutionGraph;
+use crate::dag::job_graph::{JobGraph, JobNode};
+use crate::dag::physic_graph::PhysicGraph;
+use crate::dag::stream_graph::StreamGraph;
 
 pub(crate) mod execution_graph;
 pub(crate) mod job_graph;
 pub(crate) mod physic_graph;
 pub(crate) mod stream_graph;
+pub(crate) mod utils;
 
-use daggy::{Dag, NodeIndex, Walker};
-use serde::Serialize;
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::ops::Index;
-pub(crate) use stream_graph::StreamGraph;
+use crate::api::function::InputSplit;
+use std::borrow::BorrowMut;
+pub(crate) use stream_graph::RawStreamGraph;
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
-pub(crate) struct TaskId {
+pub struct TaskId {
     pub(crate) job_id: u32,
     /// total number tasks in the chain. same as `parallelism`
     pub(crate) task_number: u16,
     pub(crate) num_tasks: u16,
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub(crate) struct TaskInstance {
+    pub task_id: TaskId,
+    pub input_split: InputSplit,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub(crate) struct WorkerManagerInstance {
+    /// build by self, format `format!("task_manager_{}", index)`
+    pub worker_manager_id: String,
+    /// chain tasks map: <chain_id, Vec<TaskInstance>>
+    pub task_instances: Vec<TaskInstance>,
+}
+
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub enum OperatorType {
+pub(crate) enum OperatorType {
     Source,
     Map,
     Filter,
@@ -103,6 +125,110 @@ impl std::fmt::Display for DagError {
 
 pub(crate) trait Label {
     fn get_label(&self) -> String;
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct DagManager {
+    stream_graph: StreamGraph,
+    job_graph: JobGraph,
+    execution_graph: ExecutionGraph,
+    physic_graph: PhysicGraph,
+}
+
+impl DagManager {
+    pub fn new(raw_stream_graph: &RawStreamGraph) -> Self {
+        let stream_graph = StreamGraph::new(
+            raw_stream_graph.sources.clone(),
+            raw_stream_graph.dag.clone(),
+        );
+
+        let mut job_graph = JobGraph::new();
+        job_graph.build(&stream_graph).unwrap();
+
+        let mut execution_graph = ExecutionGraph::new();
+        execution_graph
+            .build(&job_graph, raw_stream_graph.get_operators().borrow_mut())
+            .unwrap();
+
+        let mut physic_graph = PhysicGraph::new();
+        physic_graph.build(&execution_graph);
+
+        DagManager {
+            stream_graph,
+            job_graph,
+            execution_graph,
+            physic_graph,
+        }
+    }
+
+    pub fn stream_graph(&self) -> &StreamGraph {
+        &self.stream_graph
+    }
+
+    pub fn job_graph(&self) -> &JobGraph {
+        &self.job_graph
+    }
+
+    pub fn execution_graph(&self) -> &ExecutionGraph {
+        &self.execution_graph
+    }
+
+    pub fn physic_graph(&self) -> &PhysicGraph {
+        &self.physic_graph
+    }
+
+    #[inline]
+    pub fn get_job_node(&self, task_id: &TaskId) -> Option<JobNode> {
+        self.job_graph.get_job_node(task_id.job_id)
+    }
+
+    #[inline]
+    pub(crate) fn get_parents(&self, job_id: u32) -> Option<Vec<JobNode>> {
+        self.job_graph.get_parents(job_id)
+    }
+
+    #[inline]
+    pub(crate) fn get_children(&self, job_id: u32) -> Option<Vec<JobNode>> {
+        self.job_graph.get_children(job_id)
+    }
+
+    // pub fn get_task_parents(&self, task_id: &TaskId) -> Vec<(ExecutionNode, ExecutionEdge)> {
+    //     let execution_dag = &self.execution_graph.dag;
+    //     execution_dag
+    //         .raw_edges()
+    //         .iter()
+    //         .filter_map(|edge| {
+    //             let execution_node = execution_dag.index(edge.target());
+    //             if execution_node.task_id.eq(task_id) {
+    //                 Some((
+    //                     execution_dag.index(edge.source()).clone(),
+    //                     edge.weight.clone(),
+    //                 ))
+    //             } else {
+    //                 None
+    //             }
+    //         })
+    //         .collect()
+    // }
+    //
+    // pub fn get_task_children(&self, task_id: &TaskId) -> Vec<(ExecutionNode, ExecutionEdge)> {
+    //     let execution_dag = &self.execution_graph.dag;
+    //     execution_dag
+    //         .raw_edges()
+    //         .iter()
+    //         .filter_map(|edge| {
+    //             let execution_node = execution_dag.index(edge.source());
+    //             if execution_node.task_id.eq(task_id) {
+    //                 Some((
+    //                     execution_dag.index(edge.target()).clone(),
+    //                     edge.weight.clone(),
+    //                 ))
+    //             } else {
+    //                 None
+    //             }
+    //         })
+    //         .collect()
+    // }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

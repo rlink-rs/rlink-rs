@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt::Debug;
 
-use crate::runtime::{JobDescriptor, TaskManagerStatus};
+use crate::runtime::{ApplicationDescriptor, TaskManagerStatus};
 use crate::storage::metadata::mem_metadata_storage::MemoryMetadataStorage;
 
 pub mod mem_metadata_storage;
@@ -13,10 +13,10 @@ pub use metadata_loader::MetadataLoader;
 pub trait MetadataStorage: Debug {
     fn save_job_descriptor(
         &mut self,
-        metadata: JobDescriptor,
+        metadata: ApplicationDescriptor,
     ) -> Result<(), Box<dyn Error + Send + Sync>>;
     fn delete_job_descriptor(&mut self) -> Result<(), Box<dyn Error + Send + Sync>>;
-    fn read_job_descriptor(&self) -> Result<JobDescriptor, Box<dyn Error + Send + Sync>>;
+    fn read_job_descriptor(&self) -> Result<ApplicationDescriptor, Box<dyn Error + Send + Sync>>;
     fn update_job_status(
         &self,
         job_manager_status: TaskManagerStatus,
@@ -55,7 +55,7 @@ impl MetadataStorageWrap {
 impl MetadataStorage for MetadataStorageWrap {
     fn save_job_descriptor(
         &mut self,
-        metadata: JobDescriptor,
+        metadata: ApplicationDescriptor,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         match self {
             MetadataStorageWrap::MemoryMetadataStorage(storage) => {
@@ -73,7 +73,7 @@ impl MetadataStorage for MetadataStorageWrap {
         }
     }
 
-    fn read_job_descriptor(&self) -> Result<JobDescriptor, Box<dyn Error + Send + Sync>> {
+    fn read_job_descriptor(&self) -> Result<ApplicationDescriptor, Box<dyn Error + Send + Sync>> {
         match self {
             MetadataStorageWrap::MemoryMetadataStorage(storage) => storage.read_job_descriptor(),
             // MetadataStorageWrap::EtcdMetadataStorage(storage) => storage.read_job_descriptor(),
@@ -117,7 +117,9 @@ impl MetadataStorage for MetadataStorageWrap {
     }
 }
 
-pub(crate) fn loop_read_job_descriptor(metadata_storage: &MetadataStorageWrap) -> JobDescriptor {
+pub(crate) fn loop_read_job_descriptor(
+    metadata_storage: &MetadataStorageWrap,
+) -> ApplicationDescriptor {
     loop_fn!(
         metadata_storage.read_job_descriptor(),
         std::time::Duration::from_secs(2)
@@ -126,10 +128,10 @@ pub(crate) fn loop_read_job_descriptor(metadata_storage: &MetadataStorageWrap) -
 
 pub(crate) fn loop_save_job_descriptor(
     metadata_storage: &mut MetadataStorageWrap,
-    job_descriptor: JobDescriptor,
+    application_descriptor: ApplicationDescriptor,
 ) {
     loop_fn!(
-        metadata_storage.save_job_descriptor(job_descriptor.clone()),
+        metadata_storage.save_job_descriptor(application_descriptor.clone()),
         std::time::Duration::from_secs(2)
     );
 }

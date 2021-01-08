@@ -1,12 +1,12 @@
 use std::fmt::Debug;
 
 use crate::api::cluster::TaskResourceInfo;
-use crate::api::env::{StreamExecutionEnvironment, StreamJob};
+use crate::api::env_v2::{StreamExecutionEnvironment, StreamJob};
 use crate::deployment::local::LocalResourceManager;
 use crate::deployment::standalone::StandaloneResourceManager;
 use crate::deployment::yarn::YarnResourceManager;
 use crate::runtime::context::Context;
-use crate::runtime::{ClusterMode, JobDescriptor};
+use crate::runtime::{ApplicationDescriptor, ClusterMode};
 
 pub mod local;
 pub mod standalone;
@@ -27,7 +27,7 @@ pub(crate) trait ResourceManager
 where
     Self: Debug,
 {
-    fn prepare(&mut self, context: &Context, job_descriptor: &JobDescriptor);
+    fn prepare(&mut self, context: &Context, job_descriptor: &ApplicationDescriptor);
 
     /// worker resource allocate
     /// Return a resource location.
@@ -66,7 +66,7 @@ impl ResourceManagerWrap {
 }
 
 impl ResourceManager for ResourceManagerWrap {
-    fn prepare(&mut self, context: &Context, job_descriptor: &JobDescriptor) {
+    fn prepare(&mut self, context: &Context, job_descriptor: &ApplicationDescriptor) {
         match self {
             ResourceManagerWrap::LocalResourceManager(rm) => rm.prepare(context, job_descriptor),
             ResourceManagerWrap::StandaloneResourceManager(rm) => {

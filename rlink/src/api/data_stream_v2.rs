@@ -421,8 +421,6 @@ impl TEndStream for StreamBuilder {}
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::BorrowMut;
-    use std::ops::Deref;
     use std::time::Duration;
 
     use crate::api::data_stream_v2::{TConnectedStreams, TKeyedStream};
@@ -436,10 +434,7 @@ mod tests {
     use crate::api::properties::Properties;
     use crate::api::watermark::{BoundedOutOfOrdernessTimestampExtractor, TimestampAssigner};
     use crate::api::window::SlidingEventTimeWindows;
-    use crate::dag::execution_graph::ExecutionGraph;
-    use crate::dag::job_graph::JobGraph;
-    use crate::dag::physic_graph::PhysicGraph;
-    use crate::dag::JsonDag;
+    use crate::dag::{DagManager, JsonDag};
 
     #[test]
     pub fn data_stream_test() {
@@ -492,8 +487,17 @@ mod tests {
             .map(MyMapFunction::new())
             .add_sink(MyOutputFormat::new(Properties::new()));
 
+        let dag_manager = DagManager::new(&env.stream_manager.stream_graph.borrow());
         {
-            let dag = &env.stream_manager.stream_graph.borrow().dag;
+            let dag = &dag_manager.stream_graph().dag;
+            println!("{:?}", dag);
+            println!(
+                "{}",
+                JsonDag::dag_json(dag).fill_begin_end_node().to_string()
+            )
+        }
+        {
+            let dag = &dag_manager.job_graph().dag;
             println!("{:?}", dag);
             println!(
                 "{}",
@@ -501,12 +505,8 @@ mod tests {
             )
         }
 
-        let mut job_graph = JobGraph::new();
-        job_graph
-            .build(env.stream_manager.stream_graph.borrow().deref())
-            .unwrap();
         {
-            let dag = &job_graph.dag;
+            let dag = &dag_manager.execution_graph().dag;
             println!("{:?}", dag);
             println!(
                 "{}",
@@ -514,23 +514,7 @@ mod tests {
             )
         }
 
-        let mut operators = env.stream_manager.pop_operators();
-        let mut execution_graph = ExecutionGraph::new();
-        execution_graph
-            .build(&job_graph, operators.borrow_mut())
-            .unwrap();
-        {
-            let dag = &execution_graph.dag;
-            println!("{:?}", dag);
-            println!(
-                "{}",
-                JsonDag::dag_json(dag).fill_begin_end_node().to_string()
-            )
-        }
-
-        let mut physic_graph = PhysicGraph::new();
-        let n = physic_graph.build(&execution_graph);
-        println!("{}", serde_json::to_string(&n).unwrap());
+        println!("{:?}", &dag_manager.physic_graph());
     }
 
     #[derive(Serialize, Deserialize, Debug)]

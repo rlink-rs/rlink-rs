@@ -17,8 +17,7 @@ use crate::utils::timer::TimerChannel;
 pub(crate) struct SourceRunnable {
     context: Option<RunnableContext>,
 
-    task_id: Option<String>,
-    chain_id: u32,
+    job_id: u32,
     task_number: u16,
 
     stream_source: StreamOperator<dyn InputFormat>,
@@ -39,8 +38,7 @@ impl SourceRunnable {
         info!("Create SourceRunnable input_split={:?}", &input_split);
         SourceRunnable {
             context: None,
-            task_id: None,
-            chain_id: 0,
+            job_id: 0,
             task_number: 0,
 
             stream_source,
@@ -58,9 +56,8 @@ impl Runnable for SourceRunnable {
     fn open(&mut self, context: &RunnableContext) {
         self.context = Some(context.clone());
 
-        self.task_id = Some(context.task_descriptor.task_id.clone());
-        self.chain_id = context.task_descriptor.chain_id;
-        self.task_number = context.task_descriptor.task_number;
+        self.job_id = context.task_descriptor.task_id.job_id;
+        self.task_number = context.task_descriptor.task_id.task_number;
 
         // first open next, then open self
         self.next_runnable.as_mut().unwrap().open(context);
@@ -73,9 +70,9 @@ impl Runnable for SourceRunnable {
 
         if let FunctionCreator::User = self.stream_source.get_fn_creator() {
             let checkpoint_period = context
-                .job_descriptor
-                .job_manager
-                .job_properties
+                .application_descriptor
+                .coordinator_manager
+                .application_properties
                 .get_checkpoint_internal()
                 .unwrap_or(Duration::from_secs(30));
 
@@ -94,12 +91,12 @@ impl Runnable for SourceRunnable {
 
         let tags = vec![
             Tag(
-                "chain_id".to_string(),
-                context.task_descriptor.chain_id.to_string(),
+                "job_id".to_string(),
+                context.task_descriptor.task_id.job_id.to_string(),
             ),
             Tag(
                 "task_number".to_string(),
-                context.task_descriptor.task_number.to_string(),
+                context.task_descriptor.task_id.task_number.to_string(),
             ),
         ];
         let metric_name = format!(
@@ -213,7 +210,7 @@ impl Runnable for SourceRunnable {
             Some(checkpoint) => {
                 let ck_handle = checkpoint.snapshot_state(&context);
                 let ck = Checkpoint {
-                    chain_id: self.chain_id,
+                    job_id: self.job_id,
                     task_num: self.task_number,
                     checkpoint_id,
                     handle: ck_handle,

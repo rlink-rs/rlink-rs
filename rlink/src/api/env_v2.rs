@@ -3,7 +3,7 @@ use crate::api::function::InputFormat;
 use crate::api::operator::StreamOperatorWrap;
 use crate::api::properties::Properties;
 use crate::dag::stream_graph::OperatorId;
-use crate::dag::StreamGraph;
+use crate::dag::RawStreamGraph;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -18,21 +18,21 @@ pub trait StreamJob: Send + Sync + Clone {
     /// build job stream
     /// will invoke many times on the `Coordinator` and `Worker`
     /// ensure the method is stateless
-    fn build_stream(&self, properties: &Properties, env: &StreamExecutionEnvironment);
+    fn build_stream(&self, properties: &Properties, env: &mut StreamExecutionEnvironment);
 }
 
 #[derive(Debug)]
 pub struct StreamExecutionEnvironment {
-    pub(crate) job_name: String,
+    pub(crate) application_name: String,
 
     pub(crate) stream_manager: Rc<StreamManager>,
 }
 
 impl StreamExecutionEnvironment {
-    pub(crate) fn new(job_name: String) -> Self {
+    pub(crate) fn new(application_name: String) -> Self {
         StreamExecutionEnvironment {
-            job_name: job_name.clone(),
-            stream_manager: Rc::new(StreamManager::new(job_name)),
+            application_name: application_name.clone(),
+            stream_manager: Rc::new(StreamManager::new(application_name)),
         }
     }
 
@@ -80,13 +80,13 @@ impl IdGen {
 
 #[derive(Debug)]
 pub(crate) struct StreamManager {
-    pub(crate) stream_graph: RefCell<StreamGraph>,
+    pub(crate) stream_graph: RefCell<RawStreamGraph>,
 }
 
 impl StreamManager {
-    pub fn new(job_name: String) -> Self {
+    pub fn new(application_name: String) -> Self {
         StreamManager {
-            stream_graph: RefCell::new(StreamGraph::new(job_name)),
+            stream_graph: RefCell::new(RawStreamGraph::new(application_name)),
         }
     }
 

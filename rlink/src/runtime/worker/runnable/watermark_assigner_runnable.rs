@@ -44,17 +44,17 @@ impl Runnable for WatermarkAssignerRunnable {
     fn open(&mut self, context: &RunnableContext) {
         self.next_runnable.as_mut().unwrap().open(context);
 
-        self.task_number = context.task_descriptor.task_number;
-        self.num_tasks = context.task_descriptor.num_tasks;
+        self.task_number = context.task_descriptor.task_id.task_number;
+        self.num_tasks = context.task_descriptor.task_id.num_tasks;
 
         let tags = vec![
             Tag(
-                "chain_id".to_string(),
-                context.task_descriptor.chain_id.to_string(),
+                "job_id".to_string(),
+                context.task_descriptor.task_id.job_id.to_string(),
             ),
             Tag(
-                "partition_num".to_string(),
-                context.task_descriptor.task_number.to_string(),
+                "task_number".to_string(),
+                context.task_descriptor.task_id.task_number.to_string(),
             ),
         ];
         let fn_name = self.stream_watermark.operator_fn.as_ref().get_name();

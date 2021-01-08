@@ -2,23 +2,25 @@ use std::borrow::BorrowMut;
 use std::time::Duration;
 
 use crate::api::element::{Element, Record};
-use crate::api::env::{StreamExecutionEnvironment, StreamJob};
+use crate::api::env_v2::{StreamExecutionEnvironment, StreamJob};
 use crate::api::function::KeySelectorFunction;
 use crate::api::operator::{StreamOperator, StreamOperatorWrap};
-use crate::graph::{build_logic_plan, JobGraph, OperatorChain};
+use crate::dag::{DagManager, OperatorType};
 use crate::runtime::context::Context;
 use crate::runtime::worker::runnable::co_process_runnable::CoProcessRunnable;
 use crate::runtime::worker::runnable::{
     FilterRunnable, KeyByRunnable, MapRunnable, ReduceRunnable, Runnable, RunnableContext,
     SinkRunnable, SourceRunnable, WatermarkAssignerRunnable, WindowAssignerRunnable,
 };
-use crate::runtime::{JobDescriptor, TaskDescriptor, TaskManagerStatus};
+use crate::runtime::{ApplicationDescriptor, TaskDescriptor, TaskManagerStatus};
 use crate::storage::metadata::MetadataLoader;
 use crate::utils::timer::WindowTimer;
+use std::collections::HashMap;
+use std::ops::Deref;
 
 pub mod checkpoint;
 pub mod heart_beat;
-pub mod io;
+// pub mod io;
 pub mod runnable;
 
 pub(crate) type FunctionContext = crate::api::function::Context;
@@ -28,19 +30,21 @@ pub(crate) fn run<S>(
     mut metadata_loader: MetadataLoader,
     task_descriptor: TaskDescriptor,
     stream_job: S,
-    stream_env: StreamExecutionEnvironment,
+    stream_env: &StreamExecutionEnvironment,
     window_timer: WindowTimer,
 ) where
     S: StreamJob + 'static,
 {
+    let application_name = stream_env.application_name.clone();
     std::thread::Builder::new()
         .name(format!(
-            "TaskManager-Task-{}",
-            task_descriptor.task_id.clone()
+            "RM-Task-{}-{}",
+            task_descriptor.task_id.job_id, task_descriptor.task_id.task_number,
         ))
         .spawn(move || {
             waiting_all_task_manager_fine(metadata_loader.borrow_mut());
 
+            let stream_env = StreamExecutionEnvironment::new(application_name);
             WorkerTask::new(
                 context,
                 task_descriptor,
@@ -57,7 +61,7 @@ pub(crate) fn run<S>(
 fn waiting_all_task_manager_fine(metadata_loader: &mut MetadataLoader) {
     loop {
         let job_descriptor = metadata_loader.get_job_descriptor();
-        match job_descriptor.job_manager.job_status {
+        match job_descriptor.coordinator_manager.coordinator_status {
             TaskManagerStatus::Registered => {
                 break;
             }
@@ -73,7 +77,7 @@ where
 {
     context: Context,
     task_descriptor: TaskDescriptor,
-    job_descriptor: JobDescriptor,
+    application_descriptor: ApplicationDescriptor,
     metadata_loader: MetadataLoader,
     stream_job: S,
     stream_env: StreamExecutionEnvironment,
@@ -95,7 +99,7 @@ where
         WorkerTask {
             context,
             task_descriptor,
-            job_descriptor: metadata_loader.get_job_descriptor_from_cache(),
+            application_descriptor: metadata_loader.get_job_descriptor_from_cache(),
             metadata_loader,
             stream_job,
             stream_env,
@@ -103,22 +107,24 @@ where
         }
     }
 
-    pub fn run(self) {
-        let data_stream = self.stream_job.build_stream(
-            &self.job_descriptor.job_manager.job_properties,
-            &self.stream_env,
-        );
-        debug!("DataStream: {:?}", data_stream);
+    pub fn run(mut self) {
+        let application_properties = &self
+            .application_descriptor
+            .coordinator_manager
+            .application_properties;
+        self.stream_job
+            .build_stream(application_properties, self.stream_env.borrow_mut());
 
-        let logic_plan = build_logic_plan(data_stream, self.metadata_loader.clone());
-        debug!("Logic Plan: {:?}", logic_plan);
+        let mut raw_stream_graph = self.stream_env.stream_manager.stream_graph.borrow_mut();
+        let dag_manager = DagManager::new(raw_stream_graph.deref());
+        let operators = raw_stream_graph.pop_operators();
 
-        let mut operator_invoke_chain = self.build_invoke_chain(logic_plan);
+        let mut operator_invoke_chain = self.build_invoke_chain(&dag_manager, operators);
         debug!("Invoke: {:?}", operator_invoke_chain);
 
         let runnable_context = RunnableContext {
-            task_manager_id: self.context.task_manager_id.clone(),
-            job_descriptor: self.job_descriptor.clone(),
+            dag_manager,
+            application_descriptor: self.application_descriptor.clone(),
             task_descriptor: self.task_descriptor.clone(),
             window_timer: self.window_timer.clone(),
         };
@@ -133,20 +139,20 @@ where
         operator_invoke_chain.close();
     }
 
-    fn build_invoke_chain(&self, mut logic_plan: JobGraph) -> Box<dyn Runnable> {
-        let chain_id = self.task_descriptor.chain_id;
-        let operator_chain = logic_plan
-            .chain_map
-            .get(&chain_id)
-            .expect(format!("Chain={} is not found", chain_id).as_str())
-            .clone();
-
-        let chain_nodes = operator_chain.nodes.clone();
+    fn build_invoke_chain(
+        &self,
+        dag_manager: &DagManager,
+        mut operators: HashMap<u32, StreamOperatorWrap>,
+    ) -> Box<dyn Runnable> {
+        let job_node = dag_manager
+            .get_job_node(&self.task_descriptor.task_id)
+            .expect(format!("Job={:?} is not found", &self.task_descriptor).as_str());
 
         let mut invoke_operators = Vec::new();
-        for index in 0..chain_nodes.len() {
-            let operator_id = chain_nodes[index].node_id;
-            let invoke_operator = match logic_plan.pop_stream_operator(operator_id) {
+        for index in 0..job_node.stream_nodes.len() {
+            let operator_id = job_node.stream_nodes[index].id;
+            let operator = operators.remove(&operator_id).expect("operator not found");
+            let invoke_operator = match operator {
                 StreamOperatorWrap::StreamSource(stream_operator) => {
                     let op = SourceRunnable::new(
                         self.task_descriptor.input_split.clone(),
@@ -172,14 +178,16 @@ where
                     op
                 }
                 StreamOperatorWrap::StreamKeyBy(stream_operator) => {
-                    let partition_size = self.get_key_by_partition_size(&logic_plan, chain_id);
-                    let op = KeyByRunnable::new(stream_operator, None, partition_size);
+                    let op = KeyByRunnable::new(stream_operator, None);
                     let op: Box<dyn Runnable> = Box::new(op);
                     op
                 }
                 StreamOperatorWrap::StreamReduce(stream_operator) => {
-                    let stream_key_by = self
-                        .get_dependency_key_by(&mut logic_plan, operator_chain.dependency_chain_id);
+                    let stream_key_by = self.get_dependency_key_by(
+                        &dag_manager,
+                        operators.borrow_mut(),
+                        job_node.job_id,
+                    );
                     let op = ReduceRunnable::new(stream_key_by, stream_operator, None);
                     let op: Box<dyn Runnable> = Box::new(op);
                     op
@@ -221,45 +229,35 @@ where
 
     fn get_dependency_key_by(
         &self,
-        logic_plan: &mut JobGraph,
-        dependency_chain_id: u32,
+        dag_manager: &DagManager,
+        operators: &mut HashMap<u32, StreamOperatorWrap>,
+        job_id: u32,
     ) -> Option<StreamOperator<dyn KeySelectorFunction>> {
-        let dependency_operator_chain = logic_plan.chain_map.get(&dependency_chain_id);
-        match dependency_operator_chain {
-            Some(operator_chain) => operator_chain
-                .nodes
-                .clone()
-                .iter()
-                .find(|node| {
-                    let operator_index = node.operator_index as usize;
-                    let operator = &logic_plan.operators.get(operator_index).unwrap();
-                    operator.is_key_by()
-                })
-                .map(|node| {
-                    let key_by_operator = logic_plan.pop_stream_operator(node.node_id);
+        match dag_manager.get_parents(job_id) {
+            Some(job_nodes) => {
+                if job_nodes.len() == 0 {
+                    error!("key by not found");
+                    None
+                } else if job_nodes.len() > 1 {
+                    error!("multi key by parents");
+                    None
+                } else {
+                    let job_node = &job_nodes[0];
+                    let stream_node = job_node
+                        .stream_nodes
+                        .iter()
+                        .find(|x| x.operator_type == OperatorType::KeyBy)
+                        .unwrap();
+                    let key_by_operator = operators.remove(&stream_node.id).unwrap();
                     if let StreamOperatorWrap::StreamKeyBy(stream_operator) = key_by_operator {
-                        stream_operator
+                        Some(stream_operator)
                     } else {
-                        panic!("dependency StreamKeyBy not found")
+                        error!("dependency StreamKeyBy not found");
+                        None
                     }
-                }),
+                }
+            }
             None => None,
         }
-    }
-
-    fn get_key_by_partition_size(&self, logic_plan: &JobGraph, chain_id: u32) -> u16 {
-        self.get_next_chain(logic_plan, chain_id)
-            .expect("`KeyBy` Operator must be has the next `Chain`")
-            .parallelism as u16
-    }
-
-    fn get_next_chain(&self, logic_plan: &JobGraph, chain_id: u32) -> Option<OperatorChain> {
-        for (_chain_id, chain) in &logic_plan.chain_map {
-            if chain.dependency_chain_id == chain_id {
-                return Some(chain.clone());
-            }
-        }
-
-        None
     }
 }

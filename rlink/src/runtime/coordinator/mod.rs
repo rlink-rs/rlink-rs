@@ -3,22 +3,22 @@ use std::time::Duration;
 
 use crate::api::checkpoint::CheckpointHandle;
 use crate::api::cluster::TaskResourceInfo;
-use crate::api::env::{StreamExecutionEnvironment, StreamJob};
+use crate::api::env_v2::{StreamExecutionEnvironment, StreamJob};
 use crate::api::metadata::MetadataStorageMode;
 use crate::api::properties::{Properties, SYSTEM_CLUSTER_MODE};
+use crate::dag::DagManager;
 use crate::deployment::ResourceManager;
-use crate::graph::{build_logic_plan, JobGraph};
 use crate::runtime::context::Context;
 use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
 use crate::runtime::coordinator::server::web_launch;
 use crate::runtime::coordinator::task_distribution::build_job_descriptor;
-use crate::runtime::{JobDescriptor, TaskManagerStatus};
-use crate::storage::metadata::MetadataLoader;
+use crate::runtime::{ApplicationDescriptor, TaskManagerStatus};
 use crate::storage::metadata::{
     loop_delete_job_descriptor, loop_read_job_descriptor, loop_save_job_descriptor,
     loop_update_job_status, MetadataStorageWrap,
 };
 use crate::utils::date_time::timestamp_str;
+use std::ops::Deref;
 
 // pub mod checkpoint;
 pub mod checkpoint_manager;
@@ -68,39 +68,42 @@ where
     pub fn run(&mut self) {
         info!("coordinator start with mode {}", self.context.manager_type);
 
-        let job_properties = self.prepare_properties();
+        let application_properties = self.prepare_properties();
 
-        let data_stream = self
-            .stream_job
-            .build_stream(&job_properties, &self.stream_env);
-        info!("DataStream: {:?}", data_stream);
+        self.stream_job
+            .build_stream(&application_properties, self.stream_env.borrow_mut());
 
-        let logic_plan = build_logic_plan(data_stream, MetadataLoader::place_holder());
-        info!(
-            "Logic Plan: {}",
-            serde_json::to_string_pretty(&logic_plan).unwrap()
-        );
+        let dag_manager = {
+            let raw_stream_graph = self.stream_env.stream_manager.stream_graph.borrow();
+            DagManager::new(raw_stream_graph.deref())
+        };
+        info!("StreamGraph: {:?}", dag_manager.stream_graph().dag);
+        info!("JobGraph: {:?}", dag_manager.job_graph().dag);
+        info!("ExecutionGraph: {:?}", dag_manager.execution_graph().dag);
 
-        let mut job_descriptor = self.build_metadata(&logic_plan, &job_properties);
-        info!("JobDescriptor : {:?}", &job_descriptor);
+        let mut application_descriptor = self.build_metadata(&dag_manager, &application_properties);
+        info!("JobDescriptor : {:?}", &application_descriptor);
 
-        let ck_manager = self.build_checkpoint_manager(&logic_plan, job_descriptor.borrow_mut());
+        let ck_manager =
+            self.build_checkpoint_manager(&dag_manager, application_descriptor.borrow_mut());
         info!("CheckpointManager create");
 
-        self.web_serve(job_descriptor.borrow_mut(), ck_manager);
+        self.web_serve(application_descriptor.borrow_mut(), ck_manager);
         info!(
             "serve coordinator web ui {}",
-            &job_descriptor.job_manager.coordinator_address
+            &application_descriptor
+                .coordinator_manager
+                .coordinator_address
         );
 
         self.resource_manager
-            .prepare(&self.context, &job_descriptor);
+            .prepare(&self.context, &application_descriptor);
         info!("ResourceManager prepared");
 
         // loop restart all tasks when some task is failure
         loop {
             // save metadata to storage
-            self.save_metadata(job_descriptor.clone());
+            self.save_metadata(application_descriptor.clone());
             info!("save metadata to storage");
 
             // allocate all worker's resources
@@ -144,23 +147,26 @@ where
 
     fn build_metadata(
         &mut self,
-        logic_plan: &JobGraph,
+        dag_manager: &DagManager,
         job_properties: &Properties,
-    ) -> JobDescriptor {
-        let job_descriptor = build_job_descriptor(
-            self.stream_env.job_name.as_str(),
-            logic_plan,
+    ) -> ApplicationDescriptor {
+        let application_descriptor = build_job_descriptor(
+            self.stream_env.application_name.as_str(),
+            dag_manager,
             job_properties,
             &self.context,
         );
         // let mut metadata_storage = MetadataStorageWrap::new(&self.metadata_storage_mode);
         // loop_save_job_descriptor(metadata_storage.borrow_mut(), job_descriptor.clone());
-        job_descriptor
+        application_descriptor
     }
 
-    fn save_metadata(&self, job_descriptor: JobDescriptor) {
+    fn save_metadata(&self, application_descriptor: ApplicationDescriptor) {
         let mut metadata_storage = MetadataStorageWrap::new(&self.metadata_storage_mode);
-        loop_save_job_descriptor(metadata_storage.borrow_mut(), job_descriptor.clone());
+        loop_save_job_descriptor(
+            metadata_storage.borrow_mut(),
+            application_descriptor.clone(),
+        );
     }
 
     fn clear_metadata(&self) {
@@ -170,47 +176,56 @@ where
 
     fn build_checkpoint_manager(
         &self,
-        job_graph: &JobGraph,
-        job_descriptor: &mut JobDescriptor,
+        dag_manager: &DagManager,
+        application_descriptor: &mut ApplicationDescriptor,
     ) -> CheckpointManager {
-        let mut ck_manager = CheckpointManager::new(job_graph, &self.context, &job_descriptor);
-        let chain_checkpoints = ck_manager.load().expect("load checkpoints error");
-        if chain_checkpoints.len() == 0 {
+        let mut ck_manager =
+            CheckpointManager::new(dag_manager, &self.context, application_descriptor);
+        let job_checkpoints = ck_manager.load().expect("load checkpoints error");
+        if job_checkpoints.len() == 0 {
             return ck_manager;
         }
 
-        for task_manager_descriptor in &mut job_descriptor.task_managers {
-            for (chain_id, tasks_desc) in &mut task_manager_descriptor.chain_tasks {
-                let cks = chain_checkpoints.get(chain_id).unwrap();
+        for task_manager_descriptor in &mut application_descriptor.worker_managers {
+            for task_descriptor in &mut task_manager_descriptor.task_descriptors {
+                let cks = job_checkpoints
+                    .get(&task_descriptor.task_id.job_id)
+                    .unwrap();
                 if cks.len() == 0 {
-                    info!("chain_id {} checkpoint not found", chain_id);
+                    info!(
+                        "job_id {} checkpoint not found",
+                        task_descriptor.task_id.job_id
+                    );
                     continue;
                 }
 
-                // todo case compatible `ck.task_num != task_desc.task_number`
-                tasks_desc.iter_mut().for_each(|task_desc| {
-                    let ck = cks
-                        .iter()
-                        .find(|ck| ck.task_num == task_desc.task_number)
-                        .unwrap();
-                    task_desc.checkpoint_id = ck.checkpoint_id;
-                    task_desc.checkpoint_handle = Some(CheckpointHandle {
-                        handle: ck.handle.handle.clone(),
-                    });
+                let ck = cks
+                    .iter()
+                    .find(|ck| ck.task_num == task_descriptor.task_id.task_number)
+                    .unwrap();
+                task_descriptor.checkpoint_id = ck.checkpoint_id;
+                task_descriptor.checkpoint_handle = Some(CheckpointHandle {
+                    handle: ck.handle.handle.clone(),
                 });
-                info!("chain_id {} checkpoint loaded", chain_id);
+                info!("task_descriptor {:?} checkpoint loaded", task_descriptor);
             }
         }
 
         ck_manager
     }
 
-    fn web_serve(&self, job_descriptor: &mut JobDescriptor, checkpoint_manager: CheckpointManager) {
+    fn web_serve(
+        &self,
+        application_descriptor: &mut ApplicationDescriptor,
+        checkpoint_manager: CheckpointManager,
+    ) {
         let context = self.context.clone();
         let metadata_storage_mode = self.metadata_storage_mode.clone();
 
         let address = web_launch(context, metadata_storage_mode, checkpoint_manager);
-        job_descriptor.job_manager.coordinator_address = address;
+        application_descriptor
+            .coordinator_manager
+            .coordinator_address = address;
     }
 
     fn allocate_worker(&self) -> Vec<TaskResourceInfo> {
@@ -227,7 +242,7 @@ where
             let job_descriptor = loop_read_job_descriptor(&metadata_storage);
 
             let unregister_worker = job_descriptor
-                .task_managers
+                .worker_managers
                 .iter()
                 .find(|x| x.task_status.ne(&TaskManagerStatus::Registered));
 
@@ -237,7 +252,7 @@ where
                     TaskManagerStatus::Registered,
                 );
                 info!("all workers status fine and Job update state to `Registered`");
-                job_descriptor.task_managers.iter().for_each(|tm| {
+                job_descriptor.worker_managers.iter().for_each(|tm| {
                     info!(
                         "Registered List: `{}` registered at {}",
                         tm.task_manager_id,

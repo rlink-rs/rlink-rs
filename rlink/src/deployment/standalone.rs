@@ -1,16 +1,16 @@
 use std::collections::HashMap;
 
 use crate::api::cluster::{BatchExecuteRequest, ResponseCode, StdResponse, TaskResourceInfo};
-use crate::api::env::{StreamExecutionEnvironment, StreamJob};
+use crate::api::env_v2::{StreamExecutionEnvironment, StreamJob};
 use crate::deployment::{Resource, ResourceManager};
 use crate::runtime::context::Context;
-use crate::runtime::{JobDescriptor, ManagerType};
+use crate::runtime::{ApplicationDescriptor, ManagerType};
 use crate::utils::http_client;
 
 #[derive(Clone, Debug)]
 pub(crate) struct StandaloneResourceManager {
     context: Context,
-    job_descriptor: Option<JobDescriptor>,
+    job_descriptor: Option<ApplicationDescriptor>,
 }
 
 impl StandaloneResourceManager {
@@ -23,7 +23,7 @@ impl StandaloneResourceManager {
 }
 
 impl ResourceManager for StandaloneResourceManager {
-    fn prepare(&mut self, _context: &Context, job_descriptor: &JobDescriptor) {
+    fn prepare(&mut self, _context: &Context, job_descriptor: &ApplicationDescriptor) {
         self.job_descriptor = Some(job_descriptor.clone());
     }
 
@@ -42,7 +42,7 @@ impl ResourceManager for StandaloneResourceManager {
 
         let job_id = self.context.job_id.as_str();
         let mut task_args = Vec::new();
-        for task_manager_descriptor in &job_descriptor.task_managers {
+        for task_manager_descriptor in &job_descriptor.worker_managers {
             let resource = Resource::new(
                 task_manager_descriptor.physical_memory,
                 task_manager_descriptor.cpu_cores,
@@ -66,7 +66,10 @@ impl ResourceManager for StandaloneResourceManager {
             );
             args.insert(
                 "coordinator_address".to_string(),
-                job_descriptor.job_manager.coordinator_address.clone(),
+                job_descriptor
+                    .coordinator_manager
+                    .coordinator_address
+                    .clone(),
             );
 
             task_args.push(args);

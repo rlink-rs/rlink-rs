@@ -14,9 +14,8 @@ use tokio_util::codec::LengthDelimitedCodec;
 
 use crate::api::element::{Element, Serde};
 use crate::channel::TryRecvError;
-use crate::io::network::ElementRequest;
+use crate::io::network::{ElementRequest, ResponseCode};
 use crate::io::pub_sub::publisher;
-use crate::net::ResponseCode;
 use crate::utils::get_runtime;
 
 #[derive(Debug, Clone)]

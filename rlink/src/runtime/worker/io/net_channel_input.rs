@@ -7,7 +7,6 @@ use crate::api::function::{
 use crate::api::properties::Properties;
 use crate::channel::{mb, named_bounded, ElementReceiver, TryRecvError};
 use crate::metrics::Tag;
-use crate::net::worker_client_pool::WorkerClientPool;
 use crate::runtime::worker::io::NET_IN_CHANNEL_SIZE;
 use crate::storage::metadata::MetadataLoader;
 use crate::utils;

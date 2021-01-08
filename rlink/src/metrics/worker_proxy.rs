@@ -1,18 +1,18 @@
 use tokio::task::JoinHandle;
 
 use crate::runtime::coordinator::heart_beat::get_global_job_descriptor;
-use crate::runtime::TaskManagerDescriptor;
+use crate::runtime::WorkerManagerDescriptor;
 use crate::utils::http_client;
 
 pub(crate) async fn collect_worker_metrics() -> String {
     let job_descriptor = get_global_job_descriptor();
     match job_descriptor {
-        Some(job_descriptor) => collect_worker_metrics0(&job_descriptor.task_managers).await,
+        Some(job_descriptor) => collect_worker_metrics0(&job_descriptor.worker_managers).await,
         None => "".to_string(),
     }
 }
 
-async fn collect_worker_metrics0(workers_address: &Vec<TaskManagerDescriptor>) -> String {
+async fn collect_worker_metrics0(workers_address: &Vec<WorkerManagerDescriptor>) -> String {
     let mut result_handles = Vec::new();
     for task_manager_descriptor in workers_address {
         let addr = task_manager_descriptor.metrics_address.clone();

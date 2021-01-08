@@ -19,12 +19,14 @@ pub trait StreamJob: Send + Sync + Clone {
 
 #[derive(Debug, Clone)]
 pub struct StreamExecutionEnvironment {
-    pub(crate) job_name: String,
+    pub(crate) application_name: String,
 }
 
 impl StreamExecutionEnvironment {
-    fn new(job_name: String) -> Self {
-        StreamExecutionEnvironment { job_name }
+    fn new(application_name: &str) -> Self {
+        StreamExecutionEnvironment {
+            application_name: application_name.to_string(),
+        }
     }
 
     pub fn register_source<I>(&self, input_format: I, parallelism: u32) -> DataStream
@@ -36,10 +38,10 @@ impl StreamExecutionEnvironment {
     }
 }
 
-pub fn execute<S>(job_name: &str, stream_job: S)
+pub fn execute<S>(application_name: &str, stream_job: S)
 where
     S: StreamJob + 'static,
 {
-    let stream_env = StreamExecutionEnvironment::new(job_name.to_string());
+    let stream_env = StreamExecutionEnvironment::new(application_name);
     runtime::run(stream_env, stream_job);
 }

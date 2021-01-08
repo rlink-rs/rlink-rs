@@ -125,9 +125,7 @@ fn get_dep_task_mgr_addrs(
 ) -> Vec<(String, SocketAddr)> {
     let mut dep_task_mgr_addrs = Vec::new();
     for task_manager_descriptor in &job_descriptor.task_managers {
-        let dependency_tasks = task_manager_descriptor
-            .chain_tasks
-            .get(&dependency_chain_id);
+        let dependency_tasks = task_manager_descriptor.jobs.get(&dependency_chain_id);
 
         if dependency_tasks.is_some() {
             let task_manager_id = task_manager_descriptor.task_manager_id.as_str();
@@ -169,7 +167,7 @@ fn get_current_task_manager(
     task_number: u16,
 ) -> Option<TaskManagerDescriptor> {
     for task_manager_descriptor in &job_descriptor.task_managers {
-        if let Some(task_descriptors) = task_manager_descriptor.chain_tasks.get(&chain_id) {
+        if let Some(task_descriptors) = task_manager_descriptor.jobs.get(&chain_id) {
             for task_descriptor in task_descriptors {
                 if task_descriptor.task_number == task_number {
                     return Some(task_manager_descriptor.clone());
