@@ -4,8 +4,8 @@ use crate::api::operator::StreamOperatorWrap;
 use crate::api::properties::Properties;
 use crate::dag::stream_graph::OperatorId;
 use crate::dag::RawStreamGraph;
+use crate::runtime;
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 /// define a stream job
@@ -56,6 +56,14 @@ impl StreamExecutionEnvironment {
     // }
 }
 
+pub fn execute<S>(job_name: &str, stream_job: S)
+where
+    S: StreamJob + 'static,
+{
+    let stream_env = StreamExecutionEnvironment::new(job_name.to_string());
+    runtime::run(stream_env, stream_job);
+}
+
 pub(crate) const ROOT_ID: u32 = 100;
 
 #[derive(Debug, Clone)]
@@ -99,9 +107,5 @@ impl StreamManager {
             .borrow_mut()
             .add_operator(operator, parent_operator_ids)
             .expect("add operator error")
-    }
-
-    pub fn pop_operators(&self) -> HashMap<OperatorId, StreamOperatorWrap> {
-        self.stream_graph.borrow_mut().pop_operators()
     }
 }

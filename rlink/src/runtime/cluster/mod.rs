@@ -13,11 +13,11 @@ where
     match context.manager_type {
         ManagerType::Coordinator => {
             let resource_manager = ResourceManagerWrap::new(&context);
-            coordinator::run_task(context, stream_env, stream_job, resource_manager);
+            coordinator::run(context, stream_env, stream_job, resource_manager);
         }
         ManagerType::Standby => {}
         ManagerType::Worker => {
-            worker::run_task(context, stream_env, stream_job);
+            worker::run(context, stream_env, stream_job);
         }
     };
 }

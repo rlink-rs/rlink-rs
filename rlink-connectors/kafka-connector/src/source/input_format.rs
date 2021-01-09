@@ -52,15 +52,15 @@ impl InputFormat for KafkaInputFormat {
             .unwrap();
         if can_create_consumer.to_lowercase().eq("true") {
             let state_backend = context
-                .job_properties
+                .application_properties
                 .get_operator_state_backend()
                 .unwrap_or(OperatorStateBackend::None);
             self.state_mode = Some(state_backend);
 
             let mut kafka_checkpoint = KafkaCheckpointed::new(
-                context.job_id.clone(),
-                context.chain_id,
-                context.task_number,
+                context.application_id.clone(),
+                context.task_id.job_id(),
+                context.task_id.task_number(),
                 // self.state_mode.as_ref().unwrap().clone(),
             );
             // todo provide the data from coordinator
@@ -86,8 +86,8 @@ impl InputFormat for KafkaInputFormat {
             let handover = self.handover.as_ref().unwrap().clone();
             let partition_offsets = vec![partition_offset];
             create_kafka_consumer(
-                context.chain_id,
-                context.task_number,
+                context.task_id.job_id(),
+                context.task_id.task_number(),
                 client_config,
                 partition_offsets,
                 handover,
@@ -95,7 +95,7 @@ impl InputFormat for KafkaInputFormat {
 
             info!("start with consumer and operator mode")
         } else {
-            self.handover = get_kafka_consumer_handover(context.chain_id);
+            self.handover = get_kafka_consumer_handover(context.task_id.job_id());
 
             info!("start with follower operator mode")
         }

@@ -1,5 +1,4 @@
 use std::borrow::BorrowMut;
-use std::time::Duration;
 
 use crate::api::element::{Element, Record};
 use crate::api::env::{StreamExecutionEnvironment, StreamJob};
@@ -12,11 +11,12 @@ use crate::runtime::worker::runnable::{
     FilterRunnable, KeyByRunnable, MapRunnable, ReduceRunnable, Runnable, RunnableContext,
     SinkRunnable, SourceRunnable, WatermarkAssignerRunnable, WindowAssignerRunnable,
 };
-use crate::runtime::{ApplicationDescriptor, TaskDescriptor, TaskManagerStatus};
+use crate::runtime::{ApplicationDescriptor, TaskDescriptor};
 use crate::storage::metadata::MetadataLoader;
 use crate::utils::timer::WindowTimer;
 use std::collections::HashMap;
 use std::ops::Deref;
+use std::thread::JoinHandle;
 
 pub mod checkpoint;
 pub mod heart_beat;
@@ -27,12 +27,13 @@ pub(crate) type FunctionContext = crate::api::function::Context;
 
 pub(crate) fn run<S>(
     context: Context,
-    mut metadata_loader: MetadataLoader,
+    metadata_loader: MetadataLoader,
     task_descriptor: TaskDescriptor,
     stream_job: S,
     stream_env: &StreamExecutionEnvironment,
     window_timer: WindowTimer,
-) where
+) -> JoinHandle<()>
+where
     S: StreamJob + 'static,
 {
     let application_name = stream_env.application_name.clone();
@@ -42,8 +43,6 @@ pub(crate) fn run<S>(
             task_descriptor.task_id.job_id, task_descriptor.task_id.task_number,
         ))
         .spawn(move || {
-            waiting_all_task_manager_fine(metadata_loader.borrow_mut());
-
             let stream_env = StreamExecutionEnvironment::new(application_name);
             WorkerTask::new(
                 context,
@@ -55,19 +54,7 @@ pub(crate) fn run<S>(
             )
             .run();
         })
-        .unwrap();
-}
-
-fn waiting_all_task_manager_fine(metadata_loader: &mut MetadataLoader) {
-    loop {
-        let job_descriptor = metadata_loader.get_job_descriptor();
-        match job_descriptor.coordinator_manager.coordinator_status {
-            TaskManagerStatus::Registered => {
-                break;
-            }
-            _ => std::thread::sleep(Duration::from_secs(2)),
-        }
-    }
+        .unwrap()
 }
 
 #[derive(Debug)]

@@ -109,7 +109,7 @@ impl std::fmt::Display for ResponseCode {
     }
 }
 
-pub(crate) struct ElementResponse {}
+// pub(crate) struct ElementResponse {}
 
 pub(crate) trait ServerHandler
 where

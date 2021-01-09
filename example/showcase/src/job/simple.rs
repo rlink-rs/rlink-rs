@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use rlink::api::backend::KeyedStateBackend;
-use rlink::api::data_stream::{SinkStream, TDataStream, TKeyedStream, TWindowedStream};
+use rlink::api::data_stream::{TDataStream, TKeyedStream, TWindowedStream};
 use rlink::api::element::Record;
 use rlink::api::env::{StreamExecutionEnvironment, StreamJob};
 use rlink::api::function::{
@@ -28,11 +28,7 @@ impl StreamJob for MyStreamJob {
         properties.set_keyed_state_backend(KeyedStateBackend::Memory);
     }
 
-    fn build_stream(
-        &self,
-        properties: &Properties,
-        env: &StreamExecutionEnvironment,
-    ) -> SinkStream {
+    fn build_stream(&self, properties: &Properties, env: &mut StreamExecutionEnvironment) {
         let key_selector = ColumnBaseKeySelector::new(vec![2], DATA_TYPE.to_vec());
         let reduce_function = ColumnBaseReduceFunction::new(vec![sum_i64(5)], DATA_TYPE.to_vec());
 
@@ -59,7 +55,7 @@ impl StreamJob for MyStreamJob {
                 None,
             ))
             .reduce(reduce_function, 2)
-            .add_sink(MyOutputFormat::new(output_schema_types))
+            .add_sink(MyOutputFormat::new(output_schema_types));
     }
 }
 

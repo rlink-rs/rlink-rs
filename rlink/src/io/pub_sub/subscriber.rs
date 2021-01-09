@@ -21,11 +21,11 @@ pub(crate) fn get_memory_channel(key: &ChannelKey) -> Option<ElementSender> {
 
 pub(crate) fn set_network_channel(key: ChannelKey, sender: ElementSender) {
     let network_channels: &DashMap<ChannelKey, ElementSender> = &*NETWORK_CHANNELS;
-    network_channels.insert(key.clone(), sender);
-    client::subscribe_post(key);
+    network_channels.insert(key.clone(), sender.clone());
+    client::subscribe_post(key, sender);
 }
 
-pub(crate) fn get_network_channel(key: &ChannelKey) -> Option<ElementSender> {
-    let network_channels: &DashMap<ChannelKey, ElementSender> = &*NETWORK_CHANNELS;
-    network_channels.get(key).map(|x| x.value().clone())
-}
+// pub(crate) fn get_network_channel(key: &ChannelKey) -> Option<ElementSender> {
+//     let network_channels: &DashMap<ChannelKey, ElementSender> = &*NETWORK_CHANNELS;
+//     network_channels.get(key).map(|x| x.value().clone())
+// }
