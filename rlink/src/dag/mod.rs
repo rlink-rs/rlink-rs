@@ -289,58 +289,58 @@ where
         JsonDag { nodes, edges }
     }
 
-    pub(crate) fn fill_begin_end_node(mut self) -> Self {
-        let begin_node: JsonNode<N> = JsonNode {
-            id: "Begin".to_string(),
-            label: "Begin".to_string(),
-            ty: "begin".to_string(),
-            detail: None,
-        };
-        let end_node: JsonNode<N> = JsonNode {
-            id: "End".to_string(),
-            label: "End".to_string(),
-            ty: "end".to_string(),
-            detail: None,
-        };
-        let begin_edges: Vec<JsonEdge<E>> = self
-            .nodes
-            .iter_mut()
-            .filter(|node| node.ty.eq("begin"))
-            .map(|node| {
-                node.ty = "".to_string();
-                let edge: JsonEdge<E> = JsonEdge {
-                    source: begin_node.id.clone(),
-                    target: node.id.clone(),
-                    label: "".to_string(),
-                    detail: None,
-                };
-                edge
-            })
-            .collect();
-        let end_edges: Vec<JsonEdge<E>> = self
-            .nodes
-            .iter_mut()
-            .filter(|node| node.ty.eq("end"))
-            .map(|node| {
-                node.ty = "".to_string();
-                let edge: JsonEdge<E> = JsonEdge {
-                    source: node.id.clone(),
-                    target: end_node.id.clone(),
-                    label: "".to_string(),
-                    detail: None,
-                };
-                edge
-            })
-            .collect();
-        self.edges.extend_from_slice(begin_edges.as_slice());
-        self.edges.extend_from_slice(end_edges.as_slice());
-        self.nodes.push(begin_node);
-        self.nodes.push(end_node);
-
-        self
-    }
-
-    pub(crate) fn to_string(&self) -> String {
-        serde_json::to_string(self).unwrap_or("".to_string())
-    }
+    // pub(crate) fn fill_begin_end_node(mut self) -> Self {
+    //     let begin_node: JsonNode<N> = JsonNode {
+    //         id: "Begin".to_string(),
+    //         label: "Begin".to_string(),
+    //         ty: "begin".to_string(),
+    //         detail: None,
+    //     };
+    //     let end_node: JsonNode<N> = JsonNode {
+    //         id: "End".to_string(),
+    //         label: "End".to_string(),
+    //         ty: "end".to_string(),
+    //         detail: None,
+    //     };
+    //     let begin_edges: Vec<JsonEdge<E>> = self
+    //         .nodes
+    //         .iter_mut()
+    //         .filter(|node| node.ty.eq("begin"))
+    //         .map(|node| {
+    //             node.ty = "".to_string();
+    //             let edge: JsonEdge<E> = JsonEdge {
+    //                 source: begin_node.id.clone(),
+    //                 target: node.id.clone(),
+    //                 label: "".to_string(),
+    //                 detail: None,
+    //             };
+    //             edge
+    //         })
+    //         .collect();
+    //     let end_edges: Vec<JsonEdge<E>> = self
+    //         .nodes
+    //         .iter_mut()
+    //         .filter(|node| node.ty.eq("end"))
+    //         .map(|node| {
+    //             node.ty = "".to_string();
+    //             let edge: JsonEdge<E> = JsonEdge {
+    //                 source: node.id.clone(),
+    //                 target: end_node.id.clone(),
+    //                 label: "".to_string(),
+    //                 detail: None,
+    //             };
+    //             edge
+    //         })
+    //         .collect();
+    //     self.edges.extend_from_slice(begin_edges.as_slice());
+    //     self.edges.extend_from_slice(end_edges.as_slice());
+    //     self.nodes.push(begin_node);
+    //     self.nodes.push(end_node);
+    //
+    //     self
+    // }
+    //
+    // pub(crate) fn to_string(&self) -> String {
+    //     serde_json::to_string(self).unwrap_or("".to_string())
+    // }
 }

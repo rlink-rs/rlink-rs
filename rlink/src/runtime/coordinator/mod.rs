@@ -88,7 +88,7 @@ where
             self.build_checkpoint_manager(&dag_manager, application_descriptor.borrow_mut());
         info!("CheckpointManager create");
 
-        self.web_serve(application_descriptor.borrow_mut(), ck_manager);
+        self.web_serve(application_descriptor.borrow_mut(), ck_manager, dag_manager);
         info!(
             "serve coordinator web ui {}",
             &application_descriptor
@@ -218,11 +218,17 @@ where
         &self,
         application_descriptor: &mut ApplicationDescriptor,
         checkpoint_manager: CheckpointManager,
+        dag_manager: DagManager,
     ) {
         let context = self.context.clone();
         let metadata_storage_mode = self.metadata_storage_mode.clone();
 
-        let address = web_launch(context, metadata_storage_mode, checkpoint_manager);
+        let address = web_launch(
+            context,
+            metadata_storage_mode,
+            checkpoint_manager,
+            dag_manager,
+        );
         application_descriptor
             .coordinator_manager
             .coordinator_address = address;
