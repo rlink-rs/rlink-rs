@@ -193,8 +193,11 @@ impl Server {
                         .await
                 }
                 None => {
-                    error!("channel_key({:?}) not found", channel_key);
-                    self.send(ResponseCode::ReadErr, None, framed_read).await
+                    error!(
+                        "channel_key({:?}) not found, maybe the job haven't initialized yet",
+                        channel_key
+                    );
+                    self.send(ResponseCode::Empty, None, framed_read).await
                 }
             }
         }

@@ -1,5 +1,6 @@
 use std::borrow::BorrowMut;
 use std::net::{Shutdown, SocketAddr};
+use std::str::FromStr;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -15,10 +16,56 @@ use tokio_util::codec::LengthDelimitedCodec;
 use tokio_util::codec::{BytesCodec, FramedWrite};
 
 use crate::api::element::{Element, Serde};
-use crate::channel::{ElementSender, TrySendError};
+use crate::channel::{bounded, ElementSender, Receiver, Sender, TryRecvError, TrySendError};
 use crate::io::network::{ElementRequest, ResponseCode};
-use crate::io::pub_sub::ChannelKey;
+use crate::io::pub_sub::{subscriber, ChannelKey};
 use crate::metrics::{register_counter, Tag};
+use crate::runtime::ApplicationDescriptor;
+use crate::utils::get_runtime;
+
+lazy_static! {
+    static ref C: (Sender<ChannelKey>, Receiver<ChannelKey>) = bounded(1024);
+}
+
+pub(crate) fn subscribe_post(channel_key: ChannelKey) {
+    let c: &(Sender<ChannelKey>, Receiver<ChannelKey>) = &*C;
+    c.0.send(channel_key).unwrap()
+}
+
+pub(crate) fn run_subscribe(application_descriptor: ApplicationDescriptor) {
+    std::thread::spawn(move || {
+        get_runtime().block_on(subscribe_listen(application_descriptor));
+    });
+}
+
+async fn subscribe_listen(application_descriptor: ApplicationDescriptor) {
+    let c: &(Sender<ChannelKey>, Receiver<ChannelKey>) = &*C;
+
+    let delay = Duration::from_millis(100);
+    loop {
+        match c.1.try_recv() {
+            Ok(channel_key) => {
+                let sender = subscriber::get_network_channel(&channel_key).expect("");
+                let worker_manager_descriptor = application_descriptor
+                    .get_worker_manager(&channel_key.source_task_id)
+                    .expect("WorkerManagerDescriptor not found");
+                let addr = SocketAddr::from_str(&worker_manager_descriptor.task_manager_address)
+                    .expect("parse address error");
+
+                tokio::spawn(async move {
+                    let mut client = Client::new(channel_key, sender, addr, 6000).await.unwrap();
+                    client.send().await.unwrap();
+                });
+            }
+            Err(TryRecvError::Empty) => {
+                tokio::time::delay_for(delay).await;
+            }
+            Err(TryRecvError::Disconnected) => {}
+        }
+    }
+}
+
+pub(crate) struct ClientManager {}
 
 pub(crate) struct Client {
     channel_key: ChannelKey,

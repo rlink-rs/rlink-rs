@@ -126,7 +126,7 @@ impl RawStreamGraph {
         parent_id: u32,
         parallelism: u32,
     ) -> StreamOperatorWrap {
-        let input_format = Box::new(SystemInputFormat {});
+        let input_format = Box::new(SystemInputFormat::new());
         StreamOperatorWrap::StreamSource(StreamOperator::new(
             id,
             vec![parent_id],
@@ -142,7 +142,7 @@ impl RawStreamGraph {
         parent_id: OperatorId,
         parallelism: u32,
     ) -> StreamOperatorWrap {
-        let output_format = Box::new(SystemOutputFormat {});
+        let output_format = Box::new(SystemOutputFormat::new());
         StreamOperatorWrap::StreamSink(StreamOperator::new(
             id,
             vec![parent_id],

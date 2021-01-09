@@ -127,6 +127,20 @@ pub struct ApplicationDescriptor {
     pub worker_managers: Vec<WorkerManagerDescriptor>,
 }
 
+impl ApplicationDescriptor {
+    pub fn get_worker_manager(&self, task_id: &TaskId) -> Option<&WorkerManagerDescriptor> {
+        self.worker_managers
+            .iter()
+            .find(|worker_manager_descriptor| {
+                worker_manager_descriptor
+                    .task_descriptors
+                    .iter()
+                    .find(|task_descriptor| task_descriptor.task_id.eq(task_id))
+                    .is_some()
+            })
+    }
+}
+
 pub fn run<S>(stream_env: StreamExecutionEnvironment, stream_job: S)
 where
     S: StreamJob + 'static,

@@ -1,4 +1,4 @@
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub struct TaskId {
     pub(crate) job_id: u32,
     /// total number tasks in the chain. same as `parallelism`

@@ -1,12 +1,25 @@
-use crate::api::element::Record;
+use crate::api::element::{Element, Record};
 use crate::api::function::{
     Context, Function, InputFormat, InputSplit, InputSplitAssigner, InputSplitSource,
 };
 use crate::api::properties::Properties;
+use crate::channel::{ElementReceiver, TryRecvError};
 use crate::dag::execution_graph::ExecutionEdge;
 use crate::io::pub_sub::{subscribe, ChannelType};
 
-pub struct SystemInputFormat {}
+pub struct SystemInputFormat {
+    memory_receiver: Option<ElementReceiver>,
+    network_receiver: Option<ElementReceiver>,
+}
+
+impl SystemInputFormat {
+    pub fn new() -> Self {
+        SystemInputFormat {
+            memory_receiver: None,
+            network_receiver: None,
+        }
+    }
+}
 
 impl InputFormat for SystemInputFormat {
     fn open(&mut self, input_split: InputSplit, context: &Context) {
@@ -23,19 +36,47 @@ impl InputFormat for SystemInputFormat {
             });
 
         if memory_jobs.len() > 0 {
-            let n = subscribe(&memory_jobs, &context.task_id, ChannelType::Memory);
+            let rx = subscribe(&memory_jobs, &context.task_id, ChannelType::Memory);
+            self.memory_receiver = Some(rx);
         }
         if network_jobs.len() > 0 {
-            let n = subscribe(&network_jobs, &context.task_id, ChannelType::Network);
+            let rx = subscribe(&network_jobs, &context.task_id, ChannelType::Network);
+            self.network_receiver = Some(rx);
         }
     }
 
     fn reached_end(&self) -> bool {
-        true
+        false
     }
 
     fn next_record(&mut self) -> Option<Record> {
         None
+    }
+
+    fn next_element(&mut self) -> Option<Element> {
+        match &self.network_receiver {
+            Some(network_receiver) => match network_receiver.try_recv() {
+                Ok(element) => {
+                    return Some(element);
+                }
+                Err(TryRecvError::Empty) => {}
+                Err(TryRecvError::Disconnected) => {
+                    panic!("network_receiver Disconnected");
+                }
+            },
+            None => {}
+        }
+
+        match &self.memory_receiver {
+            Some(memory_receiver) => match memory_receiver.try_recv() {
+                Ok(element) => Some(element),
+                Err(TryRecvError::Empty) => None,
+                Err(TryRecvError::Disconnected) => {
+                    panic!("memory_receiver Disconnected");
+                }
+            },
+            None => None,
+        }
     }
 
     fn close(&mut self) {}
