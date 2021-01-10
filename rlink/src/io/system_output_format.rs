@@ -3,7 +3,7 @@ use crate::api::function::{Context, Function, OutputFormat};
 use crate::api::runtime::TaskId;
 use crate::channel::ElementSender;
 use crate::dag::execution_graph::ExecutionEdge;
-use crate::io::pub_sub::{publish, ChannelType};
+use crate::io::{memory, network, ChannelType};
 use std::collections::HashMap;
 use std::time::Duration;
 
@@ -46,18 +46,19 @@ impl OutputFormat for SystemOutputFormat {
         if memory_jobs.len() > 0 {
             self.channel_type = ChannelType::Memory;
 
-            let task_senders = publish(&context.task_id, &memory_jobs, self.channel_type);
+            let task_senders = memory::publish(&context.task_id, &memory_jobs);
 
             let mut job_senders = HashMap::new();
-            for (task_id, sender) in task_senders {
-                if context.task_id.task_number != task_id.task_number {
+            for (channel_key, sender) in task_senders {
+                let target_task_id = channel_key.target_task_id;
+                if context.task_id.task_number != target_task_id.task_number {
                     panic!("the task `task_number` conflict in memory channel");
                 }
 
                 job_senders
-                    .entry(task_id.job_id)
+                    .entry(target_task_id.job_id)
                     .or_insert(Vec::new())
-                    .push((task_id, sender));
+                    .push((target_task_id, sender));
             }
 
             for (job_id, senders) in job_senders {
@@ -69,22 +70,23 @@ impl OutputFormat for SystemOutputFormat {
         }
 
         if network_jobs.len() > 0 {
-            self.channel_type = ChannelType::Memory;
-            let task_senders = publish(&context.task_id, &network_jobs, self.channel_type);
+            self.channel_type = ChannelType::Network;
+            let task_senders = network::publish(&context.task_id, &network_jobs);
 
-            let child_parallelism = task_senders[0].0.num_tasks;
+            let child_parallelism = task_senders[0].0.target_task_id.num_tasks;
 
             // group by `job_id`
             let mut job_senders = HashMap::new();
-            for (task_id, sender) in task_senders {
-                if child_parallelism != task_id.num_tasks {
+            for (channel_key, sender) in task_senders {
+                let target_task_id = channel_key.target_task_id;
+                if child_parallelism != target_task_id.num_tasks {
                     panic!("the task `num_tasks` conflict in network channel");
                 }
 
                 job_senders
-                    .entry(task_id.job_id)
+                    .entry(target_task_id.job_id)
                     .or_insert(Vec::new())
-                    .push((task_id, sender));
+                    .push((target_task_id, sender));
             }
 
             for (job_id, mut task_senders) in job_senders {

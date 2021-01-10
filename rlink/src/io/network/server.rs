@@ -5,6 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use bytes::{Buf, BufMut, BytesMut};
+use dashmap::DashMap;
 use futures::{SinkExt, StreamExt};
 use rand::prelude::*;
 use tokio::net::TcpListener;
@@ -13,10 +14,64 @@ use tokio::sync::RwLock;
 use tokio_util::codec::LengthDelimitedCodec;
 
 use crate::api::element::{Element, Serde};
-use crate::channel::TryRecvError;
+use crate::api::runtime::TaskId;
+use crate::channel::{mb, named_bounded, ElementReceiver, ElementSender, TryRecvError};
 use crate::io::network::{ElementRequest, ResponseCode};
-use crate::io::pub_sub::publisher;
+use crate::io::ChannelKey;
+use crate::metrics::Tag;
 use crate::utils::get_runtime;
+
+lazy_static! {
+    static ref NETWORK_CHANNELS: DashMap<ChannelKey, ElementReceiver> = DashMap::new();
+}
+
+pub(crate) fn publish(
+    source_task_id: &TaskId,
+    target_task_ids: &Vec<TaskId>,
+) -> Vec<(ChannelKey, ElementSender)> {
+    let mut senders = Vec::new();
+    for target_task_id in target_task_ids {
+        let channel_key = ChannelKey {
+            source_task_id: source_task_id.clone(),
+            target_task_id: target_task_id.clone(),
+        };
+
+        let (sender, receiver) = named_bounded(
+            "Network_Publish",
+            vec![
+                Tag::new(
+                    "source_job_id".to_string(),
+                    source_task_id.job_id.to_string(),
+                ),
+                Tag::new(
+                    "target_job_id".to_string(),
+                    target_task_id.job_id.to_string(),
+                ),
+                Tag::new(
+                    "target_task_number".to_string(),
+                    target_task_id.task_number.to_string(),
+                ),
+            ],
+            100000,
+            mb(10),
+        );
+
+        senders.push((channel_key.clone(), sender));
+        set_network_channel(channel_key, receiver);
+    }
+
+    senders
+}
+
+fn set_network_channel(key: ChannelKey, sender: ElementReceiver) {
+    let network_channels: &DashMap<ChannelKey, ElementReceiver> = &*NETWORK_CHANNELS;
+    network_channels.insert(key, sender);
+}
+
+fn get_network_channel(key: &ChannelKey) -> Option<ElementReceiver> {
+    let network_channels: &DashMap<ChannelKey, ElementReceiver> = &*NETWORK_CHANNELS;
+    network_channels.get(key).map(|x| x.value().clone())
+}
 
 #[derive(Debug, Clone)]
 pub(crate) struct Server {
@@ -172,7 +227,7 @@ impl Server {
                 batch_pull_size,
             } = batch_request;
 
-            match publisher::get_network_channel(&channel_key) {
+            match get_network_channel(&channel_key) {
                 Some(receiver) => {
                     for _ in 0..batch_pull_size {
                         match receiver.try_recv() {

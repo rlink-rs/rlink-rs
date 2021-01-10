@@ -82,7 +82,7 @@ fn bootstrap_publish_serve(bind_ip: String) -> SocketAddr {
 fn bootstrap_subscribe_client(application_descriptor: &ApplicationDescriptor) {
     let application_descriptor = application_descriptor.clone();
     utils::spawn("subscribe_client", move || {
-        network::client::run_subscribe(application_descriptor)
+        network::run_subscribe(application_descriptor)
     });
 }
 

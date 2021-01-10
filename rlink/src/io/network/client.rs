@@ -16,9 +16,13 @@ use tokio_util::codec::LengthDelimitedCodec;
 use tokio_util::codec::{BytesCodec, FramedWrite};
 
 use crate::api::element::{Element, Serde};
-use crate::channel::{bounded, ElementSender, Receiver, Sender, TryRecvError, TrySendError};
+use crate::api::runtime::TaskId;
+use crate::channel::{
+    bounded, mb, named_bounded, ElementReceiver, ElementSender, Receiver, Sender, TryRecvError,
+    TrySendError,
+};
 use crate::io::network::{ElementRequest, ResponseCode};
-use crate::io::pub_sub::ChannelKey;
+use crate::io::ChannelKey;
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::ApplicationDescriptor;
 use crate::utils::get_runtime;
@@ -30,7 +34,40 @@ lazy_static! {
     ) = bounded(1024);
 }
 
-pub(crate) fn subscribe_post(channel_key: ChannelKey, sender: ElementSender) {
+pub(crate) fn subscribe(source_task_ids: &Vec<TaskId>, target_task_id: &TaskId) -> ElementReceiver {
+    let (sender, receiver) = named_bounded(
+        "NetworkSubscribe",
+        vec![
+            Tag::new(
+                "source_job_id".to_string(),
+                source_task_ids[0].job_id.to_string(),
+            ),
+            Tag::new(
+                "target_job_id".to_string(),
+                target_task_id.job_id.to_string(),
+            ),
+            Tag::new(
+                "target_task_number".to_string(),
+                target_task_id.task_number.to_string(),
+            ),
+        ],
+        100000,
+        mb(10),
+    );
+
+    for source_task_id in source_task_ids {
+        let sub_key = ChannelKey {
+            source_task_id: source_task_id.clone(),
+            target_task_id: target_task_id.clone(),
+        };
+
+        subscribe_post(sub_key, sender.clone());
+    }
+
+    receiver
+}
+
+fn subscribe_post(channel_key: ChannelKey, sender: ElementSender) {
     let c: &(
         Sender<(ChannelKey, ElementSender)>,
         Receiver<(ChannelKey, ElementSender)>,

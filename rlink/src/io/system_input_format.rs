@@ -5,7 +5,7 @@ use crate::api::function::{
 use crate::api::properties::Properties;
 use crate::channel::{ElementReceiver, TryRecvError};
 use crate::dag::execution_graph::ExecutionEdge;
-use crate::io::pub_sub::{subscribe, ChannelType};
+use crate::io::{memory, network};
 
 pub struct SystemInputFormat {
     memory_receiver: Option<ElementReceiver>,
@@ -36,11 +36,11 @@ impl InputFormat for SystemInputFormat {
             });
 
         if memory_jobs.len() > 0 {
-            let rx = subscribe(&memory_jobs, &context.task_id, ChannelType::Memory);
+            let rx = memory::subscribe(&memory_jobs, &context.task_id);
             self.memory_receiver = Some(rx);
         }
         if network_jobs.len() > 0 {
-            let rx = subscribe(&network_jobs, &context.task_id, ChannelType::Network);
+            let rx = network::subscribe(&network_jobs, &context.task_id);
             self.network_receiver = Some(rx);
         }
     }
