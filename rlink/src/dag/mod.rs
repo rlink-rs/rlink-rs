@@ -340,7 +340,7 @@ where
     //     self
     // }
     //
-    // pub(crate) fn to_string(&self) -> String {
-    //     serde_json::to_string(self).unwrap_or("".to_string())
-    // }
+    pub(crate) fn to_string(&self) -> String {
+        serde_json::to_string(self).unwrap_or("".to_string())
+    }
 }

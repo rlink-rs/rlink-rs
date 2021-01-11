@@ -6,7 +6,7 @@ use daggy::{Dag, EdgeIndex, NodeIndex, Walker};
 use crate::api::function::InputSplit;
 use crate::api::operator::StreamOperatorWrap;
 use crate::dag::job_graph::{JobEdge, JobGraph};
-use crate::dag::{DagError, Label, TaskId};
+use crate::dag::{DagError, JsonDag, Label, TaskId};
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub(crate) enum ExecutionEdge {
@@ -199,5 +199,9 @@ impl ExecutionGraph {
         }
 
         Ok(())
+    }
+
+    pub(crate) fn to_string(&self) -> String {
+        JsonDag::dag_json(&self.dag).to_string()
     }
 }

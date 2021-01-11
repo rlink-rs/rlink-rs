@@ -111,6 +111,7 @@ impl InputFormat for TestInputFormat {
         if self.step_index < self.data.len() {
             let record = self.data.get(self.step_index).unwrap().clone();
             self.step_index += 1;
+            info!("my element {}", self.step_index);
             Some(record)
         } else {
             None
@@ -194,7 +195,7 @@ fn create_record(key: &str, value: i32, date_time: &str) -> Record {
 
     let model = model::Entity {
         timestamp,
-        id: 0,
+        id: 1,
         name: key.to_string(),
         value1: value,
         value2: 1,
@@ -269,11 +270,9 @@ impl OutputFormat for MyOutputFormat {
 
         let mut reader = record.get_reader(self.date_type.as_slice());
         info!(
-            "\tRecord output : 0:{}, 1:{}, 2:{}, 3:{}, window_max_ts:{}",
+            "\tRecord output : 0:{}, 1:{}, window_max_ts:{}",
             reader.get_str(0).unwrap(),
-            reader.get_i32(1).unwrap(),
-            reader.get_u32(2).unwrap(),
-            reader.get_i64(3).unwrap(),
+            reader.get_i64(1).unwrap(),
             record.get_trigger_window().unwrap().max_timestamp(),
         );
     }

@@ -1,6 +1,6 @@
 use crate::api::operator::DEFAULT_PARALLELISM;
 use crate::dag::stream_graph::{OperatorId, StreamGraph, StreamNode};
-use crate::dag::{utils, DagError, Label, OperatorType};
+use crate::dag::{utils, DagError, JsonDag, Label, OperatorType};
 use daggy::{Dag, EdgeIndex, NodeIndex, Walker};
 use std::cmp::max;
 use std::collections::HashMap;
@@ -279,5 +279,9 @@ impl JobGraph {
             follower_job_ids,
             dependency_job_ids: vec![],
         })
+    }
+
+    pub(crate) fn to_string(&self) -> String {
+        JsonDag::dag_json(&self.dag).to_string()
     }
 }

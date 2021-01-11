@@ -77,12 +77,15 @@ where
             let raw_stream_graph = self.stream_env.stream_manager.stream_graph.borrow();
             DagManager::new(raw_stream_graph.deref())
         };
-        info!("StreamGraph: {:?}", dag_manager.stream_graph().dag);
-        info!("JobGraph: {:?}", dag_manager.job_graph().dag);
-        info!("ExecutionGraph: {:?}", dag_manager.execution_graph().dag);
+        info!("StreamGraph: {}", dag_manager.stream_graph().to_string());
+        info!("JobGraph: {}", dag_manager.job_graph().to_string());
+        info!(
+            "ExecutionGraph: {}",
+            dag_manager.execution_graph().to_string()
+        );
 
         let mut application_descriptor = self.build_metadata(&dag_manager, &application_properties);
-        info!("JobDescriptor : {:?}", &application_descriptor);
+        info!("ApplicationDescriptor : {:?}", &application_descriptor);
 
         let ck_manager =
             self.build_checkpoint_manager(&dag_manager, application_descriptor.borrow_mut());

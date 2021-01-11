@@ -24,6 +24,18 @@ impl SystemOutputFormat {
 
 impl OutputFormat for SystemOutputFormat {
     fn open(&mut self, context: &Context) {
+        let parents: Vec<String> = context
+            .children
+            .iter()
+            .map(|(node, edge)| {
+                format!(
+                    "Node: {:?}--{:?}--> {:?}",
+                    &context.task_id, edge, node.task_id
+                )
+            })
+            .collect();
+        info!("publish\n   {}", parents.join("\n  "));
+
         let mut memory_jobs = Vec::new();
         let mut network_jobs = Vec::new();
 

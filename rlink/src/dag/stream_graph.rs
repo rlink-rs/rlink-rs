@@ -7,7 +7,7 @@ use daggy::{Dag, EdgeIndex, NodeIndex};
 use crate::api::operator::{
     FunctionCreator, StreamOperator, StreamOperatorWrap, TStreamOperator, DEFAULT_PARALLELISM,
 };
-use crate::dag::{DagError, Label, OperatorType};
+use crate::dag::{DagError, JsonDag, Label, OperatorType};
 use crate::io::system_input_format::SystemInputFormat;
 use crate::io::system_keyed_state_flat_map::SystemKeyedStateMapFunction;
 use crate::io::system_output_format::SystemOutputFormat;
@@ -57,6 +57,10 @@ impl StreamGraph {
 
     pub fn get_stream_node(&self, node_index: NodeIndex) -> &StreamNode {
         self.dag.index(node_index)
+    }
+
+    pub(crate) fn to_string(&self) -> String {
+        JsonDag::dag_json(&self.dag).to_string()
     }
 }
 

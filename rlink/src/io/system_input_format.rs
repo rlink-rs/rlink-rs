@@ -3,6 +3,7 @@ use crate::api::function::{
     Context, Function, InputFormat, InputSplit, InputSplitAssigner, InputSplitSource,
 };
 use crate::api::properties::Properties;
+use crate::api::runtime::TaskId;
 use crate::channel::{ElementReceiver, TryRecvError};
 use crate::dag::execution_graph::ExecutionEdge;
 use crate::io::{memory, network};
@@ -10,6 +11,8 @@ use crate::io::{memory, network};
 pub struct SystemInputFormat {
     memory_receiver: Option<ElementReceiver>,
     network_receiver: Option<ElementReceiver>,
+
+    task_id: TaskId,
 }
 
 impl SystemInputFormat {
@@ -17,13 +20,25 @@ impl SystemInputFormat {
         SystemInputFormat {
             memory_receiver: None,
             network_receiver: None,
+            task_id: TaskId::default(),
         }
     }
 }
 
 impl InputFormat for SystemInputFormat {
-    fn open(&mut self, input_split: InputSplit, context: &Context) {
-        let _task_number = input_split.get_split_number();
+    fn open(&mut self, _input_split: InputSplit, context: &Context) {
+        self.task_id = context.task_id.clone();
+        let parents: Vec<String> = context
+            .parents
+            .iter()
+            .map(|(node, edge)| {
+                format!(
+                    "Node: {:?} --{:?}--> {:?}",
+                    node.task_id, edge, &context.task_id
+                )
+            })
+            .collect();
+        info!("subscribe\n   {}", parents.join("\n  "));
 
         let mut memory_jobs = Vec::new();
         let mut network_jobs = Vec::new();
@@ -57,6 +72,7 @@ impl InputFormat for SystemInputFormat {
         match &self.network_receiver {
             Some(network_receiver) => match network_receiver.try_recv() {
                 Ok(element) => {
+                    info!("receive element {:?}", &self.task_id);
                     return Some(element);
                 }
                 Err(TryRecvError::Empty) => {}
@@ -69,7 +85,10 @@ impl InputFormat for SystemInputFormat {
 
         match &self.memory_receiver {
             Some(memory_receiver) => match memory_receiver.try_recv() {
-                Ok(element) => Some(element),
+                Ok(element) => {
+                    info!("receive element {:?}", &self.task_id);
+                    Some(element)
+                }
                 Err(TryRecvError::Empty) => None,
                 Err(TryRecvError::Disconnected) => {
                     panic!("memory_receiver Disconnected");
