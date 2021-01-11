@@ -8,8 +8,13 @@ pub(crate) use client::subscribe;
 pub(crate) use server::publish;
 pub(crate) use server::Server;
 
+use std::convert::TryFrom;
+
 use crate::api::runtime::TaskId;
 use crate::io::ChannelKey;
+use std::error::Error;
+
+const BODY_LEN: usize = 18;
 
 #[derive(Clone, Debug)]
 pub struct ElementRequest {
@@ -19,8 +24,8 @@ pub struct ElementRequest {
 
 impl Into<BytesMut> for ElementRequest {
     fn into(self) -> BytesMut {
-        let mut buffer = BytesMut::with_capacity(4 + 18);
-        buffer.put_u32(12); // (4 + 2 + 2) + (4 + 2 + 2) + 2
+        let mut buffer = BytesMut::with_capacity(4 + BODY_LEN);
+        buffer.put_u32(18); // (4 + 2 + 2) + (4 + 2 + 2) + 2
         buffer.put_u32(self.channel_key.source_task_id.job_id);
         buffer.put_u16(self.channel_key.source_task_id.task_number);
         buffer.put_u16(self.channel_key.source_task_id.num_tasks);
@@ -33,8 +38,15 @@ impl Into<BytesMut> for ElementRequest {
     }
 }
 
-impl From<BytesMut> for ElementRequest {
-    fn from(mut buffer: BytesMut) -> Self {
+impl TryFrom<BytesMut> for ElementRequest {
+    type Error = NetWorkError;
+
+    fn try_from(mut buffer: BytesMut) -> Result<Self, Self::Error> {
+        let len = buffer.get_u32(); // skip header length
+        if len as usize != BODY_LEN {
+            return Err(NetWorkError::IllegalRequestBodyLenError);
+        }
+
         let source_task_id = {
             let job_id = buffer.get_u32();
             let task_number = buffer.get_u16();
@@ -59,13 +71,13 @@ impl From<BytesMut> for ElementRequest {
 
         let batch_pull_size = buffer.get_u16();
 
-        ElementRequest {
+        Ok(ElementRequest {
             channel_key: ChannelKey {
                 source_task_id,
                 target_task_id,
             },
             batch_pull_size,
-        }
+        })
     }
 }
 
@@ -119,4 +131,19 @@ where
     Self: Sync + Send,
 {
     fn on_request(&self);
+}
+
+#[derive(Debug)]
+pub enum NetWorkError {
+    IllegalRequestBodyLenError,
+}
+
+impl Error for NetWorkError {}
+
+impl std::fmt::Display for NetWorkError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NetWorkError::IllegalRequestBodyLenError => write!(f, "IllegalRequestBodyLenError"),
+        }
+    }
 }

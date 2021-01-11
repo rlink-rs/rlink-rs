@@ -20,6 +20,7 @@ use crate::io::network::{ElementRequest, ResponseCode};
 use crate::io::ChannelKey;
 use crate::metrics::Tag;
 use crate::utils::get_runtime;
+use std::convert::TryFrom;
 
 lazy_static! {
     static ref NETWORK_CHANNELS: DashMap<ChannelKey, ElementReceiver> = DashMap::new();
@@ -290,9 +291,8 @@ impl Server {
     }
 
     /// Return the `partition_num`
-    fn frame_parse(&self, mut buffer: BytesMut, _peer_addr: String) -> ElementRequest {
-        buffer.advance(4); // skip header length
-        ElementRequest::from(buffer)
+    fn frame_parse(&self, buffer: BytesMut, _peer_addr: String) -> ElementRequest {
+        ElementRequest::try_from(buffer).unwrap()
     }
 
     fn sock_addr_to_str(&self, addr: &std::net::SocketAddr) -> String {

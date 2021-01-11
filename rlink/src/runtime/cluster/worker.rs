@@ -19,12 +19,12 @@ where
 {
     let mut metadata_loader = MetadataLoader::new(context.coordinator_address.as_str());
 
-    let application_descriptor = metadata_loader.get_job_descriptor_from_cache();
+    let application_descriptor = metadata_loader.get_application_descriptor();
 
     let server_addr = bootstrap_publish_serve(context.bind_ip.to_string());
     info!("bootstrap publish server, listen: {}", server_addr);
 
-    bootstrap_timer_task(&application_descriptor, &context);
+    bootstrap_timer_task(&application_descriptor, &context, server_addr);
     info!("bootstrap timer task");
 
     let window_timer = start_window_timer();
@@ -32,6 +32,9 @@ where
 
     waiting_all_task_manager_fine(metadata_loader.borrow_mut());
     info!("all task manager is fine");
+
+    // after all task fine. and reload `ApplicationDescriptor` from metadata
+    let application_descriptor = metadata_loader.get_application_descriptor();
 
     bootstrap_subscribe_client(&application_descriptor);
     info!("bootstrap subscribe client");
@@ -86,7 +89,11 @@ fn bootstrap_subscribe_client(application_descriptor: &ApplicationDescriptor) {
     });
 }
 
-fn bootstrap_timer_task(application_descriptor: &ApplicationDescriptor, context: &Context) {
+fn bootstrap_timer_task(
+    application_descriptor: &ApplicationDescriptor,
+    context: &Context,
+    bind_addr: SocketAddr,
+) {
     let coordinator_address = application_descriptor
         .coordinator_manager
         .coordinator_address
@@ -95,7 +102,7 @@ fn bootstrap_timer_task(application_descriptor: &ApplicationDescriptor, context:
     status_heartbeat(
         coordinator_address,
         context.task_manager_id.as_str(),
-        context.bind_ip.as_str(),
+        bind_addr.to_string().as_str(),
         context.metric_addr.as_str(),
     );
 
@@ -103,7 +110,7 @@ fn bootstrap_timer_task(application_descriptor: &ApplicationDescriptor, context:
     start_heart_beat_timer(
         coordinator_address,
         context.task_manager_id.as_str(),
-        context.bind_ip.as_str(),
+        bind_addr.to_string().as_str(),
         context.metric_addr.as_str(),
     );
 
@@ -113,7 +120,7 @@ fn bootstrap_timer_task(application_descriptor: &ApplicationDescriptor, context:
 
 fn waiting_all_task_manager_fine(metadata_loader: &mut MetadataLoader) {
     loop {
-        let job_descriptor = metadata_loader.get_job_descriptor();
+        let job_descriptor = metadata_loader.get_application_descriptor();
         match job_descriptor.coordinator_manager.coordinator_status {
             TaskManagerStatus::Registered => {
                 break;
