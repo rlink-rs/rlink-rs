@@ -181,12 +181,7 @@ impl Server {
                         debug!("tcp bytes: {:?}", bytes);
                     }
 
-                    let batch_request = self.frame_parse(bytes, remote_addr.ip().to_string());
-                    let code = ResponseCode::Ok;
-                    match self
-                        .response(code, batch_request, codec_framed.get_mut())
-                        .await
-                    {
+                    match self.subscribe_handle(bytes, codec_framed.get_mut()).await {
                         Ok(_) => {}
                         Err(err) => {
                             error!(
@@ -214,47 +209,50 @@ impl Server {
         );
     }
 
-    async fn response(
+    async fn subscribe_handle(
         &self,
-        response_code: ResponseCode,
-        batch_request: ElementRequest,
+        bytes: BytesMut,
         framed_read: &mut tokio::net::TcpStream,
     ) -> Result<(), std::io::Error> {
-        if response_code == ResponseCode::ParseErr {
-            self.send(response_code, None, framed_read).await
-        } else {
-            let ElementRequest {
-                channel_key,
-                batch_pull_size,
-            } = batch_request;
+        match ElementRequest::try_from(bytes) {
+            Ok(request) => {
+                let ElementRequest {
+                    channel_key,
+                    batch_pull_size,
+                } = request;
 
-            match get_network_channel(&channel_key) {
-                Some(receiver) => {
-                    for _ in 0..batch_pull_size {
-                        match receiver.try_recv() {
-                            Ok(element) => {
-                                self.send(ResponseCode::Ok, Some(element), framed_read)
-                                    .await?
-                            }
-                            Err(TryRecvError::Empty) => {
-                                debug!("try recv channel_key({:?}) empty", channel_key);
-                                return self.send(ResponseCode::Empty, None, framed_read).await;
-                            }
-                            Err(TryRecvError::Disconnected) => {
-                                panic!(format!("channel_key({:?}) close", channel_key))
+                match get_network_channel(&channel_key) {
+                    Some(receiver) => {
+                        for _ in 0..batch_pull_size {
+                            match receiver.try_recv() {
+                                Ok(element) => {
+                                    self.send(ResponseCode::Ok, Some(element), framed_read)
+                                        .await?
+                                }
+                                Err(TryRecvError::Empty) => {
+                                    debug!("try recv channel_key({:?}) empty", channel_key);
+                                    return self.send(ResponseCode::Empty, None, framed_read).await;
+                                }
+                                Err(TryRecvError::Disconnected) => {
+                                    panic!(format!("channel_key({:?}) close", channel_key))
+                                }
                             }
                         }
+                        self.send(ResponseCode::BatchFinish, None, framed_read)
+                            .await
                     }
-                    self.send(ResponseCode::BatchFinish, None, framed_read)
-                        .await
+                    None => {
+                        warn!(
+                            "channel_key({:?}) not found, maybe the job haven't initialized yet",
+                            channel_key
+                        );
+                        self.send(ResponseCode::Empty, None, framed_read).await
+                    }
                 }
-                None => {
-                    error!(
-                        "channel_key({:?}) not found, maybe the job haven't initialized yet",
-                        channel_key
-                    );
-                    self.send(ResponseCode::Empty, None, framed_read).await
-                }
+            }
+            Err(e) => {
+                error!("parse request error. {}", e);
+                self.send(ResponseCode::ParseErr, None, framed_read).await
             }
         }
     }
@@ -288,11 +286,6 @@ impl Server {
             .new_framed(framed_read);
 
         codec_framed0.send(req.to_bytes()).await
-    }
-
-    /// Return the `partition_num`
-    fn frame_parse(&self, buffer: BytesMut, _peer_addr: String) -> ElementRequest {
-        ElementRequest::try_from(buffer).unwrap()
     }
 
     fn sock_addr_to_str(&self, addr: &std::net::SocketAddr) -> String {
