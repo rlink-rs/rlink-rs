@@ -16,10 +16,6 @@ impl MetadataLoader {
         }
     }
 
-    pub fn place_holder() -> Self {
-        MetadataLoader::new("")
-    }
-
     pub fn get_job_descriptor_from_cache(&mut self) -> ApplicationDescriptor {
         if let Some(j) = &self.job_descriptor_cache {
             j.clone()

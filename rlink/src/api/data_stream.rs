@@ -493,7 +493,7 @@ mod tests {
             println!("{:?}", dag);
             println!(
                 "{}",
-                JsonDag::dag_json(dag).fill_begin_end_node().to_string()
+                serde_json::to_string(&JsonDag::dag_json(dag)).unwrap()
             )
         }
         {
@@ -501,7 +501,7 @@ mod tests {
             println!("{:?}", dag);
             println!(
                 "{}",
-                JsonDag::dag_json(dag).fill_begin_end_node().to_string()
+                serde_json::to_string(&JsonDag::dag_json(dag)).unwrap()
             )
         }
 
@@ -510,7 +510,7 @@ mod tests {
             println!("{:?}", dag);
             println!(
                 "{}",
-                JsonDag::dag_json(dag).fill_begin_end_node().to_string()
+                serde_json::to_string(&JsonDag::dag_json(dag)).unwrap()
             )
         }
 

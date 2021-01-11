@@ -9,6 +9,7 @@ use crate::api::operator::{
 };
 use crate::dag::{DagError, Label, OperatorType};
 use crate::io::system_input_format::SystemInputFormat;
+use crate::io::system_keyed_state_flat_map::SystemKeyedStateMapFunction;
 use crate::io::system_output_format::SystemOutputFormat;
 
 pub type OperatorId = u32;
@@ -92,10 +93,6 @@ impl RawStreamGraph {
         }
     }
 
-    // pub fn get_stream_node(&self, node_index: NodeIndex) -> &StreamNode {
-    //     self.dag.index(node_index)
-    // }
-
     pub fn pop_operators(&mut self) -> HashMap<OperatorId, StreamOperatorWrap> {
         let operator_ids: Vec<OperatorId> = self.operators.iter().map(|(x, _)| *x).collect();
 
@@ -118,6 +115,22 @@ impl RawStreamGraph {
         });
 
         operators
+    }
+
+    fn create_virtual_map(
+        &mut self,
+        id: u32,
+        parent_id: u32,
+        parallelism: u32,
+    ) -> StreamOperatorWrap {
+        let map_format = Box::new(SystemKeyedStateMapFunction::new());
+        StreamOperatorWrap::StreamMap(StreamOperator::new(
+            id,
+            vec![parent_id],
+            parallelism,
+            FunctionCreator::System,
+            map_format,
+        ))
     }
 
     fn create_virtual_source(
@@ -241,6 +254,13 @@ impl RawStreamGraph {
                 let vir_operator_id =
                     self.add_operator0(vir_source, vec![vir_operator_id], parallelism)?;
 
+                let vir_operator_id = if self.is_reduce_parent(p_operator_id) {
+                    let vir_map = self.create_virtual_map(0, vir_operator_id, parallelism);
+                    self.add_operator0(vir_map, vec![vir_operator_id], parallelism)?
+                } else {
+                    vir_operator_id
+                };
+
                 self.add_operator0(operator, vec![vir_operator_id], parallelism)
             }
         } else {
@@ -336,5 +356,10 @@ impl RawStreamGraph {
             },
             OperatorType::Sink => panic!("Sink is end Operator"),
         }
+    }
+
+    fn is_reduce_parent(&self, parent_id: u32) -> bool {
+        let (_, operator) = self.operators.get(&parent_id).unwrap();
+        OperatorType::from(operator) == OperatorType::Reduce
     }
 }

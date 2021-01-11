@@ -34,7 +34,13 @@ pub struct JobNode {
 
 impl Label for JobNode {
     fn get_label(&self) -> String {
-        format!("job:{}(p{})", self.job_id, self.parallelism)
+        let op_names: Vec<&str> = self
+            .stream_nodes
+            .iter()
+            .map(|x| x.operator_name.as_str())
+            .collect();
+        let names: String = op_names.join(",\n");
+        format!("job:{}(p{})\n[{}]", self.job_id, self.parallelism, names)
     }
 }
 
