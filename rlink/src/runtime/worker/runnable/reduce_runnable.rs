@@ -170,7 +170,7 @@ impl Runnable for ReduceRunnable {
                 let align_watermarks = watermark_align.align();
 
                 if align_watermarks.len() > 0 {
-                    let mut align_watermark = align_watermarks[align_watermarks.len() - 1].clone();
+                    let align_watermark = align_watermarks[align_watermarks.len() - 1].clone();
                     let minimum_watermark_window =
                         align_watermark.get_min_location_windows().unwrap();
                     self.limited_watermark_window = Some(minimum_watermark_window.clone());
@@ -207,11 +207,21 @@ impl Runnable for ReduceRunnable {
                             drop_windows.len()
                         );
 
-                        align_watermark.drop_windows = Some(drop_windows);
-                        self.next_runnable
-                            .as_mut()
-                            .unwrap()
-                            .run(Element::from(align_watermark));
+                        // align_watermark.drop_windows = Some(drop_windows);
+                        // self.next_runnable
+                        //     .as_mut()
+                        //     .unwrap()
+                        //     .run(Element::from(align_watermark));
+
+                        for drop_window in drop_windows {
+                            let mut drop_record = Record::new();
+                            drop_record.trigger_window = Some(drop_window);
+
+                            self.next_runnable
+                                .as_mut()
+                                .unwrap()
+                                .run(Element::from(drop_record));
+                        }
                     }
                 }
             }

@@ -218,8 +218,8 @@ impl MyMapFunction {
 impl MapFunction for MyMapFunction {
     fn open(&mut self, _context: &Context) {}
 
-    fn map(&mut self, t: &mut Record) -> Vec<Record> {
-        vec![t.clone()]
+    fn map(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>> {
+        Box::new(vec![record].into_iter())
     }
 
     fn close(&mut self) {}

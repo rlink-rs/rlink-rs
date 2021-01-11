@@ -51,19 +51,21 @@ impl Runnable for MapRunnable {
         register_counter(metric_name.as_str(), tags, self.counter.clone());
     }
 
-    fn run(&mut self, mut element: Element) {
+    fn run(&mut self, element: Element) {
         if element.is_record() {
             let records = self
                 .stream_map
                 .operator_fn
                 .as_mut()
-                .map(element.as_record_mut());
-            let len = records.len() as u64;
+                .map(element.into_record());
+
+            let mut len = 0;
             for record in records {
                 self.next_runnable
                     .as_mut()
                     .unwrap()
                     .run(Element::Record(record));
+                len += 1;
             }
 
             self.counter.fetch_add(len, Ordering::Relaxed);

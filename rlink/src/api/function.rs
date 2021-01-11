@@ -143,7 +143,7 @@ where
     Self: Function,
 {
     fn open(&mut self, context: &Context);
-    fn map(&mut self, record: &mut Record) -> Vec<Record>;
+    fn map(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>>;
     fn close(&mut self);
 }
 

@@ -19,7 +19,7 @@ impl Display for CheckpointBackend {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
 #[serde(tag = "type", content = "param")]
 pub enum KeyedStateBackend {
     Memory,
