@@ -26,7 +26,7 @@ impl MemoryReducingState {
 
     pub fn from(state_key: &StateKey) -> Option<MemoryReducingState> {
         let state = remove_drop_window(
-            state_key.chain_id,
+            state_key.job_id,
             state_key.task_number,
             state_key.window.clone(),
         );

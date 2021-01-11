@@ -15,7 +15,6 @@ pub mod coordinator;
 pub mod logger;
 pub mod worker;
 
-pub type ChainId = u32;
 pub type CheckpointId = u64;
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, Eq, PartialEq)]

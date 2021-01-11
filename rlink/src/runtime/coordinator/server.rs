@@ -143,13 +143,16 @@ async fn serve(
 
 fn index() -> HttpResponse {
     let html = r#"<html>
-        <head><title>Streaming UI</title></head>
+        <head><title>rlink UI</title></head>
         <body>
-            <h1>Streaming</h1>
+            <h1>rlink</h1>
             <ul>
                 <li><a href="context">context</a></li>
                 <li><a href="metadata">metadata</a></li>
                 <li><a href="checkpoints">checkpoints</a></li>
+                <li><a href="dag/stream_graph">dag:stream_graph</a></li>
+                <li><a href="dag/job_graph">dag:job_graph</a></li>
+                <li><a href="dag/execution_graph">dag:execution_graph</a></li>
             </ul>
         </body>
     </html>"#;

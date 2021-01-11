@@ -21,9 +21,9 @@ impl MySqlCheckpointStorage {
 impl CheckpointStorage for MySqlCheckpointStorage {
     fn save(
         &mut self,
-        job_name: &str,
+        application_name: &str,
         application_id: &str,
-        chain_id: u32,
+        job_id: u32,
         checkpoint_id: u64,
         finish_cks: Vec<Checkpoint>,
         ttl: u64,
@@ -34,14 +34,14 @@ impl CheckpointStorage for MySqlCheckpointStorage {
         conn.exec_batch(
             r"
 insert into rlink_cks 
-  (job_name, application_id, chain_id, checkpoint_id, task_num, handle, create_time)
+  (application_name, application_id, job_id, checkpoint_id, task_num, handle, create_time)
 values 
-  (:job_name, :application_id, :chain_id, :checkpoint_id, :task_num, :handle, :create_time)",
+  (:application_name, :application_id, :job_id, :checkpoint_id, :task_num, :handle, :create_time)",
             finish_cks.iter().map(|p| {
                 params! {
-                    "job_name" => job_name,
+                    "application_name" => application_name,
                     "application_id" => application_id,
-                    "chain_id" => chain_id,
+                    "job_id" => job_id,
                     "checkpoint_id" => checkpoint_id,
                     "task_num" => p.task_num,
                     "handle" => &p.handle.handle,
@@ -59,49 +59,49 @@ values
             r"
 delete
 from rlink_cks
-where job_name = :job_name
-  and chain_id = :chain_id
+where application_name = :application_name
+  and job_id = :job_id
   and application_id = :application_id
   and checkpoint_id < :checkpoint_id",
             params! {
-                "job_name" => job_name,
-                "chain_id"=> chain_id,
+                "application_name" => application_name,
+                "job_id"=> job_id,
                 "application_id" => application_id,
                 "checkpoint_id" => checkpoint_id_ttl
             },
         )?;
 
         info!(
-            "checkpoint save success, chain_id={}, checkpoint_id={}",
-            chain_id, checkpoint_id
+            "checkpoint save success, job_id={}, checkpoint_id={}",
+            job_id, checkpoint_id
         );
         Ok(())
     }
 
-    fn load(&mut self, job_name: &str, chain_id: u32) -> anyhow::Result<Vec<Checkpoint>> {
+    fn load(&mut self, application_name: &str, job_id: u32) -> anyhow::Result<Vec<Checkpoint>> {
         let pool = Pool::new(self.url.as_str())?;
 
         let mut conn = pool.get_conn()?;
 
         let stmt = conn.prep(
             r"
-SELECT cks.chain_id, cks.checkpoint_id, cks.task_num, cks.handle
+SELECT cks.job_id, cks.checkpoint_id, cks.task_num, cks.handle
 from rlink_cks as cks
          inner join (
     SELECT max(checkpoint_id) as checkpoint_id
     from rlink_cks
-    where job_name = :job_name
-      and chain_id = :chain_id
+    where application_name = :application_name
+      and job_id = :job_id
 ) as t on t.checkpoint_id = cks.checkpoint_id
-where cks.job_name = :job_name
-  and cks.chain_id = :chain_id",
+where cks.application_name = :application_name
+  and cks.job_id = :job_id",
         )?;
 
         let selected_payments = conn.exec_map(
             &stmt,
-            params! { "job_name" => job_name, "chain_id" => chain_id },
-            |(chain_id, checkpoint_id, task_num, handle)| Checkpoint {
-                job_id: chain_id,
+            params! { "application_name" => application_name, "job_id" => job_id },
+            |(job_id, checkpoint_id, task_num, handle)| Checkpoint {
+                job_id,
                 task_num,
                 checkpoint_id,
                 handle: CheckpointHandle { handle },

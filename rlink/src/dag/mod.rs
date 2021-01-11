@@ -36,7 +36,7 @@ pub(crate) struct TaskInstance {
 pub(crate) struct WorkerManagerInstance {
     /// build by self, format `format!("task_manager_{}", index)`
     pub worker_manager_id: String,
-    /// chain tasks map: <chain_id, Vec<TaskInstance>>
+    /// task instances
     pub task_instances: Vec<TaskInstance>,
 }
 

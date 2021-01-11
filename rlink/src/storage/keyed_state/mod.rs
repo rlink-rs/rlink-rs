@@ -14,15 +14,15 @@ pub mod mem_window_state;
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct StateKey {
     pub(crate) window: WindowWrap,
-    pub(crate) chain_id: u32,
+    pub(crate) job_id: u32,
     pub(crate) task_number: u16,
 }
 
 impl StateKey {
-    pub fn new(window: WindowWrap, chain_id: u32, task_number: u16) -> Self {
+    pub fn new(window: WindowWrap, job_id: u32, task_number: u16) -> Self {
         StateKey {
             window,
-            chain_id,
+            job_id,
             task_number,
         }
     }
@@ -141,10 +141,15 @@ pub enum WindowStateWrap {
 }
 
 impl WindowStateWrap {
-    pub fn new(job_id: String, chain_id: u32, task_number: u16, mode: KeyedStateBackend) -> Self {
+    pub fn new(
+        application_id: String,
+        job_id: u32,
+        task_number: u16,
+        mode: KeyedStateBackend,
+    ) -> Self {
         match mode {
             KeyedStateBackend::Memory => WindowStateWrap::MemoryWindowState(
-                MemoryWindowState::new(job_id, chain_id, task_number),
+                MemoryWindowState::new(application_id, job_id, task_number),
             ),
         }
     }

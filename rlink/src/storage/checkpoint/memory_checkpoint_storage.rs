@@ -20,9 +20,9 @@ impl MemoryCheckpointStorage {
 impl CheckpointStorage for MemoryCheckpointStorage {
     fn save(
         &mut self,
-        _job_name: &str,
-        _job_id: &str,
-        _chain_id: u32,
+        _application_name: &str,
+        _application_id: &str,
+        _job_id: u32,
         checkpoint_id: u64,
         finish_cks: Vec<Checkpoint>,
         ttl: u64,
@@ -61,7 +61,7 @@ impl CheckpointStorage for MemoryCheckpointStorage {
         Ok(())
     }
 
-    fn load(&mut self, _job_name: &str, _chain_id: u32) -> anyhow::Result<Vec<Checkpoint>> {
+    fn load(&mut self, _application_name: &str, _job_id: u32) -> anyhow::Result<Vec<Checkpoint>> {
         Ok(vec![])
     }
 }

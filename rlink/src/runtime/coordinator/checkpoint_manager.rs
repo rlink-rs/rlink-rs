@@ -6,15 +6,15 @@ use crate::api::checkpoint::Checkpoint;
 use crate::api::properties::SystemProperties;
 use crate::dag::DagManager;
 use crate::runtime::context::Context;
-use crate::runtime::{ApplicationDescriptor, ChainId};
+use crate::runtime::ApplicationDescriptor;
 use crate::storage::checkpoint::{CheckpointStorage, CheckpointStorageWrap};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct JobCheckpoint {
-    job_name: String,
-    job_id: String,
+pub(crate) struct ApplicationCheckpoint {
+    application_name: String,
+    application_id: String,
 
-    chain_id: ChainId,
+    job_id: u32,
     parallelism: u32,
 
     #[serde(skip_serializing, skip_deserializing)]
@@ -26,18 +26,18 @@ pub(crate) struct JobCheckpoint {
     latest_finish_cks: Vec<Checkpoint>,
 }
 
-impl JobCheckpoint {
+impl ApplicationCheckpoint {
     pub fn new(
-        job_name: String,
-        job_id: String,
-        chain_id: u32,
+        application_name: String,
+        application_id: String,
+        job_id: u32,
         parallelism: u32,
         storage: Option<CheckpointStorageWrap>,
     ) -> Self {
-        JobCheckpoint {
-            job_name,
+        ApplicationCheckpoint {
+            application_name,
+            application_id,
             job_id,
-            chain_id,
             parallelism,
             storage,
             current_ck_id: 0,
@@ -107,9 +107,9 @@ impl JobCheckpoint {
         match self.storage.as_mut() {
             Some(storage) => {
                 let rt = storage.save(
-                    self.job_name.as_str(),
-                    self.job_id.as_str(),
-                    self.chain_id,
+                    self.application_name.as_str(),
+                    self.application_id.as_str(),
+                    self.job_id,
                     self.current_ck_id,
                     cks,
                     Duration::from_secs(60 * 30).as_millis() as u64,
@@ -125,18 +125,18 @@ impl JobCheckpoint {
 
     pub fn load(&mut self) -> anyhow::Result<Vec<Checkpoint>> {
         match self.storage.as_mut() {
-            Some(storage) => storage.load(self.job_name.as_str(), self.chain_id),
+            Some(storage) => storage.load(self.application_name.as_str(), self.job_id),
             None => Ok(vec![]),
         }
     }
 }
 
-impl Clone for JobCheckpoint {
+impl Clone for ApplicationCheckpoint {
     fn clone(&self) -> Self {
-        JobCheckpoint {
-            job_name: self.job_name.clone(),
-            job_id: self.job_id.clone(),
-            chain_id: self.chain_id,
+        ApplicationCheckpoint {
+            application_name: self.application_name.clone(),
+            application_id: self.application_id.clone(),
+            job_id: self.job_id,
             parallelism: self.parallelism,
             storage: None,
             current_ck_id: self.current_ck_id,
@@ -146,12 +146,12 @@ impl Clone for JobCheckpoint {
     }
 }
 
-pub(crate) type JobCheckpointSafe = Arc<RwLock<JobCheckpoint>>;
+pub(crate) type JobCheckpointSafe = Arc<RwLock<ApplicationCheckpoint>>;
 
 #[derive(Debug)]
 pub(crate) struct CheckpointManager {
     application_name: String,
-    job_cks: dashmap::DashMap<ChainId, JobCheckpointSafe>,
+    job_cks: dashmap::DashMap<u32, JobCheckpointSafe>,
 }
 
 impl CheckpointManager {
@@ -176,7 +176,7 @@ impl CheckpointManager {
             let storage = checkpoint_backend
                 .as_ref()
                 .map(|ck_backend| CheckpointStorageWrap::new(ck_backend));
-            let chain_ck = JobCheckpoint::new(
+            let chain_ck = ApplicationCheckpoint::new(
                 application_name,
                 application_id,
                 job_id,
@@ -206,7 +206,7 @@ impl CheckpointManager {
         }
     }
 
-    pub fn load(&mut self) -> anyhow::Result<HashMap<ChainId, Vec<Checkpoint>>> {
+    pub fn load(&mut self) -> anyhow::Result<HashMap<u32, Vec<Checkpoint>>> {
         let mut job_checkpoints = HashMap::new();
         for entry in &self.job_cks {
             let mut chain_ck = entry.value().write().unwrap();
@@ -217,7 +217,7 @@ impl CheckpointManager {
         Ok(job_checkpoints)
     }
 
-    pub fn get(&self) -> HashMap<ChainId, JobCheckpoint> {
+    pub fn get(&self) -> HashMap<u32, ApplicationCheckpoint> {
         let mut map = HashMap::new();
         for entry in &self.job_cks {
             let job_ck = entry.value().read().unwrap();
