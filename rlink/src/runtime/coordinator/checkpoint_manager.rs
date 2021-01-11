@@ -169,8 +169,8 @@ impl CheckpointManager {
 
         let job_cks = dashmap::DashMap::new();
         for job_node in dag_manager.job_graph().get_nodes() {
-            let application_name = context.job_name.clone();
-            let application_id = context.job_id.clone();
+            let application_name = context.application_name.clone();
+            let application_id = context.application_id.clone();
             let job_id = job_node.job_id;
             let parallelism = job_node.parallelism;
             let storage = checkpoint_backend
@@ -188,7 +188,7 @@ impl CheckpointManager {
         }
 
         CheckpointManager {
-            application_name: context.job_name.clone(),
+            application_name: context.application_name.clone(),
             job_cks: job_cks,
         }
     }

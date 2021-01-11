@@ -50,7 +50,7 @@ where
         stream_env: StreamExecutionEnvironment,
     ) -> Self {
         let metadata_storage_mode = {
-            let job_id = context.job_id.as_str();
+            let job_id = context.application_id.as_str();
             let mode = context.cluster_config.metadata_storage_mode.as_str();
             let endpoints = &context.cluster_config.metadata_storage_endpoints;
             MetadataStorageMode::from(mode, endpoints, job_id)

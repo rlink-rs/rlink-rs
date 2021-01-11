@@ -61,7 +61,6 @@ impl InputFormat for KafkaInputFormat {
                 context.application_id.clone(),
                 context.task_id.job_id(),
                 context.task_id.task_number(),
-                // self.state_mode.as_ref().unwrap().clone(),
             );
             // todo provide the data from coordinator
             kafka_checkpoint.initialize_state(

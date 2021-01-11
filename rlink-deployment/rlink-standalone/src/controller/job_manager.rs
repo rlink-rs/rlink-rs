@@ -12,7 +12,7 @@ use rlink::api::cluster::{
 use crate::config::Context;
 use crate::controller::get_resource_storage_path;
 use crate::controller::HttpClientError;
-use crate::job::{Job, Status};
+use crate::job::{Application, Status};
 use crate::utils::current_timestamp_millis;
 
 #[derive(Deserialize)]
@@ -58,7 +58,7 @@ pub async fn create_application(
             f = web::block(move || f.write_all(&data).map(|_| f)).await?;
         }
 
-        let job = Job::new(application_id.clone(), filename);
+        let job = Application::new(application_id.clone(), filename);
         job.storage(storage_path)?;
     }
 
@@ -73,7 +73,7 @@ pub async fn submit_job(
     let application_id = application_id.as_str();
 
     let storage_path = get_resource_storage_path(application_id);
-    let job = Job::load(storage_path.clone())?;
+    let job = Application::load(storage_path.clone())?;
     if job.status == Status::Killed {
         let response: StdResponse<String> = StdResponse {
             code: ResponseCode::ERR("Job has killed".to_string()),
@@ -273,7 +273,7 @@ pub async fn kill_job(
     context: Data<Context>,
 ) -> Result<HttpResponse, Error> {
     let storage_path = get_resource_storage_path(application_id.as_str());
-    let mut job = Job::load(storage_path.clone())?;
+    let mut job = Application::load(storage_path.clone())?;
     job.status = Status::Killed;
 
     job.storage(storage_path)?;

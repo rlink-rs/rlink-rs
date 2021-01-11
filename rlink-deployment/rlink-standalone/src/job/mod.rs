@@ -12,16 +12,16 @@ pub enum Status {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Job {
-    pub(crate) job_id: String,
+pub struct Application {
+    pub(crate) application_id: String,
     pub(crate) execute_file: String,
     pub(crate) status: Status,
 }
 
-impl Job {
-    pub fn new(job_id: String, execute_file: String) -> Self {
-        Job {
-            job_id,
+impl Application {
+    pub fn new(application_id: String, execute_file: String) -> Self {
+        Application {
+            application_id,
             execute_file,
             status: Status::Ready,
         }
@@ -32,7 +32,7 @@ impl Job {
 
         let s = read_file_as_string(metadata_file)?;
 
-        let job: Job = serde_json::from_str(s.as_str())
+        let job: Application = serde_json::from_str(s.as_str())
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
 
         Ok(job)

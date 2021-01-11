@@ -5,25 +5,19 @@ use crate::state::{KafkaSourceStateCache, OffsetMetadata};
 #[derive(Debug)]
 pub struct KafkaCheckpointed {
     pub(crate) state_cache: Option<KafkaSourceStateCache>,
-    pub(crate) job_id: String,
-    pub(crate) chain_id: u32,
+    pub(crate) application_id: String,
+    pub(crate) job_id: u32,
     pub(crate) task_number: u16,
     // pub(crate) state_mode: OperatorStateBackend,
 }
 
 impl KafkaCheckpointed {
-    pub fn new(
-        job_id: String,
-        chain_id: u32,
-        task_number: u16,
-        // state_mode: OperatorStateBackend,
-    ) -> Self {
+    pub fn new(application_id: String, job_id: u32, task_number: u16) -> Self {
         KafkaCheckpointed {
             state_cache: None,
+            application_id,
             job_id,
-            chain_id,
             task_number,
-            // state_mode,
         }
     }
 

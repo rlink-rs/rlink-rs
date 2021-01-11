@@ -43,7 +43,7 @@ pub(crate) fn build_job_descriptor(
     }
 
     let job_manager = CoordinatorManagerDescriptor {
-        application_id: context.job_id.clone(),
+        application_id: context.application_id.clone(),
         application_name: job_name.to_string(),
         application_properties: application_properties.clone(),
         coordinator_address: "".to_string(),

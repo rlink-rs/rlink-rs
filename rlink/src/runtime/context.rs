@@ -43,8 +43,8 @@ use crate::utils;
 ///
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub(crate) struct Context {
-    pub job_name: String,
-    pub job_id: String,
+    pub application_name: String,
+    pub application_id: String,
     /// when `ManagerType::Coordinator`: `job_manager_id`
     /// when `ManagerType::Worker`: `task_manager_id`
     pub task_manager_id: String,
@@ -65,8 +65,8 @@ pub(crate) struct Context {
 
 impl Context {
     pub fn new(
-        job_name: String,
-        job_id: String,
+        application_name: String,
+        application_id: String,
         task_manager_id: String,
         bind_ip: String,
         cluster_mode: ClusterMode,
@@ -80,8 +80,8 @@ impl Context {
         v_cores: usize,
     ) -> Self {
         Context {
-            job_name,
-            job_id,
+            application_name,
+            application_id,
             task_manager_id,
             bind_ip,
             cluster_mode,
