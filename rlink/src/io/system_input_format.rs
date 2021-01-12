@@ -72,7 +72,7 @@ impl InputFormat for SystemInputFormat {
         match &self.network_receiver {
             Some(network_receiver) => match network_receiver.try_recv() {
                 Ok(element) => {
-                    info!("receive element {:?}", &self.task_id);
+                    debug!("receive element {:?}", &self.task_id);
                     return Some(element);
                 }
                 Err(TryRecvError::Empty) => {}
@@ -86,7 +86,7 @@ impl InputFormat for SystemInputFormat {
         match &self.memory_receiver {
             Some(memory_receiver) => match memory_receiver.try_recv() {
                 Ok(element) => {
-                    info!("receive element {:?}", &self.task_id);
+                    debug!("receive element {:?}", &self.task_id);
                     Some(element)
                 }
                 Err(TryRecvError::Empty) => None,

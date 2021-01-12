@@ -113,39 +113,41 @@ impl Runnable for SourceRunnable {
 
         let fn_creator = self.stream_source.get_fn_creator();
 
-        let mut idle_counter = 0;
+        let mut idle_counter = 0u32;
         let idle_delay_10 = Duration::from_millis(10);
         let idle_delay_300 = Duration::from_millis(300);
 
         loop {
-            let end = self.stream_source.operator_fn.as_mut().reached_end();
-
+            let mut end = false;
             let mut counter = 0;
-            if !end {
-                // let source_fn = self.stream_source.operator_fn.as_mut();
-                for _ in 0..1000 {
-                    match self.stream_source.operator_fn.as_mut().next_element() {
-                        Some(row) => {
-                            if row.is_watermark() {
-                                debug!(
-                                    "Source `next_element` get Watermark({})",
-                                    row.as_watermark().timestamp
-                                );
-                            } else if row.is_barrier() {
-                                // if `InputFormat` return the Barrier, fire checkpoint immediately
-                                self.checkpoint(row.as_barrier().checkpoint_id);
-                            }
+            for _ in 0..1000 {
+                end = self.stream_source.operator_fn.as_mut().reached_end();
+                if end {
+                    break;
+                }
 
-                            self.next_runnable.as_mut().unwrap().run(row);
-                            counter += 1;
+                match self.stream_source.operator_fn.as_mut().next_element() {
+                    Some(row) => {
+                        if row.is_watermark() {
+                            debug!(
+                                "Source `next_element` get Watermark({})",
+                                row.as_watermark().timestamp
+                            );
+                        } else if row.is_barrier() {
+                            // if `InputFormat` return the Barrier, fire checkpoint immediately
+                            self.checkpoint(row.as_barrier().checkpoint_id);
                         }
-                        None => break,
+
+                        self.next_runnable.as_mut().unwrap().run(row);
+                        counter += 1;
                     }
+                    None => break,
                 }
-                if counter > 0 {
-                    self.counter.fetch_add(counter as u64, Ordering::Relaxed);
-                }
-            };
+            }
+
+            if counter > 0 {
+                self.counter.fetch_add(counter as u64, Ordering::Relaxed);
+            }
 
             if let FunctionCreator::User = fn_creator {
                 if let Ok(window_time) = self.stream_status_timer.as_ref().unwrap().try_recv() {
@@ -163,6 +165,12 @@ impl Runnable for SourceRunnable {
                     self.next_runnable.as_mut().unwrap().run(barrier);
                 };
             }
+
+            // if end {
+            //     info!("source end");
+            //     std::thread::sleep(Duration::from_secs(3600));
+            //     // break;
+            // }
 
             if counter == 0 {
                 idle_counter += 1;

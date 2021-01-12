@@ -16,6 +16,7 @@ use rlink::functions::column_base_function::key_selector::ColumnBaseKeySelector;
 use rlink::functions::column_base_function::reduce::{sum_i64, ColumnBaseReduceFunction};
 use rlink::functions::column_base_function::timestamp_assigner::ColumnBaseTimestampAssigner;
 use rlink::functions::column_base_function::FunctionSchema;
+use rlink::utils::date_time::{fmt_date_time, FMT_DATE_TIME_1};
 
 use crate::buffer_gen::model;
 use crate::buffer_gen::model::DATA_TYPE;
@@ -111,7 +112,6 @@ impl InputFormat for TestInputFormat {
         if self.step_index < self.data.len() {
             let record = self.data.get(self.step_index).unwrap().clone();
             self.step_index += 1;
-            info!("my element {}", self.step_index);
             Some(record)
         } else {
             None
@@ -174,16 +174,6 @@ fn gen_row() -> Vec<Record> {
     rows.push(create_record("C-key-0", 14, "2020-03-11T12:02:25+0800"));
     rows.push(create_record("C-key-0", 15, "2020-03-11T12:02:35+0800"));
 
-    // rows.push(create_row("A", 13, "2222-03-11T12:02:20+0800"));
-    // rows.push(create_row("A", 14, "2222-03-11T12:02:25+0800"));
-    // rows.push(create_row("A", 15, "2222-03-11T12:02:35+0800"));
-    // rows.push(create_row("B", 13, "2222-03-11T12:02:20+0800"));
-    // rows.push(create_row("B", 14, "2222-03-11T12:02:25+0800"));
-    // rows.push(create_row("B", 15, "2222-03-11T12:02:35+0800"));
-    // rows.push(create_row("C", 13, "2222-03-11T12:02:20+0800"));
-    // rows.push(create_row("C", 14, "2222-03-11T12:02:25+0800"));
-    // rows.push(create_row("C", 15, "2222-03-11T12:02:35+0800"));
-
     rows
 }
 
@@ -199,7 +189,7 @@ fn create_record(key: &str, value: i32, date_time: &str) -> Record {
         name: key.to_string(),
         value1: value,
         value2: 1,
-        value3: 2,
+        value3: value as i64,
     };
     let mut record = Record::new();
     model.to_buffer(record.as_buffer()).unwrap();
@@ -268,12 +258,17 @@ impl OutputFormat for MyOutputFormat {
     fn write_record(&mut self, mut record: Record) {
         // info!("{}:write_record", self.get_name());
 
+        let window_time = {
+            let min_timestamp = record.get_trigger_window().unwrap().min_timestamp();
+            fmt_date_time(Duration::from_millis(min_timestamp), FMT_DATE_TIME_1)
+        };
+
         let mut reader = record.get_reader(self.date_type.as_slice());
         info!(
-            "\tRecord output : 0:{}, 1:{}, window_max_ts:{}",
+            "Record output : 0:{}, 1:{}, window_min_ts:{}",
             reader.get_str(0).unwrap(),
             reader.get_i64(1).unwrap(),
-            record.get_trigger_window().unwrap().max_timestamp(),
+            window_time,
         );
     }
 
