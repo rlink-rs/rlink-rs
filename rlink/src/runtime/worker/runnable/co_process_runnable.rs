@@ -62,16 +62,22 @@ impl Runnable for CoProcessRunnable {
     fn run(&mut self, element: Element) {
         match element {
             Element::Record(record) => {
-                let stream_seq = self
+                let stream_seq = *self
                     .parent_jobs
                     .get(&record.channel_key.source_task_id.job_id)
                     .expect("parent job not found");
 
-                let record = self
-                    .stream_co_process
-                    .operator_fn
-                    .as_mut()
-                    .process(*stream_seq, record);
+                let record = if stream_seq == self.parent_jobs.len() - 1 {
+                    self.stream_co_process
+                        .operator_fn
+                        .as_mut()
+                        .process_left(record)
+                } else {
+                    self.stream_co_process
+                        .operator_fn
+                        .as_mut()
+                        .process_right(stream_seq, record)
+                };
                 match record {
                     Some(record) => {
                         self.next_runnable

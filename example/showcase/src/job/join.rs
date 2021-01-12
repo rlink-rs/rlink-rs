@@ -49,8 +49,7 @@ impl StreamJob for MyStreamJob {
             ));
         let data_stream_right = env
             .register_source(BroadcastInputFormat::new(properties.clone()), 1)
-            .map(MyMapFunction::new())
-            .filter(MyFilterFunction::new());
+            .map(MyMapFunction::new());
 
         data_stream_left
             .connect(vec![data_stream_right], MyCoProcessFunction {})
@@ -150,13 +149,16 @@ pub struct MyCoProcessFunction {}
 impl CoProcessFunction for MyCoProcessFunction {
     fn open(&mut self, _context: &Context) {}
 
-    fn process(&self, stream_seq: usize, mut record: Record) -> Option<Record> {
-        if stream_seq == 1 {
-            let _conf = config::Entity::parse(record.as_buffer()).unwrap();
-            None
-        } else {
-            Some(record)
+    fn process_left(&self, record: Record) -> Option<Record> {
+        Some(record)
+    }
+
+    fn process_right(&self, stream_seq: usize, mut record: Record) -> Option<Record> {
+        if stream_seq == 0 {
+            let conf = config::Entity::parse(record.as_buffer()).unwrap();
+            info!("config field:{}, val:{}", conf.field, conf.value);
         }
+        None
     }
 
     fn close(&mut self) {}

@@ -339,6 +339,8 @@ impl TDataStream for StreamBuilder {
     {
         let pipeline_stream_manager = self.stream_manager.clone();
 
+        // Ensure `this` is placed in the last position!!!
+        // index trigger `process_left` at the last location, otherwise trigger `process_right`
         let mut dependency_streams: Vec<StreamBuilder> =
             data_streams.into_iter().map(|x| x.data_stream).collect();
         dependency_streams.push(self);
@@ -691,8 +693,12 @@ mod tests {
     impl CoProcessFunction for MyCoProcessFunction {
         fn open(&mut self, _context: &Context) {}
 
-        fn process(&self, _stream_seq: usize, record: Record) -> Record {
-            record
+        fn process_left(&self, record: Record) -> Option<Record> {
+            Some(record)
+        }
+
+        fn process_right(&self, stream_seq: usize, record: Record) -> Option<Record> {
+            None
         }
 
         fn close(&mut self) {}
