@@ -40,7 +40,7 @@ impl StreamJob for MyStreamJob {
         };
 
         let data_stream_left = env
-            .register_source(TestInputFormat::new(properties.clone()), 2)
+            .register_source(TestInputFormat::new(properties.clone()), 1)
             .map(MyMapFunction::new())
             .filter(MyFilterFunction::new())
             .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
@@ -59,7 +59,7 @@ impl StreamJob for MyStreamJob {
                 Duration::from_secs(20),
                 None,
             ))
-            .reduce(reduce_function, 3)
+            .reduce(reduce_function, 2)
             .add_sink(MyOutputFormat::new(output_schema_types));
     }
 }

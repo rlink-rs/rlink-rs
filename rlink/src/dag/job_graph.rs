@@ -28,8 +28,8 @@ pub struct JobNode {
     pub(crate) job_id: u32,
     pub(crate) parallelism: u32,
     pub(crate) stream_nodes: Vec<StreamNode>,
-    pub(crate) follower_job_ids: Vec<u32>,
-    pub(crate) dependency_job_ids: Vec<u32>,
+    pub(crate) child_job_ids: Vec<u32>,
+    pub(crate) parent_job_ids: Vec<u32>,
 }
 
 impl Label for JobNode {
@@ -136,23 +136,24 @@ impl JobGraph {
 
     fn build_job_edge(&mut self, job_node_index: NodeIndex) {
         let job_node = self.dag.index(job_node_index).clone();
-        if job_node.follower_job_ids.len() == 0 {
+        if job_node.child_job_ids.len() == 0 {
             return;
         }
 
-        for follower_job_id in &job_node.follower_job_ids {
-            // update `dependency_job_ids`
-            let follower_node_index = self.job_node_indies.get(follower_job_id).unwrap();
-            let follower_job_node = self.dag.index(*follower_node_index);
+        for child_job_id in &job_node.child_job_ids {
+            let child_node_index = self.job_node_indies.get(child_job_id).unwrap();
+            let child_job_node = self.dag.index(*child_node_index);
 
-            let job_edge = if job_node.is_reduce_job() {
-                if job_node.parallelism != follower_job_node.parallelism {
+            let job_edge = if child_job_node.is_reduce_job() {
+                JobEdge::Hash
+            } else if job_node.is_reduce_job() {
+                if job_node.parallelism != child_job_node.parallelism {
                     unimplemented!("unsupported")
                 }
 
                 JobEdge::Forward
             } else {
-                if job_node.parallelism == follower_job_node.parallelism {
+                if job_node.parallelism == child_job_node.parallelism {
                     JobEdge::Forward
                 } else {
                     JobEdge::Hash
@@ -160,7 +161,7 @@ impl JobGraph {
             };
 
             self.dag
-                .add_edge(job_node_index, *follower_node_index, job_edge)
+                .add_edge(job_node_index, *child_node_index, job_edge)
                 .unwrap();
         }
     }
@@ -171,10 +172,10 @@ impl JobGraph {
         for source_node_index in sources {
             let job_node = self.build_job_node(source_node_index, stream_graph)?;
 
-            // build map: follower_job_id -> vec[dependency_job_id]
-            for follower_job_id in &job_node.follower_job_ids {
-                let dependency_job_ids = job_id_map.entry(*follower_job_id).or_insert(Vec::new());
-                dependency_job_ids.push(job_node.job_id);
+            // build map: child_job_id -> vec[parent_job_id]
+            for child_job_id in &job_node.child_job_ids {
+                let parent_job_ids = job_id_map.entry(*child_job_id).or_insert(Vec::new());
+                parent_job_ids.push(job_node.job_id);
             }
 
             // build map: job_id -> NodeIndex
@@ -183,17 +184,17 @@ impl JobGraph {
             self.job_node_indies.insert(job_id, node_index);
         }
 
-        for (follower_job_id, dependency_job_ids) in job_id_map {
-            // update `dependency_job_ids`
-            let node_index = self.job_node_indies.get(&follower_job_id).unwrap();
+        for (child_job_id, parent_job_ids) in job_id_map {
+            // update `parent_job_ids`
+            let node_index = self.job_node_indies.get(&child_job_id).unwrap();
             let job_node = self.dag.index_mut(*node_index);
-            job_node.dependency_job_ids = dependency_job_ids;
+            job_node.parent_job_ids = parent_job_ids;
 
             // update parallelism
             let job_node = self.dag.index(*node_index).clone();
             if job_node.is_co_process_job() {
                 let max_dep_parallelism = job_node
-                    .dependency_job_ids
+                    .parent_job_ids
                     .iter()
                     .map(|dep_job_id| {
                         let dep_node_index = self.job_node_indies.get(dep_job_id).unwrap();
@@ -212,15 +213,11 @@ impl JobGraph {
                 }
             }
             if job_node.is_reduce_job() {
-                job_node
-                    .follower_job_ids
-                    .iter()
-                    .for_each(|follower_job_id| {
-                        let follower_node_index =
-                            self.job_node_indies.get(follower_job_id).unwrap();
-                        let follower_node_stream = self.dag.index_mut(*follower_node_index);
-                        follower_node_stream.parallelism = job_node.parallelism;
-                    })
+                job_node.child_job_ids.iter().for_each(|child_job_id| {
+                    let child_node_index = self.job_node_indies.get(child_job_id).unwrap();
+                    let child_node_stream = self.dag.index_mut(*child_node_index);
+                    child_node_stream.parallelism = job_node.parallelism;
+                })
             }
         }
 
@@ -235,7 +232,7 @@ impl JobGraph {
         let mut stream_nodes = Vec::new();
         let mut parallelism = DEFAULT_PARALLELISM;
         let mut job_id = 0;
-        let mut follower_job_ids: Vec<OperatorId> = Vec::new();
+        let mut child_job_ids: Vec<OperatorId> = Vec::new();
 
         let mut node_index = source_node_index;
         let stream_dag = &stream_graph.dag;
@@ -256,7 +253,7 @@ impl JobGraph {
                     .map(|(_edge_index, node_index)| stream_graph.get_stream_node(*node_index))
                     .map(|stream_node| stream_node.id)
                     .collect();
-                follower_job_ids.extend_from_slice(f_job_ids.as_slice());
+                child_job_ids.extend_from_slice(f_job_ids.as_slice());
                 break;
             } else {
                 if children.len() == 0 {
@@ -276,8 +273,8 @@ impl JobGraph {
             job_id,
             parallelism,
             stream_nodes,
-            follower_job_ids,
-            dependency_job_ids: vec![],
+            child_job_ids,
+            parent_job_ids: vec![],
         })
     }
 
