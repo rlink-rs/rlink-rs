@@ -16,13 +16,12 @@ use tokio_util::codec::LengthDelimitedCodec;
 use tokio_util::codec::{BytesCodec, FramedWrite};
 
 use crate::api::element::{Element, Serde};
-use crate::api::runtime::TaskId;
+use crate::api::runtime::{ChannelKey, TaskId};
 use crate::channel::{
     bounded, mb, named_bounded, ElementReceiver, ElementSender, Receiver, Sender, TryRecvError,
     TrySendError,
 };
 use crate::io::network::{ElementRequest, ResponseCode};
-use crate::io::ChannelKey;
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::ApplicationDescriptor;
 use crate::utils::get_runtime;
@@ -187,12 +186,15 @@ impl Client {
                             let (code, element) = frame_parse(bytes);
                             match code {
                                 ResponseCode::Ok => {
-                                    let element = element.unwrap();
-                                    if element.is_watermark() {
-                                        debug!(
-                                            "net recv Watermark {}",
-                                            element.as_watermark().timestamp
-                                        );
+                                    let mut element = element.unwrap();
+                                    match element.borrow_mut() {
+                                        Element::Record(record) => {
+                                            record.channel_key = self.channel_key
+                                        }
+                                        Element::Watermark(watermark) => {
+                                            debug!("net recv Watermark {}", watermark.timestamp);
+                                        }
+                                        _ => {}
                                     }
 
                                     Client::send_to_channel(element, &self.sender, &counter).await;

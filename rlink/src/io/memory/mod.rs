@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use crate::api::runtime::TaskId;
+use crate::api::runtime::{ChannelKey, TaskId};
 use crate::channel::{mb, named_bounded, ElementReceiver, ElementSender};
-use crate::io::ChannelKey;
 use crate::metrics::Tag;
 
 lazy_static! {

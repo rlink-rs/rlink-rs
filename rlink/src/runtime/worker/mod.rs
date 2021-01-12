@@ -160,7 +160,7 @@ where
                     op
                 }
                 StreamOperatorWrap::StreamCoProcess(stream_operator) => {
-                    let op = CoProcessRunnable::new(stream_operator, None);
+                    let op = CoProcessRunnable::new(operator_id, stream_operator, None);
                     let op: Box<dyn Runnable> = Box::new(op);
                     op
                 }

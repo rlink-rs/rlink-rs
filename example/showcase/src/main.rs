@@ -9,5 +9,5 @@ mod buffer_gen;
 mod job;
 
 pub fn main() {
-    rlink::api::env::execute("test", crate::job::simple::MyStreamJob {});
+    rlink::api::env::execute("test", crate::job::join::MyStreamJob {});
 }

@@ -17,3 +17,9 @@ impl TaskId {
         self.num_tasks
     }
 }
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Default)]
+pub(crate) struct ChannelKey {
+    pub(crate) source_task_id: TaskId,
+    pub(crate) target_task_id: TaskId,
+}

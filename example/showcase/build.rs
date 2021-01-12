@@ -10,4 +10,10 @@ fn main() {
         .field("value3", I64)
         .gen()
         .expect("buffer gen error");
+
+    Codegen::new("src/buffer_gen", "Config")
+        .field("field", STRING)
+        .field("value", STRING)
+        .gen()
+        .expect("buffer gen error");
 }

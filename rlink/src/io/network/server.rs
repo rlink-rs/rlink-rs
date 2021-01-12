@@ -14,10 +14,9 @@ use tokio::sync::RwLock;
 use tokio_util::codec::LengthDelimitedCodec;
 
 use crate::api::element::{Element, Serde};
-use crate::api::runtime::TaskId;
+use crate::api::runtime::{ChannelKey, TaskId};
 use crate::channel::{mb, named_bounded, ElementReceiver, ElementSender, TryRecvError};
 use crate::io::network::{ElementRequest, ResponseCode};
-use crate::io::ChannelKey;
 use crate::metrics::Tag;
 use crate::utils::get_runtime;
 use std::convert::TryFrom;

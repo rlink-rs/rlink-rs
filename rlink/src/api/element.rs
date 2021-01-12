@@ -3,6 +3,7 @@ use std::fmt::Debug;
 
 use bytes::{Buf, BufMut, BytesMut};
 
+use crate::api::runtime::ChannelKey;
 use crate::api::window::WindowWrap;
 
 lazy_static! {
@@ -41,6 +42,7 @@ pub struct Record {
     pub(crate) partition_num: u16,
     pub(crate) timestamp: u64,
 
+    pub(crate) channel_key: ChannelKey,
     pub(crate) location_windows: Option<Vec<WindowWrap>>,
     pub(crate) trigger_window: Option<WindowWrap>,
 
@@ -52,6 +54,7 @@ impl Record {
         Record {
             partition_num: 0,
             timestamp: 0,
+            channel_key: ChannelKey::default(),
             location_windows: None,
             trigger_window: None,
             values: Buffer::new(),
@@ -62,6 +65,7 @@ impl Record {
         Record {
             partition_num: 0,
             timestamp: 0,
+            channel_key: ChannelKey::default(),
             location_windows: None,
             trigger_window: None,
             values: Buffer::with_capacity(capacity),
@@ -164,6 +168,7 @@ impl Serde for Record {
         Record {
             partition_num,
             timestamp,
+            channel_key: ChannelKey::default(),
             location_windows: None,
             trigger_window: None,
             values: Buffer::from(values),

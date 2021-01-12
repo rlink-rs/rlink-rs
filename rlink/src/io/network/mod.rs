@@ -10,8 +10,7 @@ pub(crate) use server::Server;
 
 use std::convert::TryFrom;
 
-use crate::api::runtime::TaskId;
-use crate::io::ChannelKey;
+use crate::api::runtime::{ChannelKey, TaskId};
 use std::error::Error;
 
 const BODY_LEN: usize = 18;

@@ -1,3 +1,6 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use crate::api::data_stream::{DataStream, StreamBuilder};
 use crate::api::function::InputFormat;
 use crate::api::operator::StreamOperatorWrap;
@@ -5,8 +8,6 @@ use crate::api::properties::Properties;
 use crate::dag::stream_graph::OperatorId;
 use crate::dag::RawStreamGraph;
 use crate::runtime;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 /// define a stream job
 pub trait StreamJob: Send + Sync + Clone {

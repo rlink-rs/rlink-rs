@@ -17,6 +17,7 @@ pub type OperatorId = u32;
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct StreamNode {
     pub(crate) id: u32,
+    pub(crate) parent_ids: Vec<u32>,
     pub(crate) parallelism: u32,
 
     pub(crate) operator_name: String,
@@ -58,6 +59,30 @@ impl StreamGraph {
     pub fn get_stream_node(&self, node_index: NodeIndex) -> &StreamNode {
         self.dag.index(node_index)
     }
+
+    pub fn get_stream_node_by_operator_id(&self, operator_id: u32) -> Option<&StreamNode> {
+        self.dag
+            .raw_nodes()
+            .iter()
+            .find(|x| x.weight.id == operator_id)
+            .map(|x| &x.weight)
+    }
+
+    // pub fn get_parents(&self, operator_id: u32) -> Vec<&StreamNode> {
+    //     self.dag
+    //         .raw_edges()
+    //         .iter()
+    //         .filter_map(|x| {
+    //             let target = self.dag.index(x.target());
+    //             if target.id == operator_id {
+    //                 let source = self.dag.index(x.source());
+    //                 Some(source)
+    //             } else {
+    //                 None
+    //             }
+    //         })
+    //         .collect()
+    // }
 
     pub(crate) fn to_string(&self) -> String {
         JsonDag::dag_json(&self.dag).to_string()
@@ -180,6 +205,7 @@ impl RawStreamGraph {
 
         let stream_node = StreamNode {
             id: operator_id,
+            parent_ids: parent_operator_ids.clone(),
             parallelism,
             operator_name: operator.get_operator_name().to_string(),
             operator_type: OperatorType::from(&operator),

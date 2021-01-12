@@ -16,6 +16,8 @@ pub mod source_runnable;
 pub mod watermark_assigner_runnable;
 pub mod window_assigner_runnable;
 
+use crate::dag::job_graph::{JobEdge, JobNode};
+use crate::dag::stream_graph::StreamNode;
 use crate::dag::DagManager;
 pub(crate) use filter_runnable::FilterRunnable;
 pub(crate) use key_by_runnable::KeyByRunnable;
@@ -85,6 +87,22 @@ impl RunnableContext {
             .iter()
             .map(|(job_node, _)| job_node.parallelism)
             .collect()
+    }
+
+    pub(crate) fn get_parent_jobs(&self) -> Vec<(JobNode, JobEdge)> {
+        self.dag_manager
+            .get_job_parents(self.task_descriptor.task_id.job_id)
+            .iter()
+            .map(|(job_node, job_edge)| (job_node.clone(), job_edge.clone()))
+            .collect()
+    }
+
+    // pub(crate) fn get_parent_streams(&self, operator_id: u32) -> Vec<StreamNode> {
+    //     self.dag_manager.get_stream_parents(operator_id)
+    // }
+
+    pub(crate) fn get_stream(&self, operator_id: u32) -> StreamNode {
+        self.dag_manager.get_stream(operator_id).unwrap()
     }
 }
 

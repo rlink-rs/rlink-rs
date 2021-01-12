@@ -1,14 +1,17 @@
-use crate::api::element::{Element, Partition, Record};
-use crate::api::function::{Context, Function, OutputFormat};
-use crate::api::runtime::TaskId;
-use crate::channel::ElementSender;
-use crate::dag::execution_graph::ExecutionEdge;
-use crate::io::{memory, network, ChannelType};
+use std::borrow::BorrowMut;
 use std::collections::HashMap;
 use std::time::Duration;
 
+use crate::api::element::{Element, Partition, Record};
+use crate::api::function::{Context, Function, OutputFormat};
+use crate::api::runtime::{ChannelKey, TaskId};
+use crate::channel::ElementSender;
+use crate::dag::execution_graph::ExecutionEdge;
+use crate::io::{memory, network, ChannelType};
+
 /// support job's Multiplexing, but only one channel mode(memory/network) support
 pub struct SystemOutputFormat {
+    task_id: TaskId,
     channel_type: ChannelType,
     job_senders: Vec<(u32, Vec<(TaskId, ElementSender)>)>,
 }
@@ -16,6 +19,7 @@ pub struct SystemOutputFormat {
 impl SystemOutputFormat {
     pub fn new() -> Self {
         SystemOutputFormat {
+            task_id: TaskId::default(),
             channel_type: ChannelType::Memory,
             job_senders: Vec::new(),
         }
@@ -24,6 +28,8 @@ impl SystemOutputFormat {
 
 impl OutputFormat for SystemOutputFormat {
     fn open(&mut self, context: &Context) {
+        self.task_id = context.task_id;
+
         let parents: Vec<String> = context
             .children
             .iter()
@@ -121,17 +127,35 @@ impl OutputFormat for SystemOutputFormat {
 
     fn write_record(&mut self, _record: Record) {}
 
-    fn write_element(&mut self, element: Element) {
+    fn write_element(&mut self, mut element: Element) {
         match self.channel_type {
             ChannelType::Memory => {
                 // Multiplexing publish
                 if self.job_senders.len() == 1 {
                     let (_job_id, task_senders) = &self.job_senders[0];
-                    let (_task_id, sender) = &task_senders[0];
-                    sender.try_send_loop(element.clone(), Duration::from_secs(1))
+                    let (task_id, sender) = &task_senders[0];
+                    match element.borrow_mut() {
+                        Element::Record(record) => {
+                            record.channel_key = ChannelKey {
+                                source_task_id: self.task_id,
+                                target_task_id: *task_id,
+                            };
+                        }
+                        _ => {}
+                    }
+                    sender.try_send_loop(element, Duration::from_secs(1))
                 } else {
                     for (_job, task_senders) in &self.job_senders {
-                        let (_task_id, sender) = &task_senders[0];
+                        let (task_id, sender) = &task_senders[0];
+                        match element.borrow_mut() {
+                            Element::Record(record) => {
+                                record.channel_key = ChannelKey {
+                                    source_task_id: self.task_id,
+                                    target_task_id: *task_id,
+                                };
+                            }
+                            _ => {}
+                        }
                         sender.try_send_loop(element.clone(), Duration::from_secs(1))
                     }
                 }

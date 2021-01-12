@@ -16,7 +16,7 @@ use crate::api::runtime::TaskId;
 use crate::dag::execution_graph::{ExecutionEdge, ExecutionGraph, ExecutionNode};
 use crate::dag::job_graph::{JobEdge, JobGraph, JobNode};
 use crate::dag::physic_graph::PhysicGraph;
-use crate::dag::stream_graph::StreamGraph;
+use crate::dag::stream_graph::{StreamGraph, StreamNode};
 
 pub(crate) mod execution_graph;
 pub(crate) mod job_graph;
@@ -168,6 +168,18 @@ impl DagManager {
 
     pub fn physic_graph(&self) -> &PhysicGraph {
         &self.physic_graph
+    }
+
+    // pub fn get_stream_parents(&self, operator_id: u32) -> Vec<StreamNode> {
+    //     let parents = self.stream_graph.get_parents(operator_id);
+    //     let parents: Vec<StreamNode> = parents.into_iter().map(|x| x.clone()).collect();
+    //     parents
+    // }
+
+    pub fn get_stream(&self, operator_id: u32) -> Option<StreamNode> {
+        self.stream_graph
+            .get_stream_node_by_operator_id(operator_id)
+            .map(|stream_node| stream_node.clone())
     }
 
     #[inline]

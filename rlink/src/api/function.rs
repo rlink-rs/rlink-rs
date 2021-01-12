@@ -183,6 +183,6 @@ where
     /// This method is called for each element in the first of the connected streams.
     ///
     /// `stream_seq` is the `DataStream` index
-    fn process(&self, stream_seq: usize, record: Record) -> Record;
+    fn process(&self, stream_seq: usize, record: Record) -> Option<Record>;
     fn close(&mut self);
 }
