@@ -150,16 +150,20 @@ pub struct MyCoProcessFunction {}
 impl CoProcessFunction for MyCoProcessFunction {
     fn open(&mut self, _context: &Context) {}
 
-    fn process_left(&self, record: Record) -> Option<Record> {
-        Some(record)
+    fn process_left(&self, record: Record) -> Box<dyn Iterator<Item = Record>> {
+        Box::new(vec![record].into_iter())
     }
 
-    fn process_right(&self, stream_seq: usize, mut record: Record) -> Option<Record> {
+    fn process_right(
+        &self,
+        stream_seq: usize,
+        mut record: Record,
+    ) -> Box<dyn Iterator<Item = Record>> {
         if stream_seq == 0 {
             let conf = config::Entity::parse(record.as_buffer()).unwrap();
             info!("config field:{}, val:{}", conf.field, conf.value);
         }
-        None
+        Box::new(vec![].into_iter())
     }
 
     fn close(&mut self) {}

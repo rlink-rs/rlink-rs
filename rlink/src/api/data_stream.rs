@@ -713,12 +713,16 @@ mod tests {
     impl CoProcessFunction for MyCoProcessFunction {
         fn open(&mut self, _context: &Context) {}
 
-        fn process_left(&self, record: Record) -> Option<Record> {
-            Some(record)
+        fn process_left(&self, record: Record) -> Box<dyn Iterator<Item = Record>> {
+            Box::new(vec![].into_iter())
         }
 
-        fn process_right(&self, stream_seq: usize, record: Record) -> Option<Record> {
-            None
+        fn process_right(
+            &self,
+            stream_seq: usize,
+            record: Record,
+        ) -> Box<dyn Iterator<Item = Record>> {
+            Box::new(vec![].into_iter())
         }
 
         fn close(&mut self) {}

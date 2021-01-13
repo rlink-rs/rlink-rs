@@ -173,7 +173,7 @@ impl Runnable for SourceRunnable {
             }
 
             if end {
-                info!("source end");
+                // info!("source end");
                 std::thread::sleep(Duration::from_secs(1));
                 // break;
             }
