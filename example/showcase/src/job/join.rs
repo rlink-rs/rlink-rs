@@ -18,6 +18,7 @@ use rlink::functions::column_base_function::FunctionSchema;
 use crate::buffer_gen::model::DATA_TYPE;
 use crate::buffer_gen::{config, model};
 use crate::job::simple::{MyFilterFunction, MyFlatMapFunction, MyOutputFormat, TestInputFormat};
+use rlink::functions::broadcast_flat_map::BroadcastFlagMapFunction;
 
 #[derive(Clone, Debug)]
 pub struct MyStreamJob {}
@@ -41,7 +42,7 @@ impl StreamJob for MyStreamJob {
         };
 
         let data_stream_left = env
-            .register_source(TestInputFormat::new(properties.clone()), 1)
+            .register_source(TestInputFormat::new(properties.clone()), 3)
             .flat_map(MyFlatMapFunction::new())
             .filter(MyFilterFunction::new())
             .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
@@ -50,7 +51,7 @@ impl StreamJob for MyStreamJob {
             ));
         let data_stream_right = env
             .register_source(BroadcastInputFormat::new(properties.clone()), 1)
-            .flat_map(MyFlatMapFunction::new());
+            .flat_map(BroadcastFlagMapFunction::new());
 
         data_stream_left
             .connect(vec![data_stream_right], MyCoProcessFunction {})

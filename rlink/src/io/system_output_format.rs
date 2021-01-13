@@ -40,7 +40,7 @@ impl OutputFormat for SystemOutputFormat {
                 )
             })
             .collect();
-        info!("publish\n   {}", parents.join("\n  "));
+        info!("publish\n  {}", parents.join("\n  "));
 
         let mut memory_jobs = Vec::new();
         let mut network_jobs = Vec::new();

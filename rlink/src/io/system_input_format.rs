@@ -38,7 +38,7 @@ impl InputFormat for SystemInputFormat {
                 )
             })
             .collect();
-        info!("subscribe\n   {}", parents.join("\n  "));
+        info!("subscribe\n  {}", parents.join("\n  "));
 
         let mut memory_jobs = Vec::new();
         let mut network_jobs = Vec::new();
