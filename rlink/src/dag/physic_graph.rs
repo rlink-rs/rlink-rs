@@ -1,3 +1,4 @@
+use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
 use std::ops::Index;
 
@@ -6,7 +7,6 @@ use daggy::{Dag, EdgeIndex, NodeIndex, Walker};
 use crate::api::runtime::JobId;
 use crate::dag::execution_graph::{ExecutionEdge, ExecutionGraph, ExecutionNode};
 use crate::dag::{TaskId, TaskInstance, WorkerManagerInstance};
-use std::borrow::BorrowMut;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub(crate) struct ForwardTaskChain {

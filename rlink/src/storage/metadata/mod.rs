@@ -1,13 +1,13 @@
 use std::error::Error;
 use std::fmt::Debug;
 
+use crate::api::metadata::MetadataStorageMode;
 use crate::runtime::{ApplicationDescriptor, TaskManagerStatus};
 use crate::storage::metadata::mem_metadata_storage::MemoryMetadataStorage;
 
 pub mod mem_metadata_storage;
 
 pub mod metadata_loader;
-use crate::api::metadata::MetadataStorageMode;
 pub use metadata_loader::MetadataLoader;
 
 pub trait MetadataStorage: Debug {

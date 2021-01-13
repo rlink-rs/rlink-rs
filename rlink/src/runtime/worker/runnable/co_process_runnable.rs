@@ -1,9 +1,10 @@
+use std::collections::HashMap;
+
 use crate::api::element::Element;
 use crate::api::function::CoProcessFunction;
 use crate::api::operator::StreamOperator;
 use crate::api::runtime::{CheckpointId, JobId, OperatorId};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
-use std::collections::HashMap;
 
 #[derive(Debug)]
 pub(crate) struct CoProcessRunnable {

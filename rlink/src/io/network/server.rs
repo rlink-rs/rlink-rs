@@ -1,4 +1,5 @@
 use std::borrow::BorrowMut;
+use std::convert::TryFrom;
 use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -19,7 +20,6 @@ use crate::channel::{mb, named_bounded, ElementReceiver, ElementSender, TryRecvE
 use crate::io::network::{ElementRequest, ResponseCode};
 use crate::metrics::Tag;
 use crate::utils::get_runtime;
-use std::convert::TryFrom;
 
 lazy_static! {
     static ref NETWORK_CHANNELS: DashMap<ChannelKey, ElementReceiver> = DashMap::new();

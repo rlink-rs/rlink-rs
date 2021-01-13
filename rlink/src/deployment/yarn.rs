@@ -1,8 +1,9 @@
-use serde::Deserialize;
-use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{BufRead, Write};
 use std::process::Stdio;
+
+use serde::Deserialize;
+use serde::Serialize;
 
 use crate::api::cluster::TaskResourceInfo;
 use crate::api::env::{StreamExecutionEnvironment, StreamJob};

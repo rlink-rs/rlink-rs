@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::hash::Hash;
 use std::io::Read;
+use std::path::PathBuf;
+use std::thread::JoinHandle;
 
 // pub mod buffer;
 pub mod date_time;
@@ -15,8 +17,6 @@ pub mod panic;
 pub mod timer;
 
 pub use id_generator::gen_id;
-use std::path::PathBuf;
-use std::thread::JoinHandle;
 
 pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 

@@ -1,4 +1,7 @@
 use std::borrow::BorrowMut;
+use std::collections::HashMap;
+use std::ops::Deref;
+use std::thread::JoinHandle;
 
 use crate::api::element::{Element, Record};
 use crate::api::env::{StreamExecutionEnvironment, StreamJob};
@@ -15,9 +18,6 @@ use crate::runtime::worker::runnable::{
 use crate::runtime::{ApplicationDescriptor, TaskDescriptor};
 use crate::storage::metadata::MetadataLoader;
 use crate::utils::timer::WindowTimer;
-use std::collections::HashMap;
-use std::ops::Deref;
-use std::thread::JoinHandle;
 
 pub mod checkpoint;
 pub mod heart_beat;
