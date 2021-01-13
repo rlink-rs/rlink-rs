@@ -1,4 +1,5 @@
 use std::borrow::BorrowMut;
+use std::ops::Deref;
 use std::time::Duration;
 
 use crate::api::checkpoint::CheckpointHandle;
@@ -18,7 +19,6 @@ use crate::storage::metadata::{
     loop_update_job_status, MetadataStorageWrap,
 };
 use crate::utils::date_time::timestamp_str;
-use std::ops::Deref;
 
 // pub mod checkpoint;
 pub mod checkpoint_manager;

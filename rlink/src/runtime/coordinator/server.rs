@@ -117,6 +117,7 @@ async fn serve(
                 .service(
                     web::resource("/dag/execution_graph").route(web::get().to(get_execution_graph)),
                 )
+                .service(web::resource("/dag/physic_graph").route(web::get().to(get_physic_graph)))
         })
         .disable_signals()
         .workers(8)
@@ -153,6 +154,7 @@ fn index() -> HttpResponse {
                 <li><a href="dag/stream_graph">dag:stream_graph</a></li>
                 <li><a href="dag/job_graph">dag:job_graph</a></li>
                 <li><a href="dag/execution_graph">dag:execution_graph</a></li>
+                <li><a href="dag/physic_graph">dag:physic_graph</a></li>
             </ul>
         </body>
     </html>"#;
@@ -257,5 +259,12 @@ pub(crate) async fn get_execution_graph(
     let json_dag = JsonDag::dag_json(dag);
 
     let response = StdResponse::new(ResponseCode::OK, Some(json_dag));
+    Ok(HttpResponse::Ok().json(response))
+}
+
+pub(crate) async fn get_physic_graph(dag_manager: Data<DagManager>) -> Result<HttpResponse, Error> {
+    let task_groups = &dag_manager.get_ref().physic_graph().task_groups.clone();
+
+    let response = StdResponse::new(ResponseCode::OK, Some(task_groups));
     Ok(HttpResponse::Ok().json(response))
 }

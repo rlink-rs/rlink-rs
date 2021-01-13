@@ -26,7 +26,7 @@ impl ForwardTaskChain {
 #[derive(Debug, Clone)]
 pub(crate) struct PhysicGraph {
     /// Map key: first JobId
-    task_groups: HashMap<JobId, Vec<ForwardTaskChain>>,
+    pub(crate) task_groups: HashMap<JobId, Vec<ForwardTaskChain>>,
 }
 
 impl PhysicGraph {
