@@ -3,8 +3,8 @@ use std::rc::Rc;
 
 use crate::api::env::StreamManager;
 use crate::api::function::{
-    CoProcessFunction, FilterFunction, InputFormat, KeySelectorFunction, MapFunction, OutputFormat,
-    ReduceFunction,
+    CoProcessFunction, FilterFunction, FlatMapFunction, InputFormat, KeySelectorFunction,
+    OutputFormat, ReduceFunction,
 };
 use crate::api::operator::{FunctionCreator, StreamOperatorWrap};
 use crate::api::runtime::OperatorId;
@@ -16,9 +16,9 @@ pub(crate) trait PipelineStream: Debug {
 }
 
 pub trait TDataStream {
-    fn map<F>(self, map: F) -> DataStream
+    fn flat_map<F>(self, flat_mapper: F) -> DataStream
     where
-        F: MapFunction + 'static;
+        F: FlatMapFunction + 'static;
 
     fn filter<F>(self, filter: F) -> DataStream
     where
@@ -83,11 +83,11 @@ impl DataStream {
 }
 
 impl TDataStream for DataStream {
-    fn map<F>(self, mapper: F) -> DataStream
+    fn flat_map<F>(self, flat_mapper: F) -> DataStream
     where
-        F: MapFunction + 'static,
+        F: FlatMapFunction + 'static,
     {
-        self.data_stream.map(mapper)
+        self.data_stream.flat_map(flat_mapper)
     }
 
     fn filter<F>(self, filter: F) -> DataStream
@@ -274,11 +274,11 @@ impl PipelineStream for StreamBuilder {
 }
 
 impl TDataStream for StreamBuilder {
-    fn map<F>(mut self, mapper: F) -> DataStream
+    fn flat_map<F>(mut self, flat_mapper: F) -> DataStream
     where
-        F: MapFunction + 'static,
+        F: FlatMapFunction + 'static,
     {
-        let map_func = Box::new(mapper);
+        let map_func = Box::new(flat_mapper);
         let stream_map = StreamOperatorWrap::new_map(OperatorId::default(), vec![], map_func);
 
         self.cur_operator_id = self
@@ -450,8 +450,8 @@ mod tests {
     use crate::api::element::Record;
     use crate::api::env::StreamExecutionEnvironment;
     use crate::api::function::{
-        CoProcessFunction, Context, Function, InputFormat, InputSplit, InputSplitAssigner,
-        InputSplitSource, KeySelectorFunction, MapFunction, OutputFormat, ReduceFunction,
+        CoProcessFunction, Context, FlatMapFunction, Function, InputFormat, InputSplit,
+        InputSplitAssigner, InputSplitSource, KeySelectorFunction, OutputFormat, ReduceFunction,
     };
     use crate::api::properties::Properties;
     use crate::api::watermark::{BoundedOutOfOrdernessTimestampExtractor, TimestampAssigner};
@@ -463,7 +463,7 @@ mod tests {
         let mut env = StreamExecutionEnvironment::new("job_name".to_string());
 
         env.register_source(MyInputFormat::new(), 100)
-            .map(MyMapFunction::new())
+            .flat_map(MyFlatMapFunction::new())
             .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
                 Duration::from_secs(1),
                 MyTimestampAssigner::new(),
@@ -486,14 +486,14 @@ mod tests {
 
         let ds = env
             .register_source(MyInputFormat::new(), 1)
-            .map(MyMapFunction::new())
+            .flat_map(MyFlatMapFunction::new())
             .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
                 Duration::from_secs(1),
                 MyTimestampAssigner::new(),
             ));
 
         env.register_source(MyInputFormat::new(), 2)
-            .map(MyMapFunction::new())
+            .flat_map(MyFlatMapFunction::new())
             .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
                 Duration::from_secs(1),
                 MyTimestampAssigner::new(),
@@ -506,7 +506,7 @@ mod tests {
                 None,
             ))
             .reduce(MyReduceFunction::new(), 3)
-            .map(MyMapFunction::new())
+            .flat_map(MyFlatMapFunction::new())
             .add_sink(MyOutputFormat::new(Properties::new()));
 
         let dag_manager = DagManager::new(&env.stream_manager.stream_graph.borrow());
@@ -583,27 +583,27 @@ mod tests {
     }
 
     #[derive(Serialize, Deserialize, Debug)]
-    pub struct MyMapFunction {}
+    pub struct MyFlatMapFunction {}
 
-    impl MyMapFunction {
+    impl MyFlatMapFunction {
         pub fn new() -> Self {
-            MyMapFunction {}
+            MyFlatMapFunction {}
         }
     }
 
-    impl MapFunction for MyMapFunction {
+    impl FlatMapFunction for MyFlatMapFunction {
         fn open(&mut self, _context: &Context) {}
 
-        fn map(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>> {
+        fn flat_map(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>> {
             Box::new(vec![record].into_iter())
         }
 
         fn close(&mut self) {}
     }
 
-    impl Function for MyMapFunction {
+    impl Function for MyFlatMapFunction {
         fn get_name(&self) -> &str {
-            "MyMapFunction"
+            "MyFlatMapFunction"
         }
     }
 

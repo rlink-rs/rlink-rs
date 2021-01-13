@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use crate::api::function::{
-    CoProcessFunction, FilterFunction, Function, InputFormat, KeySelectorFunction, MapFunction,
+    CoProcessFunction, FilterFunction, FlatMapFunction, Function, InputFormat, KeySelectorFunction,
     OutputFormat, ReduceFunction,
 };
 use crate::api::runtime::OperatorId;
@@ -104,7 +104,7 @@ where
 #[derive(Debug)]
 pub enum StreamOperatorWrap {
     StreamSource(StreamOperator<dyn InputFormat>),
-    StreamMap(StreamOperator<dyn MapFunction>),
+    StreamMap(StreamOperator<dyn FlatMapFunction>),
     StreamFilter(StreamOperator<dyn FilterFunction>),
     StreamCoProcess(StreamOperator<dyn CoProcessFunction>),
     StreamKeyBy(StreamOperator<dyn KeySelectorFunction>),
@@ -129,7 +129,7 @@ impl StreamOperatorWrap {
     pub fn new_map(
         id: OperatorId,
         parent_ids: Vec<OperatorId>,
-        map_fn: Box<dyn MapFunction>,
+        map_fn: Box<dyn FlatMapFunction>,
     ) -> Self {
         let operator = StreamOperator::new(
             id,

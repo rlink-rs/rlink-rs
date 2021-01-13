@@ -1,20 +1,21 @@
 use crate::api::backend::KeyedStateBackend;
 use crate::api::element::Record;
-use crate::api::function::{Context, Function, MapFunction};
+use crate::api::function::{Context, FlatMapFunction, Function};
 use crate::api::properties::SystemProperties;
 use crate::api::runtime::JobId;
 use crate::storage::keyed_state::{ReducingState, ReducingStateWrap, StateKey};
 
-pub struct SystemKeyedStateMapFunction {
+/// only for keyed state backend(can add a type to support other)
+pub struct SystemFlatMapFunction {
     parent_job_id: JobId,
     task_number: u16,
 
     state_mode: KeyedStateBackend,
 }
 
-impl SystemKeyedStateMapFunction {
+impl SystemFlatMapFunction {
     pub fn new() -> Self {
-        SystemKeyedStateMapFunction {
+        SystemFlatMapFunction {
             parent_job_id: JobId::default(),
             task_number: 0,
             state_mode: KeyedStateBackend::Memory,
@@ -22,7 +23,7 @@ impl SystemKeyedStateMapFunction {
     }
 }
 
-impl MapFunction for SystemKeyedStateMapFunction {
+impl FlatMapFunction for SystemFlatMapFunction {
     fn open(&mut self, context: &Context) {
         if context.parents.len() != 1 {
             panic!("KeyedStateMap job can only one parent");
@@ -36,7 +37,7 @@ impl MapFunction for SystemKeyedStateMapFunction {
         }
     }
 
-    fn map(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>> {
+    fn flat_map(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>> {
         if record.len() > 0 {
             panic!("drop window's Record is no value");
         }
@@ -60,8 +61,8 @@ impl MapFunction for SystemKeyedStateMapFunction {
     fn close(&mut self) {}
 }
 
-impl Function for SystemKeyedStateMapFunction {
+impl Function for SystemFlatMapFunction {
     fn get_name(&self) -> &str {
-        "SystemKeyedStateMapFunction"
+        "SystemFlatMapFunction"
     }
 }

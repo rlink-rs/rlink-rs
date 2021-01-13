@@ -12,7 +12,7 @@ use crate::dag::{DagManager, OperatorType};
 use crate::runtime::context::Context;
 use crate::runtime::worker::runnable::co_process_runnable::CoProcessRunnable;
 use crate::runtime::worker::runnable::{
-    FilterRunnable, KeyByRunnable, MapRunnable, ReduceRunnable, Runnable, RunnableContext,
+    FilterRunnable, FlatMapRunnable, KeyByRunnable, ReduceRunnable, Runnable, RunnableContext,
     SinkRunnable, SourceRunnable, WatermarkAssignerRunnable, WindowAssignerRunnable,
 };
 use crate::runtime::{ApplicationDescriptor, TaskDescriptor};
@@ -151,7 +151,7 @@ where
                     op
                 }
                 StreamOperatorWrap::StreamMap(stream_operator) => {
-                    let op = MapRunnable::new(stream_operator, None);
+                    let op = FlatMapRunnable::new(stream_operator, None);
                     let op: Box<dyn Runnable> = Box::new(op);
                     op
                 }

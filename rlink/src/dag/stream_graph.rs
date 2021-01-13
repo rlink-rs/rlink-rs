@@ -9,8 +9,8 @@ use crate::api::operator::{
 };
 use crate::api::runtime::OperatorId;
 use crate::dag::{DagError, JsonDag, Label, OperatorType};
+use crate::io::system_flat_map_function::SystemFlatMapFunction;
 use crate::io::system_input_format::SystemInputFormat;
-use crate::io::system_keyed_state_flat_map::SystemKeyedStateMapFunction;
 use crate::io::system_output_format::SystemOutputFormat;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -145,13 +145,13 @@ impl RawStreamGraph {
         operators
     }
 
-    fn create_virtual_map(
+    fn create_virtual_flat_map(
         &mut self,
         id: OperatorId,
         parent_id: OperatorId,
         parallelism: u32,
     ) -> StreamOperatorWrap {
-        let map_format = Box::new(SystemKeyedStateMapFunction::new());
+        let map_format = Box::new(SystemFlatMapFunction::new());
         StreamOperatorWrap::StreamMap(StreamOperator::new(
             id,
             vec![parent_id],
@@ -286,7 +286,7 @@ impl RawStreamGraph {
                     self.add_operator0(vir_source, vec![vir_operator_id], parallelism)?;
 
                 let vir_operator_id = if self.is_reduce_parent(p_operator_id) {
-                    let vir_map = self.create_virtual_map(
+                    let vir_map = self.create_virtual_flat_map(
                         OperatorId::default(),
                         vir_operator_id,
                         parallelism,

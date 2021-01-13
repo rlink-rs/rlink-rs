@@ -6,8 +6,8 @@ use rlink::api::data_stream::{TDataStream, TKeyedStream, TWindowedStream};
 use rlink::api::element::Record;
 use rlink::api::env::{StreamExecutionEnvironment, StreamJob};
 use rlink::api::function::{
-    Context, FilterFunction, InputFormat, InputSplit, InputSplitAssigner, InputSplitSource,
-    MapFunction, OutputFormat,
+    Context, FilterFunction, FlatMapFunction, InputFormat, InputSplit, InputSplitAssigner,
+    InputSplitSource, OutputFormat,
 };
 use rlink::api::properties::{Properties, SystemProperties};
 use rlink::api::watermark::BoundedOutOfOrdernessTimestampExtractor;
@@ -44,7 +44,7 @@ impl StreamJob for MyStreamJob {
 
         let data_stream = env.register_source(TestInputFormat::new(properties.clone()), 1);
         data_stream
-            .map(MyMapFunction::new())
+            .flat_map(MyFlatMapFunction::new())
             .filter(MyFilterFunction::new())
             .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
                 Duration::from_secs(1),
@@ -199,18 +199,18 @@ fn create_record(key: &str, value: i32, date_time: &str) -> Record {
 }
 
 #[derive(Debug, Function)]
-pub struct MyMapFunction {}
+pub struct MyFlatMapFunction {}
 
-impl MyMapFunction {
+impl MyFlatMapFunction {
     pub fn new() -> Self {
-        MyMapFunction {}
+        MyFlatMapFunction {}
     }
 }
 
-impl MapFunction for MyMapFunction {
+impl FlatMapFunction for MyFlatMapFunction {
     fn open(&mut self, _context: &Context) {}
 
-    fn map(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>> {
+    fn flat_map(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>> {
         Box::new(vec![record].into_iter())
     }
 

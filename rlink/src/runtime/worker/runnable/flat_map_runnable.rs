@@ -3,35 +3,35 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use crate::api::element::Element;
-use crate::api::function::MapFunction;
+use crate::api::function::FlatMapFunction;
 use crate::api::operator::StreamOperator;
 use crate::api::runtime::CheckpointId;
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
 #[derive(Debug)]
-pub(crate) struct MapRunnable {
-    stream_map: StreamOperator<dyn MapFunction>,
+pub(crate) struct FlatMapRunnable {
+    stream_map: StreamOperator<dyn FlatMapFunction>,
     next_runnable: Option<Box<dyn Runnable>>,
 
     counter: Arc<AtomicU64>,
 }
 
-impl MapRunnable {
+impl FlatMapRunnable {
     pub fn new(
-        stream_map: StreamOperator<dyn MapFunction>,
+        stream_map: StreamOperator<dyn FlatMapFunction>,
         next_runnable: Option<Box<dyn Runnable>>,
     ) -> Self {
-        info!("Create MapRunnable");
+        info!("Create FlatMapRunnable");
 
-        MapRunnable {
+        FlatMapRunnable {
             stream_map,
             next_runnable,
             counter: Arc::new(AtomicU64::new(0)),
         }
     }
 }
-impl Runnable for MapRunnable {
+impl Runnable for FlatMapRunnable {
     fn open(&mut self, context: &RunnableContext) {
         self.next_runnable.as_mut().unwrap().open(context);
 
@@ -58,7 +58,7 @@ impl Runnable for MapRunnable {
                 .stream_map
                 .operator_fn
                 .as_mut()
-                .map(element.into_record());
+                .flat_map(element.into_record());
 
             let mut len = 0;
             for record in records {
