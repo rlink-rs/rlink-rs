@@ -1,11 +1,12 @@
 use std::collections::{HashMap, HashSet};
 use std::ops::Index;
 
-use daggy::{NodeIndex, Walker};
+use daggy::{Dag, EdgeIndex, NodeIndex, Walker};
 
 use crate::api::runtime::JobId;
 use crate::dag::execution_graph::{ExecutionEdge, ExecutionGraph, ExecutionNode};
 use crate::dag::{TaskId, TaskInstance, WorkerManagerInstance};
+use std::borrow::BorrowMut;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub(crate) struct ForwardTaskChain {
@@ -106,21 +107,12 @@ impl PhysicGraph {
             let first_node_index = forward_task_set.iter().next().map(|x| *x);
             match first_node_index {
                 Some(node_index) => {
-                    let parents = self.get_parents(node_index, execution_graph);
-                    let children = self.get_children(node_index, execution_graph);
+                    let mut dag = execution_dag.clone();
+                    let forward_node_indies = self.search(node_index, dag.borrow_mut());
 
-                    forward_task_set.remove(&node_index);
-                    parents.iter().for_each(|x| {
+                    forward_node_indies.iter().for_each(|x| {
                         forward_task_set.remove(x);
                     });
-                    children.iter().for_each(|x| {
-                        forward_task_set.remove(x);
-                    });
-
-                    let mut forward_node_indies = Vec::new();
-                    forward_node_indies.push(node_index);
-                    forward_node_indies.extend_from_slice(parents.as_slice());
-                    forward_node_indies.extend_from_slice(children.as_slice());
 
                     let tasks: Vec<ExecutionNode> = forward_node_indies
                         .into_iter()
@@ -136,55 +128,76 @@ impl PhysicGraph {
         forward_chains
     }
 
+    fn search(
+        &self,
+        node_index: NodeIndex,
+        execution_dag: &mut Dag<ExecutionNode, ExecutionEdge>,
+    ) -> Vec<NodeIndex> {
+        let mut node_indies = Vec::new();
+        node_indies.push(node_index);
+
+        let parents = self.get_parents(node_index, execution_dag);
+        for p in parents {
+            let p_indies = self.search(p, execution_dag);
+            node_indies.extend_from_slice(p_indies.as_slice());
+        }
+
+        let children = self.get_children(node_index, execution_dag);
+        for p in children {
+            let p_indies = self.search(p, execution_dag);
+            node_indies.extend_from_slice(p_indies.as_slice());
+        }
+
+        node_indies
+    }
+
     fn get_parents(
         &self,
         node_index: NodeIndex,
-        execution_graph: &ExecutionGraph,
+        execution_dag: &mut Dag<ExecutionNode, ExecutionEdge>,
     ) -> Vec<NodeIndex> {
-        let execution_dag = &execution_graph.dag;
-        let parent_node_indies: Vec<NodeIndex> = execution_dag
+        let parent_node_indies: Vec<(EdgeIndex, NodeIndex)> = execution_dag
             .parents(node_index)
             .iter(execution_dag)
             .filter(|(edge, _node)| match execution_dag.index(*edge) {
                 ExecutionEdge::Memory => true,
                 ExecutionEdge::Network => false,
             })
-            .map(|(_edge, node)| node)
             .collect();
 
-        let mut node_indies = Vec::new();
-        for node_index in &parent_node_indies {
-            let pp_node_indies = self.get_parents(*node_index, execution_graph);
-            node_indies.extend_from_slice(pp_node_indies.as_slice());
-        }
+        let parent_node_indies: Vec<NodeIndex> = parent_node_indies
+            .into_iter()
+            .map(|(edge, node)| {
+                execution_dag.remove_edge(edge);
+                node
+            })
+            .collect();
 
-        node_indies.extend_from_slice(parent_node_indies.as_slice());
-        node_indies
+        parent_node_indies
     }
 
     fn get_children(
         &self,
         node_index: NodeIndex,
-        execution_graph: &ExecutionGraph,
+        execution_dag: &mut Dag<ExecutionNode, ExecutionEdge>,
     ) -> Vec<NodeIndex> {
-        let execution_dag = &execution_graph.dag;
-        let child_node_indies: Vec<NodeIndex> = execution_dag
+        let child_node_indies: Vec<(EdgeIndex, NodeIndex)> = execution_dag
             .children(node_index)
             .iter(execution_dag)
             .filter(|(edge, _node)| match execution_dag.index(*edge) {
                 ExecutionEdge::Memory => true,
                 ExecutionEdge::Network => false,
             })
-            .map(|(_edge, node)| node)
             .collect();
 
-        let mut node_indies = Vec::new();
-        for node_index in &child_node_indies {
-            let cc_node_indies = self.get_children(*node_index, execution_graph);
-            node_indies.extend_from_slice(cc_node_indies.as_slice());
-        }
+        let child_node_indies: Vec<NodeIndex> = child_node_indies
+            .into_iter()
+            .map(|(edge, node)| {
+                execution_dag.remove_edge(edge);
+                node
+            })
+            .collect();
 
-        node_indies.extend_from_slice(child_node_indies.as_slice());
-        node_indies
+        child_node_indies
     }
 }
