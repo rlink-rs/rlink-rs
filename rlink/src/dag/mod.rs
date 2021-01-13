@@ -302,58 +302,301 @@ where
         JsonDag { nodes, edges }
     }
 
-    // pub(crate) fn fill_begin_end_node(mut self) -> Self {
-    //     let begin_node: JsonNode<N> = JsonNode {
-    //         id: "Begin".to_string(),
-    //         label: "Begin".to_string(),
-    //         ty: "begin".to_string(),
-    //         detail: None,
-    //     };
-    //     let end_node: JsonNode<N> = JsonNode {
-    //         id: "End".to_string(),
-    //         label: "End".to_string(),
-    //         ty: "end".to_string(),
-    //         detail: None,
-    //     };
-    //     let begin_edges: Vec<JsonEdge<E>> = self
-    //         .nodes
-    //         .iter_mut()
-    //         .filter(|node| node.ty.eq("begin"))
-    //         .map(|node| {
-    //             node.ty = "".to_string();
-    //             let edge: JsonEdge<E> = JsonEdge {
-    //                 source: begin_node.id.clone(),
-    //                 target: node.id.clone(),
-    //                 label: "".to_string(),
-    //                 detail: None,
-    //             };
-    //             edge
-    //         })
-    //         .collect();
-    //     let end_edges: Vec<JsonEdge<E>> = self
-    //         .nodes
-    //         .iter_mut()
-    //         .filter(|node| node.ty.eq("end"))
-    //         .map(|node| {
-    //             node.ty = "".to_string();
-    //             let edge: JsonEdge<E> = JsonEdge {
-    //                 source: node.id.clone(),
-    //                 target: end_node.id.clone(),
-    //                 label: "".to_string(),
-    //                 detail: None,
-    //             };
-    //             edge
-    //         })
-    //         .collect();
-    //     self.edges.extend_from_slice(begin_edges.as_slice());
-    //     self.edges.extend_from_slice(end_edges.as_slice());
-    //     self.nodes.push(begin_node);
-    //     self.nodes.push(end_node);
-    //
-    //     self
-    // }
-    //
     pub(crate) fn to_string(&self) -> String {
         serde_json::to_string(self).unwrap_or("".to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use crate::api::data_stream::{TConnectedStreams, TKeyedStream};
+    use crate::api::data_stream::{TDataStream, TWindowedStream};
+    use crate::api::element::Record;
+    use crate::api::env::StreamExecutionEnvironment;
+    use crate::api::function::{
+        CoProcessFunction, Context, FlatMapFunction, Function, InputFormat, InputSplit,
+        InputSplitAssigner, InputSplitSource, KeySelectorFunction, OutputFormat, ReduceFunction,
+    };
+    use crate::api::properties::Properties;
+    use crate::api::watermark::{BoundedOutOfOrdernessTimestampExtractor, TimestampAssigner};
+    use crate::api::window::SlidingEventTimeWindows;
+    use crate::dag::{DagManager, JsonDag};
+
+    #[test]
+    pub fn data_stream_test() {
+        let mut env = StreamExecutionEnvironment::new("job_name".to_string());
+
+        env.register_source(MyInputFormat::new(), 100)
+            .flat_map(MyFlatMapFunction::new())
+            .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
+                Duration::from_secs(1),
+                MyTimestampAssigner::new(),
+            ))
+            .key_by(MyKeySelectorFunction::new())
+            .window(SlidingEventTimeWindows::new(
+                Duration::from_secs(60),
+                Duration::from_secs(20),
+                None,
+            ))
+            .reduce(MyReduceFunction::new(), 10)
+            .add_sink(MyOutputFormat::new(Properties::new()));
+
+        println!("{:?}", env.stream_manager.stream_graph.borrow().dag);
+    }
+
+    #[test]
+    pub fn data_stream_connect_test() {
+        let mut env = StreamExecutionEnvironment::new("job_name".to_string());
+
+        let ds = env
+            .register_source(MyInputFormat::new(), 1)
+            .flat_map(MyFlatMapFunction::new())
+            .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
+                Duration::from_secs(1),
+                MyTimestampAssigner::new(),
+            ));
+
+        env.register_source(MyInputFormat::new(), 2)
+            .flat_map(MyFlatMapFunction::new())
+            .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
+                Duration::from_secs(1),
+                MyTimestampAssigner::new(),
+            ))
+            .connect(vec![ds], MyCoProcessFunction {})
+            .key_by(MyKeySelectorFunction::new())
+            .window(SlidingEventTimeWindows::new(
+                Duration::from_secs(60),
+                Duration::from_secs(20),
+                None,
+            ))
+            .reduce(MyReduceFunction::new(), 3)
+            .flat_map(MyFlatMapFunction::new())
+            .add_sink(MyOutputFormat::new(Properties::new()));
+
+        let dag_manager = DagManager::new(&env.stream_manager.stream_graph.borrow());
+        {
+            let dag = &dag_manager.stream_graph().dag;
+            println!("{:?}", dag);
+            println!(
+                "{}",
+                serde_json::to_string(&JsonDag::dag_json(dag)).unwrap()
+            )
+        }
+        {
+            let dag = &dag_manager.job_graph().dag;
+            println!("{:?}", dag);
+            println!(
+                "{}",
+                serde_json::to_string(&JsonDag::dag_json(dag)).unwrap()
+            )
+        }
+
+        {
+            let dag = &dag_manager.execution_graph().dag;
+            println!("{:?}", dag);
+            println!(
+                "{}",
+                serde_json::to_string(&JsonDag::dag_json(dag)).unwrap()
+            )
+        }
+
+        println!("{:?}", &dag_manager.physic_graph());
+    }
+
+    #[derive(Serialize, Deserialize, Debug)]
+    pub struct MyInputFormat {}
+
+    impl MyInputFormat {
+        pub fn new() -> Self {
+            MyInputFormat {}
+        }
+    }
+
+    impl InputSplitSource for MyInputFormat {
+        fn create_input_splits(&self, min_num_splits: u32) -> Vec<InputSplit> {
+            let mut input_splits = Vec::with_capacity(min_num_splits as usize);
+            for partition_num in 0..min_num_splits {
+                input_splits.push(InputSplit::new(partition_num, Properties::new()));
+            }
+            input_splits
+        }
+
+        fn get_input_split_assigner(&self, input_splits: Vec<InputSplit>) -> InputSplitAssigner {
+            InputSplitAssigner::new(input_splits)
+        }
+    }
+
+    impl Function for MyInputFormat {
+        fn get_name(&self) -> &str {
+            "MyInputFormat"
+        }
+    }
+
+    impl InputFormat for MyInputFormat {
+        fn open(&mut self, _input_split: InputSplit, _context: &Context) {}
+
+        fn reached_end(&self) -> bool {
+            false
+        }
+
+        fn next_record(&mut self) -> Option<Record> {
+            None
+        }
+
+        fn close(&mut self) {}
+    }
+
+    #[derive(Serialize, Deserialize, Debug)]
+    pub struct MyFlatMapFunction {}
+
+    impl MyFlatMapFunction {
+        pub fn new() -> Self {
+            MyFlatMapFunction {}
+        }
+    }
+
+    impl FlatMapFunction for MyFlatMapFunction {
+        fn open(&mut self, _context: &Context) {}
+
+        fn flat_map(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>> {
+            Box::new(vec![record].into_iter())
+        }
+
+        fn close(&mut self) {}
+    }
+
+    impl Function for MyFlatMapFunction {
+        fn get_name(&self) -> &str {
+            "MyFlatMapFunction"
+        }
+    }
+
+    #[derive(Serialize, Deserialize, Debug, Clone)]
+    pub struct MyTimestampAssigner {}
+
+    impl MyTimestampAssigner {
+        pub fn new() -> Self {
+            MyTimestampAssigner {}
+        }
+    }
+
+    impl TimestampAssigner for MyTimestampAssigner {
+        fn extract_timestamp(
+            &mut self,
+            _row: &mut Record,
+            _previous_element_timestamp: u64,
+        ) -> u64 {
+            0
+        }
+    }
+
+    impl Function for MyTimestampAssigner {
+        fn get_name(&self) -> &str {
+            "MyTimestampAssigner"
+        }
+    }
+
+    #[derive(Serialize, Deserialize, Debug)]
+    pub struct MyKeySelectorFunction {}
+
+    impl MyKeySelectorFunction {
+        pub fn new() -> Self {
+            MyKeySelectorFunction {}
+        }
+    }
+
+    impl KeySelectorFunction for MyKeySelectorFunction {
+        fn open(&mut self, _context: &Context) {}
+
+        fn get_key(&self, _record: &mut Record) -> Record {
+            let record_rt = Record::new();
+            record_rt
+        }
+
+        fn close(&mut self) {}
+    }
+
+    impl Function for MyKeySelectorFunction {
+        fn get_name(&self) -> &str {
+            "MyKeySelectorFunction"
+        }
+    }
+
+    #[derive(Serialize, Deserialize, Debug)]
+    pub struct MyReduceFunction {}
+
+    impl MyReduceFunction {
+        pub fn new() -> Self {
+            MyReduceFunction {}
+        }
+    }
+
+    impl ReduceFunction for MyReduceFunction {
+        fn open(&mut self, _context: &Context) {}
+
+        fn reduce(&self, _state_value: Option<&mut Record>, record: &mut Record) -> Record {
+            record.clone()
+        }
+
+        fn close(&mut self) {}
+    }
+
+    impl Function for MyReduceFunction {
+        fn get_name(&self) -> &str {
+            "MyReduceFunction"
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct MyOutputFormat {
+        properties: Properties,
+    }
+
+    impl MyOutputFormat {
+        pub fn new(properties: Properties) -> Self {
+            MyOutputFormat { properties }
+        }
+    }
+
+    impl OutputFormat for MyOutputFormat {
+        fn open(&mut self, _context: &Context) {}
+
+        fn write_record(&mut self, _record: Record) {}
+
+        fn close(&mut self) {}
+    }
+
+    impl Function for MyOutputFormat {
+        fn get_name(&self) -> &str {
+            "MyOutputFormat"
+        }
+    }
+
+    pub struct MyCoProcessFunction {}
+
+    impl CoProcessFunction for MyCoProcessFunction {
+        fn open(&mut self, _context: &Context) {}
+
+        fn process_left(&self, record: Record) -> Box<dyn Iterator<Item = Record>> {
+            Box::new(vec![].into_iter())
+        }
+
+        fn process_right(
+            &self,
+            stream_seq: usize,
+            record: Record,
+        ) -> Box<dyn Iterator<Item = Record>> {
+            Box::new(vec![].into_iter())
+        }
+
+        fn close(&mut self) {}
+    }
+
+    impl Function for MyCoProcessFunction {
+        fn get_name(&self) -> &str {
+            "MyCoProcessFunction"
+        }
     }
 }
