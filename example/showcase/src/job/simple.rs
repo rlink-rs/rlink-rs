@@ -30,8 +30,9 @@ impl StreamJob for MyStreamJob {
     }
 
     fn build_stream(&self, properties: &Properties, env: &mut StreamExecutionEnvironment) {
-        let key_selector = ColumnBaseKeySelector::new(vec![2], DATA_TYPE.to_vec());
-        let reduce_function = ColumnBaseReduceFunction::new(vec![sum_i64(5)], DATA_TYPE.to_vec());
+        let key_selector = ColumnBaseKeySelector::new(vec![model::index::name], DATA_TYPE.to_vec());
+        let reduce_function =
+            ColumnBaseReduceFunction::new(vec![sum_i64(model::index::value3)], DATA_TYPE.to_vec());
 
         // the schema after reduce
         let output_schema_types = {
@@ -47,7 +48,7 @@ impl StreamJob for MyStreamJob {
             .filter(MyFilterFunction::new())
             .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
                 Duration::from_secs(1),
-                ColumnBaseTimestampAssigner::new(0, DATA_TYPE.to_vec()),
+                ColumnBaseTimestampAssigner::new(model::index::timestamp, DATA_TYPE.to_vec()),
             ))
             .key_by(key_selector)
             .window(SlidingEventTimeWindows::new(
