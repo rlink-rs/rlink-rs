@@ -4,6 +4,7 @@ use crate::api::element::{Element, Record};
 use crate::api::env::{StreamExecutionEnvironment, StreamJob};
 use crate::api::function::KeySelectorFunction;
 use crate::api::operator::{StreamOperator, StreamOperatorWrap};
+use crate::api::runtime::{JobId, OperatorId};
 use crate::dag::{DagManager, OperatorType};
 use crate::runtime::context::Context;
 use crate::runtime::worker::runnable::co_process_runnable::CoProcessRunnable;
@@ -40,7 +41,7 @@ where
     std::thread::Builder::new()
         .name(format!(
             "RM-Task-{}-{}",
-            task_descriptor.task_id.job_id, task_descriptor.task_id.task_number,
+            task_descriptor.task_id.job_id.0, task_descriptor.task_id.task_number,
         ))
         .spawn(move || {
             let stream_env = StreamExecutionEnvironment::new(application_name);
@@ -129,7 +130,7 @@ where
     fn build_invoke_chain(
         &self,
         dag_manager: &DagManager,
-        mut operators: HashMap<u32, StreamOperatorWrap>,
+        mut operators: HashMap<OperatorId, StreamOperatorWrap>,
     ) -> Box<dyn Runnable> {
         let job_node = dag_manager
             .get_job_node(&self.task_descriptor.task_id)
@@ -217,8 +218,8 @@ where
     fn get_dependency_key_by(
         &self,
         dag_manager: &DagManager,
-        operators: &mut HashMap<u32, StreamOperatorWrap>,
-        job_id: u32,
+        operators: &mut HashMap<OperatorId, StreamOperatorWrap>,
+        job_id: JobId,
     ) -> Option<StreamOperator<dyn KeySelectorFunction>> {
         let job_parents = dag_manager.get_job_parents(job_id);
         if job_parents.len() == 0 {

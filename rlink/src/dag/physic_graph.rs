@@ -3,6 +3,7 @@ use std::ops::Index;
 
 use daggy::{NodeIndex, Walker};
 
+use crate::api::runtime::JobId;
 use crate::dag::execution_graph::{ExecutionEdge, ExecutionGraph, ExecutionNode};
 use crate::dag::{TaskId, TaskInstance, WorkerManagerInstance};
 
@@ -15,7 +16,7 @@ impl ForwardTaskChain {
     pub fn get_task_id(&self) -> TaskId {
         self.tasks
             .iter()
-            .min_by_key(|x| x.task_id.job_id)
+            .min_by_key(|x| x.task_id.job_id.0)
             .unwrap()
             .task_id
     }
@@ -24,7 +25,7 @@ impl ForwardTaskChain {
 #[derive(Debug, Clone)]
 pub(crate) struct PhysicGraph {
     /// Map key: first JobId
-    task_groups: HashMap<u32, Vec<ForwardTaskChain>>,
+    task_groups: HashMap<JobId, Vec<ForwardTaskChain>>,
 }
 
 impl PhysicGraph {

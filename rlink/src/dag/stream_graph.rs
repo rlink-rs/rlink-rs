@@ -7,17 +7,16 @@ use daggy::{Dag, EdgeIndex, NodeIndex};
 use crate::api::operator::{
     FunctionCreator, StreamOperator, StreamOperatorWrap, TStreamOperator, DEFAULT_PARALLELISM,
 };
+use crate::api::runtime::OperatorId;
 use crate::dag::{DagError, JsonDag, Label, OperatorType};
 use crate::io::system_input_format::SystemInputFormat;
 use crate::io::system_keyed_state_flat_map::SystemKeyedStateMapFunction;
 use crate::io::system_output_format::SystemOutputFormat;
 
-pub type OperatorId = u32;
-
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct StreamNode {
-    pub(crate) id: u32,
-    pub(crate) parent_ids: Vec<u32>,
+    pub(crate) id: OperatorId,
+    pub(crate) parent_ids: Vec<OperatorId>,
     pub(crate) parallelism: u32,
 
     pub(crate) operator_name: String,
@@ -35,8 +34,8 @@ impl Label for StreamNode {
 pub struct StreamEdge {
     edge_id: String,
 
-    source_id: u32,
-    target_id: u32,
+    source_id: OperatorId,
+    target_id: OperatorId,
 }
 
 impl Label for StreamEdge {
@@ -60,7 +59,7 @@ impl StreamGraph {
         self.dag.index(node_index)
     }
 
-    pub fn get_stream_node_by_operator_id(&self, operator_id: u32) -> Option<&StreamNode> {
+    pub fn get_stream_node_by_operator_id(&self, operator_id: OperatorId) -> Option<&StreamNode> {
         self.dag
             .raw_nodes()
             .iter()
@@ -113,7 +112,7 @@ impl RawStreamGraph {
             application_name,
             stream_nodes: Vec::new(),
             stream_edges: Vec::new(),
-            id_gen: 0,
+            id_gen: OperatorId::default(),
             operators: HashMap::new(),
             sources: Vec::new(),
             user_sources: Vec::new(),
@@ -148,8 +147,8 @@ impl RawStreamGraph {
 
     fn create_virtual_map(
         &mut self,
-        id: u32,
-        parent_id: u32,
+        id: OperatorId,
+        parent_id: OperatorId,
         parallelism: u32,
     ) -> StreamOperatorWrap {
         let map_format = Box::new(SystemKeyedStateMapFunction::new());
@@ -164,8 +163,8 @@ impl RawStreamGraph {
 
     fn create_virtual_source(
         &mut self,
-        id: u32,
-        parent_id: u32,
+        id: OperatorId,
+        parent_id: OperatorId,
         parallelism: u32,
     ) -> StreamOperatorWrap {
         let input_format = Box::new(SystemInputFormat::new());
@@ -180,7 +179,7 @@ impl RawStreamGraph {
 
     fn create_virtual_sink(
         &mut self,
-        id: u32,
+        id: OperatorId,
         parent_id: OperatorId,
         parallelism: u32,
     ) -> StreamOperatorWrap {
@@ -201,7 +200,7 @@ impl RawStreamGraph {
         parallelism: u32,
     ) -> Result<OperatorId, DagError> {
         let operator_id = self.id_gen;
-        self.id_gen += 1;
+        self.id_gen.0 = self.id_gen.0 + 1;
 
         let stream_node = StreamNode {
             id: operator_id,
@@ -223,7 +222,7 @@ impl RawStreamGraph {
             let p_stream_node: &StreamNode = self.dag.index(*p_node_index);
 
             let stream_edge = StreamEdge {
-                edge_id: format!("{}->{}", p_stream_node.id, stream_node.id),
+                edge_id: format!("{:?}->{:?}", p_stream_node.id, stream_node.id),
                 source_id: p_stream_node.id,
                 target_id: stream_node.id,
             };
@@ -276,16 +275,22 @@ impl RawStreamGraph {
                 let parallelism = max(parallelism, p_parallelism);
                 self.add_operator0(operator, parent_operator_ids, parallelism)
             } else {
-                let vir_sink = self.create_virtual_sink(0, p_operator_id, p_parallelism);
+                let vir_sink =
+                    self.create_virtual_sink(OperatorId::default(), p_operator_id, p_parallelism);
                 let vir_operator_id =
                     self.add_operator0(vir_sink, vec![p_operator_id], p_parallelism)?;
 
-                let vir_source = self.create_virtual_source(0, vir_operator_id, parallelism);
+                let vir_source =
+                    self.create_virtual_source(OperatorId::default(), vir_operator_id, parallelism);
                 let vir_operator_id =
                     self.add_operator0(vir_source, vec![vir_operator_id], parallelism)?;
 
                 let vir_operator_id = if self.is_reduce_parent(p_operator_id) {
-                    let vir_map = self.create_virtual_map(0, vir_operator_id, parallelism);
+                    let vir_map = self.create_virtual_map(
+                        OperatorId::default(),
+                        vir_operator_id,
+                        parallelism,
+                    );
                     self.add_operator0(vir_map, vec![vir_operator_id], parallelism)?
                 } else {
                     vir_operator_id
@@ -304,14 +309,16 @@ impl RawStreamGraph {
                 let p_stream_node = self.dag.index(*p_node_index);
 
                 let p_parallelism = p_stream_node.parallelism;
-                let vir_sink = self.create_virtual_sink(0, 0, 0);
+                let vir_sink =
+                    self.create_virtual_sink(OperatorId::default(), OperatorId::default(), 0);
                 let vir_operator_id =
                     self.add_operator0(vir_sink, vec![p_operator_id], p_parallelism)?;
 
                 new_p_operator_ids.push(vir_operator_id);
             }
 
-            let vir_source = self.create_virtual_source(0, 0, 0);
+            let vir_source =
+                self.create_virtual_source(OperatorId::default(), OperatorId::default(), 0);
             let vir_operator_id =
                 self.add_operator0(vir_source, new_p_operator_ids, parallelism)?;
 
@@ -388,7 +395,7 @@ impl RawStreamGraph {
         }
     }
 
-    fn is_reduce_parent(&self, parent_id: u32) -> bool {
+    fn is_reduce_parent(&self, parent_id: OperatorId) -> bool {
         let (_, operator) = self.operators.get(&parent_id).unwrap();
         OperatorType::from(operator) == OperatorType::Reduce
     }

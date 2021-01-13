@@ -41,11 +41,11 @@ pub(crate) fn publish(
             vec![
                 Tag::new(
                     "source_job_id".to_string(),
-                    source_task_id.job_id.to_string(),
+                    source_task_id.job_id.0.to_string(),
                 ),
                 Tag::new(
                     "target_job_id".to_string(),
-                    target_task_id.job_id.to_string(),
+                    target_task_id.job_id.0.to_string(),
                 ),
                 Tag::new(
                     "target_task_number".to_string(),
@@ -63,9 +63,13 @@ pub(crate) fn publish(
     senders
 }
 
-fn set_network_channel(key: ChannelKey, sender: ElementReceiver) {
+fn set_network_channel(key: ChannelKey, receiver: ElementReceiver) {
     let network_channels: &DashMap<ChannelKey, ElementReceiver> = &*NETWORK_CHANNELS;
-    network_channels.insert(key, sender);
+    if network_channels.contains_key(&key) {
+        // maybe dag build bug
+        panic!("network ChannelKey register must unique");
+    }
+    network_channels.insert(key, receiver);
 }
 
 fn get_network_channel(key: &ChannelKey) -> Option<ElementReceiver> {

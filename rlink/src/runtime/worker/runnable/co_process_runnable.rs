@@ -1,23 +1,24 @@
 use crate::api::element::Element;
 use crate::api::function::CoProcessFunction;
 use crate::api::operator::StreamOperator;
+use crate::api::runtime::{CheckpointId, JobId, OperatorId};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 use std::collections::HashMap;
 
 #[derive(Debug)]
 pub(crate) struct CoProcessRunnable {
-    operator_id: u32,
+    operator_id: OperatorId,
     stream_co_process: StreamOperator<dyn CoProcessFunction>,
     next_runnable: Option<Box<dyn Runnable>>,
 
     /// key: JobId,
     /// value: DataStream index  
-    parent_jobs: HashMap<u32, usize>,
+    parent_jobs: HashMap<JobId, usize>,
 }
 
 impl CoProcessRunnable {
     pub fn new(
-        operator_id: u32,
+        operator_id: OperatorId,
         stream_co_process: StreamOperator<dyn CoProcessFunction>,
         next_runnable: Option<Box<dyn Runnable>>,
     ) -> Self {
@@ -103,5 +104,5 @@ impl Runnable for CoProcessRunnable {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, _checkpoint_id: u64) {}
+    fn checkpoint(&mut self, _checkpoint_id: CheckpointId) {}
 }

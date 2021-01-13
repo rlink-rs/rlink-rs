@@ -5,7 +5,7 @@ use crate::api::data_stream::{DataStream, StreamBuilder};
 use crate::api::function::InputFormat;
 use crate::api::operator::StreamOperatorWrap;
 use crate::api::properties::Properties;
-use crate::dag::stream_graph::OperatorId;
+use crate::api::runtime::OperatorId;
 use crate::dag::RawStreamGraph;
 use crate::runtime;
 

@@ -6,6 +6,7 @@ use std::sync::Arc;
 use crate::api::element::Element;
 use crate::api::function::KeySelectorFunction;
 use crate::api::operator::StreamOperator;
+use crate::api::runtime::CheckpointId;
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 use crate::utils;
@@ -46,7 +47,7 @@ impl Runnable for KeyByRunnable {
         let tags = vec![
             Tag(
                 "job_id".to_string(),
-                context.task_descriptor.task_id.job_id.to_string(),
+                context.task_descriptor.task_id.job_id.0.to_string(),
             ),
             Tag(
                 "task_number".to_string(),
@@ -118,5 +119,5 @@ impl Runnable for KeyByRunnable {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, _checkpoint_id: u64) {}
+    fn checkpoint(&mut self, _checkpoint_id: CheckpointId) {}
 }

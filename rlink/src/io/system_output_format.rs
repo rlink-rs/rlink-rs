@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use crate::api::element::{Element, Partition, Record};
 use crate::api::function::{Context, Function, OutputFormat};
-use crate::api::runtime::{ChannelKey, TaskId};
+use crate::api::runtime::{ChannelKey, JobId, TaskId};
 use crate::channel::ElementSender;
 use crate::dag::execution_graph::ExecutionEdge;
 use crate::io::{memory, network, ChannelType};
@@ -13,7 +13,7 @@ use crate::io::{memory, network, ChannelType};
 pub struct SystemOutputFormat {
     task_id: TaskId,
     channel_type: ChannelType,
-    job_senders: Vec<(u32, Vec<(TaskId, ElementSender)>)>,
+    job_senders: Vec<(JobId, Vec<(TaskId, ElementSender)>)>,
 }
 
 impl SystemOutputFormat {

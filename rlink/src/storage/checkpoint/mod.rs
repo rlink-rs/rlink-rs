@@ -1,5 +1,6 @@
 use crate::api::backend::CheckpointBackend;
 use crate::api::checkpoint::Checkpoint;
+use crate::api::runtime::{CheckpointId, JobId};
 use crate::storage::checkpoint::memory_checkpoint_storage::MemoryCheckpointStorage;
 use crate::storage::checkpoint::mysql_checkpoint_storage::MySqlCheckpointStorage;
 
@@ -11,12 +12,12 @@ pub trait CheckpointStorage {
         &mut self,
         application_name: &str,
         application_id: &str,
-        job_id: u32,
-        checkpoint_id: u64,
+        job_id: JobId,
+        checkpoint_id: CheckpointId,
         finish_cks: Vec<Checkpoint>,
         ttl: u64,
     ) -> anyhow::Result<()>;
-    fn load(&mut self, application_name: &str, job_id: u32) -> anyhow::Result<Vec<Checkpoint>>;
+    fn load(&mut self, application_name: &str, job_id: JobId) -> anyhow::Result<Vec<Checkpoint>>;
 }
 
 #[derive(Debug)]
@@ -43,8 +44,8 @@ impl CheckpointStorage for CheckpointStorageWrap {
         &mut self,
         application_name: &str,
         application_id: &str,
-        job_id: u32,
-        checkpoint_id: u64,
+        job_id: JobId,
+        checkpoint_id: CheckpointId,
         finish_cks: Vec<Checkpoint>,
         ttl: u64,
     ) -> anyhow::Result<()> {
@@ -68,7 +69,7 @@ impl CheckpointStorage for CheckpointStorageWrap {
         }
     }
 
-    fn load(&mut self, application_name: &str, job_id: u32) -> anyhow::Result<Vec<Checkpoint>> {
+    fn load(&mut self, application_name: &str, job_id: JobId) -> anyhow::Result<Vec<Checkpoint>> {
         match self {
             CheckpointStorageWrap::MemoryCheckpointStorage(storage) => {
                 storage.load(application_name, job_id)

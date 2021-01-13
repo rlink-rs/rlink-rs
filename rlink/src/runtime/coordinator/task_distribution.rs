@@ -1,4 +1,5 @@
 use crate::api::properties::Properties;
+use crate::api::runtime::CheckpointId;
 use crate::dag::DagManager;
 use crate::runtime::context::Context;
 use crate::runtime::{
@@ -23,7 +24,7 @@ pub(crate) fn build_job_descriptor(
             let task_descriptor = TaskDescriptor {
                 task_id: task_instance.task_id.clone(),
                 input_split: task_instance.input_split.clone(),
-                checkpoint_id: 0,
+                checkpoint_id: CheckpointId::default(),
                 checkpoint_handle: None,
             };
             task_descriptors.push(task_descriptor);

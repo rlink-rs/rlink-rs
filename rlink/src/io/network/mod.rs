@@ -10,7 +10,7 @@ pub(crate) use server::Server;
 
 use std::convert::TryFrom;
 
-use crate::api::runtime::{ChannelKey, TaskId};
+use crate::api::runtime::{ChannelKey, JobId, TaskId};
 use std::error::Error;
 
 const BODY_LEN: usize = 18;
@@ -25,10 +25,10 @@ impl Into<BytesMut> for ElementRequest {
     fn into(self) -> BytesMut {
         let mut buffer = BytesMut::with_capacity(4 + BODY_LEN);
         buffer.put_u32(18); // (4 + 2 + 2) + (4 + 2 + 2) + 2
-        buffer.put_u32(self.channel_key.source_task_id.job_id);
+        buffer.put_u32(self.channel_key.source_task_id.job_id.0);
         buffer.put_u16(self.channel_key.source_task_id.task_number);
         buffer.put_u16(self.channel_key.source_task_id.num_tasks);
-        buffer.put_u32(self.channel_key.target_task_id.job_id);
+        buffer.put_u32(self.channel_key.target_task_id.job_id.0);
         buffer.put_u16(self.channel_key.target_task_id.task_number);
         buffer.put_u16(self.channel_key.target_task_id.num_tasks);
         buffer.put_u16(self.batch_pull_size);
@@ -51,7 +51,7 @@ impl TryFrom<BytesMut> for ElementRequest {
             let task_number = buffer.get_u16();
             let num_tasks = buffer.get_u16();
             TaskId {
-                job_id,
+                job_id: JobId(job_id),
                 task_number,
                 num_tasks,
             }
@@ -62,7 +62,7 @@ impl TryFrom<BytesMut> for ElementRequest {
             let task_number = buffer.get_u16();
             let num_tasks = buffer.get_u16();
             TaskId {
-                job_id,
+                job_id: JobId(job_id),
                 task_number,
                 num_tasks,
             }

@@ -8,6 +8,7 @@ use crate::api::element::Element;
 use crate::api::function::{InputFormat, InputSplit};
 use crate::api::operator::{FunctionCreator, StreamOperator, TStreamOperator};
 use crate::api::properties::SystemProperties;
+use crate::api::runtime::{CheckpointId, JobId};
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::checkpoint::report_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
@@ -17,7 +18,7 @@ use crate::utils::timer::TimerChannel;
 pub(crate) struct SourceRunnable {
     context: Option<RunnableContext>,
 
-    job_id: u32,
+    job_id: JobId,
     task_number: u16,
 
     stream_source: StreamOperator<dyn InputFormat>,
@@ -38,7 +39,7 @@ impl SourceRunnable {
         info!("Create SourceRunnable input_split={:?}", &input_split);
         SourceRunnable {
             context: None,
-            job_id: 0,
+            job_id: JobId::default(),
             task_number: 0,
 
             stream_source,
@@ -92,7 +93,7 @@ impl Runnable for SourceRunnable {
         let tags = vec![
             Tag(
                 "job_id".to_string(),
-                context.task_descriptor.task_id.job_id.to_string(),
+                context.task_descriptor.task_id.job_id.0.to_string(),
             ),
             Tag(
                 "task_number".to_string(),
@@ -117,10 +118,14 @@ impl Runnable for SourceRunnable {
         let idle_delay_10 = Duration::from_millis(10);
         let idle_delay_300 = Duration::from_millis(300);
 
+        let mut end = false;
         loop {
-            let mut end = false;
             let mut counter = 0;
             for _ in 0..1000 {
+                if end {
+                    break;
+                }
+
                 end = self.stream_source.operator_fn.as_mut().reached_end();
                 if end {
                     break;
@@ -158,19 +163,20 @@ impl Runnable for SourceRunnable {
 
                 if let Ok(window_time) = self.checkpoint_timer.as_ref().unwrap().try_recv() {
                     debug!("Trigger Checkpoint");
-                    let barrier = Element::new_barrier(window_time);
+                    let checkpoint_id = CheckpointId(window_time);
+                    let barrier = Element::new_barrier(checkpoint_id);
 
-                    self.checkpoint(window_time);
+                    self.checkpoint(checkpoint_id);
 
                     self.next_runnable.as_mut().unwrap().run(barrier);
                 };
             }
 
-            // if end {
-            //     info!("source end");
-            //     std::thread::sleep(Duration::from_secs(3600));
-            //     // break;
-            // }
+            if end {
+                info!("source end");
+                std::thread::sleep(Duration::from_secs(1));
+                // break;
+            }
 
             if counter == 0 {
                 idle_counter += 1;
@@ -205,7 +211,7 @@ impl Runnable for SourceRunnable {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, checkpoint_id: u64) {
+    fn checkpoint(&mut self, checkpoint_id: CheckpointId) {
         let context = {
             let context = self.context.as_ref().unwrap();
             context.get_checkpoint_context(checkpoint_id)

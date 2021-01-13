@@ -2,6 +2,7 @@ use std::borrow::BorrowMut;
 
 use crate::api::element::Element;
 use crate::api::operator::StreamOperator;
+use crate::api::runtime::CheckpointId;
 use crate::api::window::{WindowAssigner, WindowAssignerContext};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
@@ -86,5 +87,5 @@ impl Runnable for WindowAssignerRunnable {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, _checkpoint_id: u64) {}
+    fn checkpoint(&mut self, _checkpoint_id: CheckpointId) {}
 }

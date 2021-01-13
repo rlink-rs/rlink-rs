@@ -1,5 +1,6 @@
 use dashmap::DashMap;
 
+use crate::api::runtime::JobId;
 use crate::api::window::WindowWrap;
 use crate::storage::keyed_state::mem_reducing_state::MemoryReducingState;
 
@@ -10,12 +11,12 @@ lazy_static! {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct StorageKey {
-    job_id: u32,
+    job_id: JobId,
     task_number: u16,
 }
 
 impl StorageKey {
-    pub fn new(job_id: u32, task_number: u16) -> Self {
+    pub fn new(job_id: JobId, task_number: u16) -> Self {
         StorageKey {
             job_id,
             task_number,
@@ -38,7 +39,7 @@ pub(crate) fn append_drop_window(
 }
 
 pub(crate) fn remove_drop_window(
-    job_id: u32,
+    job_id: JobId,
     task_number: u16,
     window: WindowWrap,
 ) -> Option<MemoryReducingState> {

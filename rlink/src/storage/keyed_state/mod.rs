@@ -3,6 +3,7 @@ use std::fmt::Debug;
 
 use crate::api::backend::KeyedStateBackend;
 use crate::api::element::{Barrier, Record};
+use crate::api::runtime::JobId;
 use crate::api::window::WindowWrap;
 use crate::storage::keyed_state::mem_reducing_state::MemoryReducingState;
 use crate::storage::keyed_state::mem_window_state::MemoryWindowState;
@@ -14,12 +15,12 @@ pub mod mem_window_state;
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct StateKey {
     pub(crate) window: WindowWrap,
-    pub(crate) job_id: u32,
+    pub(crate) job_id: JobId,
     pub(crate) task_number: u16,
 }
 
 impl StateKey {
-    pub fn new(window: WindowWrap, job_id: u32, task_number: u16) -> Self {
+    pub fn new(window: WindowWrap, job_id: JobId, task_number: u16) -> Self {
         StateKey {
             window,
             job_id,
@@ -143,7 +144,7 @@ pub enum WindowStateWrap {
 impl WindowStateWrap {
     pub fn new(
         application_id: String,
-        job_id: u32,
+        job_id: JobId,
         task_number: u16,
         mode: KeyedStateBackend,
     ) -> Self {

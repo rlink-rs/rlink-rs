@@ -1,17 +1,18 @@
 use std::fmt::Debug;
 
 use crate::api::backend::{OperatorState, OperatorStateBackend};
+use crate::api::runtime::{CheckpointId, JobId};
 use crate::storage::operator_state::{OperatorStateManager, OperatorStateManagerWrap};
 
 #[derive(Clone, Debug)]
 pub struct FunctionSnapshotContext {
-    pub job_id: u32,
+    pub job_id: JobId,
     pub task_number: u16,
-    pub checkpoint_id: u64,
+    pub checkpoint_id: CheckpointId,
 }
 
 impl FunctionSnapshotContext {
-    pub fn new(job_id: u32, task_number: u16, checkpoint_id: u64) -> Self {
+    pub fn new(job_id: JobId, task_number: u16, checkpoint_id: CheckpointId) -> Self {
         FunctionSnapshotContext {
             job_id,
             task_number,
@@ -21,7 +22,7 @@ impl FunctionSnapshotContext {
 
     pub fn create_state(
         &self,
-        job_id: u32,
+        job_id: JobId,
         state: OperatorStateBackend,
         application_id: String,
         task_number: u16,
@@ -43,9 +44,9 @@ pub struct CheckpointHandle {
 /// use for network communication between `Coordinator` and `Worker`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Checkpoint {
-    pub job_id: u32,
+    pub job_id: JobId,
     pub task_num: u16,
-    pub checkpoint_id: u64,
+    pub checkpoint_id: CheckpointId,
     pub handle: CheckpointHandle,
 }
 

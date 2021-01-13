@@ -2,10 +2,11 @@ use crate::api::backend::KeyedStateBackend;
 use crate::api::element::Record;
 use crate::api::function::{Context, Function, MapFunction};
 use crate::api::properties::SystemProperties;
+use crate::api::runtime::JobId;
 use crate::storage::keyed_state::{ReducingState, ReducingStateWrap, StateKey};
 
 pub struct SystemKeyedStateMapFunction {
-    parent_job_id: u32,
+    parent_job_id: JobId,
     task_number: u16,
 
     state_mode: KeyedStateBackend,
@@ -14,7 +15,7 @@ pub struct SystemKeyedStateMapFunction {
 impl SystemKeyedStateMapFunction {
     pub fn new() -> Self {
         SystemKeyedStateMapFunction {
-            parent_job_id: 0,
+            parent_job_id: JobId::default(),
             task_number: 0,
             state_mode: KeyedStateBackend::Memory,
         }

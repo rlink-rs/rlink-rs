@@ -5,6 +5,7 @@ use std::sync::Arc;
 use crate::api::element::Element;
 use crate::api::function::OutputFormat;
 use crate::api::operator::{FunctionCreator, StreamOperator, TStreamOperator};
+use crate::api::runtime::CheckpointId;
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
@@ -45,7 +46,7 @@ impl Runnable for SinkRunnable {
         let tags = vec![
             Tag(
                 "job_id".to_string(),
-                context.task_descriptor.task_id.job_id.to_string(),
+                context.task_descriptor.task_id.job_id.0.to_string(),
             ),
             Tag(
                 "task_number".to_string(),
@@ -115,7 +116,7 @@ impl Runnable for SinkRunnable {
         unimplemented!()
     }
 
-    fn checkpoint(&mut self, _checkpoint_id: u64) {
+    fn checkpoint(&mut self, _checkpoint_id: CheckpointId) {
         self.stream_sink.operator_fn.prepare_commit();
     }
 }

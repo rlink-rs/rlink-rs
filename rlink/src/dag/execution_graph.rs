@@ -5,6 +5,7 @@ use daggy::{Dag, EdgeIndex, NodeIndex, Walker};
 
 use crate::api::function::InputSplit;
 use crate::api::operator::StreamOperatorWrap;
+use crate::api::runtime::{JobId, OperatorId};
 use crate::dag::job_graph::{JobEdge, JobGraph};
 use crate::dag::{DagError, JsonDag, Label, TaskId};
 
@@ -24,10 +25,6 @@ impl Label for ExecutionEdge {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub(crate) struct ExecutionNode {
-    // pub job_id: u32,
-    // pub task_number: u16,
-    // /// total number tasks in the chain. same as `parallelism`
-    // pub num_tasks: u16,
     pub task_id: TaskId,
     pub input_split: InputSplit,
 }
@@ -35,7 +32,7 @@ pub(crate) struct ExecutionNode {
 impl Label for ExecutionNode {
     fn get_label(&self) -> String {
         format!(
-            "job:{}({}/{})",
+            "{:?}({}/{})",
             self.task_id.job_id, self.task_id.task_number, self.task_id.num_tasks
         )
     }
@@ -98,7 +95,7 @@ impl ExecutionGraph {
     pub fn build(
         &mut self,
         job_graph: &JobGraph,
-        operators: &mut HashMap<u32, &StreamOperatorWrap>,
+        operators: &mut HashMap<OperatorId, &StreamOperatorWrap>,
     ) -> Result<(), DagError> {
         let execution_node_indies = self.build_nodes(job_graph, operators)?;
         self.build_edges(job_graph, execution_node_indies)
@@ -107,8 +104,8 @@ impl ExecutionGraph {
     pub fn build_nodes(
         &mut self,
         job_graph: &JobGraph,
-        operators: &mut HashMap<u32, &StreamOperatorWrap>,
-    ) -> Result<HashMap<u32, Vec<NodeIndex>>, DagError> {
+        operators: &mut HashMap<OperatorId, &StreamOperatorWrap>,
+    ) -> Result<HashMap<JobId, Vec<NodeIndex>>, DagError> {
         let job_dag = &job_graph.dag;
 
         // HashMap<JobId(u32), Vec<NodeIndex>>
@@ -152,7 +149,7 @@ impl ExecutionGraph {
     fn build_edges(
         &mut self,
         job_graph: &JobGraph,
-        execution_node_index_map: HashMap<u32, Vec<NodeIndex>>,
+        execution_node_index_map: HashMap<JobId, Vec<NodeIndex>>,
     ) -> Result<(), DagError> {
         let job_dag = &job_graph.dag;
 

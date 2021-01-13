@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use crate::api::checkpoint::{CheckpointHandle, CheckpointedFunction, FunctionSnapshotContext};
 use crate::api::element::{Element, Record};
 use crate::api::properties::Properties;
-use crate::api::runtime::TaskId;
+use crate::api::runtime::{CheckpointId, TaskId};
 use crate::dag::execution_graph::{ExecutionEdge, ExecutionNode};
 
 /// Base class of all operators in the Rust API.
@@ -17,7 +17,7 @@ pub struct Context {
     pub application_properties: Properties,
     pub task_id: TaskId,
 
-    pub checkpoint_id: u64,
+    pub checkpoint_id: CheckpointId,
     pub checkpoint_handle: Option<CheckpointHandle>,
 
     pub(crate) children: Vec<(ExecutionNode, ExecutionEdge)>,

@@ -2,7 +2,7 @@ use crate::api::checkpoint::CheckpointHandle;
 use crate::api::env::{StreamExecutionEnvironment, StreamJob};
 use crate::api::function::InputSplit;
 use crate::api::properties::Properties;
-use crate::api::runtime::TaskId;
+use crate::api::runtime::{CheckpointId, TaskId};
 use crate::utils::panic::panic_notify;
 
 pub mod cluster;
@@ -10,8 +10,6 @@ pub mod context;
 pub mod coordinator;
 pub mod logger;
 pub mod worker;
-
-pub type CheckpointId = u64;
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub enum ClusterMode {
@@ -90,7 +88,7 @@ pub enum TaskManagerStatus {
 pub struct TaskDescriptor {
     pub task_id: TaskId,
     pub input_split: InputSplit,
-    pub checkpoint_id: u64,
+    pub checkpoint_id: CheckpointId,
     pub checkpoint_handle: Option<CheckpointHandle>,
 }
 
@@ -133,6 +131,10 @@ impl ApplicationDescriptor {
                     .find(|task_descriptor| task_descriptor.task_id.eq(task_id))
                     .is_some()
             })
+    }
+
+    pub fn to_string(&self) -> String {
+        serde_json::to_string(self).unwrap()
     }
 }
 

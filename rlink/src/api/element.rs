@@ -3,7 +3,7 @@ use std::fmt::Debug;
 
 use bytes::{Buf, BufMut, BytesMut};
 
-use crate::api::runtime::ChannelKey;
+use crate::api::runtime::{ChannelKey, CheckpointId};
 use crate::api::window::WindowWrap;
 
 lazy_static! {
@@ -331,11 +331,11 @@ impl Serde for StreamStatus {
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub struct Barrier {
     pub(crate) partition_num: u16,
-    pub(crate) checkpoint_id: u64,
+    pub(crate) checkpoint_id: CheckpointId,
 }
 
 impl Barrier {
-    pub fn new(checkpoint_id: u64) -> Self {
+    pub fn new(checkpoint_id: CheckpointId) -> Self {
         Barrier {
             partition_num: 0,
             checkpoint_id,
@@ -357,7 +357,7 @@ impl Serde for Barrier {
     fn serialize(&self, bytes: &mut BytesMut) {
         bytes.put_u8(SER_DE_BARRIER);
         bytes.put_u16(self.partition_num);
-        bytes.put_u64(self.checkpoint_id);
+        bytes.put_u64(self.checkpoint_id.0);
     }
 
     fn deserialize(bytes: &mut BytesMut) -> Self {
@@ -369,7 +369,7 @@ impl Serde for Barrier {
 
         Barrier {
             partition_num,
-            checkpoint_id,
+            checkpoint_id: CheckpointId(checkpoint_id),
         }
     }
 }
@@ -405,7 +405,7 @@ impl Element {
         Element::StreamStatus(StreamStatus::new(timestamp, end))
     }
 
-    pub(crate) fn new_barrier(checkpoint_id: u64) -> Self {
+    pub(crate) fn new_barrier(checkpoint_id: CheckpointId) -> Self {
         Element::Barrier(Barrier::new(checkpoint_id))
     }
 

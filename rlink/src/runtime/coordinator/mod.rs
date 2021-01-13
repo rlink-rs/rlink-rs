@@ -85,7 +85,10 @@ where
         );
 
         let mut application_descriptor = self.build_metadata(&dag_manager, &application_properties);
-        info!("ApplicationDescriptor : {:?}", &application_descriptor);
+        info!(
+            "ApplicationDescriptor : {}",
+            application_descriptor.to_string()
+        );
 
         let ck_manager =
             self.build_checkpoint_manager(&dag_manager, application_descriptor.borrow_mut());
@@ -196,7 +199,7 @@ where
                     .unwrap();
                 if cks.len() == 0 {
                     info!(
-                        "job_id {} checkpoint not found",
+                        "job_id {:?} checkpoint not found",
                         task_descriptor.task_id.job_id
                     );
                     continue;

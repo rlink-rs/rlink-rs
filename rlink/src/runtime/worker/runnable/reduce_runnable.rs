@@ -9,6 +9,7 @@ use crate::api::element::{Barrier, Element, Record, Watermark};
 use crate::api::function::{KeySelectorFunction, ReduceFunction};
 use crate::api::operator::StreamOperator;
 use crate::api::properties::SystemProperties;
+use crate::api::runtime::CheckpointId;
 use crate::api::window::{Window, WindowWrap};
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
@@ -26,7 +27,7 @@ pub(crate) struct ReduceRunnable {
 
     state: Option<WindowStateWrap>, // HashMap<Vec<u8>, Record>, // HashMap<TimeWindow, HashMap<Record, Record>>,
 
-    current_checkpoint_id: u64,
+    current_checkpoint_id: CheckpointId,
     reached_barriers: Vec<Barrier>,
 
     max_watermark_status_timestamp: u64,
@@ -51,7 +52,7 @@ impl ReduceRunnable {
             stream_reduce,
             next_runnable,
             state: None,
-            current_checkpoint_id: 0,
+            current_checkpoint_id: CheckpointId::default(),
             reached_barriers: Vec::new(),
             max_watermark_status_timestamp: 0,
             watermark_align: None,
@@ -103,7 +104,7 @@ impl Runnable for ReduceRunnable {
         let tags = vec![
             Tag(
                 "job_id".to_string(),
-                context.task_descriptor.task_id.job_id.to_string(),
+                context.task_descriptor.task_id.job_id.0.to_string(),
             ),
             Tag(
                 "task_number".to_string(),
@@ -226,7 +227,7 @@ impl Runnable for ReduceRunnable {
                 }
             }
             Element::Barrier(barrier) => {
-                if self.current_checkpoint_id == 0 {
+                if self.current_checkpoint_id.is_default() {
                     self.current_checkpoint_id = barrier.checkpoint_id;
                 }
 
@@ -236,16 +237,16 @@ impl Runnable for ReduceRunnable {
                         self.checkpoint(self.current_checkpoint_id);
                     }
 
-                    self.current_checkpoint_id = 0;
+                    self.current_checkpoint_id = CheckpointId::default();
                     self.reached_barriers.clear();
                 } else {
-                    if self.current_checkpoint_id > barrier.checkpoint_id {
+                    if self.current_checkpoint_id.0 > barrier.checkpoint_id.0 {
                         error!(
                             "Unusual state of Checkpoint. Barrier's `checkpoint_id` is less than `current_checkpoint_id`"
                         )
                     } else {
                         error!(
-                            "Found a new checkpoint({}) if the current checkpoint({}) is not completed",
+                            "Found a new checkpoint({:?}) if the current checkpoint({:?}) is not completed",
                             barrier.checkpoint_id,
                             self.current_checkpoint_id,
                         );
@@ -270,7 +271,7 @@ impl Runnable for ReduceRunnable {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, _checkpoint_id: u64) {
+    fn checkpoint(&mut self, _checkpoint_id: CheckpointId) {
         // foreach self.reached_barriers
     }
 }

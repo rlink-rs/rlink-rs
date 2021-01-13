@@ -2,6 +2,7 @@ use std::borrow::BorrowMut;
 use std::collections::HashMap;
 
 use crate::api::element::{Barrier, Record};
+use crate::api::runtime::JobId;
 use crate::api::window::WindowWrap;
 use crate::storage::keyed_state::mem_reducing_state::MemoryReducingState;
 use crate::storage::keyed_state::mem_storage::{append_drop_window, StorageKey};
@@ -10,7 +11,7 @@ use crate::storage::keyed_state::{ReducingState, StateKey, WindowState};
 #[derive(Clone, Debug)]
 pub struct MemoryWindowState {
     application_id: String,
-    job_id: u32,
+    job_id: JobId,
     task_number: u16,
 
     windows: HashMap<WindowWrap, MemoryReducingState>,
@@ -18,7 +19,7 @@ pub struct MemoryWindowState {
 }
 
 impl MemoryWindowState {
-    pub fn new(application_id: String, job_id: u32, task_number: u16) -> Self {
+    pub fn new(application_id: String, job_id: JobId, task_number: u16) -> Self {
         MemoryWindowState {
             application_id,
             job_id,

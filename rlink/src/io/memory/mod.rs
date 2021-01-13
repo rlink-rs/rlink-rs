@@ -44,7 +44,7 @@ pub(crate) fn get(target_task_id: TaskId) -> (ElementSender, ElementReceiver) {
             vec![
                 Tag::new(
                     "target_job_id".to_string(),
-                    target_task_id.job_id.to_string(),
+                    target_task_id.job_id.0.to_string(),
                 ),
                 Tag::new(
                     "target_task_number".to_string(),

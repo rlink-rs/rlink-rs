@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 
 use crate::api::backend::{OperatorState, OperatorStateBackend};
+use crate::api::runtime::JobId;
 use crate::storage::operator_state::empty_state::EmptyOperatorStateManager;
 
 pub mod empty_state;
@@ -15,7 +16,7 @@ pub enum OperatorStateManagerWrap {
 }
 
 impl OperatorStateManagerWrap {
-    pub(crate) fn new(_job_id: u32, state: OperatorStateBackend) -> Self {
+    pub(crate) fn new(_job_id: JobId, state: OperatorStateBackend) -> Self {
         match state {
             OperatorStateBackend::None => {
                 OperatorStateManagerWrap::EmptyOperatorStateManager(EmptyOperatorStateManager {})

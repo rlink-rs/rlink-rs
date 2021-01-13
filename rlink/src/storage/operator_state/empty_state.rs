@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 
 use crate::api::backend::{OperatorState, StateValue};
-use crate::runtime::CheckpointId;
+use crate::api::runtime::CheckpointId;
 use crate::storage::operator_state::OperatorStateManager;
 
 #[derive(Clone, Debug)]
 pub struct EmptyOperatorState {}
 
 impl OperatorState for EmptyOperatorState {
-    fn update(&mut self, _checkpoint_id: u64, _values: Vec<String>) {}
+    fn update(&mut self, _checkpoint_id: CheckpointId, _values: Vec<String>) {}
 
     fn snapshot(&mut self) -> std::io::Result<()> {
         Ok(())

@@ -1,6 +1,7 @@
 use crate::api::element::Element;
 use crate::api::function::FilterFunction;
 use crate::api::operator::StreamOperator;
+use crate::api::runtime::CheckpointId;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
 #[derive(Debug)]
@@ -55,5 +56,5 @@ impl Runnable for FilterRunnable {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, _checkpoint_id: u64) {}
+    fn checkpoint(&mut self, _checkpoint_id: CheckpointId) {}
 }

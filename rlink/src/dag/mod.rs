@@ -12,7 +12,7 @@ use serde::Serialize;
 
 use crate::api::function::InputSplit;
 use crate::api::operator::StreamOperatorWrap;
-use crate::api::runtime::TaskId;
+use crate::api::runtime::{JobId, OperatorId, TaskId};
 use crate::dag::execution_graph::{ExecutionEdge, ExecutionGraph, ExecutionNode};
 use crate::dag::job_graph::{JobEdge, JobGraph, JobNode};
 use crate::dag::physic_graph::PhysicGraph;
@@ -176,7 +176,7 @@ impl DagManager {
     //     parents
     // }
 
-    pub fn get_stream(&self, operator_id: u32) -> Option<StreamNode> {
+    pub fn get_stream(&self, operator_id: OperatorId) -> Option<StreamNode> {
         self.stream_graph
             .get_stream_node_by_operator_id(operator_id)
             .map(|stream_node| stream_node.clone())
@@ -188,12 +188,12 @@ impl DagManager {
     }
 
     #[inline]
-    pub(crate) fn get_job_parents(&self, job_id: u32) -> Vec<(JobNode, JobEdge)> {
+    pub(crate) fn get_job_parents(&self, job_id: JobId) -> Vec<(JobNode, JobEdge)> {
         self.job_graph.get_parents(job_id).unwrap_or(vec![])
     }
 
     #[inline]
-    pub(crate) fn get_job_children(&self, job_id: u32) -> Vec<(JobNode, JobEdge)> {
+    pub(crate) fn get_job_children(&self, job_id: JobId) -> Vec<(JobNode, JobEdge)> {
         self.job_graph.get_children(job_id).unwrap_or(vec![])
     }
 

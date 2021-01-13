@@ -1,5 +1,6 @@
 use crate::api::operator::DEFAULT_PARALLELISM;
-use crate::dag::stream_graph::{OperatorId, StreamGraph, StreamNode};
+use crate::api::runtime::JobId;
+use crate::dag::stream_graph::{StreamGraph, StreamNode};
 use crate::dag::{utils, DagError, JsonDag, Label, OperatorType};
 use daggy::{Dag, EdgeIndex, NodeIndex, Walker};
 use std::cmp::max;
@@ -25,11 +26,11 @@ impl Label for JobEdge {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct JobNode {
     /// the first operator id in a pipeline as job_id
-    pub(crate) job_id: u32,
+    pub(crate) job_id: JobId,
     pub(crate) parallelism: u32,
     pub(crate) stream_nodes: Vec<StreamNode>,
-    pub(crate) child_job_ids: Vec<u32>,
-    pub(crate) parent_job_ids: Vec<u32>,
+    pub(crate) child_job_ids: Vec<JobId>,
+    pub(crate) parent_job_ids: Vec<JobId>,
 }
 
 impl Label for JobNode {
@@ -40,7 +41,7 @@ impl Label for JobNode {
             .map(|x| x.operator_name.as_str())
             .collect();
         let names: String = op_names.join(",\n");
-        format!("job:{}(p{})\n[{}]", self.job_id, self.parallelism, names)
+        format!("{:?}(p{})\n[{}]", self.job_id, self.parallelism, names)
     }
 }
 
@@ -62,7 +63,7 @@ impl JobNode {
 
 #[derive(Debug, Clone)]
 pub(crate) struct JobGraph {
-    pub(crate) job_node_indies: HashMap<u32, NodeIndex>,
+    pub(crate) job_node_indies: HashMap<JobId, NodeIndex>,
     pub(crate) dag: Dag<JobNode, JobEdge>,
 }
 
@@ -78,14 +79,14 @@ impl JobGraph {
         utils::get_nodes(&self.dag)
     }
 
-    pub(crate) fn get_job_node(&self, job_id: u32) -> Option<JobNode> {
+    pub(crate) fn get_job_node(&self, job_id: JobId) -> Option<JobNode> {
         self.job_node_indies.get(&job_id).map(|node_index| {
             let job_node = self.dag.index(*node_index);
             job_node.clone()
         })
     }
 
-    pub(crate) fn get_parents(&self, job_id: u32) -> Option<Vec<(JobNode, JobEdge)>> {
+    pub(crate) fn get_parents(&self, job_id: JobId) -> Option<Vec<(JobNode, JobEdge)>> {
         self.job_node_indies.get(&job_id).map(|node_index| {
             let job_nodes: Vec<(JobNode, JobEdge)> = self
                 .dag
@@ -102,7 +103,7 @@ impl JobGraph {
         })
     }
 
-    pub(crate) fn get_children(&self, job_id: u32) -> Option<Vec<(JobNode, JobEdge)>> {
+    pub(crate) fn get_children(&self, job_id: JobId) -> Option<Vec<(JobNode, JobEdge)>> {
         self.job_node_indies.get(&job_id).map(|node_index| {
             let job_nodes: Vec<(JobNode, JobEdge)> = self
                 .dag
@@ -231,8 +232,8 @@ impl JobGraph {
     ) -> Result<JobNode, DagError> {
         let mut stream_nodes = Vec::new();
         let mut parallelism = DEFAULT_PARALLELISM;
-        let mut job_id = 0;
-        let mut child_job_ids: Vec<OperatorId> = Vec::new();
+        let mut job_id = JobId::default();
+        let mut child_job_ids: Vec<JobId> = Vec::new();
 
         let mut node_index = source_node_index;
         let stream_dag = &stream_graph.dag;
@@ -244,14 +245,14 @@ impl JobGraph {
             stream_nodes.push(stream_node.clone());
             parallelism = max(parallelism, stream_node.parallelism);
             if stream_node.operator_type == OperatorType::Source {
-                job_id = stream_node.id;
+                job_id.0 = stream_node.id.0;
             }
 
             if stream_node.operator_type == OperatorType::Sink {
-                let f_job_ids: Vec<OperatorId> = children
+                let f_job_ids: Vec<JobId> = children
                     .iter()
                     .map(|(_edge_index, node_index)| stream_graph.get_stream_node(*node_index))
-                    .map(|stream_node| stream_node.id)
+                    .map(|stream_node| JobId(stream_node.id.0))
                     .collect();
                 child_job_ids.extend_from_slice(f_job_ids.as_slice());
                 break;

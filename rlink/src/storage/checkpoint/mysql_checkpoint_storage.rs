@@ -2,6 +2,7 @@ use mysql::prelude::*;
 use mysql::*;
 
 use crate::api::checkpoint::{Checkpoint, CheckpointHandle};
+use crate::api::runtime::{CheckpointId, JobId};
 use crate::storage::checkpoint::CheckpointStorage;
 use crate::utils::date_time::{current_timestamp, fmt_date_time};
 
@@ -23,8 +24,8 @@ impl CheckpointStorage for MySqlCheckpointStorage {
         &mut self,
         application_name: &str,
         application_id: &str,
-        job_id: u32,
-        checkpoint_id: u64,
+        job_id: JobId,
+        checkpoint_id: CheckpointId,
         finish_cks: Vec<Checkpoint>,
         ttl: u64,
     ) -> anyhow::Result<()> {
@@ -41,8 +42,8 @@ values
                 params! {
                     "application_name" => application_name,
                     "application_id" => application_id,
-                    "job_id" => job_id,
-                    "checkpoint_id" => checkpoint_id,
+                    "job_id" => job_id.0,
+                    "checkpoint_id" => checkpoint_id.0,
                     "task_num" => p.task_num,
                     "handle" => &p.handle.handle,
                     "create_time" => fmt_date_time(current_timestamp(), "%Y-%m-%d %T"),
@@ -50,11 +51,11 @@ values
             }),
         )?;
 
-        if checkpoint_id < ttl {
+        if checkpoint_id.0 < ttl {
             return Ok(());
         }
 
-        let checkpoint_id_ttl = checkpoint_id - ttl;
+        let checkpoint_id_ttl = checkpoint_id.0 - ttl;
         let _n: Option<usize> = conn.exec_first(
             r"
 delete
@@ -65,20 +66,20 @@ where application_name = :application_name
   and checkpoint_id < :checkpoint_id",
             params! {
                 "application_name" => application_name,
-                "job_id"=> job_id,
+                "job_id"=> job_id.0,
                 "application_id" => application_id,
                 "checkpoint_id" => checkpoint_id_ttl
             },
         )?;
 
         info!(
-            "checkpoint save success, job_id={}, checkpoint_id={}",
+            "checkpoint save success, job_id={:?}, checkpoint_id={:?}",
             job_id, checkpoint_id
         );
         Ok(())
     }
 
-    fn load(&mut self, application_name: &str, job_id: u32) -> anyhow::Result<Vec<Checkpoint>> {
+    fn load(&mut self, application_name: &str, job_id: JobId) -> anyhow::Result<Vec<Checkpoint>> {
         let pool = Pool::new(self.url.as_str())?;
 
         let mut conn = pool.get_conn()?;
@@ -99,11 +100,11 @@ where cks.application_name = :application_name
 
         let selected_payments = conn.exec_map(
             &stmt,
-            params! { "application_name" => application_name, "job_id" => job_id },
+            params! { "application_name" => application_name, "job_id" => job_id.0 },
             |(job_id, checkpoint_id, task_num, handle)| Checkpoint {
-                job_id,
+                job_id: JobId(job_id),
                 task_num,
-                checkpoint_id,
+                checkpoint_id: CheckpointId(checkpoint_id),
                 handle: CheckpointHandle { handle },
             },
         )?;
@@ -116,12 +117,14 @@ where cks.application_name = :application_name
 #[cfg(test)]
 mod tests {
     use crate::api::checkpoint::{Checkpoint, CheckpointHandle};
+    use crate::api::runtime::{CheckpointId, JobId};
     use crate::storage::checkpoint::mysql_checkpoint_storage::MySqlCheckpointStorage;
     use crate::storage::checkpoint::CheckpointStorage;
 
     #[test]
     pub fn mysql_storage_test() {
-        let checkpoint_id = crate::utils::date_time::current_timestamp_millis();
+        let job_id = JobId(5u32);
+        let checkpoint_id = CheckpointId(crate::utils::date_time::current_timestamp_millis());
 
         let mut mysql_storage =
             MySqlCheckpointStorage::new("mysql://rlink:123456@localhost:3304/rlink");
@@ -129,11 +132,11 @@ mod tests {
             .save(
                 "abc",
                 "def",
-                5u32,
+                job_id,
                 checkpoint_id,
                 vec![
                     Checkpoint {
-                        job_id: 5u32,
+                        job_id,
                         task_num: 1,
                         checkpoint_id,
                         handle: CheckpointHandle {
@@ -141,7 +144,7 @@ mod tests {
                         },
                     },
                     Checkpoint {
-                        job_id: 5u32,
+                        job_id,
                         task_num: 2,
                         checkpoint_id,
                         handle: CheckpointHandle {
@@ -153,7 +156,7 @@ mod tests {
             )
             .unwrap();
 
-        let cks = mysql_storage.load("abc", 5u32).unwrap();
+        let cks = mysql_storage.load("abc", job_id).unwrap();
 
         for ck in cks {
             println!("{:?}", ck);

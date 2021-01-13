@@ -39,11 +39,11 @@ pub(crate) fn subscribe(source_task_ids: &Vec<TaskId>, target_task_id: &TaskId) 
         vec![
             Tag::new(
                 "source_job_id".to_string(),
-                source_task_ids[0].job_id.to_string(),
+                source_task_ids[0].job_id.0.to_string(),
             ),
             Tag::new(
                 "target_job_id".to_string(),
-                target_task_id.job_id.to_string(),
+                target_task_id.job_id.0.to_string(),
             ),
             Tag::new(
                 "target_task_number".to_string(),
@@ -152,7 +152,7 @@ impl Client {
         let tags = vec![
             Tag(
                 "source_job_id".to_string(),
-                self.channel_key.source_task_id.job_id.to_string(),
+                self.channel_key.source_task_id.job_id.0.to_string(),
             ),
             Tag(
                 "source_task_number".to_string(),
@@ -160,7 +160,7 @@ impl Client {
             ),
             Tag(
                 "target_job_id".to_string(),
-                self.channel_key.target_task_id.job_id.to_string(),
+                self.channel_key.target_task_id.job_id.0.to_string(),
             ),
             Tag(
                 "target_task_number".to_string(),

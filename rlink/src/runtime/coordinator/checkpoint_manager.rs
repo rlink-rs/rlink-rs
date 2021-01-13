@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use crate::api::checkpoint::Checkpoint;
 use crate::api::properties::SystemProperties;
+use crate::api::runtime::{CheckpointId, JobId};
 use crate::dag::DagManager;
 use crate::runtime::context::Context;
 use crate::runtime::ApplicationDescriptor;
@@ -14,13 +15,13 @@ pub(crate) struct ApplicationCheckpoint {
     application_name: String,
     application_id: String,
 
-    job_id: u32,
+    job_id: JobId,
     parallelism: u32,
 
     #[serde(skip_serializing, skip_deserializing)]
     storage: Option<CheckpointStorageWrap>,
 
-    current_ck_id: u64,
+    current_ck_id: CheckpointId,
     /// Map<task_num, Checkpoint>
     current_cks: HashMap<u16, Checkpoint>,
     latest_finish_cks: Vec<Checkpoint>,
@@ -30,7 +31,7 @@ impl ApplicationCheckpoint {
     pub fn new(
         application_name: String,
         application_id: String,
-        job_id: u32,
+        job_id: JobId,
         parallelism: u32,
         storage: Option<CheckpointStorageWrap>,
     ) -> Self {
@@ -40,14 +41,14 @@ impl ApplicationCheckpoint {
             job_id,
             parallelism,
             storage,
-            current_ck_id: 0,
+            current_ck_id: CheckpointId::default(),
             current_cks: HashMap::with_capacity(parallelism as usize),
             latest_finish_cks: Vec::with_capacity(parallelism as usize),
         }
     }
 
     pub fn add(&mut self, ck: Checkpoint) -> anyhow::Result<()> {
-        if ck.checkpoint_id == self.current_ck_id {
+        if ck.checkpoint_id.0 == self.current_ck_id.0 {
             if self.is_align() {
                 Err(anyhow::Error::msg(format!(
                     "the Checkpoint has align. {:?}",
@@ -66,8 +67,8 @@ impl ApplicationCheckpoint {
 
                 Ok(())
             }
-        } else if ck.checkpoint_id > self.current_ck_id {
-            if self.current_ck_id != 0 && !self.is_align() {
+        } else if ck.checkpoint_id.0 > self.current_ck_id.0 {
+            if self.current_ck_id.0 != 0 && !self.is_align() {
                 warn!("not all checkpoint is arrived");
             }
 
@@ -81,7 +82,7 @@ impl ApplicationCheckpoint {
             Ok(())
         } else {
             Err(anyhow::Error::msg(format!(
-                "checkpoint_id={} late. current checkpoint_id={}",
+                "checkpoint_id={:?} late. current checkpoint_id={:?}",
                 ck.checkpoint_id, self.current_ck_id
             )))
         }
@@ -151,7 +152,7 @@ pub(crate) type JobCheckpointSafe = Arc<RwLock<ApplicationCheckpoint>>;
 #[derive(Debug)]
 pub(crate) struct CheckpointManager {
     application_name: String,
-    job_cks: dashmap::DashMap<u32, JobCheckpointSafe>,
+    job_cks: dashmap::DashMap<JobId, JobCheckpointSafe>,
 }
 
 impl CheckpointManager {
@@ -176,7 +177,7 @@ impl CheckpointManager {
             let storage = checkpoint_backend
                 .as_ref()
                 .map(|ck_backend| CheckpointStorageWrap::new(ck_backend));
-            let chain_ck = ApplicationCheckpoint::new(
+            let job_ck = ApplicationCheckpoint::new(
                 application_name,
                 application_id,
                 job_id,
@@ -184,40 +185,40 @@ impl CheckpointManager {
                 storage,
             );
 
-            job_cks.insert(job_id, Arc::new(RwLock::new(chain_ck)));
+            job_cks.insert(job_id, Arc::new(RwLock::new(job_ck)));
         }
 
         CheckpointManager {
             application_name: context.application_name.clone(),
-            job_cks: job_cks,
+            job_cks,
         }
     }
 
     pub fn add(&self, ck: Checkpoint) -> anyhow::Result<()> {
         match self.job_cks.get_mut(&ck.job_id) {
             Some(mut d) => {
-                let mut chain_checkpoint = d.value_mut().write().unwrap();
-                chain_checkpoint.add(ck)
+                let mut job_checkpoint = d.value_mut().write().unwrap();
+                job_checkpoint.add(ck)
             }
             None => Err(anyhow::Error::msg(format!(
-                "ChainId={} not found",
-                ck.checkpoint_id
+                "checkpoint_id={:?} not found",
+                ck
             ))),
         }
     }
 
-    pub fn load(&mut self) -> anyhow::Result<HashMap<u32, Vec<Checkpoint>>> {
+    pub fn load(&mut self) -> anyhow::Result<HashMap<JobId, Vec<Checkpoint>>> {
         let mut job_checkpoints = HashMap::new();
         for entry in &self.job_cks {
-            let mut chain_ck = entry.value().write().unwrap();
-            let checkpoints = chain_ck.load()?;
+            let mut job_ck = entry.value().write().unwrap();
+            let checkpoints = job_ck.load()?;
             job_checkpoints.insert(*entry.key(), checkpoints);
         }
 
         Ok(job_checkpoints)
     }
 
-    pub fn get(&self) -> HashMap<u32, ApplicationCheckpoint> {
+    pub fn get(&self) -> HashMap<JobId, ApplicationCheckpoint> {
         let mut map = HashMap::new();
         for entry in &self.job_cks {
             let job_ck = entry.value().read().unwrap();

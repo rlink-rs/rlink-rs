@@ -58,10 +58,10 @@ impl ClickhouseSink {
 impl OutputFormat for ClickhouseSink {
     fn open(&mut self, context: &Context) {
         let tags = vec![
-            Tag("chain_id".to_string(), format!("{}", context.chain_id)),
+            Tag("job_id".to_string(), context.task_id.job_id().0.to_string()),
             Tag(
                 "task_number".to_string(),
-                format!("{}", context.task_number),
+                context.task_id.task_number().to_string(),
             ),
         ];
         self.handover = Some(Handover::new(self.get_name(), tags, 100000, mb(10)));

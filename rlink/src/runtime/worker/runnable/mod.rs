@@ -16,6 +16,7 @@ pub mod source_runnable;
 pub mod watermark_assigner_runnable;
 pub mod window_assigner_runnable;
 
+use crate::api::runtime::{CheckpointId, OperatorId};
 use crate::dag::job_graph::{JobEdge, JobNode};
 use crate::dag::stream_graph::StreamNode;
 use crate::dag::DagManager;
@@ -55,7 +56,10 @@ impl RunnableContext {
         }
     }
 
-    pub(crate) fn get_checkpoint_context(&self, checkpoint_id: u64) -> FunctionSnapshotContext {
+    pub(crate) fn get_checkpoint_context(
+        &self,
+        checkpoint_id: CheckpointId,
+    ) -> FunctionSnapshotContext {
         FunctionSnapshotContext::new(
             self.task_descriptor.task_id.job_id,
             self.task_descriptor.task_id.task_number,
@@ -101,7 +105,7 @@ impl RunnableContext {
     //     self.dag_manager.get_stream_parents(operator_id)
     // }
 
-    pub(crate) fn get_stream(&self, operator_id: u32) -> StreamNode {
+    pub(crate) fn get_stream(&self, operator_id: OperatorId) -> StreamNode {
         self.dag_manager.get_stream(operator_id).unwrap()
     }
 }
@@ -111,5 +115,5 @@ pub(crate) trait Runnable: Debug {
     fn run(&mut self, element: Element);
     fn close(&mut self);
     fn set_next_runnable(&mut self, next_runnable: Option<Box<dyn Runnable>>);
-    fn checkpoint(&mut self, checkpoint_id: u64);
+    fn checkpoint(&mut self, checkpoint_id: CheckpointId);
 }
