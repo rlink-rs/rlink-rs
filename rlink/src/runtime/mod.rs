@@ -1,7 +1,3 @@
-use std::fmt::Display;
-
-use serde::export::Formatter;
-
 use crate::api::checkpoint::CheckpointHandle;
 use crate::api::env::{StreamExecutionEnvironment, StreamJob};
 use crate::api::function::InputSplit;
@@ -37,8 +33,8 @@ impl From<String> for ClusterMode {
     }
 }
 
-impl Display for ClusterMode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl std::fmt::Display for ClusterMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ClusterMode::Local => write!(f, "Local"),
             ClusterMode::Standalone => write!(f, "Standalone"),
@@ -69,8 +65,8 @@ impl From<String> for ManagerType {
     }
 }
 
-impl Display for ManagerType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl std::fmt::Display for ManagerType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ManagerType::Coordinator => write!(f, "Coordinator"),
             ManagerType::Standby => write!(f, "Standby"),
