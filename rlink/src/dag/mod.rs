@@ -144,7 +144,7 @@ impl DagManager {
             .unwrap();
 
         let mut physic_graph = PhysicGraph::new();
-        physic_graph.build0(&execution_graph);
+        physic_graph.build(&execution_graph);
 
         DagManager {
             stream_graph,
