@@ -1,8 +1,10 @@
-use crate::dag::execution_graph::{ExecutionEdge, ExecutionGraph, ExecutionNode};
-use crate::dag::{TaskId, TaskInstance, WorkerManagerInstance};
-use daggy::{EdgeIndex, NodeIndex, Walker};
 use std::collections::{HashMap, HashSet};
 use std::ops::Index;
+
+use daggy::{NodeIndex, Walker};
+
+use crate::dag::execution_graph::{ExecutionEdge, ExecutionGraph, ExecutionNode};
+use crate::dag::{TaskId, TaskInstance, WorkerManagerInstance};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub(crate) struct ForwardTaskChain {
@@ -10,10 +12,6 @@ pub(crate) struct ForwardTaskChain {
 }
 
 impl ForwardTaskChain {
-    pub fn new(tasks: Vec<ExecutionNode>) -> Self {
-        ForwardTaskChain { tasks }
-    }
-
     pub fn get_task_id(&self) -> TaskId {
         self.tasks
             .iter()

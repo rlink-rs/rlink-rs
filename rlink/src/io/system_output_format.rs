@@ -80,6 +80,7 @@ impl OutputFormat for SystemOutputFormat {
             }
 
             for (job_id, senders) in job_senders {
+                // todo support multiplexing
                 if senders.len() != 1 {
                     panic!("only `Forward` support in memory channel");
                 }

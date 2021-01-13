@@ -6,7 +6,7 @@ use crate::channel::{mb, named_bounded, ElementReceiver, ElementSender};
 use crate::metrics::Tag;
 
 lazy_static! {
-    static ref MEMORY_CHANNELS: Mutex<HashMap<ChannelKey, (ElementSender, ElementReceiver)>> =
+    static ref MEMORY_CHANNELS: Mutex<HashMap<TaskId, (ElementSender, ElementReceiver)>> =
         Mutex::new(HashMap::new());
 }
 
@@ -20,40 +20,28 @@ pub(crate) fn publish(
             source_task_id: source_task_id.clone(),
             target_task_id: target_task_id.clone(),
         };
-        let sender = get(channel_key.clone()).0;
+        let sender = get(*target_task_id).0;
         senders.push((channel_key, sender));
     }
     senders
 }
 
 pub(crate) fn subscribe(source_task_ids: &Vec<TaskId>, target_task_id: &TaskId) -> ElementReceiver {
-    if source_task_ids.len() != 1 {
-        panic!("");
+    if source_task_ids.len() == 0 {
+        panic!("source TaskId not found");
     }
 
-    let channel_key = ChannelKey {
-        source_task_id: source_task_ids[0].clone(),
-        target_task_id: target_task_id.clone(),
-    };
-    get(channel_key).1
+    get(*target_task_id).1
 }
 
-pub(crate) fn get(key: ChannelKey) -> (ElementSender, ElementReceiver) {
-    let memory_channels: &Mutex<HashMap<ChannelKey, (ElementSender, ElementReceiver)>> =
+pub(crate) fn get(target_task_id: TaskId) -> (ElementSender, ElementReceiver) {
+    let memory_channels: &Mutex<HashMap<TaskId, (ElementSender, ElementReceiver)>> =
         &*MEMORY_CHANNELS;
     let mut guard = memory_channels.lock().unwrap();
-    let (sender, receiver) = guard.entry(key.clone()).or_insert_with(|| {
-        let ChannelKey {
-            source_task_id,
-            target_task_id,
-        } = key;
+    let (sender, receiver) = guard.entry(target_task_id).or_insert_with(|| {
         named_bounded(
             "Memory_PubSub",
             vec![
-                Tag::new(
-                    "source_job_id".to_string(),
-                    source_task_id.job_id.to_string(),
-                ),
                 Tag::new(
                     "target_job_id".to_string(),
                     target_task_id.job_id.to_string(),
