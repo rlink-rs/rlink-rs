@@ -9,7 +9,7 @@ use crate::api::operator::{
 };
 use crate::api::runtime::OperatorId;
 use crate::dag::{DagError, JsonDag, Label, OperatorType};
-use crate::io::system_flat_map_function::SystemFlatMapFunction;
+use crate::functions::keyed_state_flat_map::KeyedStateFlatMapFunction;
 use crate::io::system_input_format::SystemInputFormat;
 use crate::io::system_output_format::SystemOutputFormat;
 
@@ -151,7 +151,7 @@ impl RawStreamGraph {
         parent_id: OperatorId,
         parallelism: u32,
     ) -> StreamOperatorWrap {
-        let map_format = Box::new(SystemFlatMapFunction::new());
+        let map_format = Box::new(KeyedStateFlatMapFunction::new());
         StreamOperatorWrap::StreamMap(StreamOperator::new(
             id,
             vec![parent_id],

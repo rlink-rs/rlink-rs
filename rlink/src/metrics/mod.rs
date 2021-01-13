@@ -54,6 +54,7 @@ pub(crate) fn init_metrics2(bind_ip: &str, with_proxy: bool) -> SocketAddr {
 
     let (tx, rx) = bounded(1);
     let bind_ip = bind_ip.to_string();
+    let tx_clone = tx.clone();
     std::thread::spawn(move || {
         get_runtime().block_on(async move {
             let mut rng = rand::thread_rng();
@@ -74,7 +75,7 @@ pub(crate) fn init_metrics2(bind_ip: &str, with_proxy: bool) -> SocketAddr {
                 let exporter = HttpExporter::new(controller.clone(), builder);
                 match exporter.try_bind(&addr) {
                     Ok(addr_incoming) => {
-                        tx.send(addr.clone()).unwrap();
+                        tx_clone.send(addr.clone()).unwrap();
                         exporter
                             .async_run1(addr_incoming, with_proxy)
                             .await

@@ -8,6 +8,7 @@ use rlink::api::function::{CoProcessFunction, Context, InputFormat, InputSplit, 
 use rlink::api::properties::{Properties, SystemProperties};
 use rlink::api::watermark::BoundedOutOfOrdernessTimestampExtractor;
 use rlink::api::window::SlidingEventTimeWindows;
+use rlink::functions::broadcast_flat_map::BroadcastFlagMapFunction;
 use rlink::functions::column_base_function::key_selector::ColumnBaseKeySelector;
 use rlink::functions::column_base_function::reduce::{sum_i64, ColumnBaseReduceFunction};
 use rlink::functions::column_base_function::timestamp_assigner::ColumnBaseTimestampAssigner;
@@ -16,7 +17,6 @@ use rlink::functions::column_base_function::FunctionSchema;
 use crate::buffer_gen::model::DATA_TYPE;
 use crate::buffer_gen::{config, model};
 use crate::job::simple::{MyFilterFunction, MyFlatMapFunction, MyOutputFormat, TestInputFormat};
-use rlink::functions::broadcast_flat_map::BroadcastFlagMapFunction;
 
 #[derive(Clone, Debug)]
 pub struct MyStreamJob {}
@@ -48,7 +48,7 @@ impl StreamJob for MyStreamJob {
                 ColumnBaseTimestampAssigner::new(model::index::timestamp, DATA_TYPE.to_vec()),
             ));
         let data_stream_right = env
-            .register_source(BroadcastInputFormat::new(properties.clone()), 1)
+            .register_source(BroadcastInputFormat::new(), 1)
             .flat_map(BroadcastFlagMapFunction::new());
 
         data_stream_left
@@ -56,7 +56,7 @@ impl StreamJob for MyStreamJob {
             .key_by(key_selector)
             .window(SlidingEventTimeWindows::new(
                 Duration::from_secs(60),
-                Duration::from_secs(20),
+                Duration::from_secs(60),
                 None,
             ))
             .reduce(reduce_function, 2)
@@ -67,16 +67,11 @@ impl StreamJob for MyStreamJob {
 #[derive(Debug, Function)]
 pub struct BroadcastInputFormat {
     data: Vec<Record>,
-
-    properties: Properties,
 }
 
 impl BroadcastInputFormat {
-    pub fn new(properties: Properties) -> Self {
-        BroadcastInputFormat {
-            data: Vec::new(),
-            properties,
-        }
+    pub fn new() -> Self {
+        BroadcastInputFormat { data: Vec::new() }
     }
 }
 

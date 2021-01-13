@@ -6,16 +6,16 @@ use crate::api::runtime::JobId;
 use crate::storage::keyed_state::{ReducingState, ReducingStateWrap, StateKey};
 
 /// only for keyed state backend(can add a type to support other)
-pub struct SystemFlatMapFunction {
+pub(crate) struct KeyedStateFlatMapFunction {
     parent_job_id: JobId,
     task_number: u16,
 
     state_mode: KeyedStateBackend,
 }
 
-impl SystemFlatMapFunction {
+impl KeyedStateFlatMapFunction {
     pub fn new() -> Self {
-        SystemFlatMapFunction {
+        KeyedStateFlatMapFunction {
             parent_job_id: JobId::default(),
             task_number: 0,
             state_mode: KeyedStateBackend::Memory,
@@ -23,7 +23,7 @@ impl SystemFlatMapFunction {
     }
 }
 
-impl FlatMapFunction for SystemFlatMapFunction {
+impl FlatMapFunction for KeyedStateFlatMapFunction {
     fn open(&mut self, context: &Context) {
         if context.parents.len() != 1 {
             panic!("KeyedStateMap job can only one parent");
@@ -61,7 +61,7 @@ impl FlatMapFunction for SystemFlatMapFunction {
     fn close(&mut self) {}
 }
 
-impl Function for SystemFlatMapFunction {
+impl Function for KeyedStateFlatMapFunction {
     fn get_name(&self) -> &str {
         "SystemFlatMapFunction"
     }
