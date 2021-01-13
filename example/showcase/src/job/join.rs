@@ -4,9 +4,7 @@ use rlink::api::backend::KeyedStateBackend;
 use rlink::api::data_stream::{TConnectedStreams, TDataStream, TKeyedStream, TWindowedStream};
 use rlink::api::element::Record;
 use rlink::api::env::{StreamExecutionEnvironment, StreamJob};
-use rlink::api::function::{
-    CoProcessFunction, Context, InputFormat, InputSplit, InputSplitAssigner, InputSplitSource,
-};
+use rlink::api::function::{CoProcessFunction, Context, InputFormat, InputSplit, InputSplitSource};
 use rlink::api::properties::{Properties, SystemProperties};
 use rlink::api::watermark::BoundedOutOfOrdernessTimestampExtractor;
 use rlink::api::window::SlidingEventTimeWindows;
@@ -82,20 +80,7 @@ impl BroadcastInputFormat {
     }
 }
 
-impl InputSplitSource for BroadcastInputFormat {
-    fn create_input_splits(&self, min_num_splits: u32) -> Vec<InputSplit> {
-        let mut input_splits = Vec::new();
-        for i in 0..min_num_splits {
-            input_splits.push(InputSplit::new(i, Properties::new()));
-        }
-
-        input_splits
-    }
-
-    fn get_input_split_assigner(&self, input_splits: Vec<InputSplit>) -> InputSplitAssigner {
-        InputSplitAssigner::new(input_splits)
-    }
-}
+impl InputSplitSource for BroadcastInputFormat {}
 
 impl InputFormat for BroadcastInputFormat {
     fn open(&mut self, input_split: InputSplit, _context: &Context) {

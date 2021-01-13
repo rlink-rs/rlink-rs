@@ -80,12 +80,20 @@ pub trait InputSplitSource {
     /// Create InputSplits by system parallelism[`min_num_splits`]
     ///
     /// Returns a InputSplit vec
-    fn create_input_splits(&self, min_num_splits: u32) -> Vec<InputSplit>;
+    fn create_input_splits(&self, min_num_splits: u32) -> Vec<InputSplit> {
+        let mut input_splits = Vec::with_capacity(min_num_splits as usize);
+        for task_number in 0..min_num_splits {
+            input_splits.push(InputSplit::new(task_number, Properties::new()));
+        }
+        input_splits
+    }
 
     /// Create InputSplitAssigner by InputSplits['input_splits']
     ///
     /// Returns a InputSplitAssigner
-    fn get_input_split_assigner(&self, input_splits: Vec<InputSplit>) -> InputSplitAssigner;
+    fn get_input_split_assigner(&self, input_splits: Vec<InputSplit>) -> InputSplitAssigner {
+        InputSplitAssigner::new(input_splits)
+    }
 }
 
 /// The base interface for data sources that produces records.

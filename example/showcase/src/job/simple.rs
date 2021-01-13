@@ -6,8 +6,8 @@ use rlink::api::data_stream::{TDataStream, TKeyedStream, TWindowedStream};
 use rlink::api::element::Record;
 use rlink::api::env::{StreamExecutionEnvironment, StreamJob};
 use rlink::api::function::{
-    Context, FilterFunction, FlatMapFunction, InputFormat, InputSplit, InputSplitAssigner,
-    InputSplitSource, OutputFormat,
+    Context, FilterFunction, FlatMapFunction, InputFormat, InputSplit, InputSplitSource,
+    OutputFormat,
 };
 use rlink::api::properties::{Properties, SystemProperties};
 use rlink::api::watermark::BoundedOutOfOrdernessTimestampExtractor;
@@ -79,20 +79,7 @@ impl TestInputFormat {
     }
 }
 
-impl InputSplitSource for TestInputFormat {
-    fn create_input_splits(&self, min_num_splits: u32) -> Vec<InputSplit> {
-        let mut input_splits = Vec::new();
-        for i in 0..min_num_splits {
-            input_splits.push(InputSplit::new(i, Properties::new()));
-        }
-
-        input_splits
-    }
-
-    fn get_input_split_assigner(&self, input_splits: Vec<InputSplit>) -> InputSplitAssigner {
-        InputSplitAssigner::new(input_splits)
-    }
-}
+impl InputSplitSource for TestInputFormat {}
 
 impl InputFormat for TestInputFormat {
     fn open(&mut self, input_split: InputSplit, _context: &Context) {

@@ -2,7 +2,6 @@ use crate::api::element::{Element, Record};
 use crate::api::function::{
     Context, Function, InputFormat, InputSplit, InputSplitAssigner, InputSplitSource,
 };
-use crate::api::properties::Properties;
 use crate::api::runtime::TaskId;
 use crate::channel::{ElementReceiver, TryRecvError};
 use crate::dag::execution_graph::ExecutionEdge;
@@ -102,14 +101,6 @@ impl InputFormat for SystemInputFormat {
 }
 
 impl InputSplitSource for SystemInputFormat {
-    fn create_input_splits(&self, min_num_splits: u32) -> Vec<InputSplit> {
-        let mut input_splits = Vec::with_capacity(min_num_splits as usize);
-        for task_number in 0..min_num_splits {
-            input_splits.push(InputSplit::new(task_number, Properties::new()));
-        }
-        input_splits
-    }
-
     fn get_input_split_assigner(&self, _input_splits: Vec<InputSplit>) -> InputSplitAssigner {
         unimplemented!()
     }

@@ -414,19 +414,7 @@ mod tests {
         }
     }
 
-    impl InputSplitSource for MyInputFormat {
-        fn create_input_splits(&self, min_num_splits: u32) -> Vec<InputSplit> {
-            let mut input_splits = Vec::with_capacity(min_num_splits as usize);
-            for partition_num in 0..min_num_splits {
-                input_splits.push(InputSplit::new(partition_num, Properties::new()));
-            }
-            input_splits
-        }
-
-        fn get_input_split_assigner(&self, input_splits: Vec<InputSplit>) -> InputSplitAssigner {
-            InputSplitAssigner::new(input_splits)
-        }
-    }
+    impl InputSplitSource for MyInputFormat {}
 
     impl Function for MyInputFormat {
         fn get_name(&self) -> &str {
