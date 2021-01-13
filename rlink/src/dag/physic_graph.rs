@@ -87,24 +87,24 @@ impl PhysicGraph {
     fn merge_forward_task0(&mut self, execution_graph: &ExecutionGraph) -> Vec<ForwardTaskChain> {
         let execution_dag = &execution_graph.dag;
 
-        let mut all_tasks = HashSet::new();
-        let mut forward_tasks = HashSet::new();
+        let mut all_task_set = HashSet::new();
+        let mut forward_task_set = HashSet::new();
         for edge in execution_dag.raw_edges() {
             match edge.weight {
                 ExecutionEdge::Memory => {
-                    forward_tasks.insert(edge.source());
-                    forward_tasks.insert(edge.target());
+                    forward_task_set.insert(edge.source());
+                    forward_task_set.insert(edge.target());
                 }
                 ExecutionEdge::Network => {}
             }
 
-            all_tasks.insert(edge.source());
-            all_tasks.insert(edge.target());
+            all_task_set.insert(edge.source());
+            all_task_set.insert(edge.target());
         }
 
-        let hash_chains: Vec<ForwardTaskChain> = all_tasks
+        let hash_chains: Vec<ForwardTaskChain> = all_task_set
             .into_iter()
-            .filter(|node_index| forward_tasks.get(node_index).is_none())
+            .filter(|node_index| forward_task_set.get(node_index).is_none())
             .map(|node_index| {
                 let execution_node = execution_dag.index(node_index).clone();
                 ForwardTaskChain {
@@ -113,27 +113,35 @@ impl PhysicGraph {
             })
             .collect();
 
-        let mut forward_tasks: Vec<NodeIndex> = forward_tasks.into_iter().collect();
         let mut forward_chains = Vec::new();
         loop {
-            if forward_tasks.len() == 0 {
-                break;
+            let first_node_index = forward_task_set.iter().next().map(|x| *x);
+            match first_node_index {
+                Some(node_index) => {
+                    let parents = self.get_parents(node_index, execution_graph);
+                    let children = self.get_children(node_index, execution_graph);
+
+                    forward_task_set.remove(&node_index);
+                    parents.iter().for_each(|x| {
+                        forward_task_set.remove(x);
+                    });
+                    children.iter().for_each(|x| {
+                        forward_task_set.remove(x);
+                    });
+
+                    let mut forward_node_indies = Vec::new();
+                    forward_node_indies.push(node_index);
+                    forward_node_indies.extend_from_slice(parents.as_slice());
+                    forward_node_indies.extend_from_slice(children.as_slice());
+
+                    let tasks: Vec<ExecutionNode> = forward_node_indies
+                        .into_iter()
+                        .map(|node_index| execution_dag.index(node_index).clone())
+                        .collect();
+                    forward_chains.push(ForwardTaskChain { tasks });
+                }
+                None => break,
             }
-
-            let node_index = forward_tasks.remove(0);
-            let parents = self.get_parents(node_index, execution_graph);
-            let children = self.get_children(node_index, execution_graph);
-
-            let mut forward_node_indies = Vec::new();
-            forward_node_indies.push(node_index);
-            forward_node_indies.extend_from_slice(parents.as_slice());
-            forward_node_indies.extend_from_slice(children.as_slice());
-
-            let tasks: Vec<ExecutionNode> = forward_node_indies
-                .into_iter()
-                .map(|node_index| execution_dag.index(node_index).clone())
-                .collect();
-            forward_chains.push(ForwardTaskChain { tasks });
         }
 
         forward_chains.extend_from_slice(hash_chains.as_slice());
