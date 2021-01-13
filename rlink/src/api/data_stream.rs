@@ -11,10 +11,6 @@ use crate::api::runtime::OperatorId;
 use crate::api::watermark::WatermarkAssigner;
 use crate::api::window::WindowAssigner;
 
-pub(crate) trait PipelineStream: Debug {
-    fn into_operators(self) -> Vec<StreamOperatorWrap>;
-}
-
 pub trait TDataStream {
     fn flat_map<F>(self, flat_mapper: F) -> DataStream
     where
@@ -65,8 +61,6 @@ pub trait TWindowedStream {
     where
         F: ReduceFunction + 'static;
 }
-
-pub trait TEndStream {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -209,14 +203,6 @@ impl SinkStream {
     }
 }
 
-impl TEndStream for SinkStream {}
-
-impl PipelineStream for SinkStream {
-    fn into_operators(self) -> Vec<StreamOperatorWrap> {
-        self.end_stream.into_operators()
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -264,12 +250,6 @@ impl StreamBuilder {
             cur_operator_id: operator_id,
             stream_manager,
         }
-    }
-}
-
-impl PipelineStream for StreamBuilder {
-    fn into_operators(self) -> Vec<StreamOperatorWrap> {
-        unimplemented!()
     }
 }
 
@@ -438,5 +418,3 @@ impl TWindowedStream for StreamBuilder {
         DataStream::new(self)
     }
 }
-
-impl TEndStream for StreamBuilder {}
