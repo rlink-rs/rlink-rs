@@ -55,6 +55,7 @@ impl PhysicGraph {
                 for execution_node in &chain.tasks {
                     task_manager.task_instances.push(TaskInstance {
                         task_id: execution_node.task_id.clone(),
+                        stream_nodes: execution_node.stream_nodes.clone(),
                         input_split: execution_node.input_split.clone(),
                     });
                 }

@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use crate::api::checkpoint::{CheckpointHandle, CheckpointedFunction, FunctionSnapshotContext};
 use crate::api::element::{Element, Record};
 use crate::api::properties::Properties;
-use crate::api::runtime::{CheckpointId, TaskId};
+use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::dag::execution_graph::{ExecutionEdge, ExecutionNode};
 
 /// Base class of all operators in the Rust API.
@@ -15,6 +15,7 @@ pub trait Function {
 pub struct Context {
     pub application_id: String,
     pub application_properties: Properties,
+    pub operator_id: OperatorId,
     pub task_id: TaskId,
 
     pub checkpoint_id: CheckpointId,
@@ -26,11 +27,7 @@ pub struct Context {
 
 impl Context {
     pub fn get_checkpoint_context(&self) -> FunctionSnapshotContext {
-        FunctionSnapshotContext::new(
-            self.task_id.job_id,
-            self.task_id.task_number,
-            self.checkpoint_id,
-        )
+        FunctionSnapshotContext::new(self.operator_id, self.task_id, self.checkpoint_id)
     }
 }
 

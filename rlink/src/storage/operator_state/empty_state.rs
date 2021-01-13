@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::api::backend::{OperatorState, StateValue};
-use crate::api::runtime::CheckpointId;
+use crate::api::runtime::{CheckpointId, TaskId};
 use crate::storage::operator_state::OperatorStateManager;
 
 #[derive(Clone, Debug)]
@@ -26,7 +26,7 @@ impl OperatorState for EmptyOperatorState {
 pub struct EmptyOperatorStateManager {}
 
 impl OperatorStateManager for EmptyOperatorStateManager {
-    fn create_state(&self, _application_id: String, _task_number: u16) -> Box<dyn OperatorState> {
+    fn create_state(&self, _application_id: String, _task_id: TaskId) -> Box<dyn OperatorState> {
         let state = EmptyOperatorState {};
         let state: Box<dyn OperatorState> = Box::new(state);
         state

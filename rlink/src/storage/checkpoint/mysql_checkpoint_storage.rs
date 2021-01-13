@@ -2,7 +2,7 @@ use mysql::prelude::*;
 use mysql::*;
 
 use crate::api::checkpoint::{Checkpoint, CheckpointHandle};
-use crate::api::runtime::{CheckpointId, JobId};
+use crate::api::runtime::{CheckpointId, JobId, OperatorId, TaskId};
 use crate::storage::checkpoint::CheckpointStorage;
 use crate::utils::date_time::{current_timestamp, fmt_date_time};
 
@@ -24,7 +24,6 @@ impl CheckpointStorage for MySqlCheckpointStorage {
         &mut self,
         application_name: &str,
         application_id: &str,
-        job_id: JobId,
         checkpoint_id: CheckpointId,
         finish_cks: Vec<Checkpoint>,
         ttl: u64,
@@ -34,17 +33,19 @@ impl CheckpointStorage for MySqlCheckpointStorage {
         let mut conn = pool.get_conn()?;
         conn.exec_batch(
             r"
-insert into rlink_cks 
-  (application_name, application_id, job_id, checkpoint_id, task_num, handle, create_time)
+insert into rlink_ck 
+  (application_name, application_id, job_id, task_number, num_tasks, operator_id, checkpoint_id, handle, create_time)
 values 
-  (:application_name, :application_id, :job_id, :checkpoint_id, :task_num, :handle, :create_time)",
+  (:application_name, :application_id, :job_id, :task_number, :num_tasks, :operator_id, :checkpoint_id, :handle, :create_time)",
             finish_cks.iter().map(|p| {
                 params! {
                     "application_name" => application_name,
                     "application_id" => application_id,
-                    "job_id" => job_id.0,
+                    "job_id" => p.task_id.job_id.0,
+                    "task_number" => p.task_id.task_number,
+                    "num_tasks" => p.task_id.num_tasks,
+                    "operator_id" => p.operator_id.0,
                     "checkpoint_id" => checkpoint_id.0,
-                    "task_num" => p.task_num,
                     "handle" => &p.handle.handle,
                     "create_time" => fmt_date_time(current_timestamp(), "%Y-%m-%d %T"),
                 }
@@ -59,51 +60,60 @@ values
         let _n: Option<usize> = conn.exec_first(
             r"
 delete
-from rlink_cks
+from rlink_ck
 where application_name = :application_name
-  and job_id = :job_id
   and application_id = :application_id
   and checkpoint_id < :checkpoint_id",
             params! {
                 "application_name" => application_name,
-                "job_id"=> job_id.0,
                 "application_id" => application_id,
                 "checkpoint_id" => checkpoint_id_ttl
             },
         )?;
 
         info!(
-            "checkpoint save success, job_id={:?}, checkpoint_id={:?}",
-            job_id, checkpoint_id
+            "checkpoint save success, application_name={:?}, checkpoint_id={:?}",
+            application_name, checkpoint_id
         );
         Ok(())
     }
 
-    fn load(&mut self, application_name: &str, job_id: JobId) -> anyhow::Result<Vec<Checkpoint>> {
+    fn load(
+        &mut self,
+        application_name: &str,
+        job_id: JobId,
+        operator_id: OperatorId,
+    ) -> anyhow::Result<Vec<Checkpoint>> {
         let pool = Pool::new(self.url.as_str())?;
 
         let mut conn = pool.get_conn()?;
 
         let stmt = conn.prep(
             r"
-SELECT cks.job_id, cks.checkpoint_id, cks.task_num, cks.handle
-from rlink_cks as cks
+SELECT ck.job_id, ck.task_number, ck.num_tasks, ck.operator_id, ck.checkpoint_id, ck.handle
+from rlink_ck as ck
          inner join (
     SELECT max(checkpoint_id) as checkpoint_id
-    from rlink_cks
+    from rlink_ck
     where application_name = :application_name
       and job_id = :job_id
-) as t on t.checkpoint_id = cks.checkpoint_id
-where cks.application_name = :application_name
-  and cks.job_id = :job_id",
+      and operator_id = :operator_id
+) as t on t.checkpoint_id = ck.checkpoint_id
+where ck.application_name = :application_name
+  and ck.job_id = :job_id
+  and ck.operator_id = :operator_id",
         )?;
 
         let selected_payments = conn.exec_map(
             &stmt,
-            params! { "application_name" => application_name, "job_id" => job_id.0 },
-            |(job_id, checkpoint_id, task_num, handle)| Checkpoint {
-                job_id: JobId(job_id),
-                task_num,
+            params! { "application_name" => application_name, "job_id" => job_id.0, "operator_id" => operator_id.0 },
+            |(job_id, task_number, num_tasks, operator_id, checkpoint_id, handle)| Checkpoint {
+                operator_id: OperatorId(operator_id),
+                task_id: TaskId {
+                    job_id: JobId(job_id),
+                    task_number,
+                    num_tasks,
+                },
                 checkpoint_id: CheckpointId(checkpoint_id),
                 handle: CheckpointHandle { handle },
             },
@@ -117,13 +127,19 @@ where cks.application_name = :application_name
 #[cfg(test)]
 mod tests {
     use crate::api::checkpoint::{Checkpoint, CheckpointHandle};
-    use crate::api::runtime::{CheckpointId, JobId};
+    use crate::api::runtime::{CheckpointId, JobId, OperatorId, TaskId};
     use crate::storage::checkpoint::mysql_checkpoint_storage::MySqlCheckpointStorage;
     use crate::storage::checkpoint::CheckpointStorage;
 
     #[test]
     pub fn mysql_storage_test() {
         let job_id = JobId(5u32);
+        let task_id = TaskId {
+            job_id,
+            task_number: 0,
+            num_tasks: 5,
+        };
+        let operator_id = OperatorId(1);
         let checkpoint_id = CheckpointId(crate::utils::date_time::current_timestamp_millis());
 
         let mut mysql_storage =
@@ -132,20 +148,19 @@ mod tests {
             .save(
                 "abc",
                 "def",
-                job_id,
                 checkpoint_id,
                 vec![
                     Checkpoint {
-                        job_id,
-                        task_num: 1,
+                        operator_id,
+                        task_id,
                         checkpoint_id,
                         handle: CheckpointHandle {
                             handle: "ha".to_string(),
                         },
                     },
                     Checkpoint {
-                        job_id,
-                        task_num: 2,
+                        operator_id,
+                        task_id,
                         checkpoint_id,
                         handle: CheckpointHandle {
                             handle: "hx".to_string(),

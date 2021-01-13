@@ -9,7 +9,7 @@ use crate::api::element::{Barrier, Element, Record, Watermark};
 use crate::api::function::{KeySelectorFunction, ReduceFunction};
 use crate::api::operator::StreamOperator;
 use crate::api::properties::SystemProperties;
-use crate::api::runtime::CheckpointId;
+use crate::api::runtime::{CheckpointId, OperatorId};
 use crate::api::window::{Window, WindowWrap};
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
@@ -18,6 +18,7 @@ use crate::utils::date_time::timestamp_str;
 
 #[derive(Debug)]
 pub(crate) struct ReduceRunnable {
+    operator_id: OperatorId,
     task_number: u16,
     dependency_parallelism: u32,
 
@@ -41,11 +42,13 @@ pub(crate) struct ReduceRunnable {
 
 impl ReduceRunnable {
     pub fn new(
+        operator_id: OperatorId,
         stream_key_by: Option<StreamOperator<dyn KeySelectorFunction>>,
         stream_reduce: StreamOperator<dyn ReduceFunction>,
         next_runnable: Option<Box<dyn Runnable>>,
     ) -> Self {
         ReduceRunnable {
+            operator_id,
             task_number: 0,
             dependency_parallelism: 0,
             stream_key_by,
@@ -67,7 +70,7 @@ impl Runnable for ReduceRunnable {
     fn open(&mut self, context: &RunnableContext) {
         self.next_runnable.as_mut().unwrap().open(context);
 
-        let fun_context = context.to_fun_context();
+        let fun_context = context.to_fun_context(self.operator_id);
         self.stream_reduce.operator_fn.open(&fun_context);
         self.stream_key_by
             .as_mut()

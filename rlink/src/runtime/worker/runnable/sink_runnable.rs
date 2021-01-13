@@ -5,12 +5,13 @@ use std::sync::Arc;
 use crate::api::element::Element;
 use crate::api::function::OutputFormat;
 use crate::api::operator::{FunctionCreator, StreamOperator, TStreamOperator};
-use crate::api::runtime::CheckpointId;
+use crate::api::runtime::{CheckpointId, OperatorId};
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
 #[derive(Debug)]
 pub(crate) struct SinkRunnable {
+    operator_id: OperatorId,
     task_number: u16,
     num_tasks: u16,
 
@@ -20,8 +21,9 @@ pub(crate) struct SinkRunnable {
 }
 
 impl SinkRunnable {
-    pub fn new(stream_sink: StreamOperator<dyn OutputFormat>) -> Self {
+    pub fn new(operator_id: OperatorId, stream_sink: StreamOperator<dyn OutputFormat>) -> Self {
         SinkRunnable {
+            operator_id,
             task_number: 0,
             num_tasks: 0,
             stream_sink,
@@ -40,7 +42,7 @@ impl Runnable for SinkRunnable {
             self.task_number, self.num_tasks
         );
 
-        let fun_context = context.to_fun_context();
+        let fun_context = context.to_fun_context(self.operator_id);
         self.stream_sink.operator_fn.open(&fun_context);
 
         let tags = vec![

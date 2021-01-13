@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::api::element::Element;
 use crate::api::operator::StreamOperator;
-use crate::api::runtime::CheckpointId;
+use crate::api::runtime::{CheckpointId, OperatorId};
 use crate::api::watermark::{Watermark, WatermarkAssigner, MAX_WATERMARK, MIN_WATERMARK};
 use crate::metrics::{register_counter, register_gauge, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
@@ -11,6 +11,7 @@ use crate::utils::date_time::timestamp_str;
 
 #[derive(Debug)]
 pub(crate) struct WatermarkAssignerRunnable {
+    operator_id: OperatorId,
     task_number: u16,
     num_tasks: u16,
 
@@ -24,12 +25,14 @@ pub(crate) struct WatermarkAssignerRunnable {
 
 impl WatermarkAssignerRunnable {
     pub fn new(
+        operator_id: OperatorId,
         stream_watermark: StreamOperator<dyn WatermarkAssigner>,
         next_runnable: Option<Box<dyn Runnable>>,
     ) -> Self {
         info!("Create WatermarkAssignerRunnable");
 
         WatermarkAssignerRunnable {
+            operator_id,
             task_number: 0,
             num_tasks: 0,
             stream_watermark,

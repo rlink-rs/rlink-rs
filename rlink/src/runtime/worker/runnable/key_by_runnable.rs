@@ -6,13 +6,14 @@ use std::sync::Arc;
 use crate::api::element::Element;
 use crate::api::function::KeySelectorFunction;
 use crate::api::operator::StreamOperator;
-use crate::api::runtime::CheckpointId;
+use crate::api::runtime::{CheckpointId, OperatorId};
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 use crate::utils;
 
 #[derive(Debug)]
 pub(crate) struct KeyByRunnable {
+    operator_id: OperatorId,
     stream_key_by: StreamOperator<dyn KeySelectorFunction>,
     next_runnable: Option<Box<dyn Runnable>>,
     partition_size: u16,
@@ -22,10 +23,12 @@ pub(crate) struct KeyByRunnable {
 
 impl KeyByRunnable {
     pub fn new(
+        operator_id: OperatorId,
         stream_key_by: StreamOperator<dyn KeySelectorFunction>,
         next_runnable: Option<Box<dyn Runnable>>,
     ) -> Self {
         KeyByRunnable {
+            operator_id,
             stream_key_by,
             next_runnable,
             partition_size: 0,
@@ -38,7 +41,7 @@ impl Runnable for KeyByRunnable {
     fn open(&mut self, context: &RunnableContext) {
         self.next_runnable.as_mut().unwrap().open(context);
 
-        let fun_context = context.to_fun_context();
+        let fun_context = context.to_fun_context(self.operator_id);
         self.stream_key_by.operator_fn.open(&fun_context);
 
         // todo set self.partition_size = Reduce.partition

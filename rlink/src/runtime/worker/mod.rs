@@ -143,6 +143,7 @@ where
             let invoke_operator = match operator {
                 StreamOperatorWrap::StreamSource(stream_operator) => {
                     let op = SourceRunnable::new(
+                        operator_id,
                         self.task_descriptor.input_split.clone(),
                         stream_operator,
                         None,
@@ -151,12 +152,12 @@ where
                     op
                 }
                 StreamOperatorWrap::StreamMap(stream_operator) => {
-                    let op = FlatMapRunnable::new(stream_operator, None);
+                    let op = FlatMapRunnable::new(operator_id, stream_operator, None);
                     let op: Box<dyn Runnable> = Box::new(op);
                     op
                 }
                 StreamOperatorWrap::StreamFilter(stream_operator) => {
-                    let op = FilterRunnable::new(stream_operator, None);
+                    let op = FilterRunnable::new(operator_id, stream_operator, None);
                     let op: Box<dyn Runnable> = Box::new(op);
                     op
                 }
@@ -166,7 +167,7 @@ where
                     op
                 }
                 StreamOperatorWrap::StreamKeyBy(stream_operator) => {
-                    let op = KeyByRunnable::new(stream_operator, None);
+                    let op = KeyByRunnable::new(operator_id, stream_operator, None);
                     let op: Box<dyn Runnable> = Box::new(op);
                     op
                 }
@@ -176,22 +177,22 @@ where
                         operators.borrow_mut(),
                         job_node.job_id,
                     );
-                    let op = ReduceRunnable::new(stream_key_by, stream_operator, None);
+                    let op = ReduceRunnable::new(operator_id, stream_key_by, stream_operator, None);
                     let op: Box<dyn Runnable> = Box::new(op);
                     op
                 }
                 StreamOperatorWrap::StreamWatermarkAssigner(stream_operator) => {
-                    let op = WatermarkAssignerRunnable::new(stream_operator, None);
+                    let op = WatermarkAssignerRunnable::new(operator_id, stream_operator, None);
                     let op: Box<dyn Runnable> = Box::new(op);
                     op
                 }
                 StreamOperatorWrap::StreamWindowAssigner(stream_operator) => {
-                    let op = WindowAssignerRunnable::new(stream_operator, None);
+                    let op = WindowAssignerRunnable::new(operator_id, stream_operator, None);
                     let op: Box<dyn Runnable> = Box::new(op);
                     op
                 }
                 StreamOperatorWrap::StreamSink(stream_operator) => {
-                    let op = SinkRunnable::new(stream_operator);
+                    let op = SinkRunnable::new(operator_id, stream_operator);
                     let op: Box<dyn Runnable> = Box::new(op);
                     op
                 }

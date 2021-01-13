@@ -2,7 +2,7 @@ use crate::api::checkpoint::CheckpointHandle;
 use crate::api::env::{StreamExecutionEnvironment, StreamJob};
 use crate::api::function::InputSplit;
 use crate::api::properties::Properties;
-use crate::api::runtime::{CheckpointId, TaskId};
+use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::utils::panic::panic_notify;
 
 pub mod cluster;
@@ -87,6 +87,7 @@ pub enum TaskManagerStatus {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct TaskDescriptor {
     pub task_id: TaskId,
+    pub operator_ids: Vec<OperatorId>,
     pub input_split: InputSplit,
     pub checkpoint_id: CheckpointId,
     pub checkpoint_handle: Option<CheckpointHandle>,

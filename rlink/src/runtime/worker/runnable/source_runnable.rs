@@ -8,7 +8,7 @@ use crate::api::element::Element;
 use crate::api::function::{InputFormat, InputSplit};
 use crate::api::operator::{FunctionCreator, StreamOperator, TStreamOperator};
 use crate::api::properties::SystemProperties;
-use crate::api::runtime::{CheckpointId, JobId};
+use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::checkpoint::report_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
@@ -16,10 +16,10 @@ use crate::utils::timer::TimerChannel;
 
 #[derive(Debug)]
 pub(crate) struct SourceRunnable {
+    operator_id: OperatorId,
     context: Option<RunnableContext>,
 
-    job_id: JobId,
-    task_number: u16,
+    task_id: TaskId,
 
     stream_source: StreamOperator<dyn InputFormat>,
     next_runnable: Option<Box<dyn Runnable>>,
@@ -32,15 +32,16 @@ pub(crate) struct SourceRunnable {
 
 impl SourceRunnable {
     pub fn new(
+        operator_id: OperatorId,
         input_split: InputSplit,
         stream_source: StreamOperator<dyn InputFormat>,
         next_runnable: Option<Box<dyn Runnable>>,
     ) -> Self {
         info!("Create SourceRunnable input_split={:?}", &input_split);
         SourceRunnable {
+            operator_id,
             context: None,
-            job_id: JobId::default(),
-            task_number: 0,
+            task_id: TaskId::default(),
 
             stream_source,
             next_runnable,
@@ -57,15 +58,14 @@ impl Runnable for SourceRunnable {
     fn open(&mut self, context: &RunnableContext) {
         self.context = Some(context.clone());
 
-        self.job_id = context.task_descriptor.task_id.job_id;
-        self.task_number = context.task_descriptor.task_id.task_number;
+        self.task_id = context.task_descriptor.task_id;
 
         // first open next, then open self
         self.next_runnable.as_mut().unwrap().open(context);
 
         let input_split = context.task_descriptor.input_split.clone();
 
-        let fun_context = context.to_fun_context();
+        let fun_context = context.to_fun_context(self.operator_id);
         let source_func = self.stream_source.operator_fn.as_mut();
         source_func.open(input_split, &fun_context);
 
@@ -214,7 +214,7 @@ impl Runnable for SourceRunnable {
     fn checkpoint(&mut self, checkpoint_id: CheckpointId) {
         let context = {
             let context = self.context.as_ref().unwrap();
-            context.get_checkpoint_context(checkpoint_id)
+            context.get_checkpoint_context(self.operator_id, checkpoint_id)
         };
 
         let fn_name = self.stream_source.operator_fn.get_name();
@@ -224,8 +224,8 @@ impl Runnable for SourceRunnable {
             Some(checkpoint) => {
                 let ck_handle = checkpoint.snapshot_state(&context);
                 let ck = Checkpoint {
-                    job_id: self.job_id,
-                    task_num: self.task_number,
+                    operator_id: context.operator_id,
+                    task_id: self.task_id,
                     checkpoint_id,
                     handle: ck_handle,
                 };

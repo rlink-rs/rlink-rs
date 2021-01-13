@@ -57,7 +57,7 @@ impl Runnable for CoProcessRunnable {
             self.parent_jobs.insert(parent_job_id, index);
         }
 
-        let fun_context = context.to_fun_context();
+        let fun_context = context.to_fun_context(self.operator_id);
         self.stream_co_process.operator_fn.open(&fun_context);
     }
 

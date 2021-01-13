@@ -7,6 +7,7 @@ use crate::api::function::InputSplit;
 use crate::api::operator::StreamOperatorWrap;
 use crate::api::runtime::{JobId, OperatorId};
 use crate::dag::job_graph::{JobEdge, JobGraph};
+use crate::dag::stream_graph::StreamNode;
 use crate::dag::{DagError, JsonDag, Label, TaskId};
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -26,6 +27,7 @@ impl Label for ExecutionEdge {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub(crate) struct ExecutionNode {
     pub task_id: TaskId,
+    pub stream_nodes: Vec<StreamNode>,
     pub input_split: InputSplit,
 }
 
@@ -129,6 +131,7 @@ impl ExecutionGraph {
                     };
                     let execution_node = ExecutionNode {
                         task_id: task_id.clone(),
+                        stream_nodes: job_node.stream_nodes.clone(),
                         input_split: input_splits[task_number as usize].clone(),
                     };
 

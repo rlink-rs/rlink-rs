@@ -5,12 +5,13 @@ use std::sync::Arc;
 use crate::api::element::Element;
 use crate::api::function::FlatMapFunction;
 use crate::api::operator::StreamOperator;
-use crate::api::runtime::CheckpointId;
+use crate::api::runtime::{CheckpointId, OperatorId};
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
 #[derive(Debug)]
 pub(crate) struct FlatMapRunnable {
+    operator_id: OperatorId,
     stream_map: StreamOperator<dyn FlatMapFunction>,
     next_runnable: Option<Box<dyn Runnable>>,
 
@@ -19,12 +20,14 @@ pub(crate) struct FlatMapRunnable {
 
 impl FlatMapRunnable {
     pub fn new(
+        operator_id: OperatorId,
         stream_map: StreamOperator<dyn FlatMapFunction>,
         next_runnable: Option<Box<dyn Runnable>>,
     ) -> Self {
         info!("Create FlatMapRunnable");
 
         FlatMapRunnable {
+            operator_id,
             stream_map,
             next_runnable,
             counter: Arc::new(AtomicU64::new(0)),
@@ -35,7 +38,7 @@ impl Runnable for FlatMapRunnable {
     fn open(&mut self, context: &RunnableContext) {
         self.next_runnable.as_mut().unwrap().open(context);
 
-        let fun_context = context.to_fun_context();
+        let fun_context = context.to_fun_context(self.operator_id);
         self.stream_map.operator_fn.open(&fun_context);
 
         let tags = vec![

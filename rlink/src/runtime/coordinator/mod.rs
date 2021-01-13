@@ -187,33 +187,30 @@ where
     ) -> CheckpointManager {
         let mut ck_manager =
             CheckpointManager::new(dag_manager, &self.context, application_descriptor);
-        let job_checkpoints = ck_manager.load().expect("load checkpoints error");
-        if job_checkpoints.len() == 0 {
+        let operator_checkpoints = ck_manager.load().expect("load checkpoints error");
+        if operator_checkpoints.len() == 0 {
             return ck_manager;
         }
 
         for task_manager_descriptor in &mut application_descriptor.worker_managers {
             for task_descriptor in &mut task_manager_descriptor.task_descriptors {
-                let cks = job_checkpoints
-                    .get(&task_descriptor.task_id.job_id)
-                    .unwrap();
-                if cks.len() == 0 {
-                    info!(
-                        "job_id {:?} checkpoint not found",
-                        task_descriptor.task_id.job_id
-                    );
-                    continue;
-                }
+                for operator_id in &task_descriptor.operator_ids {
+                    let cks = operator_checkpoints.get(&operator_id).unwrap();
+                    if cks.len() == 0 {
+                        info!("operator {:?} checkpoint not found", operator_id);
+                        continue;
+                    }
 
-                let ck = cks
-                    .iter()
-                    .find(|ck| ck.task_num == task_descriptor.task_id.task_number)
-                    .unwrap();
-                task_descriptor.checkpoint_id = ck.checkpoint_id;
-                task_descriptor.checkpoint_handle = Some(CheckpointHandle {
-                    handle: ck.handle.handle.clone(),
-                });
-                info!("task_descriptor {:?} checkpoint loaded", task_descriptor);
+                    let ck = cks
+                        .iter()
+                        .find(|ck| ck.task_id.task_number == task_descriptor.task_id.task_number)
+                        .unwrap();
+                    task_descriptor.checkpoint_id = ck.checkpoint_id;
+                    task_descriptor.checkpoint_handle = Some(CheckpointHandle {
+                        handle: ck.handle.handle.clone(),
+                    });
+                    info!("task_descriptor {:?} checkpoint loaded", task_descriptor);
+                }
             }
         }
 

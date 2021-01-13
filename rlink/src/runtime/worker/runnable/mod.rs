@@ -38,11 +38,12 @@ pub(crate) struct RunnableContext {
 }
 
 impl RunnableContext {
-    pub(crate) fn to_fun_context(&self) -> FunctionContext {
+    pub(crate) fn to_fun_context(&self, operator_id: OperatorId) -> FunctionContext {
         let coordinator_manager = &self.application_descriptor.coordinator_manager;
         FunctionContext {
             application_id: coordinator_manager.application_id.clone(),
             application_properties: coordinator_manager.application_properties.clone(),
+            operator_id,
             task_id: self.task_descriptor.task_id.clone(),
             checkpoint_id: self.task_descriptor.checkpoint_id,
             checkpoint_handle: self.task_descriptor.checkpoint_handle.clone(),
@@ -58,13 +59,10 @@ impl RunnableContext {
 
     pub(crate) fn get_checkpoint_context(
         &self,
+        operator_id: OperatorId,
         checkpoint_id: CheckpointId,
     ) -> FunctionSnapshotContext {
-        FunctionSnapshotContext::new(
-            self.task_descriptor.task_id.job_id,
-            self.task_descriptor.task_id.task_number,
-            checkpoint_id,
-        )
+        FunctionSnapshotContext::new(operator_id, self.task_descriptor.task_id, checkpoint_id)
     }
 
     pub(crate) fn get_parent_parallelism(&self) -> u32 {
