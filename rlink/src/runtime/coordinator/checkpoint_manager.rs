@@ -4,84 +4,90 @@ use std::time::Duration;
 
 use crate::api::checkpoint::Checkpoint;
 use crate::api::properties::SystemProperties;
-use crate::graph::JobGraph;
+use crate::api::runtime::{CheckpointId, JobId, OperatorId};
+use crate::dag::DagManager;
 use crate::runtime::context::Context;
-use crate::runtime::{ChainId, JobDescriptor};
+use crate::runtime::ApplicationDescriptor;
 use crate::storage::checkpoint::{CheckpointStorage, CheckpointStorageWrap};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct ChainCheckpoint {
-    job_name: String,
-    job_id: String,
-
-    chain_id: ChainId,
+pub(crate) struct OperatorCheckpoint {
+    application_name: String,
+    application_id: String,
+    job_id: JobId,
+    operator_id: OperatorId,
+    operator_name: String,
     parallelism: u32,
 
     #[serde(skip_serializing, skip_deserializing)]
     storage: Option<CheckpointStorageWrap>,
 
-    current_ck_id: u64,
+    current_ck_id: CheckpointId,
     /// Map<task_num, Checkpoint>
     current_cks: HashMap<u16, Checkpoint>,
     latest_finish_cks: Vec<Checkpoint>,
 }
 
-impl ChainCheckpoint {
+impl OperatorCheckpoint {
     pub fn new(
-        job_name: String,
-        job_id: String,
-        chain_id: u32,
+        application_name: String,
+        application_id: String,
+        job_id: JobId,
+        operator_id: OperatorId,
+        operator_name: String,
         parallelism: u32,
         storage: Option<CheckpointStorageWrap>,
     ) -> Self {
-        ChainCheckpoint {
-            job_name,
+        OperatorCheckpoint {
+            application_name,
+            application_id,
             job_id,
-            chain_id,
+            operator_id,
+            operator_name,
             parallelism,
             storage,
-            current_ck_id: 0,
+            current_ck_id: CheckpointId::default(),
             current_cks: HashMap::with_capacity(parallelism as usize),
             latest_finish_cks: Vec::with_capacity(parallelism as usize),
         }
     }
 
     pub fn add(&mut self, ck: Checkpoint) -> anyhow::Result<()> {
-        if ck.checkpoint_id == self.current_ck_id {
+        if ck.checkpoint_id.0 == self.current_ck_id.0 {
             if self.is_align() {
                 Err(anyhow::Error::msg(format!(
                     "the Checkpoint has align. {:?}",
                     &ck
                 )))
-            } else if self.current_cks.contains_key(&ck.task_num) {
+            } else if self.current_cks.contains_key(&ck.task_id.task_number) {
                 Err(anyhow::Error::msg(format!(
                     "the Checkpoint has existed. {:?}",
                     &ck
                 )))
             } else {
                 self.current_ck_id = ck.checkpoint_id;
-                self.current_cks.insert(ck.task_num, ck);
+                self.current_cks.insert(ck.task_id.task_number, ck);
 
                 self.archive_align();
 
                 Ok(())
             }
-        } else if ck.checkpoint_id > self.current_ck_id {
-            if self.current_ck_id != 0 && !self.is_align() {
+        } else if ck.checkpoint_id.0 > self.current_ck_id.0 {
+            if self.current_ck_id.0 != 0 && !self.is_align() {
                 warn!("not all checkpoint is arrived");
             }
 
             self.current_ck_id = ck.checkpoint_id;
 
             self.current_cks.clear();
-            self.current_cks.insert(ck.task_num, ck);
+            self.current_cks.insert(ck.task_id.task_number, ck);
 
             self.archive_align();
 
             Ok(())
         } else {
             Err(anyhow::Error::msg(format!(
-                "checkpoint_id={} late. current checkpoint_id={}",
+                "checkpoint_id={:?} late. current checkpoint_id={:?}",
                 ck.checkpoint_id, self.current_ck_id
             )))
         }
@@ -99,7 +105,6 @@ impl ChainCheckpoint {
             self.latest_finish_cks
                 .extend_from_slice(finish_cks.as_slice());
 
-            // todo save checkpoint
             self.storage_checkpoint(finish_cks);
         }
     }
@@ -108,9 +113,8 @@ impl ChainCheckpoint {
         match self.storage.as_mut() {
             Some(storage) => {
                 let rt = storage.save(
-                    self.job_name.as_str(),
-                    self.job_id.as_str(),
-                    self.chain_id,
+                    self.application_name.as_str(),
+                    self.application_id.as_str(),
                     self.current_ck_id,
                     cks,
                     Duration::from_secs(60 * 30).as_millis() as u64,
@@ -126,18 +130,24 @@ impl ChainCheckpoint {
 
     pub fn load(&mut self) -> anyhow::Result<Vec<Checkpoint>> {
         match self.storage.as_mut() {
-            Some(storage) => storage.load(self.job_name.as_str(), self.chain_id),
+            Some(storage) => storage.load(
+                self.application_name.as_str(),
+                self.job_id,
+                self.operator_id,
+            ),
             None => Ok(vec![]),
         }
     }
 }
 
-impl Clone for ChainCheckpoint {
+impl Clone for OperatorCheckpoint {
     fn clone(&self) -> Self {
-        ChainCheckpoint {
-            job_name: self.job_name.clone(),
-            job_id: self.job_id.clone(),
-            chain_id: self.chain_id,
+        OperatorCheckpoint {
+            application_name: self.application_name.clone(),
+            application_id: self.application_id.clone(),
+            job_id: self.job_id,
+            operator_id: self.operator_id,
+            operator_name: self.operator_name.clone(),
             parallelism: self.parallelism,
             storage: None,
             current_ck_id: self.current_ck_id,
@@ -147,72 +157,90 @@ impl Clone for ChainCheckpoint {
     }
 }
 
-pub(crate) type ChainCheckpointSafe = Arc<RwLock<ChainCheckpoint>>;
+pub(crate) type JobCheckpointSafe = Arc<RwLock<OperatorCheckpoint>>;
 
 #[derive(Debug)]
 pub(crate) struct CheckpointManager {
-    job_name: String,
-    chain_cks: dashmap::DashMap<ChainId, ChainCheckpointSafe>,
+    application_name: String,
+    operator_cks: dashmap::DashMap<OperatorId, JobCheckpointSafe>,
 }
 
 impl CheckpointManager {
-    pub fn new(job_graph: &JobGraph, context: &Context, job_descriptor: &JobDescriptor) -> Self {
-        let checkpoint_backend = job_descriptor
-            .job_manager
-            .job_properties
+    pub fn new(
+        dag_manager: &DagManager,
+        context: &Context,
+        application_descriptor: &ApplicationDescriptor,
+    ) -> Self {
+        let checkpoint_backend = application_descriptor
+            .coordinator_manager
+            .application_properties
             .get_checkpoint()
             .map(|x| Some(x))
             .unwrap_or(None);
 
-        let chain_cks = dashmap::DashMap::new();
-        for (chain_id, operator_chain) in &job_graph.chain_map {
-            let job_name = context.job_name.clone();
-            let job_id = context.job_id.clone();
-            let chain_id = *chain_id;
-            let parallelism = operator_chain.parallelism;
-            let storage = checkpoint_backend
-                .as_ref()
-                .map(|ck_backend| CheckpointStorageWrap::new(ck_backend));
-            let chain_ck = ChainCheckpoint::new(job_name, job_id, chain_id, parallelism, storage);
+        let operator_cks = dashmap::DashMap::new();
+        for job_node in dag_manager.job_graph().get_nodes() {
+            let application_name = context.application_name.clone();
+            let application_id = context.application_id.clone();
+            let parallelism = job_node.parallelism;
+            let job_id = job_node.job_id;
 
-            chain_cks.insert(chain_id, Arc::new(RwLock::new(chain_ck)));
+            for stream_node in job_node.stream_nodes {
+                let operator_id = stream_node.id;
+                let operator_name = stream_node.operator_name.clone();
+                let storage = checkpoint_backend
+                    .as_ref()
+                    .map(|ck_backend| CheckpointStorageWrap::new(ck_backend));
+
+                let operator_ck = OperatorCheckpoint::new(
+                    application_name.clone(),
+                    application_id.clone(),
+                    job_id,
+                    operator_id,
+                    operator_name,
+                    parallelism,
+                    storage,
+                );
+
+                operator_cks.insert(operator_id, Arc::new(RwLock::new(operator_ck)));
+            }
         }
 
         CheckpointManager {
-            job_name: context.job_name.clone(),
-            chain_cks,
+            application_name: context.application_name.clone(),
+            operator_cks,
         }
     }
 
     pub fn add(&self, ck: Checkpoint) -> anyhow::Result<()> {
-        match self.chain_cks.get_mut(&ck.chain_id) {
+        match self.operator_cks.get_mut(&ck.operator_id) {
             Some(mut d) => {
-                let mut chain_checkpoint = d.value_mut().write().unwrap();
-                chain_checkpoint.add(ck)
+                let mut operator_checkpoint = d.value_mut().write().unwrap();
+                operator_checkpoint.add(ck)
             }
             None => Err(anyhow::Error::msg(format!(
-                "ChainId={} not found",
-                ck.checkpoint_id
+                "checkpoint_id={:?} not found",
+                ck
             ))),
         }
     }
 
-    pub fn load(&mut self) -> anyhow::Result<HashMap<ChainId, Vec<Checkpoint>>> {
-        let mut chain_checkpoints = HashMap::new();
-        for entry in &self.chain_cks {
-            let mut chain_ck = entry.value().write().unwrap();
-            let checkpoints = chain_ck.load()?;
-            chain_checkpoints.insert(*entry.key(), checkpoints);
+    pub fn load(&mut self) -> anyhow::Result<HashMap<OperatorId, Vec<Checkpoint>>> {
+        let mut operator_checkpoints = HashMap::new();
+        for entry in &self.operator_cks {
+            let mut operator_ck = entry.value().write().unwrap();
+            let checkpoints = operator_ck.load()?;
+            operator_checkpoints.insert(*entry.key(), checkpoints);
         }
 
-        Ok(chain_checkpoints)
+        Ok(operator_checkpoints)
     }
 
-    pub fn get(&self) -> HashMap<ChainId, ChainCheckpoint> {
+    pub fn get(&self) -> HashMap<OperatorId, OperatorCheckpoint> {
         let mut map = HashMap::new();
-        for entry in &self.chain_cks {
-            let chain_ck = entry.value().read().unwrap();
-            map.insert(entry.key().clone(), chain_ck.clone());
+        for entry in &self.operator_cks {
+            let operator_ck = entry.value().read().unwrap();
+            map.insert(entry.key().clone(), operator_ck.clone());
         }
 
         map
@@ -221,14 +249,14 @@ impl CheckpointManager {
 
 impl Clone for CheckpointManager {
     fn clone(&self) -> Self {
-        let chain_cks = dashmap::DashMap::new();
-        for entry in &self.chain_cks {
-            chain_cks.insert(entry.key().clone(), entry.value().clone());
+        let operator_cks = dashmap::DashMap::new();
+        for entry in &self.operator_cks {
+            operator_cks.insert(entry.key().clone(), entry.value().clone());
         }
 
         CheckpointManager {
-            job_name: self.job_name.clone(),
-            chain_cks,
+            application_name: self.application_name.clone(),
+            operator_cks,
         }
     }
 }

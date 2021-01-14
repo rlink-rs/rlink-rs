@@ -2,26 +2,26 @@ use crate::api::cluster::TaskResourceInfo;
 use crate::api::env::{StreamExecutionEnvironment, StreamJob};
 use crate::deployment::{Resource, ResourceManager};
 use crate::runtime::context::Context;
-use crate::runtime::{cluster, JobDescriptor, ManagerType};
+use crate::runtime::{cluster, ApplicationDescriptor, ManagerType};
 
 #[derive(Clone, Debug)]
 pub(crate) struct LocalResourceManager {
     context: Context,
-    job_descriptor: Option<JobDescriptor>,
+    application_descriptor: Option<ApplicationDescriptor>,
 }
 
 impl LocalResourceManager {
     pub fn new(context: Context) -> Self {
         LocalResourceManager {
             context,
-            job_descriptor: None,
+            application_descriptor: None,
         }
     }
 }
 
 impl ResourceManager for LocalResourceManager {
-    fn prepare(&mut self, _context: &Context, job_descriptor: &JobDescriptor) {
-        self.job_descriptor = Some(job_descriptor.clone());
+    fn prepare(&mut self, _context: &Context, job_descriptor: &ApplicationDescriptor) {
+        self.application_descriptor = Some(job_descriptor.clone());
     }
 
     fn worker_allocate<S>(
@@ -32,8 +32,8 @@ impl ResourceManager for LocalResourceManager {
     where
         S: StreamJob + 'static,
     {
-        let job_descriptor = self.job_descriptor.as_ref().unwrap();
-        for task_manager_descriptor in &job_descriptor.task_managers {
+        let application_descriptor = self.application_descriptor.as_ref().unwrap();
+        for task_manager_descriptor in &application_descriptor.worker_managers {
             let resource = Resource::new(
                 task_manager_descriptor.physical_memory,
                 task_manager_descriptor.cpu_cores,
@@ -46,18 +46,21 @@ impl ResourceManager for LocalResourceManager {
             let mut context_clone = self.context.clone();
             context_clone.manager_type = ManagerType::Worker;
             context_clone.task_manager_id = task_manager_descriptor.task_manager_id.clone();
-            context_clone.coordinator_address =
-                job_descriptor.job_manager.coordinator_address.clone();
+            context_clone.coordinator_address = application_descriptor
+                .coordinator_manager
+                .coordinator_address
+                .clone();
 
             let stream_job_clone = stream_job.clone();
-            let stream_env_clone = stream_env.clone();
+            let application_name = stream_env.application_name.clone();
             std::thread::Builder::new()
                 .name(format!(
                     "TaskManager(id={})",
                     &task_manager_descriptor.task_manager_id
                 ))
                 .spawn(move || {
-                    cluster::run_task(context_clone, stream_env_clone, stream_job_clone);
+                    let stream_env = StreamExecutionEnvironment::new(application_name);
+                    cluster::run_task(context_clone, stream_env, stream_job_clone);
                 })
                 .unwrap();
         }

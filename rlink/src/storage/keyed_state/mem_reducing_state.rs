@@ -8,6 +8,7 @@ use crate::storage::keyed_state::{ReducingState, StateIterator, StateKey};
 
 #[derive(Clone, Debug)]
 pub struct MemoryReducingState {
+    state_key: StateKey,
     kv: HashMap<Record, Record>,
 }
 
@@ -18,14 +19,14 @@ impl MemoryReducingState {
             state_key, suggest_capacity
         );
         MemoryReducingState {
+            state_key: state_key.clone(),
             kv: HashMap::with_capacity(suggest_capacity),
-            // kv: HashMap::<Record, Record, RecordBuildHasher>::default(),
         }
     }
 
     pub fn from(state_key: &StateKey) -> Option<MemoryReducingState> {
         let state = remove_drop_window(
-            state_key.chain_id,
+            state_key.job_id,
             state_key.task_number,
             state_key.window.clone(),
         );
@@ -56,8 +57,8 @@ impl ReducingState for MemoryReducingState {
 
     fn destroy(self) {}
 
-    fn iter(&self) -> StateIterator {
-        StateIterator::HashMap(self.kv.iter())
+    fn iter(self) -> StateIterator {
+        StateIterator::HashMap(self.state_key.window, self.kv.into_iter())
     }
 
     fn len(&self) -> usize {

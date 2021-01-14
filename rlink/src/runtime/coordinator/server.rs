@@ -8,6 +8,7 @@ use rand::prelude::*;
 use crate::api::checkpoint::Checkpoint;
 use crate::api::cluster::{ResponseCode, StdResponse};
 use crate::api::metadata::MetadataStorageMode;
+use crate::dag::{DagManager, JsonDag};
 use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
 use crate::runtime::TaskManagerStatus;
 use crate::storage::metadata::MetadataStorage;
@@ -24,13 +25,20 @@ pub(crate) fn web_launch(
     context: crate::runtime::context::Context,
     metadata_mode: MetadataStorageMode,
     checkpoint_manager: CheckpointManager,
+    dag_manager: DagManager,
 ) -> String {
     let address: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
     let address_clone = address.clone();
     std::thread::Builder::new()
         .name("WebUI".to_string())
         .spawn(move || {
-            serve_sync(context, metadata_mode, address_clone, checkpoint_manager);
+            serve_sync(
+                context,
+                metadata_mode,
+                address_clone,
+                checkpoint_manager,
+                dag_manager,
+            );
         })
         .unwrap();
 
@@ -49,6 +57,7 @@ pub(crate) fn serve_sync(
     metadata_mode: MetadataStorageMode,
     address: Arc<Mutex<Option<String>>>,
     checkpoint_manager: CheckpointManager,
+    dag_manager: DagManager,
 ) {
     actix_rt::System::new("Coordinator Web UI")
         .block_on(serve(
@@ -56,6 +65,7 @@ pub(crate) fn serve_sync(
             metadata_mode,
             address,
             checkpoint_manager,
+            dag_manager,
         ))
         .unwrap();
 }
@@ -65,6 +75,7 @@ async fn serve(
     metadata_mode: MetadataStorageMode,
     rt_address: Arc<Mutex<Option<String>>>,
     checkpoint_manager: CheckpointManager,
+    dag_manager: DagManager,
 ) -> std::io::Result<()> {
     let context = WebContext {
         job_context,
@@ -80,10 +91,12 @@ async fn serve(
 
         let data = Data::new(context.clone());
         let data_ck_manager = Data::new(checkpoint_manager.clone());
+        let dag_manager = Data::new(dag_manager.clone());
         let server = HttpServer::new(move || {
             App::new()
                 .app_data(data.clone())
                 .app_data(data_ck_manager.clone())
+                .app_data(dag_manager.clone())
                 .wrap(middleware::Logger::default())
                 .wrap(middleware::DefaultHeaders::new().header("X-Version", VERSION))
                 .service(
@@ -99,6 +112,12 @@ async fn serve(
                 .service(web::resource("/metadata").route(web::get().to(get_metadata)))
                 .service(web::resource("/checkpoint").route(web::post().to(register_checkpoint)))
                 .service(web::resource("/checkpoints").route(web::get().to(get_checkpoint)))
+                .service(web::resource("/dag/stream_graph").route(web::get().to(get_stream_graph)))
+                .service(web::resource("/dag/job_graph").route(web::get().to(get_job_graph)))
+                .service(
+                    web::resource("/dag/execution_graph").route(web::get().to(get_execution_graph)),
+                )
+                .service(web::resource("/dag/physic_graph").route(web::get().to(get_physic_graph)))
         })
         .disable_signals()
         .workers(8)
@@ -125,13 +144,17 @@ async fn serve(
 
 fn index() -> HttpResponse {
     let html = r#"<html>
-        <head><title>Streaming UI</title></head>
+        <head><title>rlink UI</title></head>
         <body>
-            <h1>Streaming</h1>
+            <h1>rlink</h1>
             <ul>
                 <li><a href="context">context</a></li>
                 <li><a href="metadata">metadata</a></li>
                 <li><a href="checkpoints">checkpoints</a></li>
+                <li><a href="dag/stream_graph">dag:stream_graph</a></li>
+                <li><a href="dag/job_graph">dag:job_graph</a></li>
+                <li><a href="dag/execution_graph">dag:execution_graph</a></li>
+                <li><a href="dag/physic_graph">dag:physic_graph</a></li>
             </ul>
         </body>
     </html>"#;
@@ -210,5 +233,38 @@ pub(crate) async fn get_checkpoint(
     let cks = ck_manager.get_ref().get();
 
     let response = StdResponse::new(ResponseCode::OK, Some(cks));
+    Ok(HttpResponse::Ok().json(response))
+}
+
+pub(crate) async fn get_stream_graph(dag_manager: Data<DagManager>) -> Result<HttpResponse, Error> {
+    let dag = &dag_manager.get_ref().stream_graph().dag;
+    let json_dag = JsonDag::dag_json(dag);
+
+    let response = StdResponse::new(ResponseCode::OK, Some(json_dag));
+    Ok(HttpResponse::Ok().json(response))
+}
+
+pub(crate) async fn get_job_graph(dag_manager: Data<DagManager>) -> Result<HttpResponse, Error> {
+    let dag = &dag_manager.get_ref().job_graph().dag;
+    let json_dag = JsonDag::dag_json(dag);
+
+    let response = StdResponse::new(ResponseCode::OK, Some(json_dag));
+    Ok(HttpResponse::Ok().json(response))
+}
+
+pub(crate) async fn get_execution_graph(
+    dag_manager: Data<DagManager>,
+) -> Result<HttpResponse, Error> {
+    let dag = &dag_manager.get_ref().execution_graph().dag;
+    let json_dag = JsonDag::dag_json(dag);
+
+    let response = StdResponse::new(ResponseCode::OK, Some(json_dag));
+    Ok(HttpResponse::Ok().json(response))
+}
+
+pub(crate) async fn get_physic_graph(dag_manager: Data<DagManager>) -> Result<HttpResponse, Error> {
+    let task_groups = &dag_manager.get_ref().physic_graph().task_groups.clone();
+
+    let response = StdResponse::new(ResponseCode::OK, Some(task_groups));
     Ok(HttpResponse::Ok().json(response))
 }

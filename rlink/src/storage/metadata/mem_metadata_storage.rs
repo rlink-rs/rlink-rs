@@ -1,12 +1,12 @@
 use std::convert::TryFrom;
 use std::sync::Mutex;
 
-use crate::runtime::{JobDescriptor, TaskManagerStatus};
+use crate::runtime::{ApplicationDescriptor, TaskManagerStatus};
 use crate::storage::metadata::MetadataStorage;
 use crate::utils;
 
 lazy_static! {
-    pub static ref METADATA_STORAGE: Mutex<Option<JobDescriptor>> = Mutex::new(None);
+    pub static ref METADATA_STORAGE: Mutex<Option<ApplicationDescriptor>> = Mutex::new(None);
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -21,7 +21,7 @@ impl MemoryMetadataStorage {
 impl MetadataStorage for MemoryMetadataStorage {
     fn save_job_descriptor(
         &mut self,
-        metadata: JobDescriptor,
+        metadata: ApplicationDescriptor,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut lock = METADATA_STORAGE
             .lock()
@@ -44,7 +44,7 @@ impl MetadataStorage for MemoryMetadataStorage {
 
     fn read_job_descriptor(
         &self,
-    ) -> Result<JobDescriptor, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<ApplicationDescriptor, Box<dyn std::error::Error + Send + Sync>> {
         let lock = METADATA_STORAGE
             .lock()
             .expect("METADATA_STORAGE lock failed");
@@ -58,8 +58,8 @@ impl MetadataStorage for MemoryMetadataStorage {
         let mut lock = METADATA_STORAGE
             .lock()
             .expect("METADATA_STORAGE lock failed");
-        let mut job_descriptor: JobDescriptor = lock.clone().unwrap();
-        job_descriptor.job_manager.job_status = job_manager_status;
+        let mut job_descriptor: ApplicationDescriptor = lock.clone().unwrap();
+        job_descriptor.coordinator_manager.coordinator_status = job_manager_status;
 
         *lock = Some(job_descriptor);
         Ok(())
@@ -77,8 +77,8 @@ impl MetadataStorage for MemoryMetadataStorage {
         let mut lock = METADATA_STORAGE
             .lock()
             .expect("METADATA_STORAGE lock failed");
-        let mut job_descriptor: JobDescriptor = lock.clone().unwrap();
-        for mut task_manager_descriptor in &mut job_descriptor.task_managers {
+        let mut job_descriptor: ApplicationDescriptor = lock.clone().unwrap();
+        for mut task_manager_descriptor in &mut job_descriptor.worker_managers {
             if task_manager_descriptor.task_manager_id.eq(task_manager_id) {
                 task_manager_descriptor.task_manager_address = task_manager_address.to_string();
                 task_manager_descriptor.task_status = task_manager_status;

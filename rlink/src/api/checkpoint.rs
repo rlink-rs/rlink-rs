@@ -1,33 +1,32 @@
 use std::fmt::Debug;
 
 use crate::api::backend::{OperatorState, OperatorStateBackend};
-use crate::runtime::ChainId;
+use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::storage::operator_state::{OperatorStateManager, OperatorStateManagerWrap};
 
 #[derive(Clone, Debug)]
 pub struct FunctionSnapshotContext {
-    pub chain_id: u32,
-    pub task_number: u16,
-    pub checkpoint_id: u64,
+    pub operator_id: OperatorId,
+    pub task_id: TaskId,
+    pub checkpoint_id: CheckpointId,
 }
 
 impl FunctionSnapshotContext {
-    pub fn new(chain_id: u32, task_number: u16, checkpoint_id: u64) -> Self {
+    pub fn new(operator_id: OperatorId, task_id: TaskId, checkpoint_id: CheckpointId) -> Self {
         FunctionSnapshotContext {
-            chain_id,
-            task_number,
+            operator_id,
+            task_id,
             checkpoint_id,
         }
     }
 
     pub fn create_state(
         &self,
-        chain_id: ChainId,
         state: OperatorStateBackend,
-        job_id: String,
-        task_number: u16,
+        application_id: String,
+        task_id: TaskId,
     ) -> Box<dyn OperatorState> {
-        OperatorStateManagerWrap::new(chain_id, state).create_state(job_id, task_number)
+        OperatorStateManagerWrap::new(task_id, state).create_state(application_id, task_id)
     }
 }
 
@@ -44,9 +43,9 @@ pub struct CheckpointHandle {
 /// use for network communication between `Coordinator` and `Worker`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Checkpoint {
-    pub chain_id: ChainId,
-    pub task_num: u16,
-    pub checkpoint_id: u64,
+    pub operator_id: OperatorId,
+    pub task_id: TaskId,
+    pub checkpoint_id: CheckpointId,
     pub handle: CheckpointHandle,
 }
 

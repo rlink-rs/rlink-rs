@@ -1,11 +1,12 @@
 use std::borrow::BorrowMut;
-use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
 use bytes::{Buf, BufMut, BytesMut};
+use dashmap::DashMap;
 use futures::{SinkExt, StreamExt};
 use rand::prelude::*;
 use tokio::net::TcpListener;
@@ -14,36 +15,82 @@ use tokio::sync::RwLock;
 use tokio_util::codec::LengthDelimitedCodec;
 
 use crate::api::element::{Element, Serde};
-use crate::channel::ElementReceiver;
-use crate::net::ResponseCode;
+use crate::api::runtime::{ChannelKey, TaskId};
+use crate::channel::{mb, named_bounded, ElementReceiver, ElementSender, TryRecvError};
+use crate::io::network::{ElementRequest, ResponseCode};
+use crate::metrics::Tag;
 use crate::utils::get_runtime;
 
+lazy_static! {
+    static ref NETWORK_CHANNELS: DashMap<ChannelKey, ElementReceiver> = DashMap::new();
+}
+
+pub(crate) fn publish(
+    source_task_id: &TaskId,
+    target_task_ids: &Vec<TaskId>,
+) -> Vec<(ChannelKey, ElementSender)> {
+    let mut senders = Vec::new();
+    for target_task_id in target_task_ids {
+        let channel_key = ChannelKey {
+            source_task_id: source_task_id.clone(),
+            target_task_id: target_task_id.clone(),
+        };
+
+        let (sender, receiver) = named_bounded(
+            "Network_Publish",
+            vec![
+                Tag::new(
+                    "source_job_id".to_string(),
+                    source_task_id.job_id.0.to_string(),
+                ),
+                Tag::new(
+                    "target_job_id".to_string(),
+                    target_task_id.job_id.0.to_string(),
+                ),
+                Tag::new(
+                    "target_task_number".to_string(),
+                    target_task_id.task_number.to_string(),
+                ),
+            ],
+            100000,
+            mb(10),
+        );
+
+        senders.push((channel_key.clone(), sender));
+        set_network_channel(channel_key, receiver);
+    }
+
+    senders
+}
+
+fn set_network_channel(key: ChannelKey, receiver: ElementReceiver) {
+    let network_channels: &DashMap<ChannelKey, ElementReceiver> = &*NETWORK_CHANNELS;
+    if network_channels.contains_key(&key) {
+        // maybe dag build bug
+        panic!("network ChannelKey register must unique");
+    }
+    network_channels.insert(key, receiver);
+}
+
+fn get_network_channel(key: &ChannelKey) -> Option<ElementReceiver> {
+    let network_channels: &DashMap<ChannelKey, ElementReceiver> = &*NETWORK_CHANNELS;
+    network_channels.get(key).map(|x| x.value().clone())
+}
+
 #[derive(Debug, Clone)]
-pub struct WorkerServer {
+pub(crate) struct Server {
     ip: String,
     bind_addr: Arc<RwLock<Option<SocketAddr>>>,
     tcp_frame_max_size: u32,
-    chain_receivers: Arc<RwLock<HashMap<u32, Vec<ElementReceiver>>>>,
 }
 
-impl WorkerServer {
+impl Server {
     pub fn new(ip: String) -> Self {
-        WorkerServer {
+        Server {
             ip,
             bind_addr: Arc::new(RwLock::new(None)),
             tcp_frame_max_size: 1024 * 1024,
-            chain_receivers: Arc::new(RwLock::new(HashMap::new())),
         }
-    }
-
-    pub fn add_receivers_sync(&mut self, receivers: HashMap<u32, Vec<ElementReceiver>>) {
-        let mut self_clone = self.clone();
-        get_runtime().block_on(self_clone.add_receivers(receivers));
-    }
-
-    pub async fn add_receivers(&mut self, receivers: HashMap<u32, Vec<ElementReceiver>>) {
-        let mut chain_receivers = self.chain_receivers.write().await;
-        *chain_receivers = receivers;
     }
 
     pub fn get_bind_addr_sync(&self) -> Option<SocketAddr> {
@@ -137,19 +184,7 @@ impl WorkerServer {
                         debug!("tcp bytes: {:?}", bytes);
                     }
 
-                    let (chain_id, partition_num, batch_size) =
-                        self.frame_parse(bytes, remote_addr.ip().to_string());
-                    let code = ResponseCode::Ok;
-                    match self
-                        .response(
-                            code,
-                            chain_id,
-                            partition_num,
-                            batch_size,
-                            codec_framed.get_mut(),
-                        )
-                        .await
-                    {
+                    match self.subscribe_handle(bytes, codec_framed.get_mut()).await {
                         Ok(_) => {}
                         Err(err) => {
                             error!(
@@ -177,82 +212,50 @@ impl WorkerServer {
         );
     }
 
-    // async fn response(
-    //     &self,
-    //     response_code: ResponseCode,
-    //     chain_id: u32,
-    //     partition_num: u16,
-    //     framed_read: &mut tokio::net::TcpStream,
-    // ) -> Result<(), std::io::Error> {
-    //     let (code, data) = if response_code == ResponseCode::ParseErr {
-    //         (response_code, vec![])
-    //     } else {
-    //         let chain_receivers = self.chain_receivers.read().await;
-    //         match chain_receivers.get(&chain_id) {
-    //             Some(receivers) => {
-    //                 let receiver = receivers.get(partition_num as usize).unwrap();
-    //                 // let receiver = receiver.as_ref().unwrap();
-    //                 match receiver.try_recv() {
-    //                     Ok(element) => (ResponseCode::Ok, element.serialize().to_vec()),
-    //                     Err(e) => {
-    //                         debug!("try recv(partition_num={}) row: {}", partition_num, e);
-    //                         (ResponseCode::Empty, vec![])
-    //                     }
-    //                 }
-    //             }
-    //             None => {
-    //                 error!("chain_id({}) not found", chain_id);
-    //                 (ResponseCode::ReadErr, vec![])
-    //             }
-    //         }
-    //     };
-    //
-    //     let mut req = bytes::BytesMut::with_capacity(4 + 1 + data.len());
-    //     req.put_u32(data.len() as u32 + 1); // (code + body).length
-    //     req.put_u8(code as u8);
-    //     req.put_slice(data.as_slice());
-    //
-    //     let mut codec_framed0 = LengthDelimitedCodec::builder()
-    //         .length_field_length(4)
-    //         .new_framed(framed_read);
-    //
-    //     codec_framed0.send(req.to_bytes()).await
-    // }
-
-    async fn response(
+    async fn subscribe_handle(
         &self,
-        response_code: ResponseCode,
-        chain_id: u32,
-        partition_num: u16,
-        batch_size: u16,
+        bytes: BytesMut,
         framed_read: &mut tokio::net::TcpStream,
     ) -> Result<(), std::io::Error> {
-        if response_code == ResponseCode::ParseErr {
-            self.send(response_code, None, framed_read).await
-        } else {
-            let chain_receivers = self.chain_receivers.read().await;
-            match chain_receivers.get(&chain_id) {
-                Some(receivers) => {
-                    let receiver: &ElementReceiver = receivers.get(partition_num as usize).unwrap();
-                    for _ in 0..batch_size {
-                        match receiver.try_recv() {
-                            Ok(element) => {
-                                self.send(ResponseCode::Ok, Some(element), framed_read)
-                                    .await?
-                            }
-                            Err(e) => {
-                                debug!("try recv(partition_num={}) row: {}", partition_num, e);
-                                return self.send(ResponseCode::Empty, None, framed_read).await;
+        match ElementRequest::try_from(bytes) {
+            Ok(request) => {
+                let ElementRequest {
+                    channel_key,
+                    batch_pull_size,
+                } = request;
+
+                match get_network_channel(&channel_key) {
+                    Some(receiver) => {
+                        for _ in 0..batch_pull_size {
+                            match receiver.try_recv() {
+                                Ok(element) => {
+                                    self.send(ResponseCode::Ok, Some(element), framed_read)
+                                        .await?
+                                }
+                                Err(TryRecvError::Empty) => {
+                                    debug!("try recv channel_key({:?}) empty", channel_key);
+                                    return self.send(ResponseCode::Empty, None, framed_read).await;
+                                }
+                                Err(TryRecvError::Disconnected) => {
+                                    panic!(format!("channel_key({:?}) close", channel_key))
+                                }
                             }
                         }
+                        self.send(ResponseCode::BatchFinish, None, framed_read)
+                            .await
                     }
-                    self.send(ResponseCode::BatchFinish, None, framed_read)
-                        .await
+                    None => {
+                        warn!(
+                            "channel_key({:?}) not found, maybe the job haven't initialized yet",
+                            channel_key
+                        );
+                        self.send(ResponseCode::Empty, None, framed_read).await
+                    }
                 }
-                None => {
-                    error!("chain_id({}) not found", chain_id);
-                    self.send(ResponseCode::ReadErr, None, framed_read).await
-                }
+            }
+            Err(e) => {
+                error!("parse request error. {}", e);
+                self.send(ResponseCode::ParseErr, None, framed_read).await
             }
         }
     }
@@ -260,7 +263,6 @@ impl WorkerServer {
     async fn send(
         &self,
         code: ResponseCode,
-        // data: &[u8],
         element: Option<Element>,
         framed_read: &mut tokio::net::TcpStream,
     ) -> Result<(), std::io::Error> {
@@ -287,15 +289,6 @@ impl WorkerServer {
             .new_framed(framed_read);
 
         codec_framed0.send(req.to_bytes()).await
-    }
-
-    /// Return the `partition_num`
-    fn frame_parse(&self, mut data: BytesMut, _peer_addr: String) -> (u32, u16, u16) {
-        data.advance(4); // skip header length
-        let chain_id = data.get_u32();
-        let partition_num = data.get_u16();
-        let batch_size = data.get_u16();
-        (chain_id, partition_num, batch_size)
     }
 
     fn sock_addr_to_str(&self, addr: &std::net::SocketAddr) -> String {

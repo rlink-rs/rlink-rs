@@ -1,21 +1,22 @@
-use serde::Deserialize;
-use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{BufRead, Write};
 use std::process::Stdio;
+
+use serde::Deserialize;
+use serde::Serialize;
 
 use crate::api::cluster::TaskResourceInfo;
 use crate::api::env::{StreamExecutionEnvironment, StreamJob};
 use crate::channel::{bounded, Receiver, Sender};
 use crate::deployment::ResourceManager;
 use crate::runtime::context::Context;
-use crate::runtime::{JobDescriptor, ManagerType};
+use crate::runtime::{ApplicationDescriptor, ManagerType};
 use crate::utils;
 
 #[derive(Debug)]
 pub(crate) struct YarnResourceManager {
     context: Context,
-    job_descriptor: Option<JobDescriptor>,
+    job_descriptor: Option<ApplicationDescriptor>,
 
     yarn_command: Option<YarnCliCommand>,
 }
@@ -31,7 +32,7 @@ impl YarnResourceManager {
 }
 
 impl ResourceManager for YarnResourceManager {
-    fn prepare(&mut self, context: &Context, job_descriptor: &JobDescriptor) {
+    fn prepare(&mut self, context: &Context, job_descriptor: &ApplicationDescriptor) {
         self.job_descriptor = Some(job_descriptor.clone());
 
         self.yarn_command = Some(YarnCliCommand::new(&context, job_descriptor));
@@ -48,21 +49,24 @@ impl ResourceManager for YarnResourceManager {
         let job_descriptor = self.job_descriptor.as_ref().unwrap();
 
         let mut task_args = Vec::new();
-        for task_manager_descriptor in &job_descriptor.task_managers {
+        for task_manager_descriptor in &job_descriptor.worker_managers {
             let mut args = HashMap::new();
             args.insert(
                 "cluster_mode".to_string(),
                 self.context.cluster_mode.to_string(),
             );
             args.insert("manager_type".to_string(), ManagerType::Worker.to_string());
-            args.insert("job_id".to_string(), self.context.job_id.clone());
+            args.insert("job_id".to_string(), self.context.application_id.clone());
             args.insert(
                 "task_manager_id".to_string(),
                 task_manager_descriptor.task_manager_id.clone(),
             );
             args.insert(
                 "coordinator_address".to_string(),
-                job_descriptor.job_manager.coordinator_address.clone(),
+                job_descriptor
+                    .coordinator_manager
+                    .coordinator_address
+                    .clone(),
             );
 
             task_args.push(args);
@@ -99,12 +103,17 @@ struct YarnCliCommand {
 }
 
 impl YarnCliCommand {
-    pub fn new(context: &Context, job_descriptor: &JobDescriptor) -> Self {
+    pub fn new(context: &Context, job_descriptor: &ApplicationDescriptor) -> Self {
         let child = std::process::Command::new("java")
             .arg("-Xmx256M")
             .arg("rlink.yarn.manager.ResourceManagerCli")
             .arg("--coordinator_address")
-            .arg(job_descriptor.job_manager.coordinator_address.as_str())
+            .arg(
+                job_descriptor
+                    .coordinator_manager
+                    .coordinator_address
+                    .as_str(),
+            )
             .arg("--worker_process_path")
             .arg(context.worker_process_path.as_str())
             .arg("--memory_mb")

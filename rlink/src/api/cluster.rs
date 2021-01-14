@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ClusterConfig {
-    pub job_manager_address: Vec<String>,
+    pub application_manager_address: Vec<String>,
 
     /// metadata storage mode
     /// use for rlink
@@ -21,7 +21,7 @@ pub struct ClusterConfig {
 impl ClusterConfig {
     pub fn new_local() -> Self {
         ClusterConfig {
-            job_manager_address: Vec::new(),
+            application_manager_address: Vec::new(),
             metadata_storage_mode: "Memory".to_string(),
             metadata_storage_endpoints: vec![],
 

@@ -24,7 +24,7 @@ cargo build --release --color=always --all --all-targets
 #### standalone.yaml
 ```bash
 # all job manager's addresses, one or more
-job_manager_address: ["http://x.x.x.x:8370","http://y.y.y.y:8370"]
+application_manager_address: ["http://x.x.x.x:8370","http://y.y.y.y:8370"]
 
 metadata_storage_mode: "memory"
 metadata_storage_endpoints: []

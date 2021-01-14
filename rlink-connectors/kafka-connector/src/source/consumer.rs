@@ -12,6 +12,7 @@ use rlink::utils::get_runtime;
 use crate::build_kafka_record;
 use crate::source::handover::Handover;
 use crate::state::OffsetMetadata;
+use rlink::api::runtime::JobId;
 
 struct TaskHandover {
     task_number: u16,
@@ -30,20 +31,21 @@ impl TaskHandover {
 }
 
 lazy_static! {
-    static ref KAFKA_CONSUMERS: Mutex<HashMap<u32, Vec<TaskHandover>>> = Mutex::new(HashMap::new());
+    static ref KAFKA_CONSUMERS: Mutex<HashMap<JobId, Vec<TaskHandover>>> =
+        Mutex::new(HashMap::new());
 }
 
 pub(crate) fn create_kafka_consumer(
-    chain_id: u32,
+    job_id: JobId,
     task_number: u16,
     client_config: ClientConfig,
     partition_offsets: Vec<OffsetMetadata>,
     handover: Handover,
 ) {
-    let kafka_consumer: &Mutex<HashMap<u32, Vec<TaskHandover>>> = &*KAFKA_CONSUMERS;
+    let kafka_consumer: &Mutex<HashMap<JobId, Vec<TaskHandover>>> = &*KAFKA_CONSUMERS;
     let mut kafka_consumer = kafka_consumer.lock().unwrap();
 
-    let task_handovers = kafka_consumer.entry(chain_id).or_insert(Vec::new());
+    let task_handovers = kafka_consumer.entry(job_id).or_insert(Vec::new());
     if task_handovers
         .iter()
         .find(|x| x.task_number == task_number)
@@ -64,13 +66,13 @@ pub(crate) fn create_kafka_consumer(
     task_handovers.push(TaskHandover::new(task_number, handover));
 }
 
-pub(crate) fn get_kafka_consumer_handover(chain_id: u32) -> Option<Handover> {
+pub(crate) fn get_kafka_consumer_handover(job_id: JobId) -> Option<Handover> {
     std::thread::sleep(Duration::from_secs(5));
 
-    let kafka_consumer: &Mutex<HashMap<u32, Vec<TaskHandover>>> = &*KAFKA_CONSUMERS;
+    let kafka_consumer: &Mutex<HashMap<JobId, Vec<TaskHandover>>> = &*KAFKA_CONSUMERS;
     for _ in 0..5 {
         let mut kafka_consumer = kafka_consumer.lock().unwrap();
-        match kafka_consumer.get_mut(&chain_id) {
+        match kafka_consumer.get_mut(&job_id) {
             Some(task_handover) => {
                 return match task_handover.iter_mut().min_by_key(|x| x.subscriptions) {
                     Some(task_handover) => {

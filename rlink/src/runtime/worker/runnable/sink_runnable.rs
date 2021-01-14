@@ -5,11 +5,13 @@ use std::sync::Arc;
 use crate::api::element::Element;
 use crate::api::function::OutputFormat;
 use crate::api::operator::{FunctionCreator, StreamOperator, TStreamOperator};
+use crate::api::runtime::{CheckpointId, OperatorId};
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
 #[derive(Debug)]
 pub(crate) struct SinkRunnable {
+    operator_id: OperatorId,
     task_number: u16,
     num_tasks: u16,
 
@@ -19,8 +21,9 @@ pub(crate) struct SinkRunnable {
 }
 
 impl SinkRunnable {
-    pub fn new(stream_sink: StreamOperator<dyn OutputFormat>) -> Self {
+    pub fn new(operator_id: OperatorId, stream_sink: StreamOperator<dyn OutputFormat>) -> Self {
         SinkRunnable {
+            operator_id,
             task_number: 0,
             num_tasks: 0,
             stream_sink,
@@ -31,25 +34,25 @@ impl SinkRunnable {
 
 impl Runnable for SinkRunnable {
     fn open(&mut self, context: &RunnableContext) {
-        self.task_number = context.task_descriptor.task_number;
-        self.num_tasks = context.task_descriptor.num_tasks;
+        self.task_number = context.task_descriptor.task_id.task_number;
+        self.num_tasks = context.task_descriptor.task_id.num_tasks;
 
         info!(
             "SinkRunnable Opened. task_number={}, num_tasks={}",
             self.task_number, self.num_tasks
         );
 
-        let fun_context = context.to_fun_context();
+        let fun_context = context.to_fun_context(self.operator_id);
         self.stream_sink.operator_fn.open(&fun_context);
 
         let tags = vec![
             Tag(
-                "chain_id".to_string(),
-                context.task_descriptor.chain_id.to_string(),
+                "job_id".to_string(),
+                context.task_descriptor.task_id.job_id.0.to_string(),
             ),
             Tag(
-                "partition_num".to_string(),
-                context.task_descriptor.task_number.to_string(),
+                "task_number".to_string(),
+                context.task_descriptor.task_id.task_number.to_string(),
             ),
         ];
         let metric_name = format!("Sink_{}", self.stream_sink.operator_fn.as_ref().get_name());
@@ -115,7 +118,7 @@ impl Runnable for SinkRunnable {
         unimplemented!()
     }
 
-    fn checkpoint(&mut self, _checkpoint_id: u64) {
+    fn checkpoint(&mut self, _checkpoint_id: CheckpointId) {
         self.stream_sink.operator_fn.prepare_commit();
     }
 }

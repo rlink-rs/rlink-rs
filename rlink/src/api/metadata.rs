@@ -6,7 +6,7 @@ pub enum MetadataStorageMode {
     Memory,
     // Zookeeper(String),
     // Etcd {
-    //     job_id: String,
+    //     application_id: String,
     //     endpoints: Vec<String>,
     // },
 }
@@ -15,7 +15,7 @@ impl MetadataStorageMode {
     pub fn from(
         metadata_storage_mode: &str,
         _metadata_storage_endpoints: &Vec<String>,
-        _job_id: &str,
+        _application_id: &str,
     ) -> Self {
         match metadata_storage_mode.to_ascii_lowercase().as_str() {
             "memory" => MetadataStorageMode::Memory,

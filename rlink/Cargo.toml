@@ -1,6 +1,6 @@
 [package]
 name = "rlink"
-version = "0.1.1"
+version = "0.2.0-alpha.1"
 authors = ["yorkart <wangyue11.4@163.com>>"]
 edition = "2018"
 description = "High performance Stream Processing Framework"
@@ -23,10 +23,9 @@ lazy_static = "1.4.0"
 backtrace = "0.3"
 anyhow = "1.0.31"
 thiserror = "1.0.20"
-
+daggy = "0.7"
 hostname = "0.3"
 dns-lookup = "1.0"
-async-trait = "0.1"
 
 # randomness
 rand = "0.7"

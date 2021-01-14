@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use crate::api::element::Element;
 use crate::api::operator::StreamOperator;
+use crate::api::runtime::{CheckpointId, OperatorId};
 use crate::api::watermark::{Watermark, WatermarkAssigner, MAX_WATERMARK, MIN_WATERMARK};
 use crate::metrics::{register_counter, register_gauge, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
@@ -10,6 +11,7 @@ use crate::utils::date_time::timestamp_str;
 
 #[derive(Debug)]
 pub(crate) struct WatermarkAssignerRunnable {
+    operator_id: OperatorId,
     task_number: u16,
     num_tasks: u16,
 
@@ -23,12 +25,14 @@ pub(crate) struct WatermarkAssignerRunnable {
 
 impl WatermarkAssignerRunnable {
     pub fn new(
+        operator_id: OperatorId,
         stream_watermark: StreamOperator<dyn WatermarkAssigner>,
         next_runnable: Option<Box<dyn Runnable>>,
     ) -> Self {
         info!("Create WatermarkAssignerRunnable");
 
         WatermarkAssignerRunnable {
+            operator_id,
             task_number: 0,
             num_tasks: 0,
             stream_watermark,
@@ -44,17 +48,17 @@ impl Runnable for WatermarkAssignerRunnable {
     fn open(&mut self, context: &RunnableContext) {
         self.next_runnable.as_mut().unwrap().open(context);
 
-        self.task_number = context.task_descriptor.task_number;
-        self.num_tasks = context.task_descriptor.num_tasks;
+        self.task_number = context.task_descriptor.task_id.task_number;
+        self.num_tasks = context.task_descriptor.task_id.num_tasks;
 
         let tags = vec![
             Tag(
-                "chain_id".to_string(),
-                context.task_descriptor.chain_id.to_string(),
+                "job_id".to_string(),
+                context.task_descriptor.task_id.job_id.0.to_string(),
             ),
             Tag(
-                "partition_num".to_string(),
-                context.task_descriptor.task_number.to_string(),
+                "task_number".to_string(),
+                context.task_descriptor.task_id.task_number.to_string(),
             ),
         ];
         let fn_name = self.stream_watermark.operator_fn.as_ref().get_name();
@@ -131,5 +135,5 @@ impl Runnable for WatermarkAssignerRunnable {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, _checkpoint_id: u64) {}
+    fn checkpoint(&mut self, _checkpoint_id: CheckpointId) {}
 }

@@ -24,7 +24,7 @@ pub async fn execute_task(
     let execute_model = execute_model.into_inner();
 
     let application_id = application_id.as_str();
-    let job_manager_address = context.config.job_manager_address.clone();
+    let application_manager_address = context.config.application_manager_address.clone();
     let executable_file = execute_model.executable_file.clone();
     let cluster_config = context.config_path.to_str().unwrap().to_string();
 
@@ -53,8 +53,8 @@ pub async fn execute_task(
     );
     // TODO: JobManager `File Share` and load balance
     envs.insert(
-        "JOB_MANAGER_ADDRESS".to_string(),
-        job_manager_address[0].clone(),
+        "APPLICATION_MANAGER_ADDRESS".to_string(),
+        application_manager_address[0].clone(),
     );
     envs.insert("APPLICATION_ID".to_string(), application_id.to_string());
     envs.insert("TASK_ID".to_string(), task_id.clone());

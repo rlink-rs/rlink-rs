@@ -6,12 +6,14 @@ use std::sync::Arc;
 use crate::api::element::Element;
 use crate::api::function::KeySelectorFunction;
 use crate::api::operator::StreamOperator;
+use crate::api::runtime::{CheckpointId, OperatorId};
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 use crate::utils;
 
 #[derive(Debug)]
 pub(crate) struct KeyByRunnable {
+    operator_id: OperatorId,
     stream_key_by: StreamOperator<dyn KeySelectorFunction>,
     next_runnable: Option<Box<dyn Runnable>>,
     partition_size: u16,
@@ -21,16 +23,15 @@ pub(crate) struct KeyByRunnable {
 
 impl KeyByRunnable {
     pub fn new(
+        operator_id: OperatorId,
         stream_key_by: StreamOperator<dyn KeySelectorFunction>,
         next_runnable: Option<Box<dyn Runnable>>,
-        partition_size: u16,
     ) -> Self {
-        info!("Create KeyByRunnable partition_size={}", partition_size);
-
         KeyByRunnable {
+            operator_id,
             stream_key_by,
             next_runnable,
-            partition_size,
+            partition_size: 0,
             counter: Arc::new(AtomicU64::new(0)),
         }
     }
@@ -40,26 +41,20 @@ impl Runnable for KeyByRunnable {
     fn open(&mut self, context: &RunnableContext) {
         self.next_runnable.as_mut().unwrap().open(context);
 
-        let fun_context = context.to_fun_context();
+        let fun_context = context.to_fun_context(self.operator_id);
         self.stream_key_by.operator_fn.open(&fun_context);
 
-        // for partition_num in 0..self.partition_size {
-        //     self.sink_counter.push(format!(
-        //         "{}.{}.KeyBy_{}.Counter",
-        //         self.stream_key_by.key_by_fn.get_name(),
-        //         context.task_descriptor.task_id.clone(),
-        //         partition_num
-        //     ));
-        // }
+        // todo set self.partition_size = Reduce.partition
+        self.partition_size = context.get_child_parallelism() as u16;
 
         let tags = vec![
             Tag(
-                "chain_id".to_string(),
-                context.task_descriptor.chain_id.to_string(),
+                "job_id".to_string(),
+                context.task_descriptor.task_id.job_id.0.to_string(),
             ),
             Tag(
-                "partition_num".to_string(),
-                context.task_descriptor.task_number.to_string(),
+                "task_number".to_string(),
+                context.task_descriptor.task_id.task_number.to_string(),
             ),
         ];
         let metric_name = format!(
@@ -127,5 +122,5 @@ impl Runnable for KeyByRunnable {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, _checkpoint_id: u64) {}
+    fn checkpoint(&mut self, _checkpoint_id: CheckpointId) {}
 }

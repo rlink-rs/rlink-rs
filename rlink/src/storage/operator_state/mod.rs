@@ -1,13 +1,13 @@
 use std::fmt::Debug;
 
 use crate::api::backend::{OperatorState, OperatorStateBackend};
-use crate::runtime::ChainId;
+use crate::api::runtime::TaskId;
 use crate::storage::operator_state::empty_state::EmptyOperatorStateManager;
 
 pub mod empty_state;
 
 pub(crate) trait OperatorStateManager: Clone + Debug {
-    fn create_state(&self, job_id: String, task_number: u16) -> Box<dyn OperatorState>;
+    fn create_state(&self, application_id: String, task_id: TaskId) -> Box<dyn OperatorState>;
 }
 
 #[derive(Clone, Debug)]
@@ -16,7 +16,7 @@ pub enum OperatorStateManagerWrap {
 }
 
 impl OperatorStateManagerWrap {
-    pub(crate) fn new(_chain_id: ChainId, state: OperatorStateBackend) -> Self {
+    pub(crate) fn new(_task_id: TaskId, state: OperatorStateBackend) -> Self {
         match state {
             OperatorStateBackend::None => {
                 OperatorStateManagerWrap::EmptyOperatorStateManager(EmptyOperatorStateManager {})
@@ -26,10 +26,10 @@ impl OperatorStateManagerWrap {
 }
 
 impl OperatorStateManager for OperatorStateManagerWrap {
-    fn create_state(&self, job_id: String, task_number: u16) -> Box<dyn OperatorState> {
+    fn create_state(&self, application_id: String, task_id: TaskId) -> Box<dyn OperatorState> {
         match self {
             OperatorStateManagerWrap::EmptyOperatorStateManager(manager) => {
-                manager.create_state(job_id, task_number)
+                manager.create_state(application_id, task_id)
             }
         }
     }

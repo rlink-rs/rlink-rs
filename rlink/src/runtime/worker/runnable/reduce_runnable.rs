@@ -9,6 +9,7 @@ use crate::api::element::{Barrier, Element, Record, Watermark};
 use crate::api::function::{KeySelectorFunction, ReduceFunction};
 use crate::api::operator::StreamOperator;
 use crate::api::properties::SystemProperties;
+use crate::api::runtime::{CheckpointId, OperatorId};
 use crate::api::window::{Window, WindowWrap};
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
@@ -17,7 +18,7 @@ use crate::utils::date_time::timestamp_str;
 
 #[derive(Debug)]
 pub(crate) struct ReduceRunnable {
-    task_id: Option<String>,
+    operator_id: OperatorId,
     task_number: u16,
     dependency_parallelism: u32,
 
@@ -27,7 +28,7 @@ pub(crate) struct ReduceRunnable {
 
     state: Option<WindowStateWrap>, // HashMap<Vec<u8>, Record>, // HashMap<TimeWindow, HashMap<Record, Record>>,
 
-    current_checkpoint_id: u64,
+    current_checkpoint_id: CheckpointId,
     reached_barriers: Vec<Barrier>,
 
     max_watermark_status_timestamp: u64,
@@ -41,19 +42,20 @@ pub(crate) struct ReduceRunnable {
 
 impl ReduceRunnable {
     pub fn new(
+        operator_id: OperatorId,
         stream_key_by: Option<StreamOperator<dyn KeySelectorFunction>>,
         stream_reduce: StreamOperator<dyn ReduceFunction>,
         next_runnable: Option<Box<dyn Runnable>>,
     ) -> Self {
         ReduceRunnable {
-            task_id: None,
+            operator_id,
             task_number: 0,
             dependency_parallelism: 0,
             stream_key_by,
             stream_reduce,
             next_runnable,
             state: None,
-            current_checkpoint_id: 0,
+            current_checkpoint_id: CheckpointId::default(),
             reached_barriers: Vec::new(),
             max_watermark_status_timestamp: 0,
             watermark_align: None,
@@ -66,47 +68,50 @@ impl ReduceRunnable {
 
 impl Runnable for ReduceRunnable {
     fn open(&mut self, context: &RunnableContext) {
-        self.task_id = Some(context.task_descriptor.task_id.clone());
         self.next_runnable.as_mut().unwrap().open(context);
 
-        let fun_context = context.to_fun_context();
+        let fun_context = context.to_fun_context(self.operator_id);
         self.stream_reduce.operator_fn.open(&fun_context);
         self.stream_key_by
             .as_mut()
             .map(|s| s.operator_fn.open(&fun_context));
 
-        self.task_number = context.task_descriptor.task_number;
-        self.dependency_parallelism = context.task_descriptor.dependency_parallelism;
+        self.task_number = context.task_descriptor.task_id.task_number;
+        self.dependency_parallelism = context.get_parent_parallelism();
 
         self.watermark_align = Some(WatermarkAlign::new());
 
         info!(
             "ReduceRunnable Opened. task_number={}, num_tasks={}",
-            self.task_number, context.task_descriptor.num_tasks
+            self.task_number, context.task_descriptor.task_id.num_tasks
         );
 
         let state_mode = context
-            .job_descriptor
-            .job_manager
-            .job_properties
+            .application_descriptor
+            .coordinator_manager
+            .application_properties
             .get_keyed_state_backend()
             .unwrap_or(KeyedStateBackend::Memory);
 
         self.state = Some(WindowStateWrap::new(
-            context.job_descriptor.job_manager.job_id.clone(),
-            context.task_descriptor.chain_id,
-            context.task_descriptor.task_number,
+            context
+                .application_descriptor
+                .coordinator_manager
+                .application_id
+                .clone(),
+            context.task_descriptor.task_id.job_id,
+            context.task_descriptor.task_id.task_number,
             state_mode,
         ));
 
         let tags = vec![
             Tag(
-                "chain_id".to_string(),
-                context.task_descriptor.chain_id.to_string(),
+                "job_id".to_string(),
+                context.task_descriptor.task_id.job_id.0.to_string(),
             ),
             Tag(
-                "partition_num".to_string(),
-                context.task_descriptor.task_number.to_string(),
+                "task_number".to_string(),
+                context.task_descriptor.task_id.task_number.to_string(),
             ),
         ];
         let fn_name = self.stream_reduce.operator_fn.as_ref().get_name();
@@ -169,7 +174,7 @@ impl Runnable for ReduceRunnable {
                 let align_watermarks = watermark_align.align();
 
                 if align_watermarks.len() > 0 {
-                    let mut align_watermark = align_watermarks[align_watermarks.len() - 1].clone();
+                    let align_watermark = align_watermarks[align_watermarks.len() - 1].clone();
                     let minimum_watermark_window =
                         align_watermark.get_min_location_windows().unwrap();
                     self.limited_watermark_window = Some(minimum_watermark_window.clone());
@@ -206,16 +211,26 @@ impl Runnable for ReduceRunnable {
                             drop_windows.len()
                         );
 
-                        align_watermark.drop_windows = Some(drop_windows);
-                        self.next_runnable
-                            .as_mut()
-                            .unwrap()
-                            .run(Element::from(align_watermark));
+                        // align_watermark.drop_windows = Some(drop_windows);
+                        // self.next_runnable
+                        //     .as_mut()
+                        //     .unwrap()
+                        //     .run(Element::from(align_watermark));
+
+                        for drop_window in drop_windows {
+                            let mut drop_record = Record::new();
+                            drop_record.trigger_window = Some(drop_window);
+
+                            self.next_runnable
+                                .as_mut()
+                                .unwrap()
+                                .run(Element::from(drop_record));
+                        }
                     }
                 }
             }
             Element::Barrier(barrier) => {
-                if self.current_checkpoint_id == 0 {
+                if self.current_checkpoint_id.is_default() {
                     self.current_checkpoint_id = barrier.checkpoint_id;
                 }
 
@@ -225,16 +240,16 @@ impl Runnable for ReduceRunnable {
                         self.checkpoint(self.current_checkpoint_id);
                     }
 
-                    self.current_checkpoint_id = 0;
+                    self.current_checkpoint_id = CheckpointId::default();
                     self.reached_barriers.clear();
                 } else {
-                    if self.current_checkpoint_id > barrier.checkpoint_id {
+                    if self.current_checkpoint_id.0 > barrier.checkpoint_id.0 {
                         error!(
                             "Unusual state of Checkpoint. Barrier's `checkpoint_id` is less than `current_checkpoint_id`"
                         )
                     } else {
                         error!(
-                            "Found a new checkpoint({}) if the current checkpoint({}) is not completed",
+                            "Found a new checkpoint({:?}) if the current checkpoint({:?}) is not completed",
                             barrier.checkpoint_id,
                             self.current_checkpoint_id,
                         );
@@ -259,7 +274,7 @@ impl Runnable for ReduceRunnable {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, _checkpoint_id: u64) {
+    fn checkpoint(&mut self, _checkpoint_id: CheckpointId) {
         // foreach self.reached_barriers
     }
 }

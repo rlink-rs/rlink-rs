@@ -1,22 +1,26 @@
 use crate::api::element::Element;
 use crate::api::function::FilterFunction;
 use crate::api::operator::StreamOperator;
+use crate::api::runtime::{CheckpointId, OperatorId};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
 #[derive(Debug)]
 pub(crate) struct FilterRunnable {
+    operator_id: OperatorId,
     stream_filter: StreamOperator<dyn FilterFunction>,
     next_runnable: Option<Box<dyn Runnable>>,
 }
 
 impl FilterRunnable {
     pub fn new(
+        operator_id: OperatorId,
         stream_filter: StreamOperator<dyn FilterFunction>,
         next_runnable: Option<Box<dyn Runnable>>,
     ) -> Self {
         info!("Create FilterRunnable");
 
         FilterRunnable {
+            operator_id,
             stream_filter,
             next_runnable,
         }
@@ -27,7 +31,7 @@ impl Runnable for FilterRunnable {
     fn open(&mut self, context: &RunnableContext) {
         self.next_runnable.as_mut().unwrap().open(context);
 
-        let fun_context = context.to_fun_context();
+        let fun_context = context.to_fun_context(self.operator_id);
         self.stream_filter.operator_fn.open(&fun_context);
     }
 
@@ -55,5 +59,5 @@ impl Runnable for FilterRunnable {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, _checkpoint_id: u64) {}
+    fn checkpoint(&mut self, _checkpoint_id: CheckpointId) {}
 }

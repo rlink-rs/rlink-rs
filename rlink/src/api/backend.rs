@@ -1,25 +1,30 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 
-use crate::runtime::CheckpointId;
+use crate::api::runtime::CheckpointId;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(tag = "type", content = "param")]
 pub enum CheckpointBackend {
     Memory,
-    MySql { endpoint: String },
+    MySql {
+        endpoint: String,
+        table: Option<String>,
+    },
 }
 
 impl Display for CheckpointBackend {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             CheckpointBackend::Memory => write!(f, "Memory"),
-            CheckpointBackend::MySql { endpoint } => write!(f, "MySql{{endpoint={}}}", endpoint),
+            CheckpointBackend::MySql { endpoint, table } => {
+                write!(f, "MySql{{endpoint={}}}, table={:?}}}", endpoint, table)
+            }
         }
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
 #[serde(tag = "type", content = "param")]
 pub enum KeyedStateBackend {
     Memory,

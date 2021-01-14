@@ -29,8 +29,8 @@ impl OutputFormat for KafkaOutputFormat {
         self.handover = Some(Handover::new(
             self.get_name(),
             self.topic.as_str(),
-            context.chain_id,
-            context.task_number,
+            context.task_id.job_id(),
+            context.task_id.task_number(),
         ));
 
         let topic = self.topic.clone();

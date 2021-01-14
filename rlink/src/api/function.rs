@@ -3,6 +3,8 @@ use std::fmt::Debug;
 use crate::api::checkpoint::{CheckpointHandle, CheckpointedFunction, FunctionSnapshotContext};
 use crate::api::element::{Element, Record};
 use crate::api::properties::Properties;
+use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
+use crate::dag::execution_graph::{ExecutionEdge, ExecutionNode};
 
 /// Base class of all operators in the Rust API.
 pub trait Function {
@@ -11,22 +13,21 @@ pub trait Function {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Context {
-    pub job_id: String,
-    pub job_properties: Properties,
-    pub task_id: String,
-    /// task sequence number. each chain，task sequence number start at 0.
-    pub task_number: u16,
-    /// total number tasks in the chain.
-    pub num_tasks: u16,
-    pub chain_id: u32,
-    pub dependency_chain_id: u32,
-    pub checkpoint_id: u64,
+    pub application_id: String,
+    pub application_properties: Properties,
+    pub operator_id: OperatorId,
+    pub task_id: TaskId,
+
+    pub checkpoint_id: CheckpointId,
     pub checkpoint_handle: Option<CheckpointHandle>,
+
+    pub(crate) children: Vec<(ExecutionNode, ExecutionEdge)>,
+    pub(crate) parents: Vec<(ExecutionNode, ExecutionEdge)>,
 }
 
 impl Context {
     pub fn get_checkpoint_context(&self) -> FunctionSnapshotContext {
-        FunctionSnapshotContext::new(self.chain_id, self.task_number, self.checkpoint_id)
+        FunctionSnapshotContext::new(self.operator_id, self.task_id, self.checkpoint_id)
     }
 }
 
@@ -79,12 +80,20 @@ pub trait InputSplitSource {
     /// Create InputSplits by system parallelism[`min_num_splits`]
     ///
     /// Returns a InputSplit vec
-    fn create_input_splits(&self, min_num_splits: u32) -> Vec<InputSplit>;
+    fn create_input_splits(&self, min_num_splits: u32) -> Vec<InputSplit> {
+        let mut input_splits = Vec::with_capacity(min_num_splits as usize);
+        for task_number in 0..min_num_splits {
+            input_splits.push(InputSplit::new(task_number, Properties::new()));
+        }
+        input_splits
+    }
 
     /// Create InputSplitAssigner by InputSplits['input_splits']
     ///
     /// Returns a InputSplitAssigner
-    fn get_input_split_assigner(&self, input_splits: Vec<InputSplit>) -> InputSplitAssigner;
+    fn get_input_split_assigner(&self, input_splits: Vec<InputSplit>) -> InputSplitAssigner {
+        InputSplitAssigner::new(input_splits)
+    }
 }
 
 /// The base interface for data sources that produces records.
@@ -134,12 +143,12 @@ where
     fn abort(&mut self) {}
 }
 
-pub trait MapFunction
+pub trait FlatMapFunction
 where
     Self: Function,
 {
     fn open(&mut self, context: &Context);
-    fn map(&mut self, record: &mut Record) -> Vec<Record>;
+    fn flat_map(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>>;
     fn close(&mut self);
 }
 
@@ -148,7 +157,7 @@ where
     Self: Function,
 {
     fn open(&mut self, context: &Context);
-    fn filter(&self, t: &mut Record) -> bool;
+    fn filter(&self, record: &mut Record) -> bool;
     fn close(&mut self);
 }
 
@@ -168,5 +177,18 @@ where
     fn open(&mut self, context: &Context);
     ///
     fn reduce(&self, value: Option<&mut Record>, record: &mut Record) -> Record;
+    fn close(&mut self);
+}
+
+pub trait CoProcessFunction
+where
+    Self: Function,
+{
+    fn open(&mut self, context: &Context);
+    /// This method is called for each element in the first of the connected streams.
+    ///
+    /// `stream_seq` is the `DataStream` index
+    fn process_left(&self, record: Record) -> Box<dyn Iterator<Item = Record>>;
+    fn process_right(&self, stream_seq: usize, record: Record) -> Box<dyn Iterator<Item = Record>>;
     fn close(&mut self);
 }

@@ -2,16 +2,16 @@ use std::borrow::BorrowMut;
 use std::collections::HashMap;
 
 use crate::api::element::{Barrier, Record};
+use crate::api::runtime::JobId;
 use crate::api::window::WindowWrap;
-use crate::runtime::ChainId;
 use crate::storage::keyed_state::mem_reducing_state::MemoryReducingState;
 use crate::storage::keyed_state::mem_storage::{append_drop_window, StorageKey};
 use crate::storage::keyed_state::{ReducingState, StateKey, WindowState};
 
 #[derive(Clone, Debug)]
 pub struct MemoryWindowState {
-    job_id: String,
-    chain_id: ChainId,
+    application_id: String,
+    job_id: JobId,
     task_number: u16,
 
     windows: HashMap<WindowWrap, MemoryReducingState>,
@@ -19,10 +19,10 @@ pub struct MemoryWindowState {
 }
 
 impl MemoryWindowState {
-    pub fn new(job_id: String, chain_id: ChainId, task_number: u16) -> Self {
+    pub fn new(application_id: String, job_id: JobId, task_number: u16) -> Self {
         MemoryWindowState {
+            application_id,
             job_id,
-            chain_id,
             task_number,
             windows: HashMap::new(),
             suggest_state_capacity: 512,
@@ -45,7 +45,7 @@ impl MemoryWindowState {
                 state.insert(key, new_val);
             }
             None => {
-                let state_key = StateKey::new(window.clone(), self.chain_id, self.task_number);
+                let state_key = StateKey::new(window.clone(), self.job_id, self.task_number);
                 let mut state = MemoryReducingState::new(&state_key, self.suggest_state_capacity);
 
                 let new_val = reduce_fun(None, record);
@@ -91,7 +91,7 @@ impl WindowState for MemoryWindowState {
                 let len = state.len() as f32;
                 self.suggest_state_capacity = (len * 1.1f32) as usize;
 
-                let state_key = StorageKey::new(self.chain_id, self.task_number);
+                let state_key = StorageKey::new(self.job_id, self.task_number);
                 append_drop_window(state_key, window.clone(), state);
             }
             None => {}

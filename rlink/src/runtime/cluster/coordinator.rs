@@ -3,7 +3,7 @@ use crate::deployment::ResourceManager;
 use crate::runtime::context::Context;
 use crate::runtime::coordinator::CoordinatorTask;
 
-pub(crate) fn run_task<S, R>(
+pub(crate) fn run<S, R>(
     context: Context,
     stream_env: StreamExecutionEnvironment,
     stream_job: S,

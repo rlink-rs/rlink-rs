@@ -2,7 +2,7 @@
 
 # envirenment list:
 echo "env WORKER_PATH = $WORKER_PATH"
-echo "env JOB_MANAGER_ADDRESS = $JOB_MANAGER_ADDRESS"
+echo "env APPLICATION_MANAGER_ADDRESS = $APPLICATION_MANAGER_ADDRESS"
 echo "env APPLICATION_ID = $APPLICATION_ID"
 echo "env TASK_ID = $TASK_ID"
 echo "env BIND_IP = $BIND_IP"
@@ -18,7 +18,7 @@ task_workspace_path=$application_path/$TASK_ID
 execute_file_path=$task_workspace_path/${FILE_NAME}
 
 if [ ! -f "$execute_file_path" ]; then
-  wget ${JOB_MANAGER_ADDRESS}/job/resource/${APPLICATION_ID}/${FILE_NAME} -O $execute_file_path
+  wget ${APPLICATION_MANAGER_ADDRESS}/job/resource/${APPLICATION_ID}/${FILE_NAME} -O $execute_file_path
 
   chmod +x $execute_file_path
 fi

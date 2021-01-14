@@ -8,6 +8,7 @@ use crate::api::element::Element;
 use crate::api::function::{InputFormat, InputSplit};
 use crate::api::operator::{FunctionCreator, StreamOperator, TStreamOperator};
 use crate::api::properties::SystemProperties;
+use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::checkpoint::report_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
@@ -15,11 +16,10 @@ use crate::utils::timer::TimerChannel;
 
 #[derive(Debug)]
 pub(crate) struct SourceRunnable {
+    operator_id: OperatorId,
     context: Option<RunnableContext>,
 
-    task_id: Option<String>,
-    chain_id: u32,
-    task_number: u16,
+    task_id: TaskId,
 
     stream_source: StreamOperator<dyn InputFormat>,
     next_runnable: Option<Box<dyn Runnable>>,
@@ -32,16 +32,16 @@ pub(crate) struct SourceRunnable {
 
 impl SourceRunnable {
     pub fn new(
+        operator_id: OperatorId,
         input_split: InputSplit,
         stream_source: StreamOperator<dyn InputFormat>,
         next_runnable: Option<Box<dyn Runnable>>,
     ) -> Self {
         info!("Create SourceRunnable input_split={:?}", &input_split);
         SourceRunnable {
+            operator_id,
             context: None,
-            task_id: None,
-            chain_id: 0,
-            task_number: 0,
+            task_id: TaskId::default(),
 
             stream_source,
             next_runnable,
@@ -58,24 +58,22 @@ impl Runnable for SourceRunnable {
     fn open(&mut self, context: &RunnableContext) {
         self.context = Some(context.clone());
 
-        self.task_id = Some(context.task_descriptor.task_id.clone());
-        self.chain_id = context.task_descriptor.chain_id;
-        self.task_number = context.task_descriptor.task_number;
+        self.task_id = context.task_descriptor.task_id;
 
         // first open next, then open self
         self.next_runnable.as_mut().unwrap().open(context);
 
         let input_split = context.task_descriptor.input_split.clone();
 
-        let fun_context = context.to_fun_context();
+        let fun_context = context.to_fun_context(self.operator_id);
         let source_func = self.stream_source.operator_fn.as_mut();
         source_func.open(input_split, &fun_context);
 
         if let FunctionCreator::User = self.stream_source.get_fn_creator() {
             let checkpoint_period = context
-                .job_descriptor
-                .job_manager
-                .job_properties
+                .application_descriptor
+                .coordinator_manager
+                .application_properties
                 .get_checkpoint_internal()
                 .unwrap_or(Duration::from_secs(30));
 
@@ -94,12 +92,12 @@ impl Runnable for SourceRunnable {
 
         let tags = vec![
             Tag(
-                "chain_id".to_string(),
-                context.task_descriptor.chain_id.to_string(),
+                "job_id".to_string(),
+                context.task_descriptor.task_id.job_id.0.to_string(),
             ),
             Tag(
                 "task_number".to_string(),
-                context.task_descriptor.task_number.to_string(),
+                context.task_descriptor.task_id.task_number.to_string(),
             ),
         ];
         let metric_name = format!(
@@ -116,39 +114,45 @@ impl Runnable for SourceRunnable {
 
         let fn_creator = self.stream_source.get_fn_creator();
 
-        let mut idle_counter = 0;
+        let mut idle_counter = 0u32;
         let idle_delay_10 = Duration::from_millis(10);
         let idle_delay_300 = Duration::from_millis(300);
 
+        let mut end = false;
         loop {
-            let end = self.stream_source.operator_fn.as_mut().reached_end();
-
             let mut counter = 0;
-            if !end {
-                // let source_fn = self.stream_source.operator_fn.as_mut();
-                for _ in 0..1000 {
-                    match self.stream_source.operator_fn.as_mut().next_element() {
-                        Some(row) => {
-                            if row.is_watermark() {
-                                debug!(
-                                    "Source `next_element` get Watermark({})",
-                                    row.as_watermark().timestamp
-                                );
-                            } else if row.is_barrier() {
-                                // if `InputFormat` return the Barrier, fire checkpoint immediately
-                                self.checkpoint(row.as_barrier().checkpoint_id);
-                            }
+            for _ in 0..1000 {
+                if end {
+                    break;
+                }
 
-                            self.next_runnable.as_mut().unwrap().run(row);
-                            counter += 1;
+                end = self.stream_source.operator_fn.as_mut().reached_end();
+                if end {
+                    break;
+                }
+
+                match self.stream_source.operator_fn.as_mut().next_element() {
+                    Some(row) => {
+                        if row.is_watermark() {
+                            debug!(
+                                "Source `next_element` get Watermark({})",
+                                row.as_watermark().timestamp
+                            );
+                        } else if row.is_barrier() {
+                            // if `InputFormat` return the Barrier, fire checkpoint immediately
+                            self.checkpoint(row.as_barrier().checkpoint_id);
                         }
-                        None => break,
+
+                        self.next_runnable.as_mut().unwrap().run(row);
+                        counter += 1;
                     }
+                    None => break,
                 }
-                if counter > 0 {
-                    self.counter.fetch_add(counter as u64, Ordering::Relaxed);
-                }
-            };
+            }
+
+            if counter > 0 {
+                self.counter.fetch_add(counter as u64, Ordering::Relaxed);
+            }
 
             if let FunctionCreator::User = fn_creator {
                 if let Ok(window_time) = self.stream_status_timer.as_ref().unwrap().try_recv() {
@@ -159,12 +163,19 @@ impl Runnable for SourceRunnable {
 
                 if let Ok(window_time) = self.checkpoint_timer.as_ref().unwrap().try_recv() {
                     debug!("Trigger Checkpoint");
-                    let barrier = Element::new_barrier(window_time);
+                    let checkpoint_id = CheckpointId(window_time);
+                    let barrier = Element::new_barrier(checkpoint_id);
 
-                    self.checkpoint(window_time);
+                    self.checkpoint(checkpoint_id);
 
                     self.next_runnable.as_mut().unwrap().run(barrier);
                 };
+            }
+
+            if end {
+                // info!("source end");
+                std::thread::sleep(Duration::from_secs(1));
+                // break;
             }
 
             if counter == 0 {
@@ -200,10 +211,10 @@ impl Runnable for SourceRunnable {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, checkpoint_id: u64) {
+    fn checkpoint(&mut self, checkpoint_id: CheckpointId) {
         let context = {
             let context = self.context.as_ref().unwrap();
-            context.get_checkpoint_context(checkpoint_id)
+            context.get_checkpoint_context(self.operator_id, checkpoint_id)
         };
 
         let fn_name = self.stream_source.operator_fn.get_name();
@@ -213,8 +224,8 @@ impl Runnable for SourceRunnable {
             Some(checkpoint) => {
                 let ck_handle = checkpoint.snapshot_state(&context);
                 let ck = Checkpoint {
-                    chain_id: self.chain_id,
-                    task_num: self.task_number,
+                    operator_id: context.operator_id,
+                    task_id: self.task_id,
                     checkpoint_id,
                     handle: ck_handle,
                 };

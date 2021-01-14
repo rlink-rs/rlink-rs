@@ -1,39 +1,35 @@
 use crate::api::cluster::{ResponseCode, StdResponse};
-use crate::runtime::JobDescriptor;
+use crate::runtime::ApplicationDescriptor;
 use crate::utils::http_client::get_sync;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct MetadataLoader {
     coordinator_address: String,
-    job_descriptor_cache: Option<JobDescriptor>,
+    application_descriptor_cache: Option<ApplicationDescriptor>,
 }
 
 impl MetadataLoader {
     pub fn new(coordinator_address: &str) -> Self {
         MetadataLoader {
             coordinator_address: coordinator_address.to_string(),
-            job_descriptor_cache: None,
+            application_descriptor_cache: None,
         }
     }
 
-    pub fn place_holder() -> Self {
-        MetadataLoader::new("")
-    }
-
-    pub fn get_job_descriptor_from_cache(&mut self) -> JobDescriptor {
-        if let Some(j) = &self.job_descriptor_cache {
-            j.clone()
+    pub fn get_job_descriptor_from_cache(&mut self) -> ApplicationDescriptor {
+        if let Some(a) = &self.application_descriptor_cache {
+            a.clone()
         } else {
-            self.get_job_descriptor()
+            self.get_application_descriptor()
         }
     }
 
-    pub fn get_job_descriptor(&mut self) -> JobDescriptor {
+    pub fn get_application_descriptor(&mut self) -> ApplicationDescriptor {
         let url = format!("{}/metadata", self.coordinator_address);
         loop {
             match get_sync(url.as_str()) {
                 Ok(resp) => {
-                    let resp_model: StdResponse<JobDescriptor> =
+                    let resp_model: StdResponse<ApplicationDescriptor> =
                         serde_json::from_str(resp.as_str()).unwrap();
                     let StdResponse { code, data } = resp_model;
                     if code != ResponseCode::OK || data.is_none() {
@@ -42,10 +38,10 @@ impl MetadataLoader {
                         );
                     }
 
-                    let job_descriptor = data.unwrap();
-                    self.job_descriptor_cache = Some(job_descriptor.clone());
+                    let application_descriptor = data.unwrap();
+                    self.application_descriptor_cache = Some(application_descriptor.clone());
 
-                    return job_descriptor;
+                    return application_descriptor;
                 }
                 Err(e) => {
                     error!("get metadata(`JobDescriptor`) error. {}", e);

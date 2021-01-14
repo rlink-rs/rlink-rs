@@ -4,13 +4,13 @@ use crate::api::cluster::{BatchExecuteRequest, ResponseCode, StdResponse, TaskRe
 use crate::api::env::{StreamExecutionEnvironment, StreamJob};
 use crate::deployment::{Resource, ResourceManager};
 use crate::runtime::context::Context;
-use crate::runtime::{JobDescriptor, ManagerType};
+use crate::runtime::{ApplicationDescriptor, ManagerType};
 use crate::utils::http_client;
 
 #[derive(Clone, Debug)]
 pub(crate) struct StandaloneResourceManager {
     context: Context,
-    job_descriptor: Option<JobDescriptor>,
+    job_descriptor: Option<ApplicationDescriptor>,
 }
 
 impl StandaloneResourceManager {
@@ -23,7 +23,7 @@ impl StandaloneResourceManager {
 }
 
 impl ResourceManager for StandaloneResourceManager {
-    fn prepare(&mut self, _context: &Context, job_descriptor: &JobDescriptor) {
+    fn prepare(&mut self, _context: &Context, job_descriptor: &ApplicationDescriptor) {
         self.job_descriptor = Some(job_descriptor.clone());
     }
 
@@ -37,12 +37,16 @@ impl ResourceManager for StandaloneResourceManager {
     {
         let job_descriptor = self.job_descriptor.as_ref().unwrap();
 
-        let cluster_client =
-            StandaloneClusterClient::new(self.context.cluster_config.job_manager_address.clone());
+        let cluster_client = StandaloneClusterClient::new(
+            self.context
+                .cluster_config
+                .application_manager_address
+                .clone(),
+        );
 
-        let job_id = self.context.job_id.as_str();
+        let job_id = self.context.application_id.as_str();
         let mut task_args = Vec::new();
-        for task_manager_descriptor in &job_descriptor.task_managers {
+        for task_manager_descriptor in &job_descriptor.worker_managers {
             let resource = Resource::new(
                 task_manager_descriptor.physical_memory,
                 task_manager_descriptor.cpu_cores,
@@ -59,14 +63,17 @@ impl ResourceManager for StandaloneResourceManager {
                 self.context.cluster_mode.to_string(),
             );
             args.insert("manager_type".to_string(), ManagerType::Worker.to_string());
-            args.insert("job_id".to_string(), self.context.job_id.clone());
+            args.insert("job_id".to_string(), self.context.application_id.clone());
             args.insert(
                 "task_manager_id".to_string(),
                 task_manager_descriptor.task_manager_id.clone(),
             );
             args.insert(
                 "coordinator_address".to_string(),
-                job_descriptor.job_manager.coordinator_address.clone(),
+                job_descriptor
+                    .coordinator_manager
+                    .coordinator_address
+                    .clone(),
             );
 
             task_args.push(args);
@@ -75,30 +82,38 @@ impl ResourceManager for StandaloneResourceManager {
     }
 
     fn stop_workers(&self, task_ids: Vec<TaskResourceInfo>) -> anyhow::Result<()> {
-        let cluster_client =
-            StandaloneClusterClient::new(self.context.cluster_config.job_manager_address.clone());
-        cluster_client.stop_all_workers(self.context.job_id.as_str(), task_ids)
+        let cluster_client = StandaloneClusterClient::new(
+            self.context
+                .cluster_config
+                .application_manager_address
+                .clone(),
+        );
+        cluster_client.stop_all_workers(self.context.application_id.as_str(), task_ids)
     }
 }
 
 struct StandaloneClusterClient {
-    pub job_manager_address: Vec<String>,
+    pub application_manager_address: Vec<String>,
 }
 
 impl StandaloneClusterClient {
-    pub fn new(job_manager_address: Vec<String>) -> Self {
+    pub fn new(application_manager_address: Vec<String>) -> Self {
         StandaloneClusterClient {
-            job_manager_address,
+            application_manager_address,
         }
     }
 
     pub fn allocate_worker(
         &self,
-        job_id: &str,
+        application_id: &str,
         args: Vec<HashMap<String, String>>,
     ) -> anyhow::Result<Vec<TaskResourceInfo>> {
-        for job_manager_address in &self.job_manager_address {
-            match self.allocate_worker0(job_manager_address.as_str(), job_id, args.clone()) {
+        for application_manager_address in &self.application_manager_address {
+            match self.allocate_worker0(
+                application_manager_address.as_str(),
+                application_id,
+                args.clone(),
+            ) {
                 Ok(rt) => {
                     return Ok(rt);
                 }
@@ -113,11 +128,14 @@ impl StandaloneClusterClient {
 
     pub fn allocate_worker0(
         &self,
-        job_manager_address: &str,
-        job_id: &str,
+        application_manager_address: &str,
+        application_id: &str,
         args: Vec<HashMap<String, String>>,
     ) -> Result<Vec<TaskResourceInfo>, Box<dyn std::error::Error + Send + Sync>> {
-        let url = format!("{}/job/application/{}", job_manager_address, job_id);
+        let url = format!(
+            "{}/job/application/{}",
+            application_manager_address, application_id
+        );
 
         info!("allocate worker, url={}, body={:?}", url, &args);
 
@@ -133,11 +151,15 @@ impl StandaloneClusterClient {
 
     pub fn stop_all_workers(
         &self,
-        job_id: &str,
+        application_id: &str,
         task_ids: Vec<TaskResourceInfo>,
     ) -> anyhow::Result<()> {
-        for job_manager_address in &self.job_manager_address {
-            match self.stop_all_workers0(job_manager_address.as_str(), job_id, &task_ids) {
+        for application_manager_address in &self.application_manager_address {
+            match self.stop_all_workers0(
+                application_manager_address.as_str(),
+                application_id,
+                &task_ids,
+            ) {
                 Ok(rt) => {
                     return Ok(rt);
                 }
@@ -152,13 +174,13 @@ impl StandaloneClusterClient {
 
     pub fn stop_all_workers0(
         &self,
-        job_manager_address: &str,
-        job_id: &str,
+        application_manager_address: &str,
+        application_id: &str,
         task_ids: &Vec<TaskResourceInfo>,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let url = format!(
             "{}/job/application/{}/task/shutdown",
-            job_manager_address, job_id
+            application_manager_address, application_id
         );
 
         let body = serde_json::to_string(&task_ids)?;
