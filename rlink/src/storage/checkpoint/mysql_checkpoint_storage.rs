@@ -6,15 +6,19 @@ use crate::api::runtime::{CheckpointId, JobId, OperatorId, TaskId};
 use crate::storage::checkpoint::CheckpointStorage;
 use crate::utils::date_time::{current_timestamp, fmt_date_time};
 
+const DEFAULT_TABLE_NAME: &'static str = "rlink_ck";
+
 #[derive(Debug)]
 pub struct MySqlCheckpointStorage {
     url: String,
+    table: String,
 }
 
 impl MySqlCheckpointStorage {
-    pub fn new(url: &str) -> Self {
+    pub fn new(url: String, table: Option<String>) -> Self {
         MySqlCheckpointStorage {
             url: url.to_string(),
+            table: table.unwrap_or(DEFAULT_TABLE_NAME.to_string()),
         }
     }
 }
@@ -36,7 +40,8 @@ impl CheckpointStorage for MySqlCheckpointStorage {
 insert into rlink_ck 
   (application_name, application_id, job_id, task_number, num_tasks, operator_id, checkpoint_id, handle, create_time)
 values 
-  (:application_name, :application_id, :job_id, :task_number, :num_tasks, :operator_id, :checkpoint_id, :handle, :create_time)",
+  (:application_name, :application_id, :job_id, :task_number, :num_tasks, :operator_id, :checkpoint_id, :handle, :create_time)"
+                .replace("rlink_ck", self.table.as_str()),
             finish_cks.iter().map(|p| {
                 params! {
                     "application_name" => application_name,
@@ -63,7 +68,8 @@ delete
 from rlink_ck
 where application_name = :application_name
   and application_id = :application_id
-  and checkpoint_id < :checkpoint_id",
+  and checkpoint_id < :checkpoint_id"
+                .replace("rlink_ck", self.table.as_str()),
             params! {
                 "application_name" => application_name,
                 "application_id" => application_id,
@@ -101,7 +107,8 @@ from rlink_ck as ck
 ) as t on t.checkpoint_id = ck.checkpoint_id
 where ck.application_name = :application_name
   and ck.job_id = :job_id
-  and ck.operator_id = :operator_id",
+  and ck.operator_id = :operator_id"
+                .replace("rlink_ck", self.table.as_str()),
         )?;
 
         let selected_payments = conn.exec_map(
@@ -133,37 +140,46 @@ mod tests {
 
     #[test]
     pub fn mysql_storage_test() {
+        let application_name = "test_app_name";
+        let application_id = "test_app_id";
         let job_id = JobId(5u32);
-        let task_id = TaskId {
+        let task_id0 = TaskId {
             job_id,
             task_number: 0,
-            num_tasks: 5,
+            num_tasks: 2,
+        };
+        let task_id1 = TaskId {
+            job_id,
+            task_number: 1,
+            num_tasks: 2,
         };
         let operator_id = OperatorId(1);
         let checkpoint_id = CheckpointId(crate::utils::date_time::current_timestamp_millis());
 
-        let mut mysql_storage =
-            MySqlCheckpointStorage::new("mysql://rlink:123456@localhost:3304/rlink");
+        let mut mysql_storage = MySqlCheckpointStorage::new(
+            "mysql://rlink:123456@localhost:3304/rlink".to_string(),
+            None,
+        );
         mysql_storage
             .save(
-                "abc",
-                "def",
+                application_name,
+                application_id,
                 checkpoint_id,
                 vec![
                     Checkpoint {
                         operator_id,
-                        task_id,
+                        task_id: task_id0,
                         checkpoint_id,
                         handle: CheckpointHandle {
-                            handle: "ha".to_string(),
+                            handle: "h0".to_string(),
                         },
                     },
                     Checkpoint {
                         operator_id,
-                        task_id,
+                        task_id: task_id1,
                         checkpoint_id,
                         handle: CheckpointHandle {
-                            handle: "hx".to_string(),
+                            handle: "h1".to_string(),
                         },
                     },
                 ],
@@ -171,7 +187,9 @@ mod tests {
             )
             .unwrap();
 
-        let cks = mysql_storage.load("abc", job_id).unwrap();
+        let cks = mysql_storage
+            .load(application_name, job_id, operator_id)
+            .unwrap();
 
         for ck in cks {
             println!("{:?}", ck);

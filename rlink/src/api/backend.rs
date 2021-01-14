@@ -7,14 +7,19 @@ use crate::api::runtime::CheckpointId;
 #[serde(tag = "type", content = "param")]
 pub enum CheckpointBackend {
     Memory,
-    MySql { endpoint: String },
+    MySql {
+        endpoint: String,
+        table: Option<String>,
+    },
 }
 
 impl Display for CheckpointBackend {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             CheckpointBackend::Memory => write!(f, "Memory"),
-            CheckpointBackend::MySql { endpoint } => write!(f, "MySql{{endpoint={}}}", endpoint),
+            CheckpointBackend::MySql { endpoint, table } => {
+                write!(f, "MySql{{endpoint={}}}, table={:?}}}", endpoint, table)
+            }
         }
     }
 }

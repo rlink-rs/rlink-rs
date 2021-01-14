@@ -317,7 +317,7 @@ mod tests {
     use crate::api::env::StreamExecutionEnvironment;
     use crate::api::function::{
         CoProcessFunction, Context, FlatMapFunction, Function, InputFormat, InputSplit,
-        InputSplitAssigner, InputSplitSource, KeySelectorFunction, OutputFormat, ReduceFunction,
+        InputSplitSource, KeySelectorFunction, OutputFormat, ReduceFunction,
     };
     use crate::api::properties::Properties;
     use crate::api::watermark::{BoundedOutOfOrdernessTimestampExtractor, TimestampAssigner};
@@ -568,13 +568,13 @@ mod tests {
         fn open(&mut self, _context: &Context) {}
 
         fn process_left(&self, record: Record) -> Box<dyn Iterator<Item = Record>> {
-            Box::new(vec![].into_iter())
+            Box::new(vec![record].into_iter())
         }
 
         fn process_right(
             &self,
-            stream_seq: usize,
-            record: Record,
+            _stream_seq: usize,
+            _record: Record,
         ) -> Box<dyn Iterator<Item = Record>> {
             Box::new(vec![].into_iter())
         }

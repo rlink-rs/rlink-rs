@@ -36,9 +36,12 @@ impl CheckpointStorageWrap {
             CheckpointBackend::Memory => {
                 CheckpointStorageWrap::MemoryCheckpointStorage(MemoryCheckpointStorage::new())
             }
-            CheckpointBackend::MySql { endpoint } => CheckpointStorageWrap::MySqlCheckpointStorage(
-                MySqlCheckpointStorage::new(endpoint.as_str()),
-            ),
+            CheckpointBackend::MySql { endpoint, table } => {
+                CheckpointStorageWrap::MySqlCheckpointStorage(MySqlCheckpointStorage::new(
+                    endpoint.clone(),
+                    table.clone(),
+                ))
+            }
         }
     }
 }
