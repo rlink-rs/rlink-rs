@@ -1,4 +1,4 @@
-create rlink_ck
+create table rlink_ck
 (
 	id int auto_increment comment 'pk'
 		primary key,
