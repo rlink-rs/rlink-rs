@@ -5,7 +5,6 @@ use crate::api::properties::SystemProperties;
 use crate::api::runtime::JobId;
 use crate::storage::keyed_state::{ReducingState, ReducingStateWrap, StateKey};
 
-/// only for keyed state backend(can add a type to support other)
 pub(crate) struct KeyedStateFlatMapFunction {
     parent_job_id: JobId,
     task_number: u16,
@@ -63,6 +62,6 @@ impl FlatMapFunction for KeyedStateFlatMapFunction {
 
 impl Function for KeyedStateFlatMapFunction {
     fn get_name(&self) -> &str {
-        "SystemFlatMapFunction"
+        "KeyedStateFlatMapFunction"
     }
 }
