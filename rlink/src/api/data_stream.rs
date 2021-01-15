@@ -125,14 +125,14 @@ impl TDataStream for DataStream {
 #[derive(Debug)]
 pub struct ConnectedStreams {
     co_stream: StreamBuilder,
-    dependency_pipeline_ids: Vec<OperatorId>,
+    parent_pipeline_ids: Vec<OperatorId>,
 }
 
 impl ConnectedStreams {
     pub(crate) fn new(co_stream: StreamBuilder, dependency_pipeline_ids: Vec<OperatorId>) -> Self {
         ConnectedStreams {
             co_stream,
-            dependency_pipeline_ids,
+            parent_pipeline_ids: dependency_pipeline_ids,
         }
     }
 }
