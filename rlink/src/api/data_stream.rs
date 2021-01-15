@@ -29,7 +29,7 @@ pub trait TDataStream {
         W: WatermarkAssigner + 'static;
 
     /// Re-balance: Round-robin, Hash, Broadcast
-    fn connect<F>(self, data_streams: Vec<DataStream>, f: F) -> ConnectedStreams
+    fn connect<F>(self, data_streams: Vec<CoStream>, f: F) -> ConnectedStreams
     where
         F: CoProcessFunction + 'static;
 
@@ -65,6 +65,32 @@ pub trait TWindowedStream {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub enum CoStream {
+    DataStream(DataStream),
+    KeyedStream(KeyedStream),
+}
+
+impl From<DataStream> for CoStream {
+    fn from(data_stream: DataStream) -> Self {
+        CoStream::DataStream(data_stream)
+    }
+}
+
+impl From<KeyedStream> for CoStream {
+    fn from(keyed_stream: KeyedStream) -> Self {
+        CoStream::KeyedStream(keyed_stream)
+    }
+}
+
+impl Into<StreamBuilder> for CoStream {
+    fn into(self) -> StreamBuilder {
+        match self {
+            CoStream::DataStream(data_stream) => data_stream.data_stream,
+            CoStream::KeyedStream(keyed_stream) => keyed_stream.keyed_stream,
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct DataStream {
@@ -107,7 +133,7 @@ impl TDataStream for DataStream {
             .assign_timestamps_and_watermarks(timestamp_and_watermark_assigner)
     }
 
-    fn connect<F>(self, data_streams: Vec<DataStream>, co_process: F) -> ConnectedStreams
+    fn connect<F>(self, data_streams: Vec<CoStream>, co_process: F) -> ConnectedStreams
     where
         F: CoProcessFunction + 'static,
     {
@@ -309,7 +335,7 @@ impl TDataStream for StreamBuilder {
         DataStream::new(self)
     }
 
-    fn connect<F>(self, data_streams: Vec<DataStream>, co_process: F) -> ConnectedStreams
+    fn connect<F>(self, data_streams: Vec<CoStream>, co_process: F) -> ConnectedStreams
     where
         F: CoProcessFunction + 'static,
     {
@@ -317,14 +343,12 @@ impl TDataStream for StreamBuilder {
 
         // Ensure `this` is placed in the last position!!!
         // index trigger `process_left` at the last location, otherwise trigger `process_right`
-        let mut dependency_streams: Vec<StreamBuilder> =
-            data_streams.into_iter().map(|x| x.data_stream).collect();
-        dependency_streams.push(self);
+        let mut parent_streams: Vec<StreamBuilder> =
+            data_streams.into_iter().map(|x| x.into()).collect();
+        parent_streams.push(self);
 
-        let parent_ids: Vec<OperatorId> = dependency_streams
-            .iter()
-            .map(|x| x.cur_operator_id)
-            .collect();
+        let parent_ids: Vec<OperatorId> =
+            parent_streams.iter().map(|x| x.cur_operator_id).collect();
 
         let co_stream = StreamBuilder::with_connect(
             pipeline_stream_manager,

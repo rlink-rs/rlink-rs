@@ -12,7 +12,7 @@ license = "MIT/Apache-2.0"
 name = "rlink"
 
 [dependencies]
-serbuffer = "0.1"
+serbuffer = "1.0"
 
 log = "0.4"
 log4rs = "0.12"

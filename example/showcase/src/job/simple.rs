@@ -12,7 +12,7 @@ use rlink::functions::column_base_function::timestamp_assigner::ColumnBaseTimest
 use rlink::functions::column_base_function::FunctionSchema;
 
 use crate::buffer_gen::model;
-use crate::buffer_gen::model::DATA_TYPE;
+use crate::buffer_gen::model::FIELD_TYPE;
 use crate::job::functions::{MyFilterFunction, MyFlatMapFunction, MyOutputFormat, TestInputFormat};
 
 #[derive(Clone, Debug)]
@@ -24,9 +24,10 @@ impl StreamJob for MyStreamJob {
     }
 
     fn build_stream(&self, properties: &Properties, env: &mut StreamExecutionEnvironment) {
-        let key_selector = ColumnBaseKeySelector::new(vec![model::index::name], DATA_TYPE.to_vec());
+        let key_selector =
+            ColumnBaseKeySelector::new(vec![model::index::name], FIELD_TYPE.to_vec());
         let reduce_function =
-            ColumnBaseReduceFunction::new(vec![sum_i64(model::index::value)], DATA_TYPE.to_vec());
+            ColumnBaseReduceFunction::new(vec![sum_i64(model::index::value)], FIELD_TYPE.to_vec());
 
         // the schema after reduce
         let output_schema_types = {
@@ -42,7 +43,7 @@ impl StreamJob for MyStreamJob {
             .filter(MyFilterFunction::new())
             .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
                 Duration::from_secs(1),
-                ColumnBaseTimestampAssigner::new(model::index::timestamp, DATA_TYPE.to_vec()),
+                ColumnBaseTimestampAssigner::new(model::index::timestamp, FIELD_TYPE.to_vec()),
             ))
             .key_by(key_selector)
             .window(SlidingEventTimeWindows::new(

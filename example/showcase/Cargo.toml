@@ -13,7 +13,7 @@ rlink = {path = "../../rlink", version = "0.2.0-alpha.1"}
 rlink-derive = {path = "../../rlink-derive", version = "0.2.0-alpha.1"}
 rlink-kafka-connector= {path = "../../rlink-connectors/kafka-connector", version = "0.2.0-alpha.1"}
 
-serbuffer = "0.1"
+serbuffer = "1.0"
 
 log = "0.4.8"
 
@@ -28,4 +28,4 @@ chrono="0.4"
 tokio = { version = "0.2", features = ["full"] }
 
 [build-dependencies]
-serbuffer-gen = "0.1"
+serbuffer-gen = "1.0"
