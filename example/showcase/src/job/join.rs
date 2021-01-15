@@ -16,9 +16,10 @@ use rlink::functions::column_base_function::FunctionSchema;
 use crate::buffer_gen::model;
 use crate::buffer_gen::model::FIELD_TYPE;
 use crate::job::functions::{
-    BroadcastInputFormat, MyCoProcessFunction, MyFilterFunction, MyFlatMapFunction, MyOutputFormat,
+    ConfigInputFormat, MyCoProcessFunction, MyFilterFunction, MyFlatMapFunction, MyOutputFormat,
     TestInputFormat,
 };
+use rlink::functions::round_robin_flat_map::RoundRobinFlagMapFunction;
 
 #[derive(Clone, Debug)]
 pub struct MyStreamJob {}
@@ -51,12 +52,19 @@ impl StreamJob for MyStreamJob {
                 ColumnBaseTimestampAssigner::new(model::index::timestamp, FIELD_TYPE.to_vec()),
             ));
         let data_stream_right = env
-            .register_source(BroadcastInputFormat::new(), 1)
+            .register_source(ConfigInputFormat::new("Broadcast"), 1)
             .flat_map(BroadcastFlagMapFunction::new());
+
+        let data_stream_right1 = env
+            .register_source(ConfigInputFormat::new("RoundRobin"), 1)
+            .flat_map(RoundRobinFlagMapFunction::new());
 
         data_stream_left
             .connect(
-                vec![CoStream::from(data_stream_right)],
+                vec![
+                    CoStream::from(data_stream_right),
+                    CoStream::from(data_stream_right1),
+                ],
                 MyCoProcessFunction {},
             )
             .key_by(key_selector)

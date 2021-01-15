@@ -130,30 +130,34 @@ impl InputFormat for TestInputFormat {
 }
 
 #[derive(Debug, Function)]
-pub struct BroadcastInputFormat {
+pub struct ConfigInputFormat {
+    name: &'static str,
     data: Vec<Record>,
 }
 
-impl BroadcastInputFormat {
-    pub fn new() -> Self {
-        BroadcastInputFormat { data: Vec::new() }
+impl ConfigInputFormat {
+    pub fn new(name: &'static str) -> Self {
+        ConfigInputFormat {
+            name,
+            data: Vec::new(),
+        }
     }
 
     fn gen_row(&self) -> Vec<Record> {
         let mut rows = Vec::new();
 
-        rows.push(self.create_record("A1", "a1"));
-        rows.push(self.create_record("A2", "a2"));
-        rows.push(self.create_record("A3", "a3"));
-        rows.push(self.create_record("A4", "a4"));
-        rows.push(self.create_record("A5", "a6"));
+        rows.push(self.create_record("0"));
+        rows.push(self.create_record("1"));
+        rows.push(self.create_record("2"));
+        rows.push(self.create_record("3"));
+        rows.push(self.create_record("4"));
 
         rows
     }
 
-    fn create_record(&self, key: &str, value: &str) -> Record {
+    fn create_record(&self, value: &str) -> Record {
         let model = config::Entity {
-            field: key.to_string(),
+            field: format!("{}-{}", self.name, value),
             value: value.to_string(),
         };
         let mut record = Record::new();
@@ -163,9 +167,9 @@ impl BroadcastInputFormat {
     }
 }
 
-impl InputSplitSource for BroadcastInputFormat {}
+impl InputSplitSource for ConfigInputFormat {}
 
-impl InputFormat for BroadcastInputFormat {
+impl InputFormat for ConfigInputFormat {
     fn open(&mut self, input_split: InputSplit, _context: &Context) {
         let partition_num = input_split.get_split_number();
         info!("open split number = {}", partition_num);
@@ -207,7 +211,10 @@ impl CoProcessFunction for MyCoProcessFunction {
     ) -> Box<dyn Iterator<Item = Record>> {
         if stream_seq == 0 {
             let conf = config::Entity::parse(record.as_buffer()).unwrap();
-            info!("config field:{}, val:{}", conf.field, conf.value);
+            info!("Broadcast config field:{}, val:{}", conf.field, conf.value);
+        } else if stream_seq == 1 {
+            let conf = config::Entity::parse(record.as_buffer()).unwrap();
+            info!("RoundRobin config field:{}, val:{}", conf.field, conf.value);
         }
         Box::new(vec![].into_iter())
     }
