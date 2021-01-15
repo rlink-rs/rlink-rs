@@ -221,13 +221,8 @@ impl StreamBuilder {
         source_func: Box<dyn InputFormat>,
         parallelism: u32,
     ) -> Self {
-        let source_operator = StreamOperatorWrap::new_source(
-            OperatorId::default(),
-            vec![],
-            parallelism,
-            FunctionCreator::User,
-            source_func,
-        );
+        let source_operator =
+            StreamOperatorWrap::new_source(parallelism, FunctionCreator::User, source_func);
         let operator_id = stream_manager.add_operator(source_operator, vec![]);
 
         StreamBuilder {
@@ -242,8 +237,7 @@ impl StreamBuilder {
         co_process_func: Box<dyn CoProcessFunction>,
         parent_ids: Vec<OperatorId>,
     ) -> Self {
-        let co_operator =
-            StreamOperatorWrap::new_co_process(OperatorId::default(), vec![], co_process_func);
+        let co_operator = StreamOperatorWrap::new_co_process(co_process_func);
         let operator_id = stream_manager.add_operator(co_operator, parent_ids);
 
         StreamBuilder {
@@ -260,7 +254,7 @@ impl TDataStream for StreamBuilder {
         F: FlatMapFunction + 'static,
     {
         let map_func = Box::new(flat_mapper);
-        let stream_map = StreamOperatorWrap::new_map(OperatorId::default(), vec![], map_func);
+        let stream_map = StreamOperatorWrap::new_map(map_func);
 
         self.cur_operator_id = self
             .stream_manager
@@ -274,8 +268,7 @@ impl TDataStream for StreamBuilder {
         F: FilterFunction + 'static,
     {
         let filter_func = Box::new(filter);
-        let stream_filter =
-            StreamOperatorWrap::new_filter(OperatorId::default(), vec![], filter_func);
+        let stream_filter = StreamOperatorWrap::new_filter(filter_func);
 
         self.cur_operator_id = self
             .stream_manager
@@ -289,8 +282,7 @@ impl TDataStream for StreamBuilder {
         F: KeySelectorFunction + 'static,
     {
         let key_selector_func = Box::new(key_selector);
-        let stream_key_by =
-            StreamOperatorWrap::new_key_by(OperatorId::default(), vec![], key_selector_func);
+        let stream_key_by = StreamOperatorWrap::new_key_by(key_selector_func);
 
         self.cur_operator_id = self
             .stream_manager
@@ -307,11 +299,8 @@ impl TDataStream for StreamBuilder {
         W: WatermarkAssigner + 'static,
     {
         let time_assigner_func = Box::new(timestamp_and_watermark_assigner);
-        let stream_watermark_assigner = StreamOperatorWrap::new_watermark_assigner(
-            OperatorId::default(),
-            vec![],
-            time_assigner_func,
-        );
+        let stream_watermark_assigner =
+            StreamOperatorWrap::new_watermark_assigner(time_assigner_func);
 
         self.cur_operator_id = self
             .stream_manager
@@ -351,12 +340,7 @@ impl TDataStream for StreamBuilder {
         O: OutputFormat + 'static,
     {
         let sink_func = Box::new(output_format);
-        let stream_sink = StreamOperatorWrap::new_sink(
-            OperatorId::default(),
-            vec![],
-            FunctionCreator::User,
-            sink_func,
-        );
+        let stream_sink = StreamOperatorWrap::new_sink(FunctionCreator::User, sink_func);
 
         self.cur_operator_id = self
             .stream_manager
@@ -370,11 +354,7 @@ impl TKeyedStream for StreamBuilder {
         W: WindowAssigner + 'static,
     {
         let window_assigner_func = Box::new(window_assigner);
-        let stream_window_assigner = StreamOperatorWrap::new_window_assigner(
-            OperatorId::default(),
-            vec![],
-            window_assigner_func,
-        );
+        let stream_window_assigner = StreamOperatorWrap::new_window_assigner(window_assigner_func);
 
         self.cur_operator_id = self
             .stream_manager
@@ -388,12 +368,7 @@ impl TKeyedStream for StreamBuilder {
         O: OutputFormat + 'static,
     {
         let sink_func = Box::new(output_format);
-        let stream_sink = StreamOperatorWrap::new_sink(
-            OperatorId::default(),
-            vec![],
-            FunctionCreator::User,
-            sink_func,
-        );
+        let stream_sink = StreamOperatorWrap::new_sink(FunctionCreator::User, sink_func);
 
         self.cur_operator_id = self
             .stream_manager
@@ -409,8 +384,7 @@ impl TWindowedStream for StreamBuilder {
         F: ReduceFunction + 'static,
     {
         let reduce_func = Box::new(reduce);
-        let stream_reduce =
-            StreamOperatorWrap::new_reduce(OperatorId::default(), vec![], parallelism, reduce_func);
+        let stream_reduce = StreamOperatorWrap::new_reduce(parallelism, reduce_func);
 
         self.cur_operator_id = self
             .stream_manager

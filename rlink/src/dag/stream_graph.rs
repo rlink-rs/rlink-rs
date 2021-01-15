@@ -145,48 +145,27 @@ impl RawStreamGraph {
         operators
     }
 
-    fn create_virtual_flat_map(
-        &mut self,
-        id: OperatorId,
-        parent_id: OperatorId,
-        parallelism: u32,
-    ) -> StreamOperatorWrap {
+    fn create_virtual_flat_map(&mut self, parallelism: u32) -> StreamOperatorWrap {
         let map_format = Box::new(KeyedStateFlatMapFunction::new());
         StreamOperatorWrap::StreamMap(StreamOperator::new(
-            id,
-            vec![parent_id],
             parallelism,
             FunctionCreator::System,
             map_format,
         ))
     }
 
-    fn create_virtual_source(
-        &mut self,
-        id: OperatorId,
-        parent_id: OperatorId,
-        parallelism: u32,
-    ) -> StreamOperatorWrap {
+    fn create_virtual_source(&mut self, parallelism: u32) -> StreamOperatorWrap {
         let input_format = Box::new(SystemInputFormat::new());
         StreamOperatorWrap::StreamSource(StreamOperator::new(
-            id,
-            vec![parent_id],
             parallelism,
             FunctionCreator::System,
             input_format,
         ))
     }
 
-    fn create_virtual_sink(
-        &mut self,
-        id: OperatorId,
-        parent_id: OperatorId,
-        parallelism: u32,
-    ) -> StreamOperatorWrap {
+    fn create_virtual_sink(&mut self, parallelism: u32) -> StreamOperatorWrap {
         let output_format = Box::new(SystemOutputFormat::new());
         StreamOperatorWrap::StreamSink(StreamOperator::new(
-            id,
-            vec![parent_id],
             parallelism,
             FunctionCreator::System,
             output_format,
@@ -275,22 +254,16 @@ impl RawStreamGraph {
                 let parallelism = max(parallelism, p_parallelism);
                 self.add_operator0(operator, parent_operator_ids, parallelism)
             } else {
-                let vir_sink =
-                    self.create_virtual_sink(OperatorId::default(), p_operator_id, p_parallelism);
+                let vir_sink = self.create_virtual_sink(p_parallelism);
                 let vir_operator_id =
                     self.add_operator0(vir_sink, vec![p_operator_id], p_parallelism)?;
 
-                let vir_source =
-                    self.create_virtual_source(OperatorId::default(), vir_operator_id, parallelism);
+                let vir_source = self.create_virtual_source(parallelism);
                 let vir_operator_id =
                     self.add_operator0(vir_source, vec![vir_operator_id], parallelism)?;
 
                 let vir_operator_id = if self.is_reduce_parent(p_operator_id) {
-                    let vir_map = self.create_virtual_flat_map(
-                        OperatorId::default(),
-                        vir_operator_id,
-                        parallelism,
-                    );
+                    let vir_map = self.create_virtual_flat_map(parallelism);
                     self.add_operator0(vir_map, vec![vir_operator_id], parallelism)?
                 } else {
                     vir_operator_id
@@ -309,16 +282,14 @@ impl RawStreamGraph {
                 let p_stream_node = self.dag.index(*p_node_index);
 
                 let p_parallelism = p_stream_node.parallelism;
-                let vir_sink =
-                    self.create_virtual_sink(OperatorId::default(), OperatorId::default(), 0);
+                let vir_sink = self.create_virtual_sink(0);
                 let vir_operator_id =
                     self.add_operator0(vir_sink, vec![p_operator_id], p_parallelism)?;
 
                 new_p_operator_ids.push(vir_operator_id);
             }
 
-            let vir_source =
-                self.create_virtual_source(OperatorId::default(), OperatorId::default(), 0);
+            let vir_source = self.create_virtual_source(0);
             let vir_operator_id =
                 self.add_operator0(vir_source, new_p_operator_ids, parallelism)?;
 
