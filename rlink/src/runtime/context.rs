@@ -96,8 +96,7 @@ impl Context {
         }
     }
 
-    pub fn parse_node_arg(job_name: &str) -> Context {
-        // let bind_ip = utils::parse_arg("bind_ip").unwrap_or("0.0.0.0".to_string());
+    pub fn parse_node_arg(application_name: &str) -> Context {
         let bind_ip = utils::ip::get_service_ip()
             .expect("get service ip error")
             .to_string();
@@ -112,10 +111,10 @@ impl Context {
             None => ManagerType::Coordinator,
         };
 
-        let job_id = match cluster_mode {
+        let application_id = match cluster_mode {
             ClusterMode::Local => utils::gen_id(),
             ClusterMode::Standalone | ClusterMode::YARN => {
-                utils::parse_arg("job_id").expect("`job_id` not found")
+                utils::parse_arg("application_id").expect("`application_id` not found")
             }
         };
 
@@ -192,8 +191,8 @@ impl Context {
         };
 
         Context::new(
-            job_name.to_string(),
-            job_id,
+            application_name.to_string(),
+            application_id,
             task_manager_id,
             bind_ip,
             cluster_mode,

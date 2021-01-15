@@ -28,6 +28,7 @@ pub trait TDataStream {
     where
         W: WatermarkAssigner + 'static;
 
+    /// Re-balance: Round-robin, Hash, Broadcast
     fn connect<F>(self, data_streams: Vec<DataStream>, f: F) -> ConnectedStreams
     where
         F: CoProcessFunction + 'static;
