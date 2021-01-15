@@ -67,22 +67,6 @@ impl StreamGraph {
             .map(|x| &x.weight)
     }
 
-    // pub fn get_parents(&self, operator_id: u32) -> Vec<&StreamNode> {
-    //     self.dag
-    //         .raw_edges()
-    //         .iter()
-    //         .filter_map(|x| {
-    //             let target = self.dag.index(x.target());
-    //             if target.id == operator_id {
-    //                 let source = self.dag.index(x.source());
-    //                 Some(source)
-    //             } else {
-    //                 None
-    //             }
-    //         })
-    //         .collect()
-    // }
-
     pub(crate) fn to_string(&self) -> String {
         JsonDag::dag_json(&self.dag).to_string()
     }
