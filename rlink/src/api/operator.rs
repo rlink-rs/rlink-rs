@@ -18,9 +18,6 @@ pub enum FunctionCreator {
 
 pub trait TStreamOperator: Debug {
     fn get_operator_name(&self) -> &str;
-    fn get_operator_id(&self) -> OperatorId;
-    fn get_parent_operator_id(&self) -> OperatorId;
-    fn get_parent_operator_ids(&self) -> Vec<OperatorId>;
     fn get_parallelism(&self) -> u32;
     fn get_fn_creator(&self) -> FunctionCreator;
 }
@@ -63,18 +60,6 @@ where
 {
     fn get_operator_name(&self) -> &str {
         self.operator_fn.get_name()
-    }
-
-    fn get_operator_id(&self) -> OperatorId {
-        self.id
-    }
-
-    fn get_parent_operator_id(&self) -> OperatorId {
-        self.parent_ids[0]
-    }
-
-    fn get_parent_operator_ids(&self) -> Vec<OperatorId> {
-        self.parent_ids.clone()
     }
 
     fn get_parallelism(&self) -> u32 {
@@ -312,48 +297,6 @@ impl TStreamOperator for StreamOperatorWrap {
             StreamOperatorWrap::StreamWatermarkAssigner(op) => op.get_operator_name(),
             StreamOperatorWrap::StreamWindowAssigner(op) => op.get_operator_name(),
             StreamOperatorWrap::StreamSink(op) => op.get_operator_name(),
-        }
-    }
-
-    fn get_operator_id(&self) -> OperatorId {
-        match self {
-            StreamOperatorWrap::StreamSource(op) => op.get_operator_id(),
-            StreamOperatorWrap::StreamMap(op) => op.get_operator_id(),
-            StreamOperatorWrap::StreamFilter(op) => op.get_operator_id(),
-            StreamOperatorWrap::StreamCoProcess(op) => op.get_operator_id(),
-            StreamOperatorWrap::StreamKeyBy(op) => op.get_operator_id(),
-            StreamOperatorWrap::StreamReduce(op) => op.get_operator_id(),
-            StreamOperatorWrap::StreamWatermarkAssigner(op) => op.get_operator_id(),
-            StreamOperatorWrap::StreamWindowAssigner(op) => op.get_operator_id(),
-            StreamOperatorWrap::StreamSink(op) => op.get_operator_id(),
-        }
-    }
-
-    fn get_parent_operator_id(&self) -> OperatorId {
-        match self {
-            StreamOperatorWrap::StreamSource(op) => op.get_parent_operator_id(),
-            StreamOperatorWrap::StreamMap(op) => op.get_parent_operator_id(),
-            StreamOperatorWrap::StreamFilter(op) => op.get_parent_operator_id(),
-            StreamOperatorWrap::StreamCoProcess(op) => op.get_parent_operator_id(),
-            StreamOperatorWrap::StreamKeyBy(op) => op.get_parent_operator_id(),
-            StreamOperatorWrap::StreamReduce(op) => op.get_parent_operator_id(),
-            StreamOperatorWrap::StreamWatermarkAssigner(op) => op.get_parent_operator_id(),
-            StreamOperatorWrap::StreamWindowAssigner(op) => op.get_parent_operator_id(),
-            StreamOperatorWrap::StreamSink(op) => op.get_parent_operator_id(),
-        }
-    }
-
-    fn get_parent_operator_ids(&self) -> Vec<OperatorId> {
-        match self {
-            StreamOperatorWrap::StreamSource(op) => op.get_parent_operator_ids(),
-            StreamOperatorWrap::StreamMap(op) => op.get_parent_operator_ids(),
-            StreamOperatorWrap::StreamFilter(op) => op.get_parent_operator_ids(),
-            StreamOperatorWrap::StreamCoProcess(op) => op.get_parent_operator_ids(),
-            StreamOperatorWrap::StreamKeyBy(op) => op.get_parent_operator_ids(),
-            StreamOperatorWrap::StreamReduce(op) => op.get_parent_operator_ids(),
-            StreamOperatorWrap::StreamWatermarkAssigner(op) => op.get_parent_operator_ids(),
-            StreamOperatorWrap::StreamWindowAssigner(op) => op.get_parent_operator_ids(),
-            StreamOperatorWrap::StreamSink(op) => op.get_parent_operator_ids(),
         }
     }
 
