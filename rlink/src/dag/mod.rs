@@ -96,6 +96,8 @@ pub enum DagError {
     // ParallelismInheritUnsupported(OperatorType),
     ChildNotFoundInPipeline,
     MultiChildrenInPipeline,
+
+    IllegalInputSplitSize(String),
 }
 
 impl Error for DagError {}
@@ -113,6 +115,9 @@ impl std::fmt::Display for DagError {
             // }
             DagError::ChildNotFoundInPipeline => write!(f, "ChildNotFoundInPipeline"),
             DagError::MultiChildrenInPipeline => write!(f, "MultiChildrenInPipeline"),
+            DagError::IllegalInputSplitSize(arg) => {
+                write!(f, "IllegalInputSplitSize({})", arg)
+            }
         }
     }
 }
