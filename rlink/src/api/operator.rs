@@ -7,7 +7,7 @@ use crate::api::function::{
 use crate::api::watermark::WatermarkAssigner;
 use crate::api::window::WindowAssigner;
 
-pub const DEFAULT_PARALLELISM: u32 = 0;
+pub const DEFAULT_PARALLELISM: u16 = 0;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum FunctionCreator {
@@ -17,7 +17,7 @@ pub enum FunctionCreator {
 
 pub trait TStreamOperator: Debug {
     fn get_operator_name(&self) -> &str;
-    fn get_parallelism(&self) -> u32;
+    fn get_parallelism(&self) -> u16;
     fn get_fn_creator(&self) -> FunctionCreator;
 }
 
@@ -25,7 +25,7 @@ pub struct StreamOperator<T>
 where
     T: ?Sized + Function,
 {
-    parallelism: u32,
+    parallelism: u16,
     fn_creator: FunctionCreator,
     pub(crate) operator_fn: Box<T>,
 }
@@ -34,7 +34,7 @@ impl<T> StreamOperator<T>
 where
     T: ?Sized + Function,
 {
-    pub fn new(parallelism: u32, fn_creator: FunctionCreator, operator_fn: Box<T>) -> Self {
+    pub fn new(parallelism: u16, fn_creator: FunctionCreator, operator_fn: Box<T>) -> Self {
         StreamOperator {
             parallelism,
             fn_creator,
@@ -51,7 +51,7 @@ where
         self.operator_fn.get_name()
     }
 
-    fn get_parallelism(&self) -> u32 {
+    fn get_parallelism(&self) -> u16 {
         self.parallelism
     }
 
@@ -88,7 +88,7 @@ pub enum StreamOperatorWrap {
 
 impl StreamOperatorWrap {
     pub fn new_source(
-        parallelism: u32,
+        parallelism: u16,
         fn_creator: FunctionCreator,
         source_fn: Box<dyn InputFormat>,
     ) -> Self {
@@ -117,7 +117,7 @@ impl StreamOperatorWrap {
         StreamOperatorWrap::StreamKeyBy(operator)
     }
 
-    pub fn new_reduce(parallelism: u32, reduce_fn: Box<dyn ReduceFunction>) -> Self {
+    pub fn new_reduce(parallelism: u16, reduce_fn: Box<dyn ReduceFunction>) -> Self {
         let operator = StreamOperator::new(parallelism, FunctionCreator::User, reduce_fn);
         StreamOperatorWrap::StreamReduce(operator)
     }
@@ -214,7 +214,7 @@ impl TStreamOperator for StreamOperatorWrap {
         }
     }
 
-    fn get_parallelism(&self) -> u32 {
+    fn get_parallelism(&self) -> u16 {
         match self {
             StreamOperatorWrap::StreamSource(op) => op.get_parallelism(),
             StreamOperatorWrap::StreamMap(op) => op.get_parallelism(),

@@ -17,7 +17,7 @@ pub(crate) struct OperatorCheckpoint {
     job_id: JobId,
     operator_id: OperatorId,
     operator_name: String,
-    parallelism: u32,
+    parallelism: u16,
 
     #[serde(skip_serializing, skip_deserializing)]
     storage: Option<CheckpointStorageWrap>,
@@ -35,7 +35,7 @@ impl OperatorCheckpoint {
         job_id: JobId,
         operator_id: OperatorId,
         operator_name: String,
-        parallelism: u32,
+        parallelism: u16,
         storage: Option<CheckpointStorageWrap>,
     ) -> Self {
         OperatorCheckpoint {

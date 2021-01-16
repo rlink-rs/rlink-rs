@@ -120,7 +120,7 @@ impl ExecutionGraph {
             if let StreamOperatorWrap::StreamSource(op) = operator {
                 let input_splits = op.operator_fn.create_input_splits(job_node.parallelism);
                 if input_splits.len() != job_node.parallelism as usize {
-                    panic!("")
+                    panic!("input_splits != job's parallelism");
                 }
 
                 for task_number in 0..job_node.parallelism {

@@ -58,7 +58,7 @@ pub trait TKeyedStream {
 }
 
 pub trait TWindowedStream {
-    fn reduce<F>(self, reduce: F, parallelism: u32) -> DataStream
+    fn reduce<F>(self, reduce: F, parallelism: u16) -> DataStream
     where
         F: ReduceFunction + 'static;
 }
@@ -211,7 +211,7 @@ impl WindowedStream {
 }
 
 impl TWindowedStream for WindowedStream {
-    fn reduce<F>(self, reduce: F, parallelism: u32) -> DataStream
+    fn reduce<F>(self, reduce: F, parallelism: u16) -> DataStream
     where
         F: ReduceFunction + 'static,
     {
@@ -245,7 +245,7 @@ impl StreamBuilder {
     pub fn with_source(
         stream_manager: Rc<StreamManager>,
         source_func: Box<dyn InputFormat>,
-        parallelism: u32,
+        parallelism: u16,
     ) -> Self {
         let source_operator =
             StreamOperatorWrap::new_source(parallelism, FunctionCreator::User, source_func);
@@ -403,7 +403,7 @@ impl TKeyedStream for StreamBuilder {
 }
 
 impl TWindowedStream for StreamBuilder {
-    fn reduce<F>(mut self, reduce: F, parallelism: u32) -> DataStream
+    fn reduce<F>(mut self, reduce: F, parallelism: u16) -> DataStream
     where
         F: ReduceFunction + 'static,
     {

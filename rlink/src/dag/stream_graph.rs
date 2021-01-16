@@ -17,7 +17,7 @@ use crate::io::system_output_format::SystemOutputFormat;
 pub struct StreamNode {
     pub(crate) id: OperatorId,
     pub(crate) parent_ids: Vec<OperatorId>,
-    pub(crate) parallelism: u32,
+    pub(crate) parallelism: u16,
 
     pub(crate) operator_name: String,
     pub(crate) operator_type: OperatorType,
@@ -129,7 +129,7 @@ impl RawStreamGraph {
         operators
     }
 
-    fn create_virtual_flat_map(&mut self, parallelism: u32) -> StreamOperatorWrap {
+    fn create_virtual_flat_map(&mut self, parallelism: u16) -> StreamOperatorWrap {
         let map_format = Box::new(KeyedStateFlatMapFunction::new());
         StreamOperatorWrap::StreamMap(StreamOperator::new(
             parallelism,
@@ -138,7 +138,7 @@ impl RawStreamGraph {
         ))
     }
 
-    fn create_virtual_source(&mut self, parallelism: u32) -> StreamOperatorWrap {
+    fn create_virtual_source(&mut self, parallelism: u16) -> StreamOperatorWrap {
         let input_format = Box::new(SystemInputFormat::new());
         StreamOperatorWrap::StreamSource(StreamOperator::new(
             parallelism,
@@ -147,7 +147,7 @@ impl RawStreamGraph {
         ))
     }
 
-    fn create_virtual_sink(&mut self, parallelism: u32) -> StreamOperatorWrap {
+    fn create_virtual_sink(&mut self, parallelism: u16) -> StreamOperatorWrap {
         let output_format = Box::new(SystemOutputFormat::new());
         StreamOperatorWrap::StreamSink(StreamOperator::new(
             parallelism,
@@ -160,7 +160,7 @@ impl RawStreamGraph {
         &mut self,
         operator: StreamOperatorWrap,
         parent_operator_ids: Vec<OperatorId>,
-        parallelism: u32,
+        parallelism: u16,
     ) -> Result<OperatorId, DagError> {
         let operator_id = self.id_gen;
         self.id_gen.0 = self.id_gen.0 + 1;
@@ -284,9 +284,9 @@ impl RawStreamGraph {
     fn is_pipeline(
         &self,
         operator_type: OperatorType,
-        parallelism: u32,
+        parallelism: u16,
         p_operator_type: OperatorType,
-        p_parallelism: u32,
+        p_parallelism: u16,
     ) -> bool {
         if p_operator_type == OperatorType::WindowAssigner && operator_type == OperatorType::Reduce
         {

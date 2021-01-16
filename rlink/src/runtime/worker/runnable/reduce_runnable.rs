@@ -20,7 +20,7 @@ use crate::utils::date_time::timestamp_str;
 pub(crate) struct ReduceRunnable {
     operator_id: OperatorId,
     task_number: u16,
-    dependency_parallelism: u32,
+    dependency_parallelism: u16,
 
     stream_key_by: Option<StreamOperator<dyn KeySelectorFunction>>,
     stream_reduce: StreamOperator<dyn ReduceFunction>,

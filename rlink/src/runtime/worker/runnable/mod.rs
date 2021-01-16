@@ -65,12 +65,12 @@ impl RunnableContext {
         FunctionSnapshotContext::new(operator_id, self.task_descriptor.task_id, checkpoint_id)
     }
 
-    pub(crate) fn get_parent_parallelism(&self) -> u32 {
+    pub(crate) fn get_parent_parallelism(&self) -> u16 {
         let ps = self.get_parents_parallelism();
         *ps.get(0).unwrap()
     }
 
-    pub(crate) fn get_parents_parallelism(&self) -> Vec<u32> {
+    pub(crate) fn get_parents_parallelism(&self) -> Vec<u16> {
         self.dag_manager
             .get_job_parents(self.task_descriptor.task_id.job_id)
             .iter()
@@ -78,12 +78,12 @@ impl RunnableContext {
             .collect()
     }
 
-    pub(crate) fn get_child_parallelism(&self) -> u32 {
+    pub(crate) fn get_child_parallelism(&self) -> u16 {
         let ps = self.get_children_parallelism();
         *ps.get(0).unwrap()
     }
 
-    pub(crate) fn get_children_parallelism(&self) -> Vec<u32> {
+    pub(crate) fn get_children_parallelism(&self) -> Vec<u16> {
         self.dag_manager
             .get_job_children(self.task_descriptor.task_id.job_id)
             .iter()

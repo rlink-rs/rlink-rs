@@ -33,19 +33,19 @@ impl Context {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct InputSplit {
-    split_number: u32,
+    split_number: u16,
     properties: Properties,
 }
 
 impl InputSplit {
-    pub fn new(split_number: u32, properties: Properties) -> Self {
+    pub fn new(split_number: u16, properties: Properties) -> Self {
         InputSplit {
             split_number,
             properties,
         }
     }
 
-    pub fn get_split_number(&self) -> u32 {
+    pub fn get_split_number(&self) -> u16 {
         self.split_number
     }
 
@@ -80,7 +80,7 @@ pub trait InputSplitSource {
     /// Create InputSplits by system parallelism[`min_num_splits`]
     ///
     /// Returns a InputSplit vec
-    fn create_input_splits(&self, min_num_splits: u32) -> Vec<InputSplit> {
+    fn create_input_splits(&self, min_num_splits: u16) -> Vec<InputSplit> {
         let mut input_splits = Vec::with_capacity(min_num_splits as usize);
         for task_number in 0..min_num_splits {
             input_splits.push(InputSplit::new(task_number, Properties::new()));

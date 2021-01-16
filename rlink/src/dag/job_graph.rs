@@ -27,7 +27,7 @@ impl Label for JobEdge {
 pub struct JobNode {
     /// the first operator id in a pipeline as job_id
     pub(crate) job_id: JobId,
-    pub(crate) parallelism: u32,
+    pub(crate) parallelism: u16,
     pub(crate) stream_nodes: Vec<StreamNode>,
     pub(crate) child_job_ids: Vec<JobId>,
     pub(crate) parent_job_ids: Vec<JobId>,

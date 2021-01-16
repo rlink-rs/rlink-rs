@@ -37,7 +37,7 @@ impl StreamExecutionEnvironment {
         }
     }
 
-    pub fn register_source<I>(&mut self, input_format: I, parallelism: u32) -> DataStream
+    pub fn register_source<I>(&mut self, input_format: I, parallelism: u16) -> DataStream
     where
         I: InputFormat + 'static,
     {

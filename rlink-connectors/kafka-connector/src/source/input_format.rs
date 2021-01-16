@@ -154,7 +154,7 @@ impl InputFormat for KafkaInputFormat {
 }
 
 impl InputSplitSource for KafkaInputFormat {
-    fn create_input_splits(&self, min_num_splits: u32) -> Vec<InputSplit> {
+    fn create_input_splits(&self, min_num_splits: u16) -> Vec<InputSplit> {
         let timeout = Duration::from_secs(3);
 
         info!("kafka config {:?}", self.client_config);
