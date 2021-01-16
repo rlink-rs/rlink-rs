@@ -108,7 +108,7 @@ impl std::fmt::Display for DagError {
         match self {
             DagError::SourceNotFound => write!(f, "SourceNotFound"),
             DagError::SourceNotAtStarting => write!(f, "SourceNotAtStarting"),
-            DagError::NotCombineOperator => write!(f, "NotCombineOperator"),
+            DagError::SinkNotAtEnding => write!(f, "SinkNotAtEnding"),
             DagError::NotCombineOperator => write!(f, "NotCombineOperator"),
             // DagError::ChildNodeNotFound(s) => write!(f, "ChildNodeNotFound({})", s),
             DagError::ParentOperatorNotFound => write!(f, "ParentOperatorNotFound"),
@@ -318,6 +318,7 @@ where
 mod tests {
     use std::time::Duration;
 
+    use crate::api::data_stream::CoStream;
     use crate::api::data_stream::{TConnectedStreams, TKeyedStream};
     use crate::api::data_stream::{TDataStream, TWindowedStream};
     use crate::api::element::Record;
@@ -371,7 +372,7 @@ mod tests {
                 Duration::from_secs(1),
                 MyTimestampAssigner::new(),
             ))
-            .connect(vec![ds], MyCoProcessFunction {})
+            .connect(vec![CoStream::from(ds)], MyCoProcessFunction {})
             .key_by(MyKeySelectorFunction::new())
             .window(SlidingEventTimeWindows::new(
                 Duration::from_secs(60),
