@@ -4,8 +4,8 @@ use std::fmt::Debug;
 use crate::api::element::Record;
 use crate::api::element::{types, BufferReader, BufferWriter};
 use crate::api::function::{Context, Function, ReduceFunction};
-use crate::functions::column_base_function::FunctionSchema;
 use crate::functions::percentile::{get_percentile_capacity, Percentile};
+use crate::functions::schema_base::FunctionSchema;
 
 pub fn sum_i64(column_index: usize) -> Box<dyn Aggregation> {
     let agg = SumI64 {

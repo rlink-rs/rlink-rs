@@ -6,11 +6,11 @@ use rlink::api::env::{StreamExecutionEnvironment, StreamJob};
 use rlink::api::properties::{Properties, SystemProperties};
 use rlink::api::watermark::BoundedOutOfOrdernessTimestampExtractor;
 use rlink::api::window::SlidingEventTimeWindows;
-use rlink::functions::column_base_function::key_selector::ColumnBaseKeySelector;
-use rlink::functions::column_base_function::print_output_format::PrintOutputFormat;
-use rlink::functions::column_base_function::reduce::{sum_i64, ColumnBaseReduceFunction};
-use rlink::functions::column_base_function::timestamp_assigner::ColumnBaseTimestampAssigner;
-use rlink::functions::column_base_function::FunctionSchema;
+use rlink::functions::schema_base::key_selector::ColumnBaseKeySelector;
+use rlink::functions::schema_base::print_output_format::PrintOutputFormat;
+use rlink::functions::schema_base::reduce::{sum_i64, ColumnBaseReduceFunction};
+use rlink::functions::schema_base::timestamp_assigner::ColumnBaseTimestampAssigner;
+use rlink::functions::schema_base::FunctionSchema;
 
 use crate::buffer_gen::model;
 use crate::buffer_gen::model::FIELD_TYPE;
