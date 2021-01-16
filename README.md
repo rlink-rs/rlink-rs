@@ -10,6 +10,23 @@ pure memory, zero copy. single cluster in the production environment stable hund
 
 Framework tested on Linux/MacOS/Windows, requires stable Rust.
 
+## Streaming Example
+```rust
+env.register_source(TestInputFormat::new(properties.clone()), 1)
+    .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
+        Duration::from_secs(1),
+        SchemaBaseTimestampAssigner::new(model::index::timestamp, &FIELD_TYPE),
+    ))
+    .key_by(key_selector)
+    .window(SlidingEventTimeWindows::new(
+        Duration::from_secs(60),
+        Duration::from_secs(20),
+        None,
+    ))
+    .reduce(reduce_function, 2)
+    .add_sink(PrintOutputFormat::new(output_schema_types.as_slice()));
+```
+
 ## Build
 #### Build source
 ```bash

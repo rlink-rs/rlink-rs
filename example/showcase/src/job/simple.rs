@@ -37,8 +37,7 @@ impl StreamJob for MyStreamJob {
             key_types
         };
 
-        let data_stream = env.register_source(TestInputFormat::new(properties.clone()), 1);
-        data_stream
+        env.register_source(TestInputFormat::new(properties.clone()), 1)
             .flat_map(MyFlatMapFunction::new())
             .filter(MyFilterFunction::new())
             .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
