@@ -11,12 +11,10 @@ use crate::dag::{utils, DagError, JsonDag, Label, OperatorType};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum JobEdge {
-    // TODO support
-    // ReBalance = 0
     /// Forward
     Forward = 1,
     /// Hash
-    Hash = 2,
+    ReBalance = 2,
 }
 
 impl Label for JobEdge {
@@ -152,7 +150,7 @@ impl JobGraph {
             let child_job_node = self.dag.index(*child_node_index);
 
             let job_edge = if child_job_node.is_reduce_job() {
-                JobEdge::Hash
+                JobEdge::ReBalance
             } else if job_node.is_reduce_job() {
                 if job_node.parallelism != child_job_node.parallelism {
                     unimplemented!("unsupported")
@@ -163,7 +161,7 @@ impl JobGraph {
                 if job_node.parallelism == child_job_node.parallelism {
                     JobEdge::Forward
                 } else {
-                    JobEdge::Hash
+                    JobEdge::ReBalance
                 }
             };
 
@@ -262,14 +260,14 @@ impl JobGraph {
             stream_nodes.push(stream_node.clone());
             parallelism = max(parallelism, stream_node.parallelism);
             if stream_node.operator_type == OperatorType::Source {
-                job_id = JobId(stream_node.id.0);
+                job_id = JobId::from(stream_node.id);
             }
 
             if stream_node.operator_type == OperatorType::Sink {
                 let f_job_ids: Vec<JobId> = children
                     .iter()
                     .map(|(_edge_index, node_index)| stream_graph.get_stream_node(*node_index))
-                    .map(|stream_node| JobId(stream_node.id.0))
+                    .map(|stream_node| JobId::from(stream_node.id))
                     .collect();
                 child_job_ids.extend_from_slice(f_job_ids.as_slice());
                 break;

@@ -180,7 +180,7 @@ impl ExecutionGraph {
                                 .unwrap();
                         }
                     }
-                    JobEdge::Hash => {
+                    JobEdge::ReBalance => {
                         // build cartesian product execution edge
                         for node_index in execution_node_indies {
                             for child_node_index in child_execution_node_indies {
