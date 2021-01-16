@@ -89,7 +89,8 @@ impl std::fmt::Display for OperatorType {
 #[derive(Debug)]
 pub enum DagError {
     SourceNotFound,
-    // SinkNotFound,
+    SourceNotAtStarting,
+    SinkNotAtEnding,
     NotCombineOperator,
     // ChildNodeNotFound(OperatorType),
     ParentOperatorNotFound,
@@ -106,7 +107,8 @@ impl std::fmt::Display for DagError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             DagError::SourceNotFound => write!(f, "SourceNotFound"),
-            // DagError::SinkNotFound => write!(f, "SinkNotFound"),
+            DagError::SourceNotAtStarting => write!(f, "SourceNotAtStarting"),
+            DagError::NotCombineOperator => write!(f, "NotCombineOperator"),
             DagError::NotCombineOperator => write!(f, "NotCombineOperator"),
             // DagError::ChildNodeNotFound(s) => write!(f, "ChildNodeNotFound({})", s),
             DagError::ParentOperatorNotFound => write!(f, "ParentOperatorNotFound"),

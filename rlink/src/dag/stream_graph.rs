@@ -231,7 +231,9 @@ impl RawStreamGraph {
             let p_parallelism = p_stream_node.parallelism;
             let p_operator_type = p_stream_node.operator_type;
 
-            if self.is_pipeline(operator_type, parallelism, p_operator_type, p_parallelism) {
+            let pipeline =
+                self.is_pipeline(operator_type, parallelism, p_operator_type, p_parallelism)?;
+            if pipeline {
                 // tow types of parallelism inherit
                 // 1. Forward:  source->map
                 // 2. Backward: window->reduce
@@ -287,35 +289,34 @@ impl RawStreamGraph {
         parallelism: u16,
         p_operator_type: OperatorType,
         p_parallelism: u16,
-    ) -> bool {
+    ) -> Result<bool, DagError> {
         if p_operator_type == OperatorType::WindowAssigner && operator_type == OperatorType::Reduce
         {
-            true
+            Ok(true)
         } else {
-            if self.is_pipeline_op(operator_type, p_operator_type)
-                && (parallelism == p_parallelism || parallelism == DEFAULT_PARALLELISM)
-            {
-                true
+            let pipeline_ip = self.check_operator(operator_type, p_operator_type)?;
+            if pipeline_ip && (parallelism == p_parallelism || parallelism == DEFAULT_PARALLELISM) {
+                Ok(true)
             } else {
-                false
+                Ok(false)
             }
         }
     }
 
-    fn is_pipeline_op(
+    fn check_operator(
         &self,
         operator_type: OperatorType,
         parent_operator_type: OperatorType,
-    ) -> bool {
+    ) -> Result<bool, DagError> {
         match parent_operator_type {
             OperatorType::Source => match operator_type {
                 OperatorType::Map
                 | OperatorType::Filter
                 | OperatorType::WatermarkAssigner
                 | OperatorType::KeyBy
-                | OperatorType::Sink => true,
-                OperatorType::Source => panic!("Source is the start Operator"),
-                _ => false,
+                | OperatorType::Sink => Ok(true),
+                OperatorType::Source => Err(DagError::SourceNotAtStarting),
+                _ => Ok(false),
             },
             OperatorType::Map | OperatorType::Filter | OperatorType::WatermarkAssigner => {
                 match operator_type {
@@ -323,30 +324,30 @@ impl RawStreamGraph {
                     | OperatorType::Filter
                     | OperatorType::WatermarkAssigner
                     | OperatorType::KeyBy
-                    | OperatorType::Sink => true,
-                    OperatorType::Source => panic!("Source is the start Operator"),
-                    _ => false,
+                    | OperatorType::Sink => Ok(true),
+                    OperatorType::Source => Err(DagError::SourceNotAtStarting),
+                    _ => Ok(false),
                 }
             }
             OperatorType::CoProcess => match operator_type {
-                OperatorType::KeyBy => true,
-                OperatorType::Source => panic!("Source is the start Operator"),
-                _ => false,
+                OperatorType::KeyBy => Ok(true),
+                OperatorType::Source => Err(DagError::SourceNotAtStarting),
+                _ => Ok(false),
             },
             OperatorType::KeyBy => match operator_type {
-                OperatorType::Source => panic!("Source is the start Operator"),
-                _ => false,
+                OperatorType::Source => Err(DagError::SourceNotAtStarting),
+                _ => Ok(false),
             },
             OperatorType::WindowAssigner => match operator_type {
-                OperatorType::Reduce => true,
-                OperatorType::Source => panic!("Source is the start Operator"),
-                _ => false,
+                OperatorType::Reduce => Ok(true),
+                OperatorType::Source => Err(DagError::SourceNotAtStarting),
+                _ => Ok(false),
             },
             OperatorType::Reduce => match operator_type {
-                OperatorType::Source => panic!("Source is the start Operator"),
-                _ => false,
+                OperatorType::Source => Err(DagError::SourceNotAtStarting),
+                _ => Ok(false),
             },
-            OperatorType::Sink => panic!("Sink is end Operator"),
+            OperatorType::Sink => Err(DagError::SinkNotAtEnding),
         }
     }
 
