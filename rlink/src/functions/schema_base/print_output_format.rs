@@ -1,9 +1,11 @@
+use std::time::Duration;
+
+use serbuffer::types;
+
 use crate::api::element::Record;
 use crate::api::function::{Context, Function, OutputFormat};
 use crate::api::window::Window;
 use crate::utils::date_time::{fmt_date_time, FMT_DATE_TIME_1};
-use serbuffer::types;
-use std::time::Duration;
 
 pub struct PrintOutputFormat {
     field_types: Vec<u8>,
