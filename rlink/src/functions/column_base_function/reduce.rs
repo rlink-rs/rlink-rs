@@ -378,8 +378,8 @@ impl Aggregation for PctU64 {
 
 #[derive(Debug)]
 pub struct ColumnBaseReduceFunction {
-    data_types: Vec<u8>,
-    val_data_types: Vec<u8>,
+    field_types: Vec<u8>,
+    val_field_types: Vec<u8>,
 
     val_len: usize,
 
@@ -387,12 +387,12 @@ pub struct ColumnBaseReduceFunction {
 }
 
 impl ColumnBaseReduceFunction {
-    pub fn new(agg_operators: Vec<Box<dyn Aggregation>>, data_types: Vec<u8>) -> Self {
-        let val_data_types: Vec<u8> = agg_operators
+    pub fn new(agg_operators: Vec<Box<dyn Aggregation>>, field_types: &[u8]) -> Self {
+        let val_field_types: Vec<u8> = agg_operators
             .iter()
             .map(|agg| {
                 if agg.agg_type() != types::BYTES
-                    && data_types[agg.record_index()] != agg.agg_type()
+                    && field_types[agg.record_index()] != agg.agg_type()
                 {
                     panic!("column type check failure at {}", agg.record_index());
                 }
@@ -403,8 +403,8 @@ impl ColumnBaseReduceFunction {
 
         // let val_len = val_data_types.len() * 8;
         ColumnBaseReduceFunction {
-            data_types,
-            val_data_types,
+            field_types: field_types.to_vec(),
+            val_field_types,
             val_len,
             agg_operators,
         }
@@ -413,7 +413,7 @@ impl ColumnBaseReduceFunction {
 
 impl FunctionSchema for ColumnBaseReduceFunction {
     fn get_schema_types(&self) -> Vec<u8> {
-        self.val_data_types.clone()
+        self.val_field_types.clone()
     }
 }
 
@@ -422,13 +422,13 @@ impl ReduceFunction for ColumnBaseReduceFunction {
 
     fn reduce(&self, value: Option<&mut Record>, record: &mut Record) -> Record {
         let mut record_rt = Record::with_capacity(self.val_len);
-        let mut writer = record_rt.get_writer(self.val_data_types.as_slice());
+        let mut writer = record_rt.get_writer(self.val_field_types.as_slice());
 
-        let mut record_reader = record.get_reader(self.data_types.as_slice());
+        let mut record_reader = record.get_reader(self.field_types.as_slice());
 
         match value {
             Some(state_value) => {
-                let mut stat_reader = state_value.get_reader(self.val_data_types.as_slice());
+                let mut stat_reader = state_value.get_reader(self.val_field_types.as_slice());
 
                 for index in 0..self.agg_operators.len() {
                     self.agg_operators[index].reduce(

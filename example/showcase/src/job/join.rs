@@ -9,10 +9,10 @@ use rlink::api::watermark::BoundedOutOfOrdernessTimestampExtractor;
 use rlink::api::window::SlidingEventTimeWindows;
 use rlink::functions::broadcast_flat_map::BroadcastFlagMapFunction;
 use rlink::functions::column_base_function::key_selector::ColumnBaseKeySelector;
+use rlink::functions::column_base_function::print_output_format::PrintOutputFormat;
 use rlink::functions::column_base_function::reduce::{sum_i64, ColumnBaseReduceFunction};
 use rlink::functions::column_base_function::timestamp_assigner::ColumnBaseTimestampAssigner;
 use rlink::functions::column_base_function::FunctionSchema;
-use rlink::functions::print_output_format::PrintOutputFormat;
 use rlink::functions::round_robin_flat_map::RoundRobinFlagMapFunction;
 
 use crate::buffer_gen::model;
@@ -30,10 +30,9 @@ impl StreamJob for MyStreamJob {
     }
 
     fn build_stream(&self, properties: &Properties, env: &mut StreamExecutionEnvironment) {
-        let key_selector =
-            ColumnBaseKeySelector::new(vec![model::index::name], FIELD_TYPE.to_vec());
+        let key_selector = ColumnBaseKeySelector::new(vec![model::index::name], &FIELD_TYPE);
         let reduce_function =
-            ColumnBaseReduceFunction::new(vec![sum_i64(model::index::value)], FIELD_TYPE.to_vec());
+            ColumnBaseReduceFunction::new(vec![sum_i64(model::index::value)], &FIELD_TYPE);
 
         // the schema after reduce
         let output_schema_types = {
@@ -49,7 +48,7 @@ impl StreamJob for MyStreamJob {
             .filter(MyFilterFunction::new())
             .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
                 Duration::from_secs(1),
-                ColumnBaseTimestampAssigner::new(model::index::timestamp, FIELD_TYPE.to_vec()),
+                ColumnBaseTimestampAssigner::new(model::index::timestamp, &FIELD_TYPE),
             ));
         let data_stream_right = env
             .register_source(ConfigInputFormat::new("Broadcast"), 1)
@@ -74,6 +73,6 @@ impl StreamJob for MyStreamJob {
                 None,
             ))
             .reduce(reduce_function, 2)
-            .add_sink(PrintOutputFormat::new(output_schema_types));
+            .add_sink(PrintOutputFormat::new(output_schema_types.as_slice()));
     }
 }

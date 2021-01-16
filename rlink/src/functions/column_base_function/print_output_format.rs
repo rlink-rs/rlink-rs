@@ -10,8 +10,10 @@ pub struct PrintOutputFormat {
 }
 
 impl PrintOutputFormat {
-    pub fn new(field_types: Vec<u8>) -> Self {
-        PrintOutputFormat { field_types }
+    pub fn new(field_types: &[u8]) -> Self {
+        PrintOutputFormat {
+            field_types: field_types.to_vec(),
+        }
     }
 }
 
