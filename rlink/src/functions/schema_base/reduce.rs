@@ -377,7 +377,7 @@ impl Aggregation for PctU64 {
 }
 
 #[derive(Debug)]
-pub struct ColumnBaseReduceFunction {
+pub struct SchemaBaseReduceFunction {
     field_types: Vec<u8>,
     val_field_types: Vec<u8>,
 
@@ -386,7 +386,7 @@ pub struct ColumnBaseReduceFunction {
     agg_operators: Vec<Box<dyn Aggregation>>,
 }
 
-impl ColumnBaseReduceFunction {
+impl SchemaBaseReduceFunction {
     pub fn new(agg_operators: Vec<Box<dyn Aggregation>>, field_types: &[u8]) -> Self {
         let val_field_types: Vec<u8> = agg_operators
             .iter()
@@ -402,7 +402,7 @@ impl ColumnBaseReduceFunction {
         let val_len: usize = agg_operators.iter().map(|x| x.len()).sum();
 
         // let val_len = val_data_types.len() * 8;
-        ColumnBaseReduceFunction {
+        SchemaBaseReduceFunction {
             field_types: field_types.to_vec(),
             val_field_types,
             val_len,
@@ -411,13 +411,13 @@ impl ColumnBaseReduceFunction {
     }
 }
 
-impl FunctionSchema for ColumnBaseReduceFunction {
+impl FunctionSchema for SchemaBaseReduceFunction {
     fn get_schema_types(&self) -> Vec<u8> {
         self.val_field_types.clone()
     }
 }
 
-impl ReduceFunction for ColumnBaseReduceFunction {
+impl ReduceFunction for SchemaBaseReduceFunction {
     fn open(&mut self, _context: &Context) {}
 
     fn reduce(&self, value: Option<&mut Record>, record: &mut Record) -> Record {
@@ -456,8 +456,8 @@ impl ReduceFunction for ColumnBaseReduceFunction {
     fn close(&mut self) {}
 }
 
-impl Function for ColumnBaseReduceFunction {
+impl Function for SchemaBaseReduceFunction {
     fn get_name(&self) -> &str {
-        "ColumnBaseReduceFunction"
+        "SchemaBaseReduceFunction"
     }
 }
