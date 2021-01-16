@@ -12,14 +12,14 @@ use rlink::functions::column_base_function::key_selector::ColumnBaseKeySelector;
 use rlink::functions::column_base_function::reduce::{sum_i64, ColumnBaseReduceFunction};
 use rlink::functions::column_base_function::timestamp_assigner::ColumnBaseTimestampAssigner;
 use rlink::functions::column_base_function::FunctionSchema;
+use rlink::functions::print_output_format::PrintOutputFormat;
+use rlink::functions::round_robin_flat_map::RoundRobinFlagMapFunction;
 
 use crate::buffer_gen::model;
 use crate::buffer_gen::model::FIELD_TYPE;
 use crate::job::functions::{
-    ConfigInputFormat, MyCoProcessFunction, MyFilterFunction, MyFlatMapFunction, MyOutputFormat,
-    TestInputFormat,
+    ConfigInputFormat, MyCoProcessFunction, MyFilterFunction, MyFlatMapFunction, TestInputFormat,
 };
-use rlink::functions::round_robin_flat_map::RoundRobinFlagMapFunction;
 
 #[derive(Clone, Debug)]
 pub struct MyStreamJob {}
@@ -74,6 +74,6 @@ impl StreamJob for MyStreamJob {
                 None,
             ))
             .reduce(reduce_function, 2)
-            .add_sink(MyOutputFormat::new(output_schema_types));
+            .add_sink(PrintOutputFormat::new(output_schema_types));
     }
 }

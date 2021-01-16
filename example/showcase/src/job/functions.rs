@@ -1,14 +1,12 @@
-use crate::buffer_gen::{config, model};
 use chrono::{DateTime, Utc};
 use rlink::api::element::Record;
 use rlink::api::function::{
     CoProcessFunction, Context, FilterFunction, FlatMapFunction, InputFormat, InputSplit,
-    InputSplitSource, OutputFormat,
+    InputSplitSource,
 };
 use rlink::api::properties::Properties;
-use rlink::api::window::Window;
-use rlink::utils::date_time::{fmt_date_time, FMT_DATE_TIME_1};
-use std::time::Duration;
+
+use crate::buffer_gen::{config, model};
 
 #[derive(Debug, Function)]
 pub struct TestInputFormat {
@@ -255,40 +253,6 @@ impl FilterFunction for MyFilterFunction {
 
     fn filter(&self, _t: &mut Record) -> bool {
         true
-    }
-
-    fn close(&mut self) {}
-}
-
-#[derive(Debug, Function)]
-pub struct MyOutputFormat {
-    date_type: Vec<u8>,
-}
-
-impl MyOutputFormat {
-    pub fn new(date_type: Vec<u8>) -> Self {
-        MyOutputFormat { date_type }
-    }
-}
-
-impl OutputFormat for MyOutputFormat {
-    fn open(&mut self, _context: &Context) {}
-
-    fn write_record(&mut self, mut record: Record) {
-        // info!("{}:write_record", self.get_name());
-
-        let window_time = {
-            let min_timestamp = record.get_trigger_window().unwrap().min_timestamp();
-            fmt_date_time(Duration::from_millis(min_timestamp), FMT_DATE_TIME_1)
-        };
-
-        let mut reader = record.get_reader(self.date_type.as_slice());
-        info!(
-            "Record output : 0:{}, 1:{}, window_min_ts:{}",
-            reader.get_str(0).unwrap(),
-            reader.get_i64(1).unwrap(),
-            window_time,
-        );
     }
 
     fn close(&mut self) {}
