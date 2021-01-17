@@ -3,12 +3,12 @@
 
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
-use std::error::Error;
 use std::fmt::Debug;
 use std::ops::Index;
 
 use daggy::{Dag, NodeIndex, Walker};
 use serde::Serialize;
+use thiserror::Error;
 
 use crate::api::function::InputSplit;
 use crate::api::operator::StreamOperatorWrap;
@@ -86,42 +86,24 @@ impl std::fmt::Display for OperatorType {
     }
 }
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum DagError {
+    #[error("source not found")]
     SourceNotFound,
+    #[error("source not at staring")]
     SourceNotAtStarting,
+    #[error("source not at ending")]
     SinkNotAtEnding,
+    #[error("the operator is not combine operator")]
     NotCombineOperator,
-    // ChildNodeNotFound(OperatorType),
+    #[error("parent operator not found")]
     ParentOperatorNotFound,
-    // ParallelismInheritUnsupported(OperatorType),
+    #[error("child not found in a pipeline job")]
     ChildNotFoundInPipeline,
+    #[error("multi-children in a pipeline job")]
     MultiChildrenInPipeline,
-
+    #[error("illegal Vec<InputSplit> len. {0}")]
     IllegalInputSplitSize(String),
-}
-
-impl Error for DagError {}
-
-impl std::fmt::Display for DagError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DagError::SourceNotFound => write!(f, "SourceNotFound"),
-            DagError::SourceNotAtStarting => write!(f, "SourceNotAtStarting"),
-            DagError::SinkNotAtEnding => write!(f, "SinkNotAtEnding"),
-            DagError::NotCombineOperator => write!(f, "NotCombineOperator"),
-            // DagError::ChildNodeNotFound(s) => write!(f, "ChildNodeNotFound({})", s),
-            DagError::ParentOperatorNotFound => write!(f, "ParentOperatorNotFound"),
-            // DagError::ParallelismInheritUnsupported(s) => {
-            //     write!(f, "ParallelismInheritUnsupported({})", s)
-            // }
-            DagError::ChildNotFoundInPipeline => write!(f, "ChildNotFoundInPipeline"),
-            DagError::MultiChildrenInPipeline => write!(f, "MultiChildrenInPipeline"),
-            DagError::IllegalInputSplitSize(arg) => {
-                write!(f, "IllegalInputSplitSize({})", arg)
-            }
-        }
-    }
 }
 
 pub(crate) trait Label {
