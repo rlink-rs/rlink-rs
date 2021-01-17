@@ -2,7 +2,7 @@ use std::ops::Deref;
 use std::sync::RwLock;
 use std::time::Duration;
 
-use crate::api::metadata::MetadataStorageMode;
+use crate::api::cluster::MetadataStorageMode;
 use crate::runtime::ApplicationDescriptor;
 use crate::storage::metadata::{loop_read_job_descriptor, MetadataStorageWrap};
 use crate::utils;

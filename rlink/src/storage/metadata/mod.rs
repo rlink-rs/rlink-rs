@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt::Debug;
 
-use crate::api::metadata::MetadataStorageMode;
+use crate::api::cluster::MetadataStorageMode;
 use crate::runtime::{ApplicationDescriptor, TaskManagerStatus};
 use crate::storage::metadata::mem_metadata_storage::MemoryMetadataStorage;
 

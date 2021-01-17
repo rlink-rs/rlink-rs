@@ -3,9 +3,9 @@ use std::ops::Deref;
 use std::time::Duration;
 
 use crate::api::checkpoint::CheckpointHandle;
+use crate::api::cluster::MetadataStorageMode;
 use crate::api::cluster::TaskResourceInfo;
 use crate::api::env::{StreamExecutionEnvironment, StreamJob};
-use crate::api::metadata::MetadataStorageMode;
 use crate::api::properties::{Properties, SYSTEM_CLUSTER_MODE};
 use crate::dag::DagManager;
 use crate::deployment::ResourceManager;
@@ -49,12 +49,7 @@ where
         resource_manager: R,
         stream_env: StreamExecutionEnvironment,
     ) -> Self {
-        let metadata_storage_mode = {
-            let job_id = context.application_id.as_str();
-            let mode = context.cluster_config.metadata_storage_mode.as_str();
-            let endpoints = &context.cluster_config.metadata_storage_endpoints;
-            MetadataStorageMode::from(mode, endpoints, job_id)
-        };
+        let metadata_storage_mode = context.cluster_config.metadata_storage_mode.clone();
 
         CoordinatorTask {
             context,

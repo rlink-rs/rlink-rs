@@ -4,15 +4,26 @@ use std::io::Read;
 use std::path::PathBuf;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", content = "param")]
+pub enum MetadataStorageMode {
+    Memory,
+}
+
+impl std::fmt::Display for MetadataStorageMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MetadataStorageMode::Memory => write!(f, "Memory"),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ClusterConfig {
     pub application_manager_address: Vec<String>,
 
     /// metadata storage mode
     /// use for rlink
-    pub metadata_storage_mode: String,
-    /// metadata storage arguments
-    /// use for rlink
-    pub metadata_storage_endpoints: Vec<String>,
+    pub metadata_storage_mode: MetadataStorageMode,
 
     pub task_manager_bind_ip: String,
     pub task_manager_work_dir: String,
@@ -22,8 +33,7 @@ impl ClusterConfig {
     pub fn new_local() -> Self {
         ClusterConfig {
             application_manager_address: Vec::new(),
-            metadata_storage_mode: "Memory".to_string(),
-            metadata_storage_endpoints: vec![],
+            metadata_storage_mode: MetadataStorageMode::Memory,
 
             task_manager_bind_ip: "".to_string(),
             task_manager_work_dir: "./".to_string(),

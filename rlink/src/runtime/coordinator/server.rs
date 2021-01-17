@@ -6,8 +6,8 @@ use actix_web::{middleware, web, App, Error, HttpResponse, HttpServer};
 use rand::prelude::*;
 
 use crate::api::checkpoint::Checkpoint;
+use crate::api::cluster::MetadataStorageMode;
 use crate::api::cluster::{ResponseCode, StdResponse};
-use crate::api::metadata::MetadataStorageMode;
 use crate::dag::{DagManager, JsonDag};
 use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
 use crate::runtime::TaskManagerStatus;

@@ -5,7 +5,6 @@ pub mod data_stream;
 pub mod element;
 pub mod env;
 pub mod function;
-pub mod metadata;
 pub mod operator;
 pub mod properties;
 pub mod runtime;
