@@ -44,7 +44,7 @@ pub(crate) struct WorkerManagerInstance {
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub(crate) enum OperatorType {
     Source,
-    Map,
+    FlatMap,
     Filter,
     CoProcess,
     KeyBy,
@@ -58,7 +58,7 @@ impl<'a> From<&'a StreamOperatorWrap> for OperatorType {
     fn from(op: &'a StreamOperatorWrap) -> Self {
         match op {
             StreamOperatorWrap::StreamSource(_) => OperatorType::Source,
-            StreamOperatorWrap::StreamMap(_) => OperatorType::Map,
+            StreamOperatorWrap::StreamFlatMap(_) => OperatorType::FlatMap,
             StreamOperatorWrap::StreamFilter(_) => OperatorType::Filter,
             StreamOperatorWrap::StreamCoProcess(_) => OperatorType::CoProcess,
             StreamOperatorWrap::StreamKeyBy(_) => OperatorType::KeyBy,
@@ -74,7 +74,7 @@ impl std::fmt::Display for OperatorType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             OperatorType::Source => write!(f, "Source"),
-            OperatorType::Map => write!(f, "Map"),
+            OperatorType::FlatMap => write!(f, "Map"),
             OperatorType::Filter => write!(f, "Filter"),
             OperatorType::CoProcess => write!(f, "CoProcess"),
             OperatorType::KeyBy => write!(f, "KeyBy"),

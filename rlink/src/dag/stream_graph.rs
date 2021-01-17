@@ -131,7 +131,7 @@ impl RawStreamGraph {
 
     fn create_virtual_flat_map(&mut self, parallelism: u16) -> StreamOperatorWrap {
         let map_format = Box::new(KeyedStateFlatMapFunction::new());
-        StreamOperatorWrap::StreamMap(StreamOperator::new(
+        StreamOperatorWrap::StreamFlatMap(StreamOperator::new(
             parallelism,
             FunctionCreator::System,
             map_format,
@@ -310,7 +310,7 @@ impl RawStreamGraph {
     ) -> Result<bool, DagError> {
         match parent_operator_type {
             OperatorType::Source => match operator_type {
-                OperatorType::Map
+                OperatorType::FlatMap
                 | OperatorType::Filter
                 | OperatorType::WatermarkAssigner
                 | OperatorType::KeyBy
@@ -318,9 +318,9 @@ impl RawStreamGraph {
                 OperatorType::Source => Err(DagError::SourceNotAtStarting),
                 _ => Ok(false),
             },
-            OperatorType::Map | OperatorType::Filter | OperatorType::WatermarkAssigner => {
+            OperatorType::FlatMap | OperatorType::Filter | OperatorType::WatermarkAssigner => {
                 match operator_type {
-                    OperatorType::Map
+                    OperatorType::FlatMap
                     | OperatorType::Filter
                     | OperatorType::WatermarkAssigner
                     | OperatorType::KeyBy

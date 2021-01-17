@@ -76,7 +76,7 @@ where
 #[derive(Debug)]
 pub enum StreamOperatorWrap {
     StreamSource(StreamOperator<dyn InputFormat>),
-    StreamMap(StreamOperator<dyn FlatMapFunction>),
+    StreamFlatMap(StreamOperator<dyn FlatMapFunction>),
     StreamFilter(StreamOperator<dyn FilterFunction>),
     StreamCoProcess(StreamOperator<dyn CoProcessFunction>),
     StreamKeyBy(StreamOperator<dyn KeySelectorFunction>),
@@ -98,7 +98,7 @@ impl StreamOperatorWrap {
 
     pub fn new_map(map_fn: Box<dyn FlatMapFunction>) -> Self {
         let operator = StreamOperator::new(DEFAULT_PARALLELISM, FunctionCreator::User, map_fn);
-        StreamOperatorWrap::StreamMap(operator)
+        StreamOperatorWrap::StreamFlatMap(operator)
     }
 
     pub fn new_filter(filter_fn: Box<dyn FilterFunction>) -> Self {
@@ -178,7 +178,7 @@ impl StreamOperatorWrap {
     }
 
     pub fn is_map(&self) -> bool {
-        if let StreamOperatorWrap::StreamMap(_stream_map) = self {
+        if let StreamOperatorWrap::StreamFlatMap(_stream_map) = self {
             return true;
         }
         false
@@ -203,7 +203,7 @@ impl TStreamOperator for StreamOperatorWrap {
     fn get_operator_name(&self) -> &str {
         match self {
             StreamOperatorWrap::StreamSource(op) => op.get_operator_name(),
-            StreamOperatorWrap::StreamMap(op) => op.get_operator_name(),
+            StreamOperatorWrap::StreamFlatMap(op) => op.get_operator_name(),
             StreamOperatorWrap::StreamFilter(op) => op.get_operator_name(),
             StreamOperatorWrap::StreamCoProcess(op) => op.get_operator_name(),
             StreamOperatorWrap::StreamKeyBy(op) => op.get_operator_name(),
@@ -217,7 +217,7 @@ impl TStreamOperator for StreamOperatorWrap {
     fn get_parallelism(&self) -> u16 {
         match self {
             StreamOperatorWrap::StreamSource(op) => op.get_parallelism(),
-            StreamOperatorWrap::StreamMap(op) => op.get_parallelism(),
+            StreamOperatorWrap::StreamFlatMap(op) => op.get_parallelism(),
             StreamOperatorWrap::StreamFilter(op) => op.get_parallelism(),
             StreamOperatorWrap::StreamCoProcess(op) => op.get_parallelism(),
             StreamOperatorWrap::StreamKeyBy(op) => op.get_parallelism(),
@@ -231,7 +231,7 @@ impl TStreamOperator for StreamOperatorWrap {
     fn get_fn_creator(&self) -> FunctionCreator {
         match self {
             StreamOperatorWrap::StreamSource(op) => op.get_fn_creator(),
-            StreamOperatorWrap::StreamMap(op) => op.get_fn_creator(),
+            StreamOperatorWrap::StreamFlatMap(op) => op.get_fn_creator(),
             StreamOperatorWrap::StreamFilter(op) => op.get_fn_creator(),
             StreamOperatorWrap::StreamCoProcess(op) => op.get_fn_creator(),
             StreamOperatorWrap::StreamKeyBy(op) => op.get_fn_creator(),

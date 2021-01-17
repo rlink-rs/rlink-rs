@@ -154,7 +154,7 @@ where
                     let op: Box<dyn Runnable> = Box::new(op);
                     op
                 }
-                StreamOperatorWrap::StreamMap(stream_operator) => {
+                StreamOperatorWrap::StreamFlatMap(stream_operator) => {
                     let op = FlatMapRunnable::new(operator_id, stream_operator, None);
                     let op: Box<dyn Runnable> = Box::new(op);
                     op
