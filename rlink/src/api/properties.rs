@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::num::ParseIntError;
+use std::convert::TryFrom;
 use std::str::FromStr;
 use std::time::Duration;
 
@@ -10,21 +10,21 @@ pub type ClusterMode = crate::runtime::ClusterMode;
 
 pub trait SystemProperties {
     fn set_metadata_mode(&mut self, metadata_storage_mode: MetadataStorageMode);
-    fn get_metadata_mode(&self) -> Result<MetadataStorageMode, PropertiesError>;
+    fn get_metadata_mode(&self) -> anyhow::Result<MetadataStorageMode>;
 
     fn set_keyed_state_backend(&mut self, state_backend: KeyedStateBackend);
-    fn get_keyed_state_backend(&self) -> Result<KeyedStateBackend, PropertiesError>;
+    fn get_keyed_state_backend(&self) -> anyhow::Result<KeyedStateBackend>;
 
     fn set_operator_state_backend(&mut self, state_backend: OperatorStateBackend);
-    fn get_operator_state_backend(&self) -> Result<OperatorStateBackend, PropertiesError>;
+    fn get_operator_state_backend(&self) -> anyhow::Result<OperatorStateBackend>;
 
     fn set_checkpoint_internal(&mut self, internal: Duration);
-    fn get_checkpoint_internal(&self) -> Result<Duration, PropertiesError>;
+    fn get_checkpoint_internal(&self) -> anyhow::Result<Duration>;
 
     fn set_checkpoint(&mut self, mode: CheckpointBackend);
-    fn get_checkpoint(&self) -> Result<CheckpointBackend, PropertiesError>;
+    fn get_checkpoint(&self) -> anyhow::Result<CheckpointBackend>;
 
-    fn get_cluster_mode(&self) -> ClusterMode;
+    fn get_cluster_mode(&self) -> anyhow::Result<ClusterMode>;
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -51,10 +51,10 @@ impl Properties {
         self.properties.insert(key, value);
     }
 
-    pub fn get_string(&self, key: &str) -> Result<String, PropertiesError> {
+    pub fn get_string(&self, key: &str) -> anyhow::Result<String> {
         match self.properties.get(key) {
             Some(v) => Ok(v.clone()),
-            None => Err(PropertiesError::None),
+            None => Err(anyhow!("`{}` field not found", key)),
         }
     }
 
@@ -62,10 +62,10 @@ impl Properties {
         self.set_string(key.to_string(), value.to_string());
     }
 
-    pub fn get_i32(&self, key: &str) -> Result<i32, PropertiesError> {
+    pub fn get_i32(&self, key: &str) -> anyhow::Result<i32> {
         match self.properties.get(key) {
-            Some(v) => i32::from_str(v).map_err(|e| PropertiesError::from(e)),
-            None => Err(PropertiesError::None),
+            Some(v) => i32::from_str(v).map_err(|e| anyhow!(e)),
+            None => Err(anyhow!("`{}` field not found", key)),
         }
     }
 
@@ -73,137 +73,99 @@ impl Properties {
         self.set_string(key.to_string(), value.to_string());
     }
 
-    pub fn get_u32(&self, key: &str) -> Result<u32, PropertiesError> {
+    pub fn get_u32(&self, key: &str) -> anyhow::Result<u32> {
         match self.properties.get(key) {
-            Some(v) => u32::from_str(v).map_err(|e| PropertiesError::from(e)),
-            None => Err(PropertiesError::None),
+            Some(v) => u32::from_str(v).map_err(|e| anyhow!(e)),
+            None => Err(anyhow!("`{}` field not found", key)),
         }
     }
 
-    pub fn get_i64(&self, key: &str) -> Result<i64, PropertiesError> {
+    pub fn set_i64(&mut self, key: &str, value: i64) {
+        self.set_string(key.to_string(), value.to_string());
+    }
+
+    pub fn get_i64(&self, key: &str) -> anyhow::Result<i64> {
         match self.properties.get(key) {
-            Some(v) => i64::from_str(v).map_err(|e| PropertiesError::from(e)),
-            None => Err(PropertiesError::None),
+            Some(v) => i64::from_str(v).map_err(|e| anyhow!(e)),
+            None => Err(anyhow!("`{}` field not found", key)),
         }
     }
 
-    pub fn get_u64(&self, key: &str) -> Result<u64, PropertiesError> {
+    pub fn set_u64(&mut self, key: &str, value: u64) {
+        self.set_string(key.to_string(), value.to_string());
+    }
+
+    pub fn get_u64(&self, key: &str) -> anyhow::Result<u64> {
         match self.properties.get(key) {
-            Some(v) => u64::from_str(v).map_err(|e| PropertiesError::from(e)),
-            None => Err(PropertiesError::None),
+            Some(v) => u64::from_str(v).map_err(|e| anyhow!(e)),
+            None => Err(anyhow!("`{}` field not found", key)),
         }
     }
 }
 
+pub(crate) const SYSTEM_METADATA_STORAGE_MODE: &str = "SYSTEM_METADATA_STORAGE_MODE";
+pub(crate) const SYSTEM_KEYED_STATE_BACKEND: &str = "SYSTEM_KEYED_STATE_BACKEND";
+pub(crate) const SYSTEM_OPERATOR_STATE_BACKEND: &str = "SYSTEM_OPERATOR_STATE_BACKEND";
+pub(crate) const SYSTEM_CHECKPOINT: &str = "SYSTEM_CHECKPOINT";
+pub(crate) const SYSTEM_CHECKPOINT_INTERNAL: &str = "SYSTEM_CHECKPOINT_INTERNAL";
 pub(crate) const SYSTEM_CLUSTER_MODE: &str = "SYSTEM_CLUSTER_MODE";
 
 impl SystemProperties for Properties {
     fn set_metadata_mode(&mut self, metadata_storage_mode: MetadataStorageMode) {
         let value = serde_json::to_string(&metadata_storage_mode).unwrap();
-        self.set_string("SYSTEM_METADATA_STORAGE_MODE".to_string(), value)
+        self.set_string(SYSTEM_METADATA_STORAGE_MODE.to_string(), value)
     }
 
-    fn get_metadata_mode(&self) -> Result<MetadataStorageMode, PropertiesError> {
-        match self.get_string("SYSTEM_METADATA_STORAGE_MODE") {
-            Ok(value) => serde_json::from_str(value.as_str()).map_err(|e| PropertiesError::from(e)),
-            Err(e) => Err(e),
-        }
+    fn get_metadata_mode(&self) -> anyhow::Result<MetadataStorageMode> {
+        let value = self.get_string(SYSTEM_METADATA_STORAGE_MODE)?;
+        serde_json::from_str(value.as_str()).map_err(|e| anyhow!(e))
     }
 
     fn set_keyed_state_backend(&mut self, state_backend: KeyedStateBackend) {
         let value = serde_json::to_string(&state_backend).unwrap();
-        self.set_string("SYSTEM_KEYED_STATE_BACKEND".to_string(), value)
+        self.set_string(SYSTEM_KEYED_STATE_BACKEND.to_string(), value)
     }
 
-    fn get_keyed_state_backend(&self) -> Result<KeyedStateBackend, PropertiesError> {
-        match self.get_string("SYSTEM_KEYED_STATE_BACKEND") {
-            Ok(value) => serde_json::from_str(value.as_str()).map_err(|e| PropertiesError::from(e)),
-            Err(e) => Err(e),
-        }
+    fn get_keyed_state_backend(&self) -> anyhow::Result<KeyedStateBackend> {
+        let value = self.get_string(SYSTEM_KEYED_STATE_BACKEND)?;
+        serde_json::from_str(value.as_str()).map_err(|e| anyhow!(e))
     }
 
     fn set_operator_state_backend(&mut self, state_backend: OperatorStateBackend) {
         let value = serde_json::to_string(&state_backend).unwrap();
-        self.set_string("SYSTEM_OPERATOR_STATE_BACKEND".to_string(), value)
+        self.set_string(SYSTEM_OPERATOR_STATE_BACKEND.to_string(), value)
     }
 
-    fn get_operator_state_backend(&self) -> Result<OperatorStateBackend, PropertiesError> {
-        match self.get_string("SYSTEM_OPERATOR_STATE_BACKEND") {
-            Ok(value) => serde_json::from_str(value.as_str()).map_err(|e| PropertiesError::from(e)),
-            Err(e) => Err(e),
-        }
+    fn get_operator_state_backend(&self) -> anyhow::Result<OperatorStateBackend> {
+        let value = self.get_string(SYSTEM_OPERATOR_STATE_BACKEND)?;
+        serde_json::from_str(value.as_str()).map_err(|e| anyhow!(e))
     }
 
     fn set_checkpoint_internal(&mut self, internal: Duration) {
         let value = format!("{}", internal.as_secs());
-        self.set_string("SYSTEM_CHECKPOINT_INTERNAL".to_string(), value)
+        self.set_string(SYSTEM_CHECKPOINT_INTERNAL.to_string(), value)
     }
 
-    fn get_checkpoint_internal(&self) -> Result<Duration, PropertiesError> {
-        match self.get_string("SYSTEM_CHECKPOINT_INTERNAL") {
-            Ok(value) => u64::from_str(value.as_str())
-                .map(|v| Duration::from_secs(v))
-                .map_err(|e| PropertiesError::from(e)),
-            Err(e) => Err(e),
-        }
+    fn get_checkpoint_internal(&self) -> anyhow::Result<Duration> {
+        let value = self.get_string(SYSTEM_CHECKPOINT_INTERNAL)?;
+        u64::from_str(value.as_str())
+            .map(|v| Duration::from_secs(v))
+            .map_err(|e| anyhow!(e))
     }
 
     fn set_checkpoint(&mut self, mode: CheckpointBackend) {
         let value = serde_json::to_string(&mode).unwrap();
-        self.set_string("SYSTEM_CHECKPOINT".to_string(), value);
+        self.set_string(SYSTEM_CHECKPOINT.to_string(), value);
     }
 
-    fn get_checkpoint(&self) -> Result<CheckpointBackend, PropertiesError> {
-        match self.get_string("SYSTEM_CHECKPOINT") {
-            Ok(value) => serde_json::from_str(value.as_str()).map_err(|e| PropertiesError::from(e)),
-            Err(e) => Err(e),
-        }
+    fn get_checkpoint(&self) -> anyhow::Result<CheckpointBackend> {
+        let value = self.get_string(SYSTEM_CHECKPOINT)?;
+        serde_json::from_str(value.as_str()).map_err(|e| anyhow!(e))
     }
 
-    fn get_cluster_mode(&self) -> ClusterMode {
-        match self.get_string(SYSTEM_CLUSTER_MODE) {
-            Ok(value) => ClusterMode::from(value),
-            Err(e) => panic!("ClusterMode not found. {}", e),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum PropertiesError {
-    None,
-    Io(std::io::Error),
-    ParseIntError(ParseIntError),
-    JsonParseError(serde_json::Error),
-}
-
-impl std::fmt::Display for PropertiesError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            PropertiesError::None => write!(f, "None error"),
-            PropertiesError::Io(ref err) => write!(f, "IO error: {}", err),
-            PropertiesError::ParseIntError(ref err) => write!(f, "ParseIntError error: {}", err),
-            PropertiesError::JsonParseError(ref err) => write!(f, "JsonParseError error: {}", err),
-        }
-    }
-}
-
-impl std::error::Error for PropertiesError {}
-
-impl From<std::io::Error> for PropertiesError {
-    fn from(e: std::io::Error) -> Self {
-        PropertiesError::Io(e)
-    }
-}
-
-impl From<ParseIntError> for PropertiesError {
-    fn from(e: ParseIntError) -> Self {
-        PropertiesError::ParseIntError(e)
-    }
-}
-
-impl From<serde_json::Error> for PropertiesError {
-    fn from(e: serde_json::Error) -> Self {
-        PropertiesError::JsonParseError(e)
+    fn get_cluster_mode(&self) -> anyhow::Result<ClusterMode> {
+        let value = self.get_string(SYSTEM_CLUSTER_MODE)?;
+        ClusterMode::try_from(value.as_str())
     }
 }
 
