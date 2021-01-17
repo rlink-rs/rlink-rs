@@ -581,43 +581,6 @@ mod tests {
     use crate::api::element::types;
     use crate::api::element::{Element, Record, Serde, StreamStatus, Watermark};
 
-    // #[test]
-    // pub fn record_test() {
-    //     let mut row = Record::new();
-    //
-    //     let data_types = vec![
-    //         types::I32,
-    //         types::U32,
-    //         types::U64,
-    //         types::I64,
-    //         types::BYTES
-    //     ];
-    //
-    //     row.set_string(0, "field".to_string());
-    //     row.set_i32(1, 1);
-    //     row.set_u32(2, 2);
-    //     row.set_i64(3, 3);
-    //     row.set_u64(4, 4);
-    //     row.set_f32(5, 2.12312);
-    //     row.set_f64(6, 12343.123213);
-    //     row.set_null(7);
-    //     row.set_str(8, "");
-    //
-    //     println!(
-    //         "row {},{},{},{},{},{},{},{:?},{}",
-    //         row.get_string(0).unwrap(),
-    //         row.get_i32(1).unwrap(),
-    //         row.get_u32(2).unwrap(),
-    //         row.get_i64(3).unwrap(),
-    //         row.get_u64(4).unwrap(),
-    //         row.get_f32(5).unwrap(),
-    //         row.get_f64(6).unwrap(),
-    //         row.get_string(7),
-    //         row.get_string(8).unwrap(),
-    //     );
-    //     println!("arity:{}", row.get_arity())
-    // }
-
     #[test]
     pub fn serde_element_record_test() {
         let mut record = Record::new();

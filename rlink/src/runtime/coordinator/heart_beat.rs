@@ -2,7 +2,7 @@ use std::ops::Deref;
 use std::sync::RwLock;
 use std::time::Duration;
 
-use crate::api::cluster::MetadataStorageMode;
+use crate::api::cluster::MetadataStorageType;
 use crate::runtime::ApplicationDescriptor;
 use crate::storage::metadata::{loop_read_job_descriptor, MetadataStorageWrap};
 use crate::utils;
@@ -23,7 +23,7 @@ pub(crate) fn get_global_job_descriptor() -> Option<ApplicationDescriptor> {
     j.deref().clone()
 }
 
-pub(crate) fn start_heart_beat_timer(metadata_storage_mode: MetadataStorageMode) {
+pub(crate) fn start_heart_beat_timer(metadata_storage_mode: MetadataStorageType) {
     let metadata_storage = MetadataStorageWrap::new(&metadata_storage_mode);
     loop {
         std::thread::sleep(Duration::from_secs(5));

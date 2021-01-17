@@ -426,7 +426,9 @@ mod tests {
             None
         }
 
-        fn close(&mut self) {}
+        fn close(&mut self) -> api::Result<()> {
+            Ok(())
+        }
     }
 
     #[derive(Serialize, Deserialize, Debug)]
@@ -439,13 +441,17 @@ mod tests {
     }
 
     impl FlatMapFunction for MyFlatMapFunction {
-        fn open(&mut self, _context: &Context) {}
+        fn open(&mut self, _context: &Context) -> api::Result<()> {
+            Ok(())
+        }
 
         fn flat_map(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>> {
             Box::new(vec![record].into_iter())
         }
 
-        fn close(&mut self) {}
+        fn close(&mut self) -> api::Result<()> {
+            Ok(())
+        }
     }
 
     impl Function for MyFlatMapFunction {
@@ -489,14 +495,18 @@ mod tests {
     }
 
     impl KeySelectorFunction for MyKeySelectorFunction {
-        fn open(&mut self, _context: &Context) {}
+        fn open(&mut self, _context: &Context) -> api::Result<()> {
+            Ok(())
+        }
 
         fn get_key(&self, _record: &mut Record) -> Record {
             let record_rt = Record::new();
             record_rt
         }
 
-        fn close(&mut self) {}
+        fn close(&mut self) -> api::Result<()> {
+            Ok(())
+        }
     }
 
     impl Function for MyKeySelectorFunction {
@@ -515,13 +525,17 @@ mod tests {
     }
 
     impl ReduceFunction for MyReduceFunction {
-        fn open(&mut self, _context: &Context) {}
+        fn open(&mut self, _context: &Context) -> api::Result<()> {
+            Ok(())
+        }
 
         fn reduce(&self, _state_value: Option<&mut Record>, record: &mut Record) -> Record {
             record.clone()
         }
 
-        fn close(&mut self) {}
+        fn close(&mut self) -> api::Result<()> {
+            Ok(())
+        }
     }
 
     impl Function for MyReduceFunction {
@@ -542,11 +556,15 @@ mod tests {
     }
 
     impl OutputFormat for MyOutputFormat {
-        fn open(&mut self, _context: &Context) {}
+        fn open(&mut self, _context: &Context) -> api::Result<()> {
+            Ok(())
+        }
 
         fn write_record(&mut self, _record: Record) {}
 
-        fn close(&mut self) {}
+        fn close(&mut self) -> api::Result<()> {
+            Ok(())
+        }
     }
 
     impl Function for MyOutputFormat {
@@ -558,7 +576,9 @@ mod tests {
     pub struct MyCoProcessFunction {}
 
     impl CoProcessFunction for MyCoProcessFunction {
-        fn open(&mut self, _context: &Context) {}
+        fn open(&mut self, _context: &Context) -> api::Result<()> {
+            Ok(())
+        }
 
         fn process_left(&self, record: Record) -> Box<dyn Iterator<Item = Record>> {
             Box::new(vec![record].into_iter())
@@ -572,7 +592,9 @@ mod tests {
             Box::new(vec![].into_iter())
         }
 
-        fn close(&mut self) {}
+        fn close(&mut self) -> api::Result<()> {
+            Ok(())
+        }
     }
 
     impl Function for MyCoProcessFunction {

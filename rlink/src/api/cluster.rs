@@ -5,14 +5,14 @@ use std::path::PathBuf;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", content = "param")]
-pub enum MetadataStorageMode {
+pub enum MetadataStorageType {
     Memory,
 }
 
-impl std::fmt::Display for MetadataStorageMode {
+impl std::fmt::Display for MetadataStorageType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            MetadataStorageMode::Memory => write!(f, "Memory"),
+            MetadataStorageType::Memory => write!(f, "Memory"),
         }
     }
 }
@@ -22,8 +22,7 @@ pub struct ClusterConfig {
     pub application_manager_address: Vec<String>,
 
     /// metadata storage mode
-    /// use for rlink
-    pub metadata_storage_mode: MetadataStorageMode,
+    pub metadata_storage: MetadataStorageType,
 
     pub task_manager_bind_ip: String,
     pub task_manager_work_dir: String,
@@ -33,7 +32,7 @@ impl ClusterConfig {
     pub fn new_local() -> Self {
         ClusterConfig {
             application_manager_address: Vec::new(),
-            metadata_storage_mode: MetadataStorageMode::Memory,
+            metadata_storage: MetadataStorageType::Memory,
 
             task_manager_bind_ip: "".to_string(),
             task_manager_work_dir: "./".to_string(),
@@ -128,5 +127,23 @@ pub struct StdResponse<T> {
 impl<T> StdResponse<T> {
     pub fn new(code: ResponseCode, data: Option<T>) -> Self {
         StdResponse { code, data }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::api::cluster::{ClusterConfig, MetadataStorageType};
+
+    #[test]
+    pub fn ser_cluster_config_test() {
+        let config = ClusterConfig {
+            application_manager_address: vec!["addr_a".to_string(), "addr_b".to_string()],
+            metadata_storage: MetadataStorageType::Memory,
+            task_manager_bind_ip: "ip".to_string(),
+            task_manager_work_dir: "dir".to_string(),
+        };
+
+        let yaml = serde_yaml::to_string(&config).unwrap();
+        println!("{}", yaml);
     }
 }

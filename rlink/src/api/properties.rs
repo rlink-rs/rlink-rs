@@ -4,13 +4,13 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use crate::api::backend::{CheckpointBackend, KeyedStateBackend, OperatorStateBackend};
-use crate::api::cluster::MetadataStorageMode;
+use crate::api::cluster::MetadataStorageType;
 
 pub type ClusterMode = crate::runtime::ClusterMode;
 
 pub trait SystemProperties {
-    fn set_metadata_mode(&mut self, metadata_storage_mode: MetadataStorageMode);
-    fn get_metadata_mode(&self) -> anyhow::Result<MetadataStorageMode>;
+    fn set_metadata_mode(&mut self, metadata_storage_mode: MetadataStorageType);
+    fn get_metadata_mode(&self) -> anyhow::Result<MetadataStorageType>;
 
     fn set_keyed_state_backend(&mut self, state_backend: KeyedStateBackend);
     fn get_keyed_state_backend(&self) -> anyhow::Result<KeyedStateBackend>;
@@ -111,12 +111,12 @@ pub(crate) const SYSTEM_CHECKPOINT_INTERNAL: &str = "SYSTEM_CHECKPOINT_INTERNAL"
 pub(crate) const SYSTEM_CLUSTER_MODE: &str = "SYSTEM_CLUSTER_MODE";
 
 impl SystemProperties for Properties {
-    fn set_metadata_mode(&mut self, metadata_storage_mode: MetadataStorageMode) {
+    fn set_metadata_mode(&mut self, metadata_storage_mode: MetadataStorageType) {
         let value = serde_json::to_string(&metadata_storage_mode).unwrap();
         self.set_string(SYSTEM_METADATA_STORAGE_MODE.to_string(), value)
     }
 
-    fn get_metadata_mode(&self) -> anyhow::Result<MetadataStorageMode> {
+    fn get_metadata_mode(&self) -> anyhow::Result<MetadataStorageType> {
         let value = self.get_string(SYSTEM_METADATA_STORAGE_MODE)?;
         serde_json::from_str(value.as_str()).map_err(|e| anyhow!(e))
     }

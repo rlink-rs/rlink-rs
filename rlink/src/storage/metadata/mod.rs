@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt::Debug;
 
-use crate::api::cluster::MetadataStorageMode;
+use crate::api::cluster::MetadataStorageType;
 use crate::runtime::{ApplicationDescriptor, TaskManagerStatus};
 use crate::storage::metadata::mem_metadata_storage::MemoryMetadataStorage;
 
@@ -37,9 +37,9 @@ pub enum MetadataStorageWrap {
 }
 
 impl MetadataStorageWrap {
-    pub fn new(mode: &MetadataStorageMode) -> Self {
+    pub fn new(mode: &MetadataStorageType) -> Self {
         match mode {
-            MetadataStorageMode::Memory => {
+            MetadataStorageType::Memory => {
                 let storage = MemoryMetadataStorage::new();
                 MetadataStorageWrap::MemoryMetadataStorage(storage)
             }
