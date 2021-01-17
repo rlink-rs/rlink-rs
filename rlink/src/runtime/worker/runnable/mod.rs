@@ -109,9 +109,9 @@ impl RunnableContext {
 }
 
 pub(crate) trait Runnable: Debug {
-    fn open(&mut self, context: &RunnableContext);
+    fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()>;
     fn run(&mut self, element: Element);
-    fn close(&mut self);
+    fn close(&mut self) -> anyhow::Result<()>;
     fn set_next_runnable(&mut self, next_runnable: Option<Box<dyn Runnable>>);
     fn checkpoint(&mut self, checkpoint_id: CheckpointId);
 }

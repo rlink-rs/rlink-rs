@@ -45,15 +45,16 @@ where
         ))
         .spawn(move || {
             let stream_env = StreamExecutionEnvironment::new(application_name);
-            WorkerTask::new(
+            let worker_task = WorkerTask::new(
                 context,
                 task_descriptor,
                 metadata_loader,
                 stream_job,
                 stream_env,
                 window_timer,
-            )
-            .run();
+            );
+            // todo error handle
+            worker_task.run().unwrap();
         })
         .unwrap()
 }
@@ -95,7 +96,7 @@ where
         }
     }
 
-    pub fn run(mut self) {
+    pub fn run(mut self) -> anyhow::Result<()> {
         let application_properties = &self
             .application_descriptor
             .coordinator_manager
@@ -118,13 +119,15 @@ where
         };
 
         info!("open Operator Chain");
-        operator_invoke_chain.open(&runnable_context);
+        operator_invoke_chain.open(&runnable_context)?;
 
         info!("run Operator Chain");
         operator_invoke_chain.run(Element::Record(Record::new()));
 
         info!("close Operator Chain");
-        operator_invoke_chain.close();
+        operator_invoke_chain.close()?;
+
+        Ok(())
     }
 
     fn build_invoke_chain(

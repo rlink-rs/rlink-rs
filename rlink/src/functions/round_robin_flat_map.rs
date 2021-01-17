@@ -16,8 +16,9 @@ impl RoundRobinFlagMapFunction {
 }
 
 impl FlatMapFunction for RoundRobinFlagMapFunction {
-    fn open(&mut self, context: &Context) {
+    fn open(&mut self, context: &Context) -> crate::api::Result<()> {
         self.child_job_parallelism = context.children.len() as u16;
+        Ok(())
     }
 
     fn flat_map(&mut self, mut record: Record) -> Box<dyn Iterator<Item = Record>> {
@@ -31,7 +32,9 @@ impl FlatMapFunction for RoundRobinFlagMapFunction {
         Box::new(vec![record].into_iter())
     }
 
-    fn close(&mut self) {}
+    fn close(&mut self) -> crate::api::Result<()> {
+        Ok(())
+    }
 }
 
 impl Function for RoundRobinFlagMapFunction {

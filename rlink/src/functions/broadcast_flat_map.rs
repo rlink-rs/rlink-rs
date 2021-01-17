@@ -14,12 +14,14 @@ impl BroadcastFlagMapFunction {
 }
 
 impl FlatMapFunction for BroadcastFlagMapFunction {
-    fn open(&mut self, context: &Context) {
+    fn open(&mut self, context: &Context) -> crate::api::Result<()> {
         // if context.children.len() != 1{
         //     panic!("BroadcastFlagMapFunction must has only one child job");
         // }
 
         self.child_job_parallelism = context.children.len() as u16;
+
+        Ok(())
     }
 
     fn flat_map(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>> {
@@ -33,7 +35,9 @@ impl FlatMapFunction for BroadcastFlagMapFunction {
         Box::new(records.into_iter())
     }
 
-    fn close(&mut self) {}
+    fn close(&mut self) -> crate::api::Result<()> {
+        Ok(())
+    }
 }
 
 impl Function for BroadcastFlagMapFunction {

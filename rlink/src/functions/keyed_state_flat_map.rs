@@ -23,7 +23,7 @@ impl KeyedStateFlatMapFunction {
 }
 
 impl FlatMapFunction for KeyedStateFlatMapFunction {
-    fn open(&mut self, context: &Context) {
+    fn open(&mut self, context: &Context) -> crate::api::Result<()> {
         if context.parents.len() != 1 {
             panic!("KeyedStateMap job can only one parent");
         }
@@ -34,6 +34,8 @@ impl FlatMapFunction for KeyedStateFlatMapFunction {
         if let Ok(state_mode) = context.application_properties.get_keyed_state_backend() {
             self.state_mode = state_mode;
         }
+
+        Ok(())
     }
 
     fn flat_map(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>> {
@@ -57,7 +59,9 @@ impl FlatMapFunction for KeyedStateFlatMapFunction {
         }
     }
 
-    fn close(&mut self) {}
+    fn close(&mut self) -> crate::api::Result<()> {
+        Ok(())
+    }
 }
 
 impl Function for KeyedStateFlatMapFunction {

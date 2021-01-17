@@ -418,7 +418,9 @@ impl FunctionSchema for SchemaBaseReduceFunction {
 }
 
 impl ReduceFunction for SchemaBaseReduceFunction {
-    fn open(&mut self, _context: &Context) {}
+    fn open(&mut self, _context: &Context) -> crate::api::Result<()> {
+        Ok(())
+    }
 
     fn reduce(&self, value: Option<&mut Record>, record: &mut Record) -> Record {
         let mut record_rt = Record::with_capacity(self.val_len);
@@ -453,7 +455,9 @@ impl ReduceFunction for SchemaBaseReduceFunction {
         record_rt
     }
 
-    fn close(&mut self) {}
+    fn close(&mut self) -> crate::api::Result<()> {
+        Ok(())
+    }
 }
 
 impl Function for SchemaBaseReduceFunction {

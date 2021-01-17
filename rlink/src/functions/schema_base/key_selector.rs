@@ -27,7 +27,9 @@ impl FunctionSchema for SchemaBaseKeySelector {
 }
 
 impl KeySelectorFunction for SchemaBaseKeySelector {
-    fn open(&mut self, _context: &Context) {}
+    fn open(&mut self, _context: &Context) -> crate::api::Result<()> {
+        Ok(())
+    }
 
     fn get_key(&self, record: &mut Record) -> Record {
         let mut record_key = Record::with_capacity(record.len());
@@ -44,7 +46,9 @@ impl KeySelectorFunction for SchemaBaseKeySelector {
         record_key
     }
 
-    fn close(&mut self) {}
+    fn close(&mut self) -> crate::api::Result<()> {
+        Ok(())
+    }
 }
 
 impl Function for SchemaBaseKeySelector {

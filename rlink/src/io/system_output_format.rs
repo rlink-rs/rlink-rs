@@ -27,7 +27,7 @@ impl SystemOutputFormat {
 }
 
 impl OutputFormat for SystemOutputFormat {
-    fn open(&mut self, context: &Context) {
+    fn open(&mut self, context: &Context) -> crate::api::Result<()> {
         self.task_id = context.task_id;
 
         let parents: Vec<String> = context
@@ -124,6 +124,7 @@ impl OutputFormat for SystemOutputFormat {
                 self.job_senders.push((job_id, task_senders));
             }
         }
+        Ok(())
     }
 
     fn write_record(&mut self, _record: Record) {}
@@ -178,7 +179,9 @@ impl OutputFormat for SystemOutputFormat {
         }
     }
 
-    fn close(&mut self) {}
+    fn close(&mut self) -> crate::api::Result<()> {
+        Ok(())
+    }
 }
 
 impl Function for SystemOutputFormat {

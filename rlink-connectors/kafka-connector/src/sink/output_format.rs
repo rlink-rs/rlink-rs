@@ -1,8 +1,8 @@
 use rdkafka::ClientConfig;
 use rlink::api::element::Record;
 use rlink::api::function::{Context, Function, OutputFormat};
-use rlink::utils;
 use rlink::utils::get_runtime;
+use rlink::{api, utils};
 
 use crate::sink::handover::Handover;
 use crate::sink::producer::KafkaProducerThread;
@@ -25,7 +25,7 @@ impl KafkaOutputFormat {
 }
 
 impl OutputFormat for KafkaOutputFormat {
-    fn open(&mut self, context: &Context) {
+    fn open(&mut self, context: &Context) -> api::Result<()> {
         self.handover = Some(Handover::new(
             self.get_name(),
             self.topic.as_str(),
@@ -42,11 +42,15 @@ impl OutputFormat for KafkaOutputFormat {
                 kafka_consumer.run().await;
             });
         });
+
+        Ok(())
     }
 
     fn write_record(&mut self, record: Record) {
         self.handover.as_ref().unwrap().produce(record);
     }
 
-    fn close(&mut self) {}
+    fn close(&mut self) -> api::Result<()> {
+        Ok(())
+    }
 }

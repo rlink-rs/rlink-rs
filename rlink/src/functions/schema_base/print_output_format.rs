@@ -20,7 +20,9 @@ impl PrintOutputFormat {
 }
 
 impl OutputFormat for PrintOutputFormat {
-    fn open(&mut self, _context: &Context) {}
+    fn open(&mut self, _context: &Context) -> crate::api::Result<()> {
+        Ok(())
+    }
 
     fn write_record(&mut self, mut record: Record) {
         let mut reader = record.as_buffer().as_reader(self.field_types.as_slice());
@@ -69,7 +71,9 @@ impl OutputFormat for PrintOutputFormat {
         );
     }
 
-    fn close(&mut self) {}
+    fn close(&mut self) -> crate::api::Result<()> {
+        Ok(())
+    }
 }
 
 impl Function for PrintOutputFormat {

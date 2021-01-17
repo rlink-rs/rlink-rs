@@ -318,6 +318,7 @@ where
 mod tests {
     use std::time::Duration;
 
+    use crate::api;
     use crate::api::data_stream::CoStream;
     use crate::api::data_stream::{TConnectedStreams, TKeyedStream};
     use crate::api::data_stream::{TDataStream, TWindowedStream};
@@ -431,7 +432,9 @@ mod tests {
     }
 
     impl InputFormat for MyInputFormat {
-        fn open(&mut self, _input_split: InputSplit, _context: &Context) {}
+        fn open(&mut self, _input_split: InputSplit, _context: &Context) -> api::Result<()> {
+            Ok(())
+        }
 
         fn reached_end(&self) -> bool {
             false

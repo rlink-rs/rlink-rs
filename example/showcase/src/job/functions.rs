@@ -7,6 +7,7 @@ use rlink::api::function::{
 use rlink::api::properties::Properties;
 
 use crate::buffer_gen::{config, model};
+use rlink::api;
 
 #[derive(Debug, Function)]
 pub struct TestInputFormat {
@@ -100,7 +101,7 @@ impl TestInputFormat {
 impl InputSplitSource for TestInputFormat {}
 
 impl InputFormat for TestInputFormat {
-    fn open(&mut self, _input_split: InputSplit, context: &Context) {
+    fn open(&mut self, _input_split: InputSplit, context: &Context) -> api::Result<()> {
         let task_number = context.task_id.task_number() as usize;
         let num_tasks = context.task_id.num_tasks() as usize;
 
@@ -110,6 +111,8 @@ impl InputFormat for TestInputFormat {
             .for_each(|i| {
                 self.data.push(data[i].clone());
             });
+
+        Ok(())
     }
 
     fn reached_end(&self) -> bool {
@@ -124,7 +127,9 @@ impl InputFormat for TestInputFormat {
         }
     }
 
-    fn close(&mut self) {}
+    fn close(&mut self) -> api::Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Debug, Function)]
@@ -168,13 +173,14 @@ impl ConfigInputFormat {
 impl InputSplitSource for ConfigInputFormat {}
 
 impl InputFormat for ConfigInputFormat {
-    fn open(&mut self, input_split: InputSplit, _context: &Context) {
+    fn open(&mut self, input_split: InputSplit, _context: &Context) -> api::Result<()> {
         let partition_num = input_split.get_split_number();
         info!("open split number = {}", partition_num);
 
         let data = self.gen_row();
 
         self.data.extend(data);
+        Ok(())
     }
 
     fn reached_end(&self) -> bool {
@@ -189,14 +195,18 @@ impl InputFormat for ConfigInputFormat {
         }
     }
 
-    fn close(&mut self) {}
+    fn close(&mut self) -> api::Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Debug, Function)]
 pub struct MyCoProcessFunction {}
 
 impl CoProcessFunction for MyCoProcessFunction {
-    fn open(&mut self, _context: &Context) {}
+    fn open(&mut self, _context: &Context) -> api::Result<()> {
+        Ok(())
+    }
 
     fn process_left(&self, record: Record) -> Box<dyn Iterator<Item = Record>> {
         Box::new(vec![record].into_iter())
@@ -217,7 +227,9 @@ impl CoProcessFunction for MyCoProcessFunction {
         Box::new(vec![].into_iter())
     }
 
-    fn close(&mut self) {}
+    fn close(&mut self) -> api::Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Debug, Function)]
@@ -230,13 +242,17 @@ impl MyFlatMapFunction {
 }
 
 impl FlatMapFunction for MyFlatMapFunction {
-    fn open(&mut self, _context: &Context) {}
+    fn open(&mut self, _context: &Context) -> api::Result<()> {
+        Ok(())
+    }
 
     fn flat_map(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>> {
         Box::new(vec![record].into_iter())
     }
 
-    fn close(&mut self) {}
+    fn close(&mut self) -> api::Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Debug, Function)]
@@ -249,11 +265,15 @@ impl MyFilterFunction {
 }
 
 impl FilterFunction for MyFilterFunction {
-    fn open(&mut self, _context: &Context) {}
+    fn open(&mut self, _context: &Context) -> api::Result<()> {
+        Ok(())
+    }
 
     fn filter(&self, _t: &mut Record) -> bool {
         true
     }
 
-    fn close(&mut self) {}
+    fn close(&mut self) -> api::Result<()> {
+        Ok(())
+    }
 }

@@ -45,8 +45,8 @@ impl WatermarkAssignerRunnable {
 }
 
 impl Runnable for WatermarkAssignerRunnable {
-    fn open(&mut self, context: &RunnableContext) {
-        self.next_runnable.as_mut().unwrap().open(context);
+    fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
+        self.next_runnable.as_mut().unwrap().open(context)?;
 
         self.task_number = context.task_descriptor.task_id.task_number;
         self.num_tasks = context.task_descriptor.task_id.num_tasks;
@@ -72,6 +72,8 @@ impl Runnable for WatermarkAssignerRunnable {
 
         let metric_name = format!("Watermark_Expire_{}", fn_name);
         register_counter(metric_name.as_str(), tags, self.expire_counter.clone());
+
+        Ok(())
     }
 
     fn run(&mut self, mut element: Element) {
@@ -127,8 +129,8 @@ impl Runnable for WatermarkAssignerRunnable {
         }
     }
 
-    fn close(&mut self) {
-        self.next_runnable.as_mut().unwrap().close();
+    fn close(&mut self) -> anyhow::Result<()> {
+        self.next_runnable.as_mut().unwrap().close()
     }
 
     fn set_next_runnable(&mut self, next_runnable: Option<Box<dyn Runnable>>) {
