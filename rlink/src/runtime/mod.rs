@@ -139,14 +139,16 @@ impl ApplicationDescriptor {
     }
 }
 
-pub fn run<S>(stream_env: StreamExecutionEnvironment, stream_job: S)
+pub fn run<S>(stream_env: StreamExecutionEnvironment, stream_job: S) -> anyhow::Result<()>
 where
     S: StreamJob + 'static,
 {
     panic_notify();
 
-    let context = context::Context::parse_node_arg(stream_env.application_name.as_str());
+    let context = context::Context::parse_node_arg(stream_env.application_name.as_str())?;
     info!("Context: {:?}", context);
 
     cluster::run_task(context, stream_env, stream_job);
+
+    Ok(())
 }

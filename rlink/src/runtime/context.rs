@@ -1,3 +1,4 @@
+use std::error::Error;
 use std::path::PathBuf;
 use std::str::FromStr;
 
@@ -96,34 +97,28 @@ impl Context {
         }
     }
 
-    pub fn parse_node_arg(application_name: &str) -> Context {
-        let bind_ip = utils::ip::get_service_ip()
-            .expect("get service ip error")
-            .to_string();
+    pub fn parse_node_arg(application_name: &str) -> anyhow::Result<Context> {
+        let bind_ip = utils::ip::get_service_ip()?.to_string();
 
         let cluster_mode = match utils::parse_arg("cluster_mode") {
-            Some(value) => ClusterMode::from(value),
-            None => ClusterMode::Local,
+            Ok(value) => ClusterMode::from(value),
+            Err(_e) => ClusterMode::Local,
         };
 
         let manager_type = match utils::parse_arg("manager_type") {
-            Some(manager_type) => ManagerType::from(manager_type),
-            None => ManagerType::Coordinator,
+            Ok(manager_type) => ManagerType::from(manager_type),
+            Err(_e) => ManagerType::Coordinator,
         };
 
         let application_id = match cluster_mode {
             ClusterMode::Local => utils::gen_id(),
-            ClusterMode::Standalone | ClusterMode::YARN => {
-                utils::parse_arg("application_id").expect("`application_id` not found")
-            }
+            ClusterMode::Standalone | ClusterMode::YARN => utils::parse_arg("application_id")?,
         };
 
         let task_manager_id = match manager_type {
             ManagerType::Coordinator => "coordinator".to_string(),
             ManagerType::Standby => "standby".to_string(),
-            ManagerType::Worker => {
-                utils::parse_arg("task_manager_id").expect("`task_manager_id` not found")
-            }
+            ManagerType::Worker => utils::parse_arg("task_manager_id")?,
         };
         set_manager_id(task_manager_id.as_str(), bind_ip.as_str());
 
@@ -131,12 +126,16 @@ impl Context {
             ManagerType::Coordinator => match cluster_mode {
                 ClusterMode::Local => 1,
                 ClusterMode::Standalone | ClusterMode::YARN => {
-                    let num_task_managers = utils::parse_arg("num_task_managers")
-                        .expect("`num_task_managers` argument is not found");
-                    let num_task_managers = u32::from_str(num_task_managers.as_str())
-                        .expect("parse `num_task_managers` to u32 error");
+                    let num_task_managers = utils::parse_arg("num_task_managers")?;
+                    let num_task_managers =
+                        u32::from_str(num_task_managers.as_str()).map_err(|_e| {
+                            anyhow!(
+                                "parse `num_task_managers`=`{}` to u32 error",
+                                num_task_managers
+                            )
+                        })?;
                     if num_task_managers < 1 {
-                        panic!("`num_task_managers` must the [value > 1]")
+                        return Err(anyhow!("`num_task_managers` must the [value > 1]"));
                     }
                     num_task_managers
                 }
@@ -146,12 +145,11 @@ impl Context {
 
         let cluster_config = match cluster_mode {
             ClusterMode::Local => match utils::parse_arg("cluster_config") {
-                Some(cluster_config) => load_config(PathBuf::from(cluster_config)),
-                None => ClusterConfig::new_local(),
+                Ok(cluster_config) => load_config(PathBuf::from(cluster_config)),
+                Err(_e) => ClusterConfig::new_local(),
             },
             ClusterMode::Standalone => {
-                let cluster_config = utils::parse_arg("cluster_config")
-                    .expect("`cluster_config` argument is not found");
+                let cluster_config = utils::parse_arg("cluster_config")?;
                 load_config(PathBuf::from(cluster_config))
             }
             ClusterMode::YARN => ClusterConfig::new_local(),
@@ -160,18 +158,16 @@ impl Context {
         let (worker_process_path, memory_mb, v_cores) = match cluster_mode {
             ClusterMode::YARN => match manager_type {
                 ManagerType::Coordinator => {
-                    let worker_process_path = utils::parse_arg("worker_process_path")
-                        .expect("`worker_process_path` argument is not found");
+                    let worker_process_path = utils::parse_arg("worker_process_path")?;
 
-                    let memory_mb =
-                        utils::parse_arg("memory_mb").expect("`memory_mb` argument is not found");
-                    let memory_mb = usize::from_str(memory_mb.as_str())
-                        .expect("parse `memory_mb` to usize error");
+                    let memory_mb = utils::parse_arg("memory_mb")?;
+                    let memory_mb = usize::from_str(memory_mb.as_str()).map_err(|_e| {
+                        anyhow!("parse `memory_mb`=`{}` to usize error", memory_mb)
+                    })?;
 
-                    let v_cores =
-                        utils::parse_arg("v_cores").expect("`v_cores` argument is not found");
-                    let v_cores =
-                        usize::from_str(v_cores.as_str()).expect("parse `v_cores` to usize error");
+                    let v_cores = utils::parse_arg("v_cores")?;
+                    let v_cores = usize::from_str(v_cores.as_str())
+                        .map_err(|_e| anyhow!("parse `v_cores`=`{}` to usize error", v_cores))?;
 
                     (worker_process_path, memory_mb, v_cores)
                 }
@@ -186,11 +182,10 @@ impl Context {
 
         let coordinator_address = match manager_type {
             ManagerType::Coordinator => "".to_string(),
-            _ => utils::parse_arg("coordinator_address")
-                .expect("`coordinator_address` argument is not found"),
+            _ => utils::parse_arg("coordinator_address")?,
         };
 
-        Context::new(
+        Ok(Context::new(
             application_name.to_string(),
             application_id,
             task_manager_id,
@@ -204,7 +199,7 @@ impl Context {
             worker_process_path,
             memory_mb,
             v_cores,
-        )
+        ))
     }
 }
 
@@ -219,4 +214,15 @@ fn metrics_serve(bind_ip: &str, cluster_mode: &ClusterMode, manager_type: &Manag
 
     let addr = crate::metrics::init_metrics2(bind_ip, with_proxy);
     format!("http://{}:{}", bind_ip, addr.port())
+}
+
+#[derive(Debug)]
+pub struct ContextError(&'static str);
+
+impl Error for ContextError {}
+
+impl std::fmt::Display for ContextError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ContextError({})", self.0)
+    }
 }

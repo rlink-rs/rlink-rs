@@ -62,7 +62,15 @@ where
     S: StreamJob + 'static,
 {
     let stream_env = StreamExecutionEnvironment::new(job_name.to_string());
-    runtime::run(stream_env, stream_job);
+    match runtime::run(stream_env, stream_job) {
+        Ok(_) => {}
+        Err(e) => {
+            panic!(
+                "force panic when catch error in job startup process. msg: {}",
+                e
+            );
+        }
+    }
 }
 
 pub(crate) const ROOT_ID: u32 = 100;
