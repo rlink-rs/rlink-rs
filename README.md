@@ -11,6 +11,11 @@ pure memory, zero copy. single cluster in the production environment stable hund
 Framework tested on Linux/MacOS/Windows, requires stable Rust.
 
 ## Streaming Example
+
+```ymal
+rlink = "0.2.0-alpha.2"
+```
+
 ```rust
 env.register_source(TestInputFormat::new(properties.clone()), 1)
     .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
