@@ -50,7 +50,7 @@ pub async fn main() -> std::io::Result<()> {
 }
 
 async fn run_as_job_manager(data: Data<Context>) -> std::io::Result<()> {
-    let ip = "0.0.0.0:8371";
+    let ip = "0.0.0.0:8770";
     HttpServer::new(move || {
         App::new()
             .wrap(middleware::Logger::default())
@@ -82,7 +82,7 @@ async fn run_as_job_manager(data: Data<Context>) -> std::io::Result<()> {
 }
 
 async fn run_as_task_manager(data: Data<Context>) -> std::io::Result<()> {
-    let ip = "0.0.0.0:8371";
+    let ip = "0.0.0.0:8771";
     HttpServer::new(move || {
         App::new()
             .wrap(middleware::Logger::default())
