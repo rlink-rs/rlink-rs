@@ -46,24 +46,27 @@ impl ResourceManager for YarnResourceManager {
     where
         S: StreamJob + 'static,
     {
-        let job_descriptor = self.job_descriptor.as_ref().unwrap();
+        let application_descriptor = self.job_descriptor.as_ref().unwrap();
 
         let mut task_args = Vec::new();
-        for task_manager_descriptor in &job_descriptor.worker_managers {
+        for task_manager_descriptor in &application_descriptor.worker_managers {
             let mut args = HashMap::new();
             args.insert(
                 "cluster_mode".to_string(),
                 self.context.cluster_mode.to_string(),
             );
             args.insert("manager_type".to_string(), ManagerType::Worker.to_string());
-            args.insert("job_id".to_string(), self.context.application_id.clone());
+            args.insert(
+                "application_id".to_string(),
+                self.context.application_id.clone(),
+            );
             args.insert(
                 "task_manager_id".to_string(),
                 task_manager_descriptor.task_manager_id.clone(),
             );
             args.insert(
                 "coordinator_address".to_string(),
-                job_descriptor
+                application_descriptor
                     .coordinator_manager
                     .coordinator_address
                     .clone(),
