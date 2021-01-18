@@ -8,9 +8,9 @@ use rlink::api::element::Record;
 use rlink::api::function::{Context, Function, OutputFormat};
 use rlink::channel::mb;
 use rlink::metrics::Tag;
-use rlink::utils;
 use rlink::utils::get_runtime;
 use rlink::utils::handover::Handover;
+use rlink::{api, utils};
 
 pub type CkBlock = clickhouse_rs::Block;
 
@@ -56,7 +56,7 @@ impl ClickhouseSink {
 }
 
 impl OutputFormat for ClickhouseSink {
-    fn open(&mut self, context: &Context) {
+    fn open(&mut self, context: &Context) -> api::Result<()> {
         let tags = vec![
             Tag("job_id".to_string(), context.task_id.job_id().0.to_string()),
             Tag(
@@ -68,7 +68,7 @@ impl OutputFormat for ClickhouseSink {
 
         let urls: Vec<&str> = self.url.split(",").collect();
         let url = if urls.len() > 1 {
-            urls.get(context.task_number as usize % urls.len())
+            urls.get(context.task_id.task_number() as usize % urls.len())
                 .unwrap()
                 .to_string()
         } else {
@@ -90,13 +90,17 @@ impl OutputFormat for ClickhouseSink {
                 task.run(tasks).await;
             });
         });
+
+        Ok(())
     }
 
     fn write_record(&mut self, record: Record) {
         self.handover.as_ref().unwrap().produce_always(record);
     }
 
-    fn close(&mut self) {}
+    fn close(&mut self) -> api::Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Clone)]
@@ -181,7 +185,7 @@ impl ClickhouseSinkTask {
                     break;
                 }
                 Err(e) => {
-                    error!("reconnection error. {}", e);
+                    error!("reconnection error. {:?}", e);
                     err = Some(e)
                 }
             }

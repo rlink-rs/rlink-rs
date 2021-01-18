@@ -39,7 +39,7 @@ pub async fn main() -> std::io::Result<()> {
     std::env::set_var("RUST_LOG", "actix_server=info,actix_web=info");
     // std::fs::create_dir_all("./tmp").unwrap();
 
-    let context = create_context();
+    let context = create_context().unwrap();
     let data = Data::new(context);
 
     let role_type = RoleType::from_arg();

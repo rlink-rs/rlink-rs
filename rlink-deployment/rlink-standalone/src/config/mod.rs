@@ -16,24 +16,24 @@ pub struct Context {
     pub task_managers: Vec<String>,
 }
 
-pub fn create_context() -> Context {
+pub fn create_context() -> anyhow::Result<Context> {
     let work_space = get_work_space();
     let conf_path = work_space.clone().join("config");
 
     let standalone_file = conf_path.clone().join("standalone.yaml");
-    let config = load_config(standalone_file.clone());
+    let config = load_config(standalone_file.clone())?;
 
     let script_path = conf_path.clone().join("run_task.sh");
 
     let task_managers_file = conf_path.clone().join("task_managers");
     let task_managers = load_task_managers(task_managers_file);
 
-    Context {
+    Ok(Context {
         config,
         config_path: standalone_file,
         script_path,
         task_managers,
-    }
+    })
 }
 
 pub fn load_task_managers(path: PathBuf) -> Vec<String> {

@@ -1,5 +1,4 @@
-use serde::export::Formatter;
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 use std::fs::DirBuilder;
 use std::path::PathBuf;
 
@@ -33,8 +32,8 @@ impl std::error::Error for HttpClientError {
     // }
 }
 
-impl Display for HttpClientError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl std::fmt::Display for HttpClientError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             HttpClientError::MessageStatusError(err) => write!(f, "{}", err),
             HttpClientError::SendRequestError(err) => write!(f, "{}", err),

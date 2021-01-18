@@ -211,25 +211,19 @@ pub async fn shutdown_tasks(
 ) -> Result<HttpResponse, Error> {
     let application_id = application_id.as_str();
 
-    for n in &task_ids.into_inner() {
-        let kill_result = kill_task(
-            application_id,
-            n.get_task_id(),
-            n.get_task_manager_address(),
-        )
-        .await;
+    for task_res_info in &task_ids.into_inner() {
+        let task_id = task_res_info.get_task_id().unwrap(); //.ok_or(anyhow!("task_id not found"))?;
+        let task_manager_address = task_res_info.get_task_manager_address().unwrap();
+
+        let kill_result = kill_task(application_id, task_id, task_manager_address).await;
         match kill_result {
             Ok(msg) => info!(
                 "kill task_id={} from {} success. {}",
-                n.get_task_id(),
-                n.get_task_manager_address(),
-                msg
+                task_id, task_manager_address, msg
             ),
             Err(e) => error!(
                 "kill task_id={} from {} failure. {}",
-                n.get_task_id(),
-                n.get_task_manager_address(),
-                e
+                task_id, task_manager_address, e
             ),
         }
     }

@@ -40,15 +40,20 @@ cargo build --release --color=always --all --all-targets
 ### Config
 #### standalone.yaml
 ```bash
-# all job manager's addresses, one or more
-application_manager_address: ["http://x.x.x.x:8370","http://y.y.y.y:8370"]
 
-metadata_storage_mode: "memory"
-metadata_storage_endpoints: []
+---
+# all job manager's addresses, one or more
+application_manager_address:
+  - "http://0.0.0.0:8370"
+  - "http://0.0.0.0:8370"
+
+metadata_storage:
+  type: Memory
 
 # bind ip
-task_manager_bind_ip: "z.z.z.z"
-task_manager_work_dir: "/xxx/rlink/job"
+task_manager_bind_ip: 0.0.0.0
+task_manager_work_dir: /data/rlink/application
+
 ```
 #### task_managers
 TaskManager list

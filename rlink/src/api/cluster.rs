@@ -17,7 +17,7 @@ impl std::fmt::Display for MetadataStorageType {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClusterConfig {
     pub application_manager_address: Vec<String>,
 
@@ -53,15 +53,8 @@ pub fn read_config_from_path(path: PathBuf) -> Result<String, std::io::Error> {
     Ok(buffer)
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskResourceInfo {
-    /// for standalone
-    #[serde(default)]
-    pub task_id: String,
-    #[serde(default)]
-    pub task_manager_address: String,
-
-    /// for yarn
     #[serde(default)]
     pub task_manager_id: String,
     #[serde(default)]
@@ -79,25 +72,17 @@ impl TaskResourceInfo {
         );
 
         TaskResourceInfo {
-            task_id,
-            task_manager_address,
             task_manager_id,
             resource_info,
         }
     }
 
-    pub fn get_task_id(&self) -> &str {
-        self.resource_info
-            .get("task_id")
-            .map(|x| x.as_str())
-            .unwrap_or(self.task_id.as_str())
+    pub fn get_task_id(&self) -> Option<&String> {
+        self.resource_info.get("task_id")
     }
 
-    pub fn get_task_manager_address(&self) -> &str {
-        self.resource_info
-            .get("task_manager_address")
-            .map(|x| x.as_str())
-            .unwrap_or(self.task_manager_address.as_str())
+    pub fn get_task_manager_address(&self) -> Option<&String> {
+        self.resource_info.get("task_manager_address")
     }
 }
 
@@ -109,7 +94,6 @@ pub struct ExecuteRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BatchExecuteRequest {
-    // pub executable_file: String,
     pub batch_args: Vec<HashMap<String, String>>,
 }
 
