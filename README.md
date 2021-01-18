@@ -44,8 +44,8 @@ cargo build --release --color=always --all --all-targets
 ---
 # all job manager's addresses, one or more
 application_manager_address:
-  - "http://0.0.0.0:8370"
-  - "http://0.0.0.0:8370"
+  - "http://0.0.0.0:8371"
+  - "http://0.0.0.0:8371"
 
 metadata_storage:
   type: Memory
