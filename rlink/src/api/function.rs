@@ -149,6 +149,10 @@ where
 {
     fn open(&mut self, context: &Context) -> crate::api::Result<()>;
     fn flat_map(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>>;
+    fn flat_map_element(&mut self, element: Element) -> Box<dyn Iterator<Item = Element>> {
+        let iterator = self.flat_map(element.into_record());
+        Box::new(ElementIterator::new(iterator))
+    }
     fn close(&mut self) -> crate::api::Result<()>;
 }
 
@@ -191,4 +195,34 @@ where
     fn process_left(&self, record: Record) -> Box<dyn Iterator<Item = Record>>;
     fn process_right(&self, stream_seq: usize, record: Record) -> Box<dyn Iterator<Item = Record>>;
     fn close(&mut self) -> crate::api::Result<()>;
+}
+
+pub(crate) struct ElementIterator<T>
+where
+    T: Iterator<Item = Record>,
+{
+    iterator: T,
+}
+
+impl<T> ElementIterator<T>
+where
+    T: Iterator<Item = Record>,
+{
+    pub fn new(iterator: T) -> Self {
+        ElementIterator { iterator }
+    }
+}
+
+impl<T> Iterator for ElementIterator<T>
+where
+    T: Iterator<Item = Record>,
+{
+    type Item = Element;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.iterator.next() {
+            Some(record) => Some(Element::Record(record)),
+            None => None,
+        }
+    }
 }
