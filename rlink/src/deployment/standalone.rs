@@ -63,10 +63,10 @@ impl ResourceManager for StandaloneResourceManager {
                 self.context.cluster_mode.to_string(),
             );
             args.insert("manager_type".to_string(), ManagerType::Worker.to_string());
-            args.insert(
-                "application_id".to_string(),
-                self.context.application_id.clone(),
-            );
+            // args.insert(
+            //     "application_id".to_string(),
+            //     self.context.application_id.clone(),
+            // );
             args.insert(
                 "task_manager_id".to_string(),
                 task_manager_descriptor.task_manager_id.clone(),
