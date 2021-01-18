@@ -82,14 +82,40 @@ Worker
 ## job demo
 
 # create job
-curl http://x.x.x.x:8370/job/application -X POST -F "file=@/path/to/execute_file" -v
+curl http://x.x.x.x:8770/job/application -X POST -F "file=@/path/to/execute_file" -v
 
 # run job
-curl http://x.x.x.x:8370/job/application/application-1591174445599 -X POST -H "Content-Type:application/json" -d '{"batch_args":[{"cluster_mode":"Standalone", "manager_type":"Coordinator","num_task_managers":"15","source_parallelism":"30", "reduce_parallelism":"30", "env":"dev"}]}' -v
+curl http://x.x.x.x:8770/job/application/application-1591174445599 -X POST -H "Content-Type:application/json" -d '{"batch_args":[{"cluster_mode":"Standalone", "manager_type":"Coordinator","num_task_managers":"15","source_parallelism":"30", "reduce_parallelism":"30", "env":"dev"}]}' -v
 
 # kill job
-curl http://x.x.x.x:8370/job/application/application-1591174445599/shutdown -X POST -H "Content-Type:application/json"
+curl http://x.x.x.x:8770/job/application/application-1591174445599/shutdown -X POST -H "Content-Type:application/json"
 ```
 
 ## On Yarn
-// todo
+
+### update manager jar to hdfs
+upload `rlink-yarn-manager-0.2.0-alpha.1-jar-with-dependencies.jar` to hdfs
+
+eg: upload to `hdfs://nn/path/to/rlink-yarn-manager-0.2.0-alpha.1-jar-with-dependencies.jar`
+
+### update application to hdfs
+upload your application executable file to hdfs.
+
+eg: upload `rlink-showcase` to `hdfs://nn/path/to/rlink-showcase`
+
+### submit yarn job
+submit yarn job with `rlink-yarn-client-0.2.0-alpha.1.jar`
+```shell
+hadoop jar rlink-yarn-client-0.2.0-alpha.1.jar rlink.yarn.client.Client \
+  --applicationName rlink-showcase \
+  --worker_process_path hdfs://nn/path/to/rlink-showcase \
+  --java_manager_path hdfs://nn/path/to/rlink-yarn-manager-0.2.0-alpha.1-jar-with-dependencies.jar \
+  --master_memory_mb 4096 \
+  --master_v_cores 2 \
+  --memory_mb 4096 \
+  --v_cores 2 \
+  --queue root.default \
+  --cluster_mode YARN \
+  --manager_type Coordinator \
+  --num_task_managers 80
+```
