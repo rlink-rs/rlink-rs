@@ -90,7 +90,7 @@ Worker
 curl http://x.x.x.x:8770/job/application -X POST -F "file=@/path/to/execute_file" -v
 
 # run job
-curl http://x.x.x.x:8770/job/application/application-1591174445599 -X POST -H "Content-Type:application/json" -d '{"batch_args":[{"cluster_mode":"Standalone", "manager_type":"Coordinator","num_task_managers":"15","source_parallelism":"30", "reduce_parallelism":"30", "env":"dev"}]}' -v
+curl http://x.x.x.x:8770/job/application/application-1591174445599 -X POST -H "Content-Type:application/json" -d '{"batch_args":[{"cluster_mode":"Standalone", "manager_type":"Coordinator","num_task_managers":"15"}]}' -v
 
 # kill job
 curl http://x.x.x.x:8770/job/application/application-1591174445599/shutdown -X POST -H "Content-Type:application/json"
