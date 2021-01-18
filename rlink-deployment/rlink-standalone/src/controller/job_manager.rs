@@ -183,7 +183,7 @@ async fn publish_task(
     task_manager_address: &str,
 ) -> Result<String, HttpClientError> {
     let url = format!(
-        "http://{}:8371/task/{}",
+        "http://{}:8771/task/{}",
         task_manager_address, application_id
     );
     let mut response = actix_web::client::Client::default()
@@ -241,7 +241,7 @@ async fn kill_task(
     task_manager_address: &str,
 ) -> Result<String, HttpClientError> {
     let url = format!(
-        "http://{}:8371/task/{}/{}/shutdown",
+        "http://{}:8771/task/{}/{}/shutdown",
         task_manager_address, application_id, task_id
     );
     let mut response = actix_web::client::Client::default()
@@ -288,7 +288,7 @@ async fn kill_job_task(
     task_manager_address: &str,
 ) -> Result<String, HttpClientError> {
     let url = format!(
-        "http://{}:8371/task/{}/shutdown",
+        "http://{}:8771/task/{}/shutdown",
         task_manager_address, application_id
     );
     let mut response = actix_web::client::Client::default()
