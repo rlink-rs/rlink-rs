@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
 use crate::api::checkpoint::CheckpointHandle;
-use crate::api::env::{StreamExecutionEnvironment, StreamJob};
+use crate::api::env::{StreamApp, StreamExecutionEnvironment};
 use crate::api::function::InputSplit;
 use crate::api::properties::Properties;
 use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
@@ -145,16 +145,16 @@ impl ApplicationDescriptor {
     }
 }
 
-pub fn run<S>(stream_env: StreamExecutionEnvironment, stream_job: S) -> anyhow::Result<()>
+pub fn run<S>(stream_env: StreamExecutionEnvironment, stream_app: S) -> anyhow::Result<()>
 where
-    S: StreamJob + 'static,
+    S: StreamApp + 'static,
 {
     panic_notify();
 
     let context = context::Context::parse_node_arg(stream_env.application_name.as_str())?;
     info!("Context: {:?}", context);
 
-    cluster::run_task(context, stream_env, stream_job);
+    cluster::run_task(context, stream_env, stream_app);
 
     Ok(())
 }

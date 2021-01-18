@@ -37,7 +37,7 @@ pub(crate) fn publish(
         };
 
         let (sender, receiver) = named_bounded(
-            "Network_Publish",
+            "NetworkPublish",
             vec![
                 Tag::new(
                     "source_job_id".to_string(),

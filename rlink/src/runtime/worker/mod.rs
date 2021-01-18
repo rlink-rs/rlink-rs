@@ -4,7 +4,7 @@ use std::ops::Deref;
 use std::thread::JoinHandle;
 
 use crate::api::element::{Element, Record};
-use crate::api::env::{StreamExecutionEnvironment, StreamJob};
+use crate::api::env::{StreamApp, StreamExecutionEnvironment};
 use crate::api::function::KeySelectorFunction;
 use crate::api::operator::{StreamOperator, StreamOperatorWrap};
 use crate::api::runtime::{JobId, OperatorId};
@@ -30,12 +30,12 @@ pub(crate) fn run<S>(
     context: Context,
     metadata_loader: MetadataLoader,
     task_descriptor: TaskDescriptor,
-    stream_job: S,
+    stream_app: S,
     stream_env: &StreamExecutionEnvironment,
     window_timer: WindowTimer,
 ) -> JoinHandle<()>
 where
-    S: StreamJob + 'static,
+    S: StreamApp + 'static,
 {
     let application_name = stream_env.application_name.clone();
     std::thread::Builder::new()
@@ -49,7 +49,7 @@ where
                 context,
                 task_descriptor,
                 metadata_loader,
-                stream_job,
+                stream_app,
                 stream_env,
                 window_timer,
             );
@@ -62,26 +62,26 @@ where
 #[derive(Debug)]
 pub struct WorkerTask<S>
 where
-    S: StreamJob + 'static,
+    S: StreamApp + 'static,
 {
     context: Context,
     task_descriptor: TaskDescriptor,
     application_descriptor: ApplicationDescriptor,
     metadata_loader: MetadataLoader,
-    stream_job: S,
+    stream_app: S,
     stream_env: StreamExecutionEnvironment,
     window_timer: WindowTimer,
 }
 
 impl<S> WorkerTask<S>
 where
-    S: StreamJob + 'static,
+    S: StreamApp + 'static,
 {
     pub(crate) fn new(
         context: Context,
         task_descriptor: TaskDescriptor,
         mut metadata_loader: MetadataLoader,
-        stream_job: S,
+        stream_app: S,
         stream_env: StreamExecutionEnvironment,
         window_timer: WindowTimer,
     ) -> Self {
@@ -90,7 +90,7 @@ where
             task_descriptor,
             application_descriptor: metadata_loader.get_job_descriptor_from_cache(),
             metadata_loader,
-            stream_job,
+            stream_app,
             stream_env,
             window_timer,
         }
@@ -101,7 +101,7 @@ where
             .application_descriptor
             .coordinator_manager
             .application_properties;
-        self.stream_job
+        self.stream_app
             .build_stream(application_properties, self.stream_env.borrow_mut());
 
         let mut raw_stream_graph = self.stream_env.stream_manager.stream_graph.borrow_mut();

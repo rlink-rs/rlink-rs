@@ -51,7 +51,10 @@ impl Runnable for FlatMapRunnable {
                 context.task_descriptor.task_id.task_number.to_string(),
             ),
         ];
-        let metric_name = format!("Map_{}", self.stream_map.operator_fn.as_ref().get_name());
+        let metric_name = format!(
+            "FlatMap_{}",
+            self.stream_map.operator_fn.as_ref().get_name()
+        );
         register_counter(metric_name.as_str(), tags, self.counter.clone());
 
         Ok(())

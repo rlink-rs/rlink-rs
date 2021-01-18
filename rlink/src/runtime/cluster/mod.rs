@@ -1,4 +1,4 @@
-use crate::api::env::{StreamExecutionEnvironment, StreamJob};
+use crate::api::env::{StreamApp, StreamExecutionEnvironment};
 use crate::deployment::ResourceManagerWrap;
 use crate::runtime::context::Context;
 use crate::runtime::ManagerType;
@@ -6,18 +6,18 @@ use crate::runtime::ManagerType;
 mod coordinator;
 mod worker;
 
-pub(crate) fn run_task<S>(context: Context, stream_env: StreamExecutionEnvironment, stream_job: S)
+pub(crate) fn run_task<S>(context: Context, stream_env: StreamExecutionEnvironment, stream_app: S)
 where
-    S: StreamJob + 'static,
+    S: StreamApp + 'static,
 {
     match context.manager_type {
         ManagerType::Coordinator => {
             let resource_manager = ResourceManagerWrap::new(&context);
-            coordinator::run(context, stream_env, stream_job, resource_manager);
+            coordinator::run(context, stream_env, stream_app, resource_manager);
         }
         ManagerType::Standby => {}
         ManagerType::Worker => {
-            worker::run(context, stream_env, stream_job);
+            worker::run(context, stream_env, stream_app);
         }
     };
 }

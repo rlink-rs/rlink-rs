@@ -1,5 +1,5 @@
 use crate::api::cluster::TaskResourceInfo;
-use crate::api::env::{StreamExecutionEnvironment, StreamJob};
+use crate::api::env::{StreamApp, StreamExecutionEnvironment};
 use crate::deployment::{Resource, ResourceManager};
 use crate::runtime::context::Context;
 use crate::runtime::{cluster, ApplicationDescriptor, ManagerType};
@@ -26,11 +26,11 @@ impl ResourceManager for LocalResourceManager {
 
     fn worker_allocate<S>(
         &self,
-        stream_job: &S,
+        stream_app: &S,
         stream_env: &StreamExecutionEnvironment,
     ) -> anyhow::Result<Vec<TaskResourceInfo>>
     where
-        S: StreamJob + 'static,
+        S: StreamApp + 'static,
     {
         let application_descriptor = self.application_descriptor.as_ref().unwrap();
         for task_manager_descriptor in &application_descriptor.worker_managers {
@@ -51,7 +51,7 @@ impl ResourceManager for LocalResourceManager {
                 .coordinator_address
                 .clone();
 
-            let stream_job_clone = stream_job.clone();
+            let stream_app_clone = stream_app.clone();
             let application_name = stream_env.application_name.clone();
             std::thread::Builder::new()
                 .name(format!(
@@ -60,7 +60,7 @@ impl ResourceManager for LocalResourceManager {
                 ))
                 .spawn(move || {
                     let stream_env = StreamExecutionEnvironment::new(application_name);
-                    cluster::run_task(context_clone, stream_env, stream_job_clone);
+                    cluster::run_task(context_clone, stream_env, stream_app_clone);
                 })
                 .unwrap();
         }

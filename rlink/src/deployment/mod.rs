@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use crate::api::cluster::TaskResourceInfo;
-use crate::api::env::{StreamExecutionEnvironment, StreamJob};
+use crate::api::env::{StreamApp, StreamExecutionEnvironment};
 use crate::deployment::local::LocalResourceManager;
 use crate::deployment::standalone::StandaloneResourceManager;
 use crate::deployment::yarn::YarnResourceManager;
@@ -33,11 +33,11 @@ where
     /// Return a resource location.
     fn worker_allocate<S>(
         &self,
-        stream_job: &S,
+        stream_app: &S,
         stream_env: &StreamExecutionEnvironment,
     ) -> anyhow::Result<Vec<TaskResourceInfo>>
     where
-        S: StreamJob + 'static;
+        S: StreamApp + 'static;
 
     fn stop_workers(&self, task_ids: Vec<TaskResourceInfo>) -> anyhow::Result<()>;
 }
@@ -78,21 +78,21 @@ impl ResourceManager for ResourceManagerWrap {
 
     fn worker_allocate<S>(
         &self,
-        stream_job: &S,
+        stream_app: &S,
         stream_env: &StreamExecutionEnvironment,
     ) -> anyhow::Result<Vec<TaskResourceInfo>>
     where
-        S: StreamJob + 'static,
+        S: StreamApp + 'static,
     {
         match self {
             ResourceManagerWrap::LocalResourceManager(rm) => {
-                rm.worker_allocate(stream_job, stream_env)
+                rm.worker_allocate(stream_app, stream_env)
             }
             ResourceManagerWrap::StandaloneResourceManager(rm) => {
-                rm.worker_allocate(stream_job, stream_env)
+                rm.worker_allocate(stream_app, stream_env)
             }
             ResourceManagerWrap::YarnResourceManager(rm) => {
-                rm.worker_allocate(stream_job, stream_env)
+                rm.worker_allocate(stream_app, stream_env)
             }
         }
     }
