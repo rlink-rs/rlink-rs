@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::{ClientConfig, Offset};
+use rlink::api;
 use rlink::api::backend::OperatorStateBackend;
 use rlink::api::checkpoint::CheckpointedFunction;
 use rlink::api::element::Record;
@@ -43,13 +44,12 @@ impl KafkaInputFormat {
 }
 
 impl InputFormat for KafkaInputFormat {
-    fn open(&mut self, input_split: InputSplit, context: &Context) {
+    fn open(&mut self, input_split: InputSplit, context: &Context) -> api::Result<()> {
         info!("kafka source open");
 
         let can_create_consumer = input_split
             .get_properties()
-            .get_string("create_kafka_connection")
-            .unwrap();
+            .get_string("create_kafka_connection")?;
         if can_create_consumer.to_lowercase().eq("true") {
             let state_backend = context
                 .application_properties
@@ -98,6 +98,8 @@ impl InputFormat for KafkaInputFormat {
 
             info!("start with follower operator mode")
         }
+
+        Ok(())
     }
 
     fn reached_end(&self) -> bool {
@@ -143,7 +145,9 @@ impl InputFormat for KafkaInputFormat {
         }
     }
 
-    fn close(&mut self) {}
+    fn close(&mut self) -> api::Result<()> {
+        Ok(())
+    }
 
     fn get_checkpoint(&mut self) -> Option<Box<&mut dyn CheckpointedFunction>> {
         match self.checkpoint.as_mut() {
@@ -154,7 +158,7 @@ impl InputFormat for KafkaInputFormat {
 }
 
 impl InputSplitSource for KafkaInputFormat {
-    fn create_input_splits(&self, min_num_splits: u32) -> Vec<InputSplit> {
+    fn create_input_splits(&self, min_num_splits: u16) -> Vec<InputSplit> {
         let timeout = Duration::from_secs(3);
 
         info!("kafka config {:?}", self.client_config);

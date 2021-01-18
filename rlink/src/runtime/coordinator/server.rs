@@ -6,8 +6,8 @@ use actix_web::{middleware, web, App, Error, HttpResponse, HttpServer};
 use rand::prelude::*;
 
 use crate::api::checkpoint::Checkpoint;
+use crate::api::cluster::MetadataStorageType;
 use crate::api::cluster::{ResponseCode, StdResponse};
-use crate::api::metadata::MetadataStorageMode;
 use crate::dag::{DagManager, JsonDag};
 use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
 use crate::runtime::TaskManagerStatus;
@@ -18,12 +18,12 @@ use crate::utils::VERSION;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct WebContext {
     job_context: crate::runtime::context::Context,
-    metadata_mode: MetadataStorageMode,
+    metadata_mode: MetadataStorageType,
 }
 
 pub(crate) fn web_launch(
     context: crate::runtime::context::Context,
-    metadata_mode: MetadataStorageMode,
+    metadata_mode: MetadataStorageType,
     checkpoint_manager: CheckpointManager,
     dag_manager: DagManager,
 ) -> String {
@@ -54,7 +54,7 @@ pub(crate) fn web_launch(
 
 pub(crate) fn serve_sync(
     job_context: crate::runtime::context::Context,
-    metadata_mode: MetadataStorageMode,
+    metadata_mode: MetadataStorageType,
     address: Arc<Mutex<Option<String>>>,
     checkpoint_manager: CheckpointManager,
     dag_manager: DagManager,
@@ -72,7 +72,7 @@ pub(crate) fn serve_sync(
 
 async fn serve(
     job_context: crate::runtime::context::Context,
-    metadata_mode: MetadataStorageMode,
+    metadata_mode: MetadataStorageType,
     rt_address: Arc<Mutex<Option<String>>>,
     checkpoint_manager: CheckpointManager,
     dag_manager: DagManager,

@@ -44,7 +44,7 @@ impl ResourceManager for StandaloneResourceManager {
                 .clone(),
         );
 
-        let job_id = self.context.application_id.as_str();
+        let application_id = self.context.application_id.as_str();
         let mut task_args = Vec::new();
         for task_manager_descriptor in &job_descriptor.worker_managers {
             let resource = Resource::new(
@@ -63,7 +63,10 @@ impl ResourceManager for StandaloneResourceManager {
                 self.context.cluster_mode.to_string(),
             );
             args.insert("manager_type".to_string(), ManagerType::Worker.to_string());
-            args.insert("job_id".to_string(), self.context.application_id.clone());
+            // args.insert(
+            //     "application_id".to_string(),
+            //     self.context.application_id.clone(),
+            // );
             args.insert(
                 "task_manager_id".to_string(),
                 task_manager_descriptor.task_manager_id.clone(),
@@ -78,7 +81,7 @@ impl ResourceManager for StandaloneResourceManager {
 
             task_args.push(args);
         }
-        cluster_client.allocate_worker(job_id, task_args)
+        cluster_client.allocate_worker(application_id, task_args)
     }
 
     fn stop_workers(&self, task_ids: Vec<TaskResourceInfo>) -> anyhow::Result<()> {

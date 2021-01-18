@@ -3,16 +3,26 @@ use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", content = "param")]
+pub enum MetadataStorageType {
+    Memory,
+}
+
+impl std::fmt::Display for MetadataStorageType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MetadataStorageType::Memory => write!(f, "Memory"),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClusterConfig {
     pub application_manager_address: Vec<String>,
 
     /// metadata storage mode
-    /// use for rlink
-    pub metadata_storage_mode: String,
-    /// metadata storage arguments
-    /// use for rlink
-    pub metadata_storage_endpoints: Vec<String>,
+    pub metadata_storage: MetadataStorageType,
 
     pub task_manager_bind_ip: String,
     pub task_manager_work_dir: String,
@@ -22,8 +32,7 @@ impl ClusterConfig {
     pub fn new_local() -> Self {
         ClusterConfig {
             application_manager_address: Vec::new(),
-            metadata_storage_mode: "Memory".to_string(),
-            metadata_storage_endpoints: vec![],
+            metadata_storage: MetadataStorageType::Memory,
 
             task_manager_bind_ip: "".to_string(),
             task_manager_work_dir: "./".to_string(),
@@ -31,9 +40,10 @@ impl ClusterConfig {
     }
 }
 
-pub fn load_config(path: PathBuf) -> ClusterConfig {
-    let context = read_config_from_path(path).expect("read Cluster config error");
-    serde_yaml::from_str(&context).expect("parse Cluster config error")
+pub fn load_config(path: PathBuf) -> anyhow::Result<ClusterConfig> {
+    let context =
+        read_config_from_path(path).map_err(|e| anyhow!("read Cluster config error {}", e))?;
+    serde_yaml::from_str(&context).map_err(|e| anyhow!("parse Cluster config error {}", e))
 }
 
 pub fn read_config_from_path(path: PathBuf) -> Result<String, std::io::Error> {
@@ -43,15 +53,8 @@ pub fn read_config_from_path(path: PathBuf) -> Result<String, std::io::Error> {
     Ok(buffer)
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskResourceInfo {
-    /// for standalone
-    #[serde(default)]
-    pub task_id: String,
-    #[serde(default)]
-    pub task_manager_address: String,
-
-    /// for yarn
     #[serde(default)]
     pub task_manager_id: String,
     #[serde(default)]
@@ -69,25 +72,17 @@ impl TaskResourceInfo {
         );
 
         TaskResourceInfo {
-            task_id,
-            task_manager_address,
             task_manager_id,
             resource_info,
         }
     }
 
-    pub fn get_task_id(&self) -> &str {
-        self.resource_info
-            .get("task_id")
-            .map(|x| x.as_str())
-            .unwrap_or(self.task_id.as_str())
+    pub fn get_task_id(&self) -> Option<&String> {
+        self.resource_info.get("task_id")
     }
 
-    pub fn get_task_manager_address(&self) -> &str {
-        self.resource_info
-            .get("task_manager_address")
-            .map(|x| x.as_str())
-            .unwrap_or(self.task_manager_address.as_str())
+    pub fn get_task_manager_address(&self) -> Option<&String> {
+        self.resource_info.get("task_manager_address")
     }
 }
 
@@ -99,7 +94,6 @@ pub struct ExecuteRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BatchExecuteRequest {
-    // pub executable_file: String,
     pub batch_args: Vec<HashMap<String, String>>,
 }
 
@@ -118,5 +112,30 @@ pub struct StdResponse<T> {
 impl<T> StdResponse<T> {
     pub fn new(code: ResponseCode, data: Option<T>) -> Self {
         StdResponse { code, data }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::api::cluster::{ClusterConfig, MetadataStorageType};
+
+    #[test]
+    pub fn ser_cluster_config_test() {
+        let config = ClusterConfig {
+            application_manager_address: vec![
+                "http://0.0.0.0:8370".to_string(),
+                "http://0.0.0.0:8370".to_string(),
+            ],
+            metadata_storage: MetadataStorageType::Memory,
+            task_manager_bind_ip: "0.0.0.0".to_string(),
+            task_manager_work_dir: "/data/rlink/application".to_string(),
+        };
+
+        let yaml = serde_yaml::to_string(&config).unwrap();
+        println!("{}", yaml);
+
+        let config1: ClusterConfig = serde_yaml::from_str(yaml.as_str()).unwrap();
+
+        assert!(config.metadata_storage.eq(&config1.metadata_storage));
     }
 }

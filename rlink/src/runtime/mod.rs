@@ -1,3 +1,5 @@
+use std::convert::TryFrom;
+
 use crate::api::checkpoint::CheckpointHandle;
 use crate::api::env::{StreamExecutionEnvironment, StreamJob};
 use crate::api::function::InputSplit;
@@ -18,15 +20,17 @@ pub enum ClusterMode {
     YARN = 2,
 }
 
-impl From<String> for ClusterMode {
-    fn from(mode_str: String) -> Self {
+impl<'a> TryFrom<&'a str> for ClusterMode {
+    type Error = anyhow::Error;
+
+    fn try_from(mode_str: &'a str) -> Result<Self, Self::Error> {
         let mode_str = mode_str.to_ascii_lowercase();
         match mode_str.as_str() {
-            "" => ClusterMode::Local,
-            "local" => ClusterMode::Local,
-            "standalone" => ClusterMode::Standalone,
-            "yarn" => ClusterMode::YARN,
-            _ => panic!(format!("Unsupported mode {}", mode_str)),
+            "" => Ok(ClusterMode::Local),
+            "local" => Ok(ClusterMode::Local),
+            "standalone" => Ok(ClusterMode::Standalone),
+            "yarn" => Ok(ClusterMode::YARN),
+            _ => Err(anyhow!("Unsupported mode {}", mode_str)),
         }
     }
 }
@@ -51,14 +55,16 @@ pub enum ManagerType {
     Worker = 3,
 }
 
-impl From<String> for ManagerType {
-    fn from(mode_str: String) -> Self {
+impl<'a> TryFrom<&'a str> for ManagerType {
+    type Error = anyhow::Error;
+
+    fn try_from(mode_str: &'a str) -> Result<Self, Self::Error> {
         let mode_str = mode_str.to_ascii_lowercase();
         match mode_str.as_str() {
-            "coordinator" => ManagerType::Coordinator,
-            "standby" => ManagerType::Standby,
-            "worker" => ManagerType::Worker,
-            _ => panic!(format!("Unsupported mode {}", mode_str)),
+            "coordinator" => Ok(ManagerType::Coordinator),
+            "standby" => Ok(ManagerType::Standby),
+            "worker" => Ok(ManagerType::Worker),
+            _ => Err(anyhow!("Unsupported mode {}", mode_str)),
         }
     }
 }
@@ -139,14 +145,16 @@ impl ApplicationDescriptor {
     }
 }
 
-pub fn run<S>(stream_env: StreamExecutionEnvironment, stream_job: S)
+pub fn run<S>(stream_env: StreamExecutionEnvironment, stream_job: S) -> anyhow::Result<()>
 where
     S: StreamJob + 'static,
 {
     panic_notify();
 
-    let context = context::Context::parse_node_arg(stream_env.application_name.as_str());
+    let context = context::Context::parse_node_arg(stream_env.application_name.as_str())?;
     info!("Context: {:?}", context);
 
     cluster::run_task(context, stream_env, stream_job);
+
+    Ok(())
 }

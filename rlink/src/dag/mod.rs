@@ -3,12 +3,12 @@
 
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
-use std::error::Error;
 use std::fmt::Debug;
 use std::ops::Index;
 
 use daggy::{Dag, NodeIndex, Walker};
 use serde::Serialize;
+use thiserror::Error;
 
 use crate::api::function::InputSplit;
 use crate::api::operator::StreamOperatorWrap;
@@ -44,7 +44,7 @@ pub(crate) struct WorkerManagerInstance {
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub(crate) enum OperatorType {
     Source,
-    Map,
+    FlatMap,
     Filter,
     CoProcess,
     KeyBy,
@@ -58,7 +58,7 @@ impl<'a> From<&'a StreamOperatorWrap> for OperatorType {
     fn from(op: &'a StreamOperatorWrap) -> Self {
         match op {
             StreamOperatorWrap::StreamSource(_) => OperatorType::Source,
-            StreamOperatorWrap::StreamMap(_) => OperatorType::Map,
+            StreamOperatorWrap::StreamFlatMap(_) => OperatorType::FlatMap,
             StreamOperatorWrap::StreamFilter(_) => OperatorType::Filter,
             StreamOperatorWrap::StreamCoProcess(_) => OperatorType::CoProcess,
             StreamOperatorWrap::StreamKeyBy(_) => OperatorType::KeyBy,
@@ -74,7 +74,7 @@ impl std::fmt::Display for OperatorType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             OperatorType::Source => write!(f, "Source"),
-            OperatorType::Map => write!(f, "Map"),
+            OperatorType::FlatMap => write!(f, "Map"),
             OperatorType::Filter => write!(f, "Filter"),
             OperatorType::CoProcess => write!(f, "CoProcess"),
             OperatorType::KeyBy => write!(f, "KeyBy"),
@@ -86,35 +86,24 @@ impl std::fmt::Display for OperatorType {
     }
 }
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum DagError {
+    #[error("source not found")]
     SourceNotFound,
-    // SinkNotFound,
+    #[error("source not at staring")]
+    SourceNotAtStarting,
+    #[error("source not at ending")]
+    SinkNotAtEnding,
+    #[error("the operator is not combine operator")]
     NotCombineOperator,
-    // ChildNodeNotFound(OperatorType),
+    #[error("parent operator not found")]
     ParentOperatorNotFound,
-    // ParallelismInheritUnsupported(OperatorType),
+    #[error("child not found in a pipeline job")]
     ChildNotFoundInPipeline,
+    #[error("multi-children in a pipeline job")]
     MultiChildrenInPipeline,
-}
-
-impl Error for DagError {}
-
-impl std::fmt::Display for DagError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DagError::SourceNotFound => write!(f, "SourceNotFound"),
-            // DagError::SinkNotFound => write!(f, "SinkNotFound"),
-            DagError::NotCombineOperator => write!(f, "NotCombineOperator"),
-            // DagError::ChildNodeNotFound(s) => write!(f, "ChildNodeNotFound({})", s),
-            DagError::ParentOperatorNotFound => write!(f, "ParentOperatorNotFound"),
-            // DagError::ParallelismInheritUnsupported(s) => {
-            //     write!(f, "ParallelismInheritUnsupported({})", s)
-            // }
-            DagError::ChildNotFoundInPipeline => write!(f, "ChildNotFoundInPipeline"),
-            DagError::MultiChildrenInPipeline => write!(f, "MultiChildrenInPipeline"),
-        }
-    }
+    #[error("illegal Vec<InputSplit> len. {0}")]
+    IllegalInputSplitSize(String),
 }
 
 pub(crate) trait Label {
@@ -311,6 +300,8 @@ where
 mod tests {
     use std::time::Duration;
 
+    use crate::api;
+    use crate::api::data_stream::CoStream;
     use crate::api::data_stream::{TConnectedStreams, TKeyedStream};
     use crate::api::data_stream::{TDataStream, TWindowedStream};
     use crate::api::element::Record;
@@ -364,7 +355,7 @@ mod tests {
                 Duration::from_secs(1),
                 MyTimestampAssigner::new(),
             ))
-            .connect(vec![ds], MyCoProcessFunction {})
+            .connect(vec![CoStream::from(ds)], MyCoProcessFunction {})
             .key_by(MyKeySelectorFunction::new())
             .window(SlidingEventTimeWindows::new(
                 Duration::from_secs(60),
@@ -423,7 +414,9 @@ mod tests {
     }
 
     impl InputFormat for MyInputFormat {
-        fn open(&mut self, _input_split: InputSplit, _context: &Context) {}
+        fn open(&mut self, _input_split: InputSplit, _context: &Context) -> api::Result<()> {
+            Ok(())
+        }
 
         fn reached_end(&self) -> bool {
             false
@@ -433,7 +426,9 @@ mod tests {
             None
         }
 
-        fn close(&mut self) {}
+        fn close(&mut self) -> api::Result<()> {
+            Ok(())
+        }
     }
 
     #[derive(Serialize, Deserialize, Debug)]
@@ -446,13 +441,17 @@ mod tests {
     }
 
     impl FlatMapFunction for MyFlatMapFunction {
-        fn open(&mut self, _context: &Context) {}
+        fn open(&mut self, _context: &Context) -> api::Result<()> {
+            Ok(())
+        }
 
         fn flat_map(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>> {
             Box::new(vec![record].into_iter())
         }
 
-        fn close(&mut self) {}
+        fn close(&mut self) -> api::Result<()> {
+            Ok(())
+        }
     }
 
     impl Function for MyFlatMapFunction {
@@ -496,14 +495,18 @@ mod tests {
     }
 
     impl KeySelectorFunction for MyKeySelectorFunction {
-        fn open(&mut self, _context: &Context) {}
+        fn open(&mut self, _context: &Context) -> api::Result<()> {
+            Ok(())
+        }
 
         fn get_key(&self, _record: &mut Record) -> Record {
             let record_rt = Record::new();
             record_rt
         }
 
-        fn close(&mut self) {}
+        fn close(&mut self) -> api::Result<()> {
+            Ok(())
+        }
     }
 
     impl Function for MyKeySelectorFunction {
@@ -522,13 +525,17 @@ mod tests {
     }
 
     impl ReduceFunction for MyReduceFunction {
-        fn open(&mut self, _context: &Context) {}
+        fn open(&mut self, _context: &Context) -> api::Result<()> {
+            Ok(())
+        }
 
         fn reduce(&self, _state_value: Option<&mut Record>, record: &mut Record) -> Record {
             record.clone()
         }
 
-        fn close(&mut self) {}
+        fn close(&mut self) -> api::Result<()> {
+            Ok(())
+        }
     }
 
     impl Function for MyReduceFunction {
@@ -549,11 +556,15 @@ mod tests {
     }
 
     impl OutputFormat for MyOutputFormat {
-        fn open(&mut self, _context: &Context) {}
+        fn open(&mut self, _context: &Context) -> api::Result<()> {
+            Ok(())
+        }
 
         fn write_record(&mut self, _record: Record) {}
 
-        fn close(&mut self) {}
+        fn close(&mut self) -> api::Result<()> {
+            Ok(())
+        }
     }
 
     impl Function for MyOutputFormat {
@@ -565,7 +576,9 @@ mod tests {
     pub struct MyCoProcessFunction {}
 
     impl CoProcessFunction for MyCoProcessFunction {
-        fn open(&mut self, _context: &Context) {}
+        fn open(&mut self, _context: &Context) -> api::Result<()> {
+            Ok(())
+        }
 
         fn process_left(&self, record: Record) -> Box<dyn Iterator<Item = Record>> {
             Box::new(vec![record].into_iter())
@@ -579,7 +592,9 @@ mod tests {
             Box::new(vec![].into_iter())
         }
 
-        fn close(&mut self) {}
+        fn close(&mut self) -> api::Result<()> {
+            Ok(())
+        }
     }
 
     impl Function for MyCoProcessFunction {

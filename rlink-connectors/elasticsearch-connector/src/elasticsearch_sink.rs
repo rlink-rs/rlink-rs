@@ -14,9 +14,9 @@ use rlink::api::element::Record;
 use rlink::api::function::{Context, Function, OutputFormat};
 use rlink::channel::mb;
 use rlink::metrics::Tag;
-use rlink::utils;
 use rlink::utils::get_runtime;
 use rlink::utils::handover::Handover;
+use rlink::{api, utils};
 use serde_json::Value;
 use thiserror::Error;
 
@@ -80,7 +80,7 @@ impl ElasticsearchOutputFormat {
 }
 
 impl OutputFormat for ElasticsearchOutputFormat {
-    fn open(&mut self, context: &Context) {
+    fn open(&mut self, context: &Context) -> api::Result<()> {
         let tags = vec![
             Tag("job_id".to_string(), context.task_id.job_id().0.to_string()),
             Tag(
@@ -104,13 +104,17 @@ impl OutputFormat for ElasticsearchOutputFormat {
                 write_thead.run(convert, 5).await;
             });
         });
+
+        Ok(())
     }
 
     fn write_record(&mut self, record: Record) {
         self.handover.as_ref().unwrap().produce_always(record);
     }
 
-    fn close(&mut self) {}
+    fn close(&mut self) -> api::Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Clone)]

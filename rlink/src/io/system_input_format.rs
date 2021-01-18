@@ -1,3 +1,4 @@
+use crate::api;
 use crate::api::element::{Element, Record};
 use crate::api::function::{
     Context, Function, InputFormat, InputSplit, InputSplitAssigner, InputSplitSource,
@@ -25,7 +26,7 @@ impl SystemInputFormat {
 }
 
 impl InputFormat for SystemInputFormat {
-    fn open(&mut self, _input_split: InputSplit, context: &Context) {
+    fn open(&mut self, _input_split: InputSplit, context: &Context) -> api::Result<()> {
         self.task_id = context.task_id.clone();
         let parents: Vec<String> = context
             .parents
@@ -57,6 +58,8 @@ impl InputFormat for SystemInputFormat {
             let rx = network::subscribe(&network_jobs, &context.task_id);
             self.network_receiver = Some(rx);
         }
+
+        Ok(())
     }
 
     fn reached_end(&self) -> bool {
@@ -97,7 +100,9 @@ impl InputFormat for SystemInputFormat {
         }
     }
 
-    fn close(&mut self) {}
+    fn close(&mut self) -> crate::api::Result<()> {
+        Ok(())
+    }
 }
 
 impl InputSplitSource for SystemInputFormat {

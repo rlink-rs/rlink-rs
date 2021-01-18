@@ -4,6 +4,12 @@ pub struct OperatorId(pub u32);
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, Default)]
 pub struct JobId(pub u32);
 
+impl From<OperatorId> for JobId {
+    fn from(operator_id: OperatorId) -> Self {
+        JobId(operator_id.0)
+    }
+}
+
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, Default)]
 pub struct TaskId {
     pub(crate) job_id: JobId,

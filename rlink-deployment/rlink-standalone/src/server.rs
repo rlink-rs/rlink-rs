@@ -39,7 +39,7 @@ pub async fn main() -> std::io::Result<()> {
     std::env::set_var("RUST_LOG", "actix_server=info,actix_web=info");
     // std::fs::create_dir_all("./tmp").unwrap();
 
-    let context = create_context();
+    let context = create_context().unwrap();
     let data = Data::new(context);
 
     let role_type = RoleType::from_arg();
@@ -50,7 +50,7 @@ pub async fn main() -> std::io::Result<()> {
 }
 
 async fn run_as_job_manager(data: Data<Context>) -> std::io::Result<()> {
-    let ip = "0.0.0.0:8370";
+    let ip = "0.0.0.0:8770";
     HttpServer::new(move || {
         App::new()
             .wrap(middleware::Logger::default())
@@ -82,7 +82,7 @@ async fn run_as_job_manager(data: Data<Context>) -> std::io::Result<()> {
 }
 
 async fn run_as_task_manager(data: Data<Context>) -> std::io::Result<()> {
-    let ip = "0.0.0.0:8371";
+    let ip = "0.0.0.0:8771";
     HttpServer::new(move || {
         App::new()
             .wrap(middleware::Logger::default())

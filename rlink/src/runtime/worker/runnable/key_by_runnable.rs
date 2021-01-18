@@ -38,11 +38,11 @@ impl KeyByRunnable {
 }
 
 impl Runnable for KeyByRunnable {
-    fn open(&mut self, context: &RunnableContext) {
-        self.next_runnable.as_mut().unwrap().open(context);
+    fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
+        self.next_runnable.as_mut().unwrap().open(context)?;
 
         let fun_context = context.to_fun_context(self.operator_id);
-        self.stream_key_by.operator_fn.open(&fun_context);
+        self.stream_key_by.operator_fn.open(&fun_context)?;
 
         // todo set self.partition_size = Reduce.partition
         self.partition_size = context.get_child_parallelism() as u16;
@@ -62,6 +62,8 @@ impl Runnable for KeyByRunnable {
             self.stream_key_by.operator_fn.as_ref().get_name()
         );
         register_counter(metric_name.as_str(), tags, self.counter.clone());
+
+        Ok(())
     }
 
     fn run(&mut self, mut element: Element) {
@@ -113,9 +115,9 @@ impl Runnable for KeyByRunnable {
         }
     }
 
-    fn close(&mut self) {
-        self.stream_key_by.operator_fn.close();
-        self.next_runnable.as_mut().unwrap().close();
+    fn close(&mut self) -> anyhow::Result<()> {
+        // self.stream_key_by.operator_fn.close();
+        self.next_runnable.as_mut().unwrap().close()
     }
 
     fn set_next_runnable(&mut self, next_runnable: Option<Box<dyn Runnable>>) {

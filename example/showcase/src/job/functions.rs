@@ -1,14 +1,13 @@
-use crate::buffer_gen::{config, model};
 use chrono::{DateTime, Utc};
 use rlink::api::element::Record;
 use rlink::api::function::{
     CoProcessFunction, Context, FilterFunction, FlatMapFunction, InputFormat, InputSplit,
-    InputSplitSource, OutputFormat,
+    InputSplitSource,
 };
 use rlink::api::properties::Properties;
-use rlink::api::window::Window;
-use rlink::utils::date_time::{fmt_date_time, FMT_DATE_TIME_1};
-use std::time::Duration;
+
+use crate::buffer_gen::{config, model};
+use rlink::api;
 
 #[derive(Debug, Function)]
 pub struct TestInputFormat {
@@ -102,7 +101,7 @@ impl TestInputFormat {
 impl InputSplitSource for TestInputFormat {}
 
 impl InputFormat for TestInputFormat {
-    fn open(&mut self, _input_split: InputSplit, context: &Context) {
+    fn open(&mut self, _input_split: InputSplit, context: &Context) -> api::Result<()> {
         let task_number = context.task_id.task_number() as usize;
         let num_tasks = context.task_id.num_tasks() as usize;
 
@@ -112,6 +111,8 @@ impl InputFormat for TestInputFormat {
             .for_each(|i| {
                 self.data.push(data[i].clone());
             });
+
+        Ok(())
     }
 
     fn reached_end(&self) -> bool {
@@ -126,34 +127,40 @@ impl InputFormat for TestInputFormat {
         }
     }
 
-    fn close(&mut self) {}
+    fn close(&mut self) -> api::Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Debug, Function)]
-pub struct BroadcastInputFormat {
+pub struct ConfigInputFormat {
+    name: &'static str,
     data: Vec<Record>,
 }
 
-impl BroadcastInputFormat {
-    pub fn new() -> Self {
-        BroadcastInputFormat { data: Vec::new() }
+impl ConfigInputFormat {
+    pub fn new(name: &'static str) -> Self {
+        ConfigInputFormat {
+            name,
+            data: Vec::new(),
+        }
     }
 
     fn gen_row(&self) -> Vec<Record> {
         let mut rows = Vec::new();
 
-        rows.push(self.create_record("A1", "a1"));
-        rows.push(self.create_record("A2", "a2"));
-        rows.push(self.create_record("A3", "a3"));
-        rows.push(self.create_record("A4", "a4"));
-        rows.push(self.create_record("A5", "a6"));
+        rows.push(self.create_record("0"));
+        rows.push(self.create_record("1"));
+        rows.push(self.create_record("2"));
+        rows.push(self.create_record("3"));
+        rows.push(self.create_record("4"));
 
         rows
     }
 
-    fn create_record(&self, key: &str, value: &str) -> Record {
+    fn create_record(&self, value: &str) -> Record {
         let model = config::Entity {
-            field: key.to_string(),
+            field: format!("{}-{}", self.name, value),
             value: value.to_string(),
         };
         let mut record = Record::new();
@@ -163,16 +170,17 @@ impl BroadcastInputFormat {
     }
 }
 
-impl InputSplitSource for BroadcastInputFormat {}
+impl InputSplitSource for ConfigInputFormat {}
 
-impl InputFormat for BroadcastInputFormat {
-    fn open(&mut self, input_split: InputSplit, _context: &Context) {
+impl InputFormat for ConfigInputFormat {
+    fn open(&mut self, input_split: InputSplit, _context: &Context) -> api::Result<()> {
         let partition_num = input_split.get_split_number();
         info!("open split number = {}", partition_num);
 
         let data = self.gen_row();
 
         self.data.extend(data);
+        Ok(())
     }
 
     fn reached_end(&self) -> bool {
@@ -187,14 +195,18 @@ impl InputFormat for BroadcastInputFormat {
         }
     }
 
-    fn close(&mut self) {}
+    fn close(&mut self) -> api::Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Debug, Function)]
 pub struct MyCoProcessFunction {}
 
 impl CoProcessFunction for MyCoProcessFunction {
-    fn open(&mut self, _context: &Context) {}
+    fn open(&mut self, _context: &Context) -> api::Result<()> {
+        Ok(())
+    }
 
     fn process_left(&self, record: Record) -> Box<dyn Iterator<Item = Record>> {
         Box::new(vec![record].into_iter())
@@ -207,12 +219,17 @@ impl CoProcessFunction for MyCoProcessFunction {
     ) -> Box<dyn Iterator<Item = Record>> {
         if stream_seq == 0 {
             let conf = config::Entity::parse(record.as_buffer()).unwrap();
-            info!("config field:{}, val:{}", conf.field, conf.value);
+            info!("Broadcast config field:{}, val:{}", conf.field, conf.value);
+        } else if stream_seq == 1 {
+            let conf = config::Entity::parse(record.as_buffer()).unwrap();
+            info!("RoundRobin config field:{}, val:{}", conf.field, conf.value);
         }
         Box::new(vec![].into_iter())
     }
 
-    fn close(&mut self) {}
+    fn close(&mut self) -> api::Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Debug, Function)]
@@ -225,13 +242,17 @@ impl MyFlatMapFunction {
 }
 
 impl FlatMapFunction for MyFlatMapFunction {
-    fn open(&mut self, _context: &Context) {}
+    fn open(&mut self, _context: &Context) -> api::Result<()> {
+        Ok(())
+    }
 
     fn flat_map(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>> {
         Box::new(vec![record].into_iter())
     }
 
-    fn close(&mut self) {}
+    fn close(&mut self) -> api::Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Debug, Function)]
@@ -244,45 +265,15 @@ impl MyFilterFunction {
 }
 
 impl FilterFunction for MyFilterFunction {
-    fn open(&mut self, _context: &Context) {}
+    fn open(&mut self, _context: &Context) -> api::Result<()> {
+        Ok(())
+    }
 
     fn filter(&self, _t: &mut Record) -> bool {
         true
     }
 
-    fn close(&mut self) {}
-}
-
-#[derive(Debug, Function)]
-pub struct MyOutputFormat {
-    date_type: Vec<u8>,
-}
-
-impl MyOutputFormat {
-    pub fn new(date_type: Vec<u8>) -> Self {
-        MyOutputFormat { date_type }
+    fn close(&mut self) -> api::Result<()> {
+        Ok(())
     }
-}
-
-impl OutputFormat for MyOutputFormat {
-    fn open(&mut self, _context: &Context) {}
-
-    fn write_record(&mut self, mut record: Record) {
-        // info!("{}:write_record", self.get_name());
-
-        let window_time = {
-            let min_timestamp = record.get_trigger_window().unwrap().min_timestamp();
-            fmt_date_time(Duration::from_millis(min_timestamp), FMT_DATE_TIME_1)
-        };
-
-        let mut reader = record.get_reader(self.date_type.as_slice());
-        info!(
-            "Record output : 0:{}, 1:{}, window_min_ts:{}",
-            reader.get_str(0).unwrap(),
-            reader.get_i64(1).unwrap(),
-            window_time,
-        );
-    }
-
-    fn close(&mut self) {}
 }

@@ -126,6 +126,7 @@ mod tests {
     use crate::sink::handover::Handover;
     use crate::sink::producer::KafkaProducerThread;
     use crate::{build_kafka_record, BOOTSTRAP_SERVERS};
+    use rlink::api::runtime::JobId;
 
     fn get_record() -> Record {
         build_kafka_record(
@@ -146,7 +147,7 @@ mod tests {
         let mut client_config = ClientConfig::new();
         client_config.set(BOOTSTRAP_SERVERS, "localhost:9092");
 
-        let handover = Handover::new("test", topic, 0, 0);
+        let handover = Handover::new("test", topic, JobId(0), 0);
 
         let handover_c = handover.clone();
         std::thread::spawn(move || {

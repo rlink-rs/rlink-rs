@@ -120,7 +120,12 @@ impl ExecutionGraph {
             if let StreamOperatorWrap::StreamSource(op) = operator {
                 let input_splits = op.operator_fn.create_input_splits(job_node.parallelism);
                 if input_splits.len() != job_node.parallelism as usize {
-                    panic!("")
+                    return Err(DagError::IllegalInputSplitSize(format!(
+                        "{}'s parallelism = {}, but input_splits size = {}",
+                        op.operator_fn.get_name(),
+                        job_node.parallelism,
+                        input_splits.len(),
+                    )));
                 }
 
                 for task_number in 0..job_node.parallelism {
@@ -180,7 +185,7 @@ impl ExecutionGraph {
                                 .unwrap();
                         }
                     }
-                    JobEdge::Hash => {
+                    JobEdge::ReBalance => {
                         // build cartesian product execution edge
                         for node_index in execution_node_indies {
                             for child_node_index in child_execution_node_indies {

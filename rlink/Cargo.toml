@@ -1,6 +1,6 @@
 [package]
 name = "rlink"
-version = "0.2.0-alpha.1"
+version = "0.2.0-alpha.2"
 authors = ["yorkart <wangyue11.4@163.com>>"]
 edition = "2018"
 description = "High performance Stream Processing Framework"
@@ -12,7 +12,7 @@ license = "MIT/Apache-2.0"
 name = "rlink"
 
 [dependencies]
-serbuffer = "0.1"
+serbuffer = "1.0"
 
 log = "0.4"
 log4rs = "0.12"
@@ -21,8 +21,8 @@ log4rs = "0.12"
 chrono="0.4"
 lazy_static = "1.4.0"
 backtrace = "0.3"
-anyhow = "1.0.31"
-thiserror = "1.0.20"
+anyhow = "1.0"
+thiserror = "1.0"
 daggy = "0.7"
 hostname = "0.3"
 dns-lookup = "1.0"

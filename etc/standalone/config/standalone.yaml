@@ -1,7 +1,9 @@
-application_manager_address: "http://0.0.0.0:8370"
+---
+application_manager_address:
+  - "http://10.100.189.40:8770"
 
-metadata_storage_mode: "memory"
-metadata_storage_endpoints: []
+metadata_storage:
+  type: Memory
 
-task_manager_bind_ip: "0.0.0.0"
-task_manager_work_dir: "/data/rlink/application"
+task_manager_bind_ip: 0.0.0.0
+task_manager_work_dir: /data/rlink/application

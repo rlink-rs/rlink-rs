@@ -30,12 +30,14 @@ impl WindowAssignerRunnable {
 }
 
 impl Runnable for WindowAssignerRunnable {
-    fn open(&mut self, context: &RunnableContext) {
-        self.next_runnable.as_mut().unwrap().open(context);
+    fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
+        self.next_runnable.as_mut().unwrap().open(context)?;
         info!(
             "WindowAssignerRunnable({}) opened",
             self.stream_window.operator_fn.get_name()
         );
+
+        Ok(())
     }
 
     fn run(&mut self, mut element: Element) {
@@ -82,8 +84,8 @@ impl Runnable for WindowAssignerRunnable {
         self.next_runnable.as_mut().unwrap().run(element);
     }
 
-    fn close(&mut self) {
-        self.next_runnable.as_mut().unwrap().close();
+    fn close(&mut self) -> anyhow::Result<()> {
+        self.next_runnable.as_mut().unwrap().close()
     }
 
     fn set_next_runnable(&mut self, next_runnable: Option<Box<dyn Runnable>>) {

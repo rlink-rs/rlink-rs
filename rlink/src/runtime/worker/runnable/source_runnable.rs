@@ -55,19 +55,19 @@ impl SourceRunnable {
 }
 
 impl Runnable for SourceRunnable {
-    fn open(&mut self, context: &RunnableContext) {
+    fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
         self.context = Some(context.clone());
 
         self.task_id = context.task_descriptor.task_id;
 
         // first open next, then open self
-        self.next_runnable.as_mut().unwrap().open(context);
+        self.next_runnable.as_mut().unwrap().open(context)?;
 
         let input_split = context.task_descriptor.input_split.clone();
 
         let fun_context = context.to_fun_context(self.operator_id);
         let source_func = self.stream_source.operator_fn.as_mut();
-        source_func.open(input_split, &fun_context);
+        source_func.open(input_split, &fun_context)?;
 
         if let FunctionCreator::User = self.stream_source.get_fn_creator() {
             let checkpoint_period = context
@@ -107,6 +107,8 @@ impl Runnable for SourceRunnable {
         register_counter(metric_name.as_str(), tags, self.counter.clone());
 
         info!("Operator(SourceOperator) open");
+
+        Ok(())
     }
 
     fn run(&mut self, mut _element: Element) {
@@ -199,12 +201,12 @@ impl Runnable for SourceRunnable {
         }
     }
 
-    fn close(&mut self) {
+    fn close(&mut self) -> anyhow::Result<()> {
         let source_func = self.stream_source.operator_fn.as_mut();
-        source_func.close();
+        source_func.close()?;
 
         // first close self, then close next
-        self.next_runnable.as_mut().unwrap().close();
+        self.next_runnable.as_mut().unwrap().close()
     }
 
     fn set_next_runnable(&mut self, next_runnable: Option<Box<dyn Runnable>>) {

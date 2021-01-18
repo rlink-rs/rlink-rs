@@ -4,6 +4,8 @@ extern crate log;
 extern crate serde_derive;
 #[macro_use]
 extern crate lazy_static;
+// #[macro_use]
+// extern crate anyhow;
 
 use log4rs::append::console::{ConsoleAppender, Target};
 use log4rs::config::{Appender, Config, Root};

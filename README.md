@@ -10,6 +10,23 @@ pure memory, zero copy. single cluster in the production environment stable hund
 
 Framework tested on Linux/MacOS/Windows, requires stable Rust.
 
+## Streaming Example
+```rust
+env.register_source(TestInputFormat::new(properties.clone()), 1)
+    .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
+        Duration::from_secs(1),
+        SchemaBaseTimestampAssigner::new(model::index::timestamp, &FIELD_TYPE),
+    ))
+    .key_by(key_selector)
+    .window(SlidingEventTimeWindows::new(
+        Duration::from_secs(60),
+        Duration::from_secs(20),
+        None,
+    ))
+    .reduce(reduce_function, 2)
+    .add_sink(PrintOutputFormat::new(output_schema_types.as_slice()));
+```
+
 ## Build
 #### Build source
 ```bash
@@ -23,15 +40,20 @@ cargo build --release --color=always --all --all-targets
 ### Config
 #### standalone.yaml
 ```bash
-# all job manager's addresses, one or more
-application_manager_address: ["http://x.x.x.x:8370","http://y.y.y.y:8370"]
 
-metadata_storage_mode: "memory"
-metadata_storage_endpoints: []
+---
+# all job manager's addresses, one or more
+application_manager_address:
+  - "http://0.0.0.0:8770"
+  - "http://0.0.0.0:8770"
+
+metadata_storage:
+  type: Memory
 
 # bind ip
-task_manager_bind_ip: "z.z.z.z"
-task_manager_work_dir: "/xxx/rlink/job"
+task_manager_bind_ip: 0.0.0.0
+task_manager_work_dir: /data/rlink/application
+
 ```
 #### task_managers
 TaskManager list
@@ -60,14 +82,40 @@ Worker
 ## job demo
 
 # create job
-curl http://x.x.x.x:8370/job/application -X POST -F "file=@/path/to/execute_file" -v
+curl http://x.x.x.x:8770/job/application -X POST -F "file=@/path/to/execute_file" -v
 
 # run job
-curl http://x.x.x.x:8370/job/application/application-1591174445599 -X POST -H "Content-Type:application/json" -d '{"batch_args":[{"cluster_mode":"Standalone", "manager_type":"Coordinator","num_task_managers":"15","source_parallelism":"30", "reduce_parallelism":"30", "env":"dev"}]}' -v
+curl http://x.x.x.x:8770/job/application/application-1591174445599 -X POST -H "Content-Type:application/json" -d '{"batch_args":[{"cluster_mode":"Standalone", "manager_type":"Coordinator","num_task_managers":"15","source_parallelism":"30", "reduce_parallelism":"30", "env":"dev"}]}' -v
 
 # kill job
-curl http://x.x.x.x:8370/job/application/application-1591174445599/shutdown -X POST -H "Content-Type:application/json"
+curl http://x.x.x.x:8770/job/application/application-1591174445599/shutdown -X POST -H "Content-Type:application/json"
 ```
 
 ## On Yarn
-// todo
+
+### update manager jar to hdfs
+upload `rlink-yarn-manager-0.2.0-alpha.1-jar-with-dependencies.jar` to hdfs
+
+eg: upload to `hdfs://nn/path/to/rlink-yarn-manager-0.2.0-alpha.1-jar-with-dependencies.jar`
+
+### update application to hdfs
+upload your application executable file to hdfs.
+
+eg: upload `rlink-showcase` to `hdfs://nn/path/to/rlink-showcase`
+
+### submit yarn job
+submit yarn job with `rlink-yarn-client-0.2.0-alpha.1.jar`
+```shell
+hadoop jar rlink-yarn-client-0.2.0-alpha.1.jar rlink.yarn.client.Client \
+  --applicationName rlink-showcase \
+  --worker_process_path hdfs://nn/path/to/rlink-showcase \
+  --java_manager_path hdfs://nn/path/to/rlink-yarn-manager-0.2.0-alpha.1-jar-with-dependencies.jar \
+  --master_memory_mb 4096 \
+  --master_v_cores 2 \
+  --memory_mb 4096 \
+  --v_cores 2 \
+  --queue root.default \
+  --cluster_mode YARN \
+  --manager_type Coordinator \
+  --num_task_managers 80
+```

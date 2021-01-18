@@ -17,7 +17,7 @@ use crate::io::system_output_format::SystemOutputFormat;
 pub struct StreamNode {
     pub(crate) id: OperatorId,
     pub(crate) parent_ids: Vec<OperatorId>,
-    pub(crate) parallelism: u32,
+    pub(crate) parallelism: u16,
 
     pub(crate) operator_name: String,
     pub(crate) operator_type: OperatorType,
@@ -66,22 +66,6 @@ impl StreamGraph {
             .find(|x| x.weight.id == operator_id)
             .map(|x| &x.weight)
     }
-
-    // pub fn get_parents(&self, operator_id: u32) -> Vec<&StreamNode> {
-    //     self.dag
-    //         .raw_edges()
-    //         .iter()
-    //         .filter_map(|x| {
-    //             let target = self.dag.index(x.target());
-    //             if target.id == operator_id {
-    //                 let source = self.dag.index(x.source());
-    //                 Some(source)
-    //             } else {
-    //                 None
-    //             }
-    //         })
-    //         .collect()
-    // }
 
     pub(crate) fn to_string(&self) -> String {
         JsonDag::dag_json(&self.dag).to_string()
@@ -145,48 +129,27 @@ impl RawStreamGraph {
         operators
     }
 
-    fn create_virtual_flat_map(
-        &mut self,
-        id: OperatorId,
-        parent_id: OperatorId,
-        parallelism: u32,
-    ) -> StreamOperatorWrap {
+    fn create_virtual_flat_map(&mut self, parallelism: u16) -> StreamOperatorWrap {
         let map_format = Box::new(KeyedStateFlatMapFunction::new());
-        StreamOperatorWrap::StreamMap(StreamOperator::new(
-            id,
-            vec![parent_id],
+        StreamOperatorWrap::StreamFlatMap(StreamOperator::new(
             parallelism,
             FunctionCreator::System,
             map_format,
         ))
     }
 
-    fn create_virtual_source(
-        &mut self,
-        id: OperatorId,
-        parent_id: OperatorId,
-        parallelism: u32,
-    ) -> StreamOperatorWrap {
+    fn create_virtual_source(&mut self, parallelism: u16) -> StreamOperatorWrap {
         let input_format = Box::new(SystemInputFormat::new());
         StreamOperatorWrap::StreamSource(StreamOperator::new(
-            id,
-            vec![parent_id],
             parallelism,
             FunctionCreator::System,
             input_format,
         ))
     }
 
-    fn create_virtual_sink(
-        &mut self,
-        id: OperatorId,
-        parent_id: OperatorId,
-        parallelism: u32,
-    ) -> StreamOperatorWrap {
+    fn create_virtual_sink(&mut self, parallelism: u16) -> StreamOperatorWrap {
         let output_format = Box::new(SystemOutputFormat::new());
         StreamOperatorWrap::StreamSink(StreamOperator::new(
-            id,
-            vec![parent_id],
             parallelism,
             FunctionCreator::System,
             output_format,
@@ -197,7 +160,7 @@ impl RawStreamGraph {
         &mut self,
         operator: StreamOperatorWrap,
         parent_operator_ids: Vec<OperatorId>,
-        parallelism: u32,
+        parallelism: u16,
     ) -> Result<OperatorId, DagError> {
         let operator_id = self.id_gen;
         self.id_gen.0 = self.id_gen.0 + 1;
@@ -268,29 +231,25 @@ impl RawStreamGraph {
             let p_parallelism = p_stream_node.parallelism;
             let p_operator_type = p_stream_node.operator_type;
 
-            if self.is_pipeline(operator_type, parallelism, p_operator_type, p_parallelism) {
+            let pipeline =
+                self.is_pipeline(operator_type, parallelism, p_operator_type, p_parallelism)?;
+            if pipeline {
                 // tow types of parallelism inherit
                 // 1. Forward:  source->map
                 // 2. Backward: window->reduce
                 let parallelism = max(parallelism, p_parallelism);
                 self.add_operator0(operator, parent_operator_ids, parallelism)
             } else {
-                let vir_sink =
-                    self.create_virtual_sink(OperatorId::default(), p_operator_id, p_parallelism);
+                let vir_sink = self.create_virtual_sink(p_parallelism);
                 let vir_operator_id =
                     self.add_operator0(vir_sink, vec![p_operator_id], p_parallelism)?;
 
-                let vir_source =
-                    self.create_virtual_source(OperatorId::default(), vir_operator_id, parallelism);
+                let vir_source = self.create_virtual_source(parallelism);
                 let vir_operator_id =
                     self.add_operator0(vir_source, vec![vir_operator_id], parallelism)?;
 
                 let vir_operator_id = if self.is_reduce_parent(p_operator_id) {
-                    let vir_map = self.create_virtual_flat_map(
-                        OperatorId::default(),
-                        vir_operator_id,
-                        parallelism,
-                    );
+                    let vir_map = self.create_virtual_flat_map(parallelism);
                     self.add_operator0(vir_map, vec![vir_operator_id], parallelism)?
                 } else {
                     vir_operator_id
@@ -309,16 +268,14 @@ impl RawStreamGraph {
                 let p_stream_node = self.dag.index(*p_node_index);
 
                 let p_parallelism = p_stream_node.parallelism;
-                let vir_sink =
-                    self.create_virtual_sink(OperatorId::default(), OperatorId::default(), 0);
+                let vir_sink = self.create_virtual_sink(0);
                 let vir_operator_id =
                     self.add_operator0(vir_sink, vec![p_operator_id], p_parallelism)?;
 
                 new_p_operator_ids.push(vir_operator_id);
             }
 
-            let vir_source =
-                self.create_virtual_source(OperatorId::default(), OperatorId::default(), 0);
+            let vir_source = self.create_virtual_source(0);
             let vir_operator_id =
                 self.add_operator0(vir_source, new_p_operator_ids, parallelism)?;
 
@@ -329,69 +286,68 @@ impl RawStreamGraph {
     fn is_pipeline(
         &self,
         operator_type: OperatorType,
-        parallelism: u32,
+        parallelism: u16,
         p_operator_type: OperatorType,
-        p_parallelism: u32,
-    ) -> bool {
+        p_parallelism: u16,
+    ) -> Result<bool, DagError> {
         if p_operator_type == OperatorType::WindowAssigner && operator_type == OperatorType::Reduce
         {
-            true
+            Ok(true)
         } else {
-            if self.is_pipeline_op(operator_type, p_operator_type)
-                && (parallelism == p_parallelism || parallelism == DEFAULT_PARALLELISM)
-            {
-                true
+            let pipeline_ip = self.check_operator(operator_type, p_operator_type)?;
+            if pipeline_ip && (parallelism == p_parallelism || parallelism == DEFAULT_PARALLELISM) {
+                Ok(true)
             } else {
-                false
+                Ok(false)
             }
         }
     }
 
-    fn is_pipeline_op(
+    fn check_operator(
         &self,
         operator_type: OperatorType,
         parent_operator_type: OperatorType,
-    ) -> bool {
+    ) -> Result<bool, DagError> {
         match parent_operator_type {
             OperatorType::Source => match operator_type {
-                OperatorType::Map
+                OperatorType::FlatMap
                 | OperatorType::Filter
                 | OperatorType::WatermarkAssigner
                 | OperatorType::KeyBy
-                | OperatorType::Sink => true,
-                OperatorType::Source => panic!("Source is the start Operator"),
-                _ => false,
+                | OperatorType::Sink => Ok(true),
+                OperatorType::Source => Err(DagError::SourceNotAtStarting),
+                _ => Ok(false),
             },
-            OperatorType::Map | OperatorType::Filter | OperatorType::WatermarkAssigner => {
+            OperatorType::FlatMap | OperatorType::Filter | OperatorType::WatermarkAssigner => {
                 match operator_type {
-                    OperatorType::Map
+                    OperatorType::FlatMap
                     | OperatorType::Filter
                     | OperatorType::WatermarkAssigner
                     | OperatorType::KeyBy
-                    | OperatorType::Sink => true,
-                    OperatorType::Source => panic!("Source is the start Operator"),
-                    _ => false,
+                    | OperatorType::Sink => Ok(true),
+                    OperatorType::Source => Err(DagError::SourceNotAtStarting),
+                    _ => Ok(false),
                 }
             }
             OperatorType::CoProcess => match operator_type {
-                OperatorType::KeyBy => true,
-                OperatorType::Source => panic!("Source is the start Operator"),
-                _ => false,
+                OperatorType::KeyBy => Ok(true),
+                OperatorType::Source => Err(DagError::SourceNotAtStarting),
+                _ => Ok(false),
             },
             OperatorType::KeyBy => match operator_type {
-                OperatorType::Source => panic!("Source is the start Operator"),
-                _ => false,
+                OperatorType::Source => Err(DagError::SourceNotAtStarting),
+                _ => Ok(false),
             },
             OperatorType::WindowAssigner => match operator_type {
-                OperatorType::Reduce => true,
-                OperatorType::Source => panic!("Source is the start Operator"),
-                _ => false,
+                OperatorType::Reduce => Ok(true),
+                OperatorType::Source => Err(DagError::SourceNotAtStarting),
+                _ => Ok(false),
             },
             OperatorType::Reduce => match operator_type {
-                OperatorType::Source => panic!("Source is the start Operator"),
-                _ => false,
+                OperatorType::Source => Err(DagError::SourceNotAtStarting),
+                _ => Ok(false),
             },
-            OperatorType::Sink => panic!("Sink is end Operator"),
+            OperatorType::Sink => Err(DagError::SinkNotAtEnding),
         }
     }
 

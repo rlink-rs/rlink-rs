@@ -1,4 +1,8 @@
+use std::convert::TryFrom;
+
 use bytes::{Buf, BufMut, BytesMut};
+
+use crate::api::runtime::{ChannelKey, JobId, TaskId};
 
 pub(crate) mod client;
 pub(crate) mod server;
@@ -7,11 +11,6 @@ pub(crate) use client::run_subscribe;
 pub(crate) use client::subscribe;
 pub(crate) use server::publish;
 pub(crate) use server::Server;
-
-use std::convert::TryFrom;
-
-use crate::api::runtime::{ChannelKey, JobId, TaskId};
-use std::error::Error;
 
 const BODY_LEN: usize = 18;
 
@@ -38,12 +37,16 @@ impl Into<BytesMut> for ElementRequest {
 }
 
 impl TryFrom<BytesMut> for ElementRequest {
-    type Error = NetWorkError;
+    type Error = anyhow::Error;
 
     fn try_from(mut buffer: BytesMut) -> Result<Self, Self::Error> {
         let len = buffer.get_u32(); // skip header length
         if len as usize != BODY_LEN {
-            return Err(NetWorkError::IllegalRequestBodyLenError);
+            return Err(anyhow!(
+                "Illegal request body length, expect {}, found {}",
+                BODY_LEN,
+                len
+            ));
         }
 
         let source_task_id = {
@@ -119,30 +122,6 @@ impl std::fmt::Display for ResponseCode {
             ResponseCode::ParseErr => write!(f, "ParseErr"),
             ResponseCode::ReadErr => write!(f, "ReadErr"),
             ResponseCode::Unknown => write!(f, "Unknown"),
-        }
-    }
-}
-
-// pub(crate) struct ElementResponse {}
-
-pub(crate) trait ServerHandler
-where
-    Self: Sync + Send,
-{
-    fn on_request(&self);
-}
-
-#[derive(Debug)]
-pub enum NetWorkError {
-    IllegalRequestBodyLenError,
-}
-
-impl Error for NetWorkError {}
-
-impl std::fmt::Display for NetWorkError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            NetWorkError::IllegalRequestBodyLenError => write!(f, "IllegalRequestBodyLenError"),
         }
     }
 }

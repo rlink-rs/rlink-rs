@@ -37,7 +37,7 @@ impl StreamExecutionEnvironment {
         }
     }
 
-    pub fn register_source<I>(&mut self, input_format: I, parallelism: u32) -> DataStream
+    pub fn register_source<I>(&mut self, input_format: I, parallelism: u16) -> DataStream
     where
         I: InputFormat + 'static,
     {
@@ -62,7 +62,15 @@ where
     S: StreamJob + 'static,
 {
     let stream_env = StreamExecutionEnvironment::new(job_name.to_string());
-    runtime::run(stream_env, stream_job);
+    match runtime::run(stream_env, stream_job) {
+        Ok(_) => {}
+        Err(e) => {
+            panic!(
+                "force panic when catch error in job startup process. msg: {}",
+                e
+            );
+        }
+    }
 }
 
 pub(crate) const ROOT_ID: u32 = 100;

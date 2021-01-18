@@ -20,7 +20,7 @@ use crate::utils::date_time::timestamp_str;
 pub(crate) struct ReduceRunnable {
     operator_id: OperatorId,
     task_number: u16,
-    dependency_parallelism: u32,
+    dependency_parallelism: u16,
 
     stream_key_by: Option<StreamOperator<dyn KeySelectorFunction>>,
     stream_reduce: StreamOperator<dyn ReduceFunction>,
@@ -67,11 +67,11 @@ impl ReduceRunnable {
 }
 
 impl Runnable for ReduceRunnable {
-    fn open(&mut self, context: &RunnableContext) {
-        self.next_runnable.as_mut().unwrap().open(context);
+    fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
+        self.next_runnable.as_mut().unwrap().open(context)?;
 
         let fun_context = context.to_fun_context(self.operator_id);
-        self.stream_reduce.operator_fn.open(&fun_context);
+        self.stream_reduce.operator_fn.open(&fun_context)?;
         self.stream_key_by
             .as_mut()
             .map(|s| s.operator_fn.open(&fun_context));
@@ -121,6 +121,8 @@ impl Runnable for ReduceRunnable {
 
         let metric_name = format!("Reduce_Expire_{}", fn_name);
         register_counter(metric_name.as_str(), tags, self.expire_counter.clone());
+
+        Ok(())
     }
 
     fn run(&mut self, element: Element) {
@@ -264,10 +266,10 @@ impl Runnable for ReduceRunnable {
         }
     }
 
-    fn close(&mut self) {
+    fn close(&mut self) -> anyhow::Result<()> {
         self.stream_key_by.as_mut().map(|s| s.operator_fn.close());
-        self.stream_reduce.operator_fn.close();
-        self.next_runnable.as_mut().unwrap().close();
+        self.stream_reduce.operator_fn.close()?;
+        self.next_runnable.as_mut().unwrap().close()
     }
 
     fn set_next_runnable(&mut self, next_runnable: Option<Box<dyn Runnable>>) {

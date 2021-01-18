@@ -4,6 +4,8 @@ extern crate serde_derive;
 extern crate log;
 #[macro_use]
 extern crate lazy_static;
+#[macro_use]
+extern crate anyhow;
 
 #[macro_use]
 mod macros;

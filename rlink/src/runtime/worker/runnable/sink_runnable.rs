@@ -33,7 +33,7 @@ impl SinkRunnable {
 }
 
 impl Runnable for SinkRunnable {
-    fn open(&mut self, context: &RunnableContext) {
+    fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
         self.task_number = context.task_descriptor.task_id.task_number;
         self.num_tasks = context.task_descriptor.task_id.num_tasks;
 
@@ -43,7 +43,7 @@ impl Runnable for SinkRunnable {
         );
 
         let fun_context = context.to_fun_context(self.operator_id);
-        self.stream_sink.operator_fn.open(&fun_context);
+        self.stream_sink.operator_fn.open(&fun_context)?;
 
         let tags = vec![
             Tag(
@@ -57,6 +57,8 @@ impl Runnable for SinkRunnable {
         ];
         let metric_name = format!("Sink_{}", self.stream_sink.operator_fn.as_ref().get_name());
         register_counter(metric_name.as_str(), tags, self.counter.clone());
+
+        Ok(())
     }
 
     fn run(&mut self, element: Element) {
@@ -110,8 +112,9 @@ impl Runnable for SinkRunnable {
         }
     }
 
-    fn close(&mut self) {
-        self.stream_sink.operator_fn.close();
+    fn close(&mut self) -> anyhow::Result<()> {
+        self.stream_sink.operator_fn.close()?;
+        Ok(())
     }
 
     fn set_next_runnable(&mut self, _next_runnable: Option<Box<dyn Runnable>>) {

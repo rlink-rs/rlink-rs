@@ -21,7 +21,7 @@ public class Client {
     public static final String MASTER_MEMORY_MB_KEY = "master_memory_mb";
     public static final String MASTER_VIRTUAL_CORES_KEY = "master_v_cores";
     public static final String QUEUE_KEY = "queue";
-    public static final String JOB_ID_KEY = "job_id";
+    public static final String APPLICATION_ID_KEY = "application_id";
 
     public static void main(String[] args) {
         try {

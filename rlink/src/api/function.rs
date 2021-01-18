@@ -33,19 +33,19 @@ impl Context {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct InputSplit {
-    split_number: u32,
+    split_number: u16,
     properties: Properties,
 }
 
 impl InputSplit {
-    pub fn new(split_number: u32, properties: Properties) -> Self {
+    pub fn new(split_number: u16, properties: Properties) -> Self {
         InputSplit {
             split_number,
             properties,
         }
     }
 
-    pub fn get_split_number(&self) -> u32 {
+    pub fn get_split_number(&self) -> u16 {
         self.split_number
     }
 
@@ -80,7 +80,7 @@ pub trait InputSplitSource {
     /// Create InputSplits by system parallelism[`min_num_splits`]
     ///
     /// Returns a InputSplit vec
-    fn create_input_splits(&self, min_num_splits: u32) -> Vec<InputSplit> {
+    fn create_input_splits(&self, min_num_splits: u16) -> Vec<InputSplit> {
         let mut input_splits = Vec::with_capacity(min_num_splits as usize);
         for task_number in 0..min_num_splits {
             input_splits.push(InputSplit::new(task_number, Properties::new()));
@@ -103,13 +103,13 @@ where
     Self: InputSplitSource + Function,
 {
     // fn configure(&mut self, properties: HashMap<String, String>);
-    fn open(&mut self, input_split: InputSplit, context: &Context);
+    fn open(&mut self, input_split: InputSplit, context: &Context) -> crate::api::Result<()>;
     fn reached_end(&self) -> bool;
     fn next_record(&mut self) -> Option<Record>;
     fn next_element(&mut self) -> Option<Element> {
         self.next_record().map(|record| Element::Record(record))
     }
-    fn close(&mut self);
+    fn close(&mut self) -> crate::api::Result<()>;
 
     fn get_checkpoint(&mut self) -> Option<Box<&mut dyn CheckpointedFunction>> {
         None
@@ -126,7 +126,7 @@ where
     ///
     /// `taskNumber` The number of the parallel instance.
     /// `numTasks` The number of parallel tasks.
-    fn open(&mut self, context: &Context);
+    fn open(&mut self, context: &Context) -> crate::api::Result<()>;
 
     fn write_record(&mut self, record: Record);
 
@@ -134,7 +134,7 @@ where
         self.write_record(element.into_record())
     }
 
-    fn close(&mut self);
+    fn close(&mut self) -> crate::api::Result<()>;
 
     // todo unsupported. `TwoPhaseCommitSinkFunction`
     fn begin_transaction(&mut self) {}
@@ -147,48 +147,48 @@ pub trait FlatMapFunction
 where
     Self: Function,
 {
-    fn open(&mut self, context: &Context);
+    fn open(&mut self, context: &Context) -> crate::api::Result<()>;
     fn flat_map(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>>;
-    fn close(&mut self);
+    fn close(&mut self) -> crate::api::Result<()>;
 }
 
 pub trait FilterFunction
 where
     Self: Function,
 {
-    fn open(&mut self, context: &Context);
+    fn open(&mut self, context: &Context) -> crate::api::Result<()>;
     fn filter(&self, record: &mut Record) -> bool;
-    fn close(&mut self);
+    fn close(&mut self) -> crate::api::Result<()>;
 }
 
 pub trait KeySelectorFunction
 where
     Self: Function,
 {
-    fn open(&mut self, context: &Context);
+    fn open(&mut self, context: &Context) -> crate::api::Result<()>;
     fn get_key(&self, record: &mut Record) -> Record;
-    fn close(&mut self);
+    fn close(&mut self) -> crate::api::Result<()>;
 }
 
 pub trait ReduceFunction
 where
     Self: Function,
 {
-    fn open(&mut self, context: &Context);
+    fn open(&mut self, context: &Context) -> crate::api::Result<()>;
     ///
     fn reduce(&self, value: Option<&mut Record>, record: &mut Record) -> Record;
-    fn close(&mut self);
+    fn close(&mut self) -> crate::api::Result<()>;
 }
 
 pub trait CoProcessFunction
 where
     Self: Function,
 {
-    fn open(&mut self, context: &Context);
+    fn open(&mut self, context: &Context) -> crate::api::Result<()>;
     /// This method is called for each element in the first of the connected streams.
     ///
     /// `stream_seq` is the `DataStream` index
     fn process_left(&self, record: Record) -> Box<dyn Iterator<Item = Record>>;
     fn process_right(&self, stream_seq: usize, record: Record) -> Box<dyn Iterator<Item = Record>>;
-    fn close(&mut self);
+    fn close(&mut self) -> crate::api::Result<()>;
 }

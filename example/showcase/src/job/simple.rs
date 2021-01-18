@@ -6,14 +6,15 @@ use rlink::api::env::{StreamExecutionEnvironment, StreamJob};
 use rlink::api::properties::{Properties, SystemProperties};
 use rlink::api::watermark::BoundedOutOfOrdernessTimestampExtractor;
 use rlink::api::window::SlidingEventTimeWindows;
-use rlink::functions::column_base_function::key_selector::ColumnBaseKeySelector;
-use rlink::functions::column_base_function::reduce::{sum_i64, ColumnBaseReduceFunction};
-use rlink::functions::column_base_function::timestamp_assigner::ColumnBaseTimestampAssigner;
-use rlink::functions::column_base_function::FunctionSchema;
+use rlink::functions::schema_base::key_selector::SchemaBaseKeySelector;
+use rlink::functions::schema_base::print_output_format::PrintOutputFormat;
+use rlink::functions::schema_base::reduce::{sum_i64, SchemaBaseReduceFunction};
+use rlink::functions::schema_base::timestamp_assigner::SchemaBaseTimestampAssigner;
+use rlink::functions::schema_base::FunctionSchema;
 
 use crate::buffer_gen::model;
-use crate::buffer_gen::model::DATA_TYPE;
-use crate::job::functions::{MyFilterFunction, MyFlatMapFunction, MyOutputFormat, TestInputFormat};
+use crate::buffer_gen::model::FIELD_TYPE;
+use crate::job::functions::{MyFilterFunction, MyFlatMapFunction, TestInputFormat};
 
 #[derive(Clone, Debug)]
 pub struct MyStreamJob {}
@@ -24,9 +25,9 @@ impl StreamJob for MyStreamJob {
     }
 
     fn build_stream(&self, properties: &Properties, env: &mut StreamExecutionEnvironment) {
-        let key_selector = ColumnBaseKeySelector::new(vec![model::index::name], DATA_TYPE.to_vec());
+        let key_selector = SchemaBaseKeySelector::new(vec![model::index::name], &FIELD_TYPE);
         let reduce_function =
-            ColumnBaseReduceFunction::new(vec![sum_i64(model::index::value)], DATA_TYPE.to_vec());
+            SchemaBaseReduceFunction::new(vec![sum_i64(model::index::value)], &FIELD_TYPE);
 
         // the schema after reduce
         let output_schema_types = {
@@ -36,13 +37,12 @@ impl StreamJob for MyStreamJob {
             key_types
         };
 
-        let data_stream = env.register_source(TestInputFormat::new(properties.clone()), 1);
-        data_stream
+        env.register_source(TestInputFormat::new(properties.clone()), 1)
             .flat_map(MyFlatMapFunction::new())
             .filter(MyFilterFunction::new())
             .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
                 Duration::from_secs(1),
-                ColumnBaseTimestampAssigner::new(model::index::timestamp, DATA_TYPE.to_vec()),
+                SchemaBaseTimestampAssigner::new(model::index::timestamp, &FIELD_TYPE),
             ))
             .key_by(key_selector)
             .window(SlidingEventTimeWindows::new(
@@ -51,6 +51,6 @@ impl StreamJob for MyStreamJob {
                 None,
             ))
             .reduce(reduce_function, 2)
-            .add_sink(MyOutputFormat::new(output_schema_types));
+            .add_sink(PrintOutputFormat::new(output_schema_types.as_slice()));
     }
 }

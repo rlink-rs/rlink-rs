@@ -28,7 +28,7 @@ echo "args:${args}"
 
 nohup $execute_file_path \
   cluster_config=${CLUSTER_CONFIG} \
-  job_id=${APPLICATION_ID} \
+  application_id=${APPLICATION_ID} \
   task_id=${TASK_ID} \
   bind_ip=${BIND_IP} \
   ${args} \
