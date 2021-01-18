@@ -3,7 +3,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", content = "param")]
 pub enum MetadataStorageType {
     Memory,
@@ -40,9 +40,10 @@ impl ClusterConfig {
     }
 }
 
-pub fn load_config(path: PathBuf) -> ClusterConfig {
-    let context = read_config_from_path(path).expect("read Cluster config error");
-    serde_yaml::from_str(&context).expect("parse Cluster config error")
+pub fn load_config(path: PathBuf) -> anyhow::Result<ClusterConfig> {
+    let context =
+        read_config_from_path(path).map_err(|e| anyhow!("read Cluster config error {}", e))?;
+    serde_yaml::from_str(&context).map_err(|e| anyhow!("parse Cluster config error {}", e))
 }
 
 pub fn read_config_from_path(path: PathBuf) -> Result<String, std::io::Error> {
@@ -137,13 +138,20 @@ mod tests {
     #[test]
     pub fn ser_cluster_config_test() {
         let config = ClusterConfig {
-            application_manager_address: vec!["addr_a".to_string(), "addr_b".to_string()],
+            application_manager_address: vec![
+                "http://0.0.0.0:8370".to_string(),
+                "http://0.0.0.0:8370".to_string(),
+            ],
             metadata_storage: MetadataStorageType::Memory,
-            task_manager_bind_ip: "ip".to_string(),
-            task_manager_work_dir: "dir".to_string(),
+            task_manager_bind_ip: "0.0.0.0".to_string(),
+            task_manager_work_dir: "/data/rlink/application".to_string(),
         };
 
         let yaml = serde_yaml::to_string(&config).unwrap();
         println!("{}", yaml);
+
+        let config1: ClusterConfig = serde_yaml::from_str(yaml.as_str()).unwrap();
+
+        assert!(config.metadata_storage.eq(&config1.metadata_storage));
     }
 }

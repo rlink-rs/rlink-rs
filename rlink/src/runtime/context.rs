@@ -145,12 +145,12 @@ impl Context {
 
         let cluster_config = match cluster_mode {
             ClusterMode::Local => match utils::parse_arg("cluster_config") {
-                Ok(cluster_config) => load_config(PathBuf::from(cluster_config)),
+                Ok(cluster_config) => load_config(PathBuf::from(cluster_config))?,
                 Err(_e) => ClusterConfig::new_local(),
             },
             ClusterMode::Standalone => {
                 let cluster_config = utils::parse_arg("cluster_config")?;
-                load_config(PathBuf::from(cluster_config))
+                load_config(PathBuf::from(cluster_config))?
             }
             ClusterMode::YARN => ClusterConfig::new_local(),
         };
