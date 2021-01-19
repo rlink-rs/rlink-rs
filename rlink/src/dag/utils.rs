@@ -177,20 +177,23 @@ where
     }
 
     fn sort_edge(&mut self) {
-        let mut edge_indies = HashMap::new();
+        let mut edge_index_map = HashMap::new();
         for i in 0..self.edges.len() {
             let edge = self.edges.get(i).unwrap();
-            edge_indies.insert(edge.source.clone(), i);
+            let indies = edge_index_map.entry(edge.source.clone()).or_insert(vec![]);
+            indies.push(i);
         }
 
         for i in 0..self.nodes.len() {
             let (edge_index, source_dept) = {
                 let node = self.nodes.get(i).unwrap();
-                let edge_index = edge_indies.get(&node.id).map(|x| *x);
+                let edge_index = edge_index_map.get(&node.id).map(|x| x.clone());
                 (edge_index, node.dept)
             };
-            edge_index.map(|edge_index| {
-                self.edges.get_mut(edge_index).unwrap().dept = source_dept;
+            edge_index.map(|edge_indies| {
+                edge_indies.into_iter().for_each(|edge_index| {
+                    self.edges.get_mut(edge_index).unwrap().dept = source_dept;
+                });
             });
         }
 
