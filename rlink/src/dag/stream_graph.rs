@@ -8,7 +8,8 @@ use crate::api::operator::{
     FunctionCreator, StreamOperator, StreamOperatorWrap, TStreamOperator, DEFAULT_PARALLELISM,
 };
 use crate::api::runtime::OperatorId;
-use crate::dag::{DagError, JsonDag, Label, OperatorType};
+use crate::dag::utils::JsonDag;
+use crate::dag::{DagError, Label, OperatorType};
 use crate::functions::keyed_state_flat_map::KeyedStateFlatMapFunction;
 use crate::io::system_input_format::SystemInputFormat;
 use crate::io::system_output_format::SystemOutputFormat;

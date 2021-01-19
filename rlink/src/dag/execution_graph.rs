@@ -8,7 +8,8 @@ use crate::api::operator::StreamOperatorWrap;
 use crate::api::runtime::{JobId, OperatorId};
 use crate::dag::job_graph::{JobEdge, JobGraph};
 use crate::dag::stream_graph::StreamNode;
-use crate::dag::{DagError, JsonDag, Label, TaskId};
+use crate::dag::utils::JsonDag;
+use crate::dag::{DagError, Label, TaskId};
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub(crate) enum ExecutionEdge {
