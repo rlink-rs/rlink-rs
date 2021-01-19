@@ -2,6 +2,7 @@
 //! stream_graph -> job_graph -> execution_graph
 
 use std::borrow::BorrowMut;
+use std::cmp::max;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::ops::Index;
@@ -206,6 +207,7 @@ where
     #[serde(rename = "type")]
     ty: String,
     detail: Option<N>,
+    dept: isize,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -213,10 +215,13 @@ pub(crate) struct JsonEdge<E>
 where
     E: Serialize,
 {
+    /// source JsonNode id
     source: String,
+    /// target JsonNode id
     target: String,
     label: String,
     detail: Option<E>,
+    dept: isize,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -259,6 +264,7 @@ where
             label,
             ty: ty.to_string(),
             detail: Some(n.clone()),
+            dept: -1,
         }
     }
 
@@ -277,6 +283,7 @@ where
                     target: target_json_node.id.clone(),
                     label,
                     detail: Some(edge.weight.clone()),
+                    dept: -1,
                 }
             };
 
@@ -288,7 +295,86 @@ where
 
         let nodes = node_map.into_iter().map(|(_, node)| node).collect();
 
-        JsonDag { nodes, edges }
+        let mut json_dag = JsonDag { nodes, edges };
+        json_dag.sort_nodes();
+        json_dag.sort_edge();
+
+        json_dag
+    }
+
+    fn sort_nodes(&mut self) {
+        let mut node_indies = HashMap::new();
+        for i in 0..self.nodes.len() {
+            let node = self.nodes.get(i).unwrap();
+            node_indies.insert(node.id.clone(), i);
+        }
+
+        let root_source_ids: Vec<String> = self
+            .nodes
+            .iter()
+            .filter(|node| {
+                self.edges
+                    .iter()
+                    .find(|edge| edge.target.eq(&node.id))
+                    .is_none()
+            })
+            .map(|node| node.id.clone())
+            .collect();
+
+        root_source_ids.into_iter().for_each(|node_id| {
+            let index = node_indies.get(&node_id).unwrap();
+            self.nodes.get_mut(*index).unwrap().dept = 0;
+        });
+
+        self.dept_build(0, &node_indies);
+
+        self.nodes.sort_by_key(|node| node.dept);
+    }
+
+    fn dept_build(&mut self, parent_dept: isize, node_indies: &HashMap<String, usize>) {
+        for i in 0..self.edges.len() {
+            let (source_index, target_index) = {
+                let edge = self.edges.get(i).unwrap();
+                let source_index = node_indies.get(&edge.source).unwrap();
+                let target_index = node_indies.get(&edge.target).unwrap();
+                (*source_index, *target_index)
+            };
+
+            let source_dept = self.nodes.get(source_index).unwrap().dept;
+            if source_dept == parent_dept {
+                let target = self.nodes.get_mut(target_index).unwrap();
+
+                let next_dept = parent_dept + 1;
+                target.dept = if target.dept == -1 {
+                    next_dept
+                } else {
+                    max(target.dept, next_dept)
+                };
+
+                self.dept_build(next_dept, node_indies);
+            }
+        }
+    }
+
+    fn sort_edge(&mut self) {
+        let mut edge_indies = HashMap::new();
+        for i in 0..self.edges.len() {
+            let edge = self.edges.get(i).unwrap();
+            edge_indies.insert(edge.source.clone(), i);
+        }
+
+        for i in 0..self.nodes.len() {
+            let (edge_index, source_dept) = {
+                let node = self.nodes.get(i).unwrap();
+                let edge_index = edge_indies.get(&node.id).map(|x| *x);
+                (edge_index, node.dept)
+            };
+            edge_index.map(|edge_index| {
+                self.edges.get_mut(edge_index).unwrap().dept = source_dept;
+            });
+        }
+
+        self.edges.sort_by_key(|edge| edge.dept);
     }
 
     pub(crate) fn to_string(&self) -> String {
