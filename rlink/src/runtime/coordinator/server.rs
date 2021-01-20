@@ -341,74 +341,74 @@ const DAG_TEMPLATE: &'static str = r##"
 <style>
 html,
 body {
-width: 100%;
-height: 100%;
-position: relative;
-margin: 0;
-padding: 0;
-/*background: #47ac98;*/
+    width: 100%;
+    height: 100%;
+    position: relative;
+    margin: 0;
+    padding: 0;
+    background: #3e3e3e;
 }
 #tree {
-width: 100%;
-height: 100%;
-display: flex;
-position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    position: relative;
 }
 #tree svg {
-width: 100%;
-height: 100%;
+    width: 100%;
+    height: 100%;
 }
 text {
-font-size: 14px;
-fill: #fff;
+    font-size: 14px;
+    fill: #fff;
 }
 .edgePath path {
-stroke: #333;
-fill: #333;
-stroke-width: 1.5px;
+    stroke: #f00;
+    fill: #f00;
+    stroke-width: 1.5px;
 }
 .node circle {
-fill: #000000;
+    fill: #000000;
 }
 /* tree svg */
 
 .chartTooltip {
-position: absolute;
-height: auto;
-padding: 10px;
-box-sizing: border-box;
-background-color: white;
-border-radius: 5px;
-box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.4);
-opacity: 0;
+    position: absolute;
+    height: auto;
+    padding: 10px;
+    box-sizing: border-box;
+    background-color: white;
+    border-radius: 5px;
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.4);
+    opacity: 0;
 }
 .chartTooltip p {
-margin: 0;
-font-size: 14px;
-line-height: 20px;
-word-wrap: break-word;
+    margin: 0;
+    font-size: 14px;
+    line-height: 20px;
+    word-wrap: break-word;
 }
 .chartTooltip p span {
-display: flex;
+    display: flex;
 }
 .chartTooltip p a {
-display: flex;
+    display: flex;
 }
 .author {
-position: absolute;
-top: 20px;
-left: 20px;
+    position: absolute;
+    top: 20px;
+    left: 20px;
 }
 </style>
 </head>
 
 <div id="tree">
-<div class="chartTooltip">
-<p id="chartTooltipText">
-<span class="chartTooltip-label"></span>
-<span class="chartTooltip-name"></span>
-</p>
-</div>
+    <div class="chartTooltip">
+        <p id="chartTooltipText">
+            <span class="chartTooltip-label"></span>
+            <span class="chartTooltip-name"></span>
+        </p>
+    </div>
 </div>
 
 <script type="text/javascript">
@@ -416,36 +416,36 @@ let width = document.getElementById("tree").offsetWidth;
 let height = document.getElementById("tree").offsetHeight;
 // Create a new directed graph
 let g = new dagreD3.graphlib.Graph().setGraph({
-rankdir: 'TB',
-edgesep: 100,
-ranksep: 150
+    rankdir: 'TB',
+    edgesep: 100,
+    ranksep: 150
 });
 
 let dag = DAG_PLACE_HOLDER;
 
 let states = dag.nodes.forEach(function(node){
-let node_id = node.id;
-let value = {
-shape: "rect",
-name: node.name,
-label : node.label,
-rx: 5,
-ry: 5,
-}
-
-g.setNode(node_id, value);
+    let node_id = node.id;
+    let value = {
+        shape: "rect",
+        name: node.name,
+        label : node.label,
+        rx: 5,
+        ry: 5,
+    }
+    
+    g.setNode(node_id, value);
 });
 
 dag.edges.forEach(function(edge) {
-let source_node_id = edge.source;
-let target_node_id = edge.target;
-let label = edge.label;
-
-g.setEdge(source_node_id, target_node_id, {
-label: label,
-lineInterpolate: 'basis',
-style: "fill: none; stroke: red"
-});
+    let source_node_id = edge.source;
+    let target_node_id = edge.target;
+    let label = edge.label;
+    
+    g.setEdge(source_node_id, target_node_id, {
+        label: label,
+        lineInterpolate: 'basis',
+        style: "fill: none; stroke: red"
+    });
 });
 
 let render = new dagreD3.render();
@@ -456,32 +456,32 @@ let inner = svg.append("g");
 render(inner, g);
 // Set up zoom support
 let zoom = d3.behavior.zoom().scaleExtent([0.1, 100])
-.on('zoomstart', () => {
-svg.style('cursor', 'move')
-})
-.on("zoom", function() {
-inner.attr('transform',
-"translate(" + d3.event.translate + ")" +
-"scale(" + d3.event.scale + ")"
-)
-}).on('zoomend', () => {
-svg.style('cursor', 'default')
-});
+    .on('zoomstart', () => {
+        svg.style('cursor', 'move')
+    })
+    .on("zoom", function() {
+        inner.attr('transform',
+            "translate(" + d3.event.translate + ")" +
+            "scale(" + d3.event.scale + ")"
+        )
+    }).on('zoomend', () => {
+        svg.style('cursor', 'default')
+    });
 svg.call(zoom);
 
 let timer;
 const nodeEnter = inner.selectAll('g.node');
 // 圆点添加 提示框
 nodeEnter
-.on('mouseover', function(d) {
-tooltipOver(d)
-console.log(d)
-})
-.on('mouseout', () => {
-timer = setTimeout(function() {
-d3.select('.chartTooltip').transition().duration(300).style('opacity', 0).style('display', 'none')
-}, 200)
-});
+    .on('mouseover', function(d) {
+        tooltipOver(d)
+        console.log(d)
+    })
+    .on('mouseout', () => {
+        timer = setTimeout(function() {
+            d3.select('.chartTooltip').transition().duration(300).style('opacity', 0).style('display', 'none')
+        }, 200)
+    });
 
 // 偏移节点内文本内容
 // nodeEnter.select('g.label').attr('transform', 'translate(0, 0)');
@@ -492,33 +492,33 @@ d3.select('.chartTooltip').transition().duration(300).style('opacity', 0).style(
 //     });
 
 function tooltipOver(d) {
-if (timer) clearTimeout(timer);
-d3.select('.chartTooltip').transition().duration(300).style('opacity', 1).style('display', 'block');
-const yPosition = d3.event.layerY + 20;
-const xPosition = d3.event.layerX + 20;
-const chartTooltip = d3.select('.chartTooltip')
-.style('left', xPosition + 'px')
-.style('top', yPosition + 'px');
-
-d3.select('.chartTooltip').on('mouseover', () => {
-if (timer) clearTimeout(timer);
-d3.select('.chartTooltip').transition().duration(300).style('opacity', 1).style('display', 'block')
-}).on('mouseout', () => {
-timer = setTimeout(function() {
-d3.select('.chartTooltip').transition().duration(300).style('opacity', 0).style('display', 'none')
-}, 200)
-});
-
-if (d) {
-chartTooltip.select('.chartTooltip-label').text('label：' + d)
-} else {
-chartTooltip.select('.chartTooltip-label').text('label：' + d)
-}
-if (g.node(d).name) {
-chartTooltip.select('.chartTooltip-name').text('名字2：' + g.node(d).name)
-} else {
-chartTooltip.select('.chartTooltip-name').text('名字2：' + g.node(d).name)
-}
+    if (timer) clearTimeout(timer);
+    d3.select('.chartTooltip').transition().duration(300).style('opacity', 1).style('display', 'block');
+    const yPosition = d3.event.layerY + 20;
+    const xPosition = d3.event.layerX + 20;
+    const chartTooltip = d3.select('.chartTooltip')
+        .style('left', xPosition + 'px')
+        .style('top', yPosition + 'px');
+    
+    d3.select('.chartTooltip').on('mouseover', () => {
+        if (timer) clearTimeout(timer);
+        d3.select('.chartTooltip').transition().duration(300).style('opacity', 1).style('display', 'block')
+    }).on('mouseout', () => {
+        timer = setTimeout(function() {
+            d3.select('.chartTooltip').transition().duration(300).style('opacity', 0).style('display', 'none')
+        }, 200)
+    });
+    
+    if (d) {
+        chartTooltip.select('.chartTooltip-label').text('label：' + d)
+    } else {
+        chartTooltip.select('.chartTooltip-label').text('label：' + d)
+    }
+    if (g.node(d).name) {
+        chartTooltip.select('.chartTooltip-name').text('名字2：' + g.node(d).name)
+    } else {
+        chartTooltip.select('.chartTooltip-name').text('名字2：' + g.node(d).name)
+    }
 }
 </script>
 </html>"##;

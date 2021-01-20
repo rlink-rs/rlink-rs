@@ -42,7 +42,7 @@ impl Label for JobNode {
             .map(|x| x.operator_name.as_str())
             .collect();
         let names: String = op_names.join(",\n");
-        format!("{:?}(p{})\n[{}]", self.job_id, self.parallelism, names)
+        format!("{:?}(p{})\n{}", self.job_id, self.parallelism, names)
     }
 }
 
