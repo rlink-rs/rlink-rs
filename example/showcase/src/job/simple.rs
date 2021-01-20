@@ -17,9 +17,9 @@ use crate::buffer_gen::model::FIELD_TYPE;
 use crate::job::functions::{MyFilterFunction, MyFlatMapFunction, TestInputFormat};
 
 #[derive(Clone, Debug)]
-pub struct MyStreamJob {}
+pub struct SimpleStreamApp {}
 
-impl StreamApp for MyStreamJob {
+impl StreamApp for SimpleStreamApp {
     fn prepare_properties(&self, properties: &mut Properties) {
         properties.set_keyed_state_backend(KeyedStateBackend::Memory);
     }

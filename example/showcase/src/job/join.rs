@@ -22,9 +22,9 @@ use crate::job::functions::{
 };
 
 #[derive(Clone, Debug)]
-pub struct MyStreamJob {}
+pub struct JoinStreamApp {}
 
-impl StreamApp for MyStreamJob {
+impl StreamApp for JoinStreamApp {
     fn prepare_properties(&self, properties: &mut Properties) {
         properties.set_keyed_state_backend(KeyedStateBackend::Memory);
     }
