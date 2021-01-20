@@ -1,9 +1,9 @@
-use serde::Serialize;
 use std::cmp::max;
 use std::collections::HashMap;
 use std::ops::Index;
 
 use daggy::{Dag, NodeIndex, Walker};
+use serde::Serialize;
 
 use crate::dag::Label;
 
