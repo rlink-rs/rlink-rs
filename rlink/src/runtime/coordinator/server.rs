@@ -108,6 +108,30 @@ async fn serve(
                         )
                         .route(web::get().to(index)),
                 )
+                .service(
+                    web::resource("/dag/stream_graph.html")
+                        .wrap(
+                            middleware::DefaultHeaders::new()
+                                .header(header::CONTENT_TYPE, "text/html; charset=UTF-8"),
+                        )
+                        .route(web::get().to(get_stream_graph_page)),
+                )
+                .service(
+                    web::resource("/dag/execution_graph.html")
+                        .wrap(
+                            middleware::DefaultHeaders::new()
+                                .header(header::CONTENT_TYPE, "text/html; charset=UTF-8"),
+                        )
+                        .route(web::get().to(get_execution_graph_page)),
+                )
+                .service(
+                    web::resource("/dag/job_graph.html")
+                        .wrap(
+                            middleware::DefaultHeaders::new()
+                                .header(header::CONTENT_TYPE, "text/html; charset=UTF-8"),
+                        )
+                        .route(web::get().to(get_job_graph_page)),
+                )
                 .service(web::resource("/heartbeat").route(web::post().to(heartbeat)))
                 .service(web::resource("/context").route(web::get().to(get_context)))
                 .service(web::resource("/metadata").route(web::get().to(get_metadata)))
@@ -147,7 +171,7 @@ fn index() -> HttpResponse {
     let html = r#"<html>
         <head><title>rlink UI</title></head>
         <body>
-            <h1>rlink</h1>
+            <h1>rlink api</h1>
             <ul>
                 <li><a href="context">context</a></li>
                 <li><a href="metadata">metadata</a></li>
@@ -156,6 +180,13 @@ fn index() -> HttpResponse {
                 <li><a href="dag/job_graph">dag:job_graph</a></li>
                 <li><a href="dag/execution_graph">dag:execution_graph</a></li>
                 <li><a href="dag/physic_graph">dag:physic_graph</a></li>
+            </ul>
+            
+            <h1>rlink page</h1>
+            <ul>
+                <li><a href="dag/stream_graph.html">dag:stream_graph</a></li>
+                <li><a href="dag/job_graph.html">dag:job_graph</a></li>
+                <li><a href="dag/execution_graph.html">dag:execution_graph</a></li>
             </ul>
         </body>
     </html>"#;
@@ -269,3 +300,225 @@ pub(crate) async fn get_physic_graph(dag_manager: Data<DagManager>) -> Result<Ht
     let response = StdResponse::new(ResponseCode::OK, Some(task_groups));
     Ok(HttpResponse::Ok().json(response))
 }
+
+async fn get_stream_graph_page(dag_manager: Data<DagManager>) -> Result<HttpResponse, Error> {
+    let dag = &dag_manager.get_ref().stream_graph().dag;
+    let json_dag = JsonDag::dag_json(dag);
+
+    let json = serde_json::to_string(&json_dag).unwrap();
+    let html = DAG_TEMPLATE.replace("DAG_PLACE_HOLDER", json.as_str());
+
+    Ok(HttpResponse::Ok().body(html))
+}
+
+async fn get_job_graph_page(dag_manager: Data<DagManager>) -> Result<HttpResponse, Error> {
+    let dag = &dag_manager.get_ref().job_graph().dag;
+    let json_dag = JsonDag::dag_json(dag);
+
+    let json = serde_json::to_string(&json_dag).unwrap();
+    let html = DAG_TEMPLATE.replace("DAG_PLACE_HOLDER", json.as_str());
+
+    Ok(HttpResponse::Ok().body(html))
+}
+
+async fn get_execution_graph_page(dag_manager: Data<DagManager>) -> Result<HttpResponse, Error> {
+    let dag = &dag_manager.get_ref().execution_graph().dag;
+    let json_dag = JsonDag::dag_json(dag);
+
+    let json = serde_json::to_string(&json_dag).unwrap();
+    let html = DAG_TEMPLATE.replace("DAG_PLACE_HOLDER", json.as_str());
+
+    Ok(HttpResponse::Ok().body(html))
+}
+
+const DAG_TEMPLATE: &'static str = r##"
+<!DOCTYPE html>
+<html lang="en">
+<title>Home · dagrejs/dagre-d3 Wiki</title>
+<head>
+<script src="https://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+<script src="https://cdn.bootcss.com/dagre-d3/0.4.17/dagre-d3.js"></script>
+<style>
+html,
+body {
+width: 100%;
+height: 100%;
+position: relative;
+margin: 0;
+padding: 0;
+/*background: #47ac98;*/
+}
+#tree {
+width: 100%;
+height: 100%;
+display: flex;
+position: relative;
+}
+#tree svg {
+width: 100%;
+height: 100%;
+}
+text {
+font-size: 14px;
+fill: #fff;
+}
+.edgePath path {
+stroke: #333;
+fill: #333;
+stroke-width: 1.5px;
+}
+.node circle {
+fill: #000000;
+}
+/* tree svg */
+
+.chartTooltip {
+position: absolute;
+height: auto;
+padding: 10px;
+box-sizing: border-box;
+background-color: white;
+border-radius: 5px;
+box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.4);
+opacity: 0;
+}
+.chartTooltip p {
+margin: 0;
+font-size: 14px;
+line-height: 20px;
+word-wrap: break-word;
+}
+.chartTooltip p span {
+display: flex;
+}
+.chartTooltip p a {
+display: flex;
+}
+.author {
+position: absolute;
+top: 20px;
+left: 20px;
+}
+</style>
+</head>
+
+<div id="tree">
+<div class="chartTooltip">
+<p id="chartTooltipText">
+<span class="chartTooltip-label"></span>
+<span class="chartTooltip-name"></span>
+</p>
+</div>
+</div>
+
+<script type="text/javascript">
+let width = document.getElementById("tree").offsetWidth;
+let height = document.getElementById("tree").offsetHeight;
+// Create a new directed graph
+let g = new dagreD3.graphlib.Graph().setGraph({
+rankdir: 'TB',
+edgesep: 100,
+ranksep: 150
+});
+
+let dag = DAG_PLACE_HOLDER;
+
+let states = dag.nodes.forEach(function(node){
+let node_id = node.id;
+let value = {
+shape: "rect",
+name: node.name,
+label : node.label,
+rx: 5,
+ry: 5,
+}
+
+g.setNode(node_id, value);
+});
+
+dag.edges.forEach(function(edge) {
+let source_node_id = edge.source;
+let target_node_id = edge.target;
+let label = edge.label;
+
+g.setEdge(source_node_id, target_node_id, {
+label: label,
+lineInterpolate: 'basis',
+style: "fill: none; stroke: red"
+});
+});
+
+let render = new dagreD3.render();
+
+// Set up an SVG group so that we can translate the final graph.
+let svg = d3.select("#tree").append('svg');
+let inner = svg.append("g");
+render(inner, g);
+// Set up zoom support
+let zoom = d3.behavior.zoom().scaleExtent([0.1, 100])
+.on('zoomstart', () => {
+svg.style('cursor', 'move')
+})
+.on("zoom", function() {
+inner.attr('transform',
+"translate(" + d3.event.translate + ")" +
+"scale(" + d3.event.scale + ")"
+)
+}).on('zoomend', () => {
+svg.style('cursor', 'default')
+});
+svg.call(zoom);
+
+let timer;
+const nodeEnter = inner.selectAll('g.node');
+// 圆点添加 提示框
+nodeEnter
+.on('mouseover', function(d) {
+tooltipOver(d)
+console.log(d)
+})
+.on('mouseout', () => {
+timer = setTimeout(function() {
+d3.select('.chartTooltip').transition().duration(300).style('opacity', 0).style('display', 'none')
+}, 200)
+});
+
+// 偏移节点内文本内容
+// nodeEnter.select('g.label').attr('transform', 'translate(0, 0)');
+// 添加 tag 标签
+// nodeEnter.append('text')
+//     .text((d) => {
+//         return d
+//     });
+
+function tooltipOver(d) {
+if (timer) clearTimeout(timer);
+d3.select('.chartTooltip').transition().duration(300).style('opacity', 1).style('display', 'block');
+const yPosition = d3.event.layerY + 20;
+const xPosition = d3.event.layerX + 20;
+const chartTooltip = d3.select('.chartTooltip')
+.style('left', xPosition + 'px')
+.style('top', yPosition + 'px');
+
+d3.select('.chartTooltip').on('mouseover', () => {
+if (timer) clearTimeout(timer);
+d3.select('.chartTooltip').transition().duration(300).style('opacity', 1).style('display', 'block')
+}).on('mouseout', () => {
+timer = setTimeout(function() {
+d3.select('.chartTooltip').transition().duration(300).style('opacity', 0).style('display', 'none')
+}, 200)
+});
+
+if (d) {
+chartTooltip.select('.chartTooltip-label').text('label：' + d)
+} else {
+chartTooltip.select('.chartTooltip-label').text('label：' + d)
+}
+if (g.node(d).name) {
+chartTooltip.select('.chartTooltip-name').text('名字2：' + g.node(d).name)
+} else {
+chartTooltip.select('.chartTooltip-name').text('名字2：' + g.node(d).name)
+}
+}
+</script>
+</html>"##;
