@@ -27,7 +27,7 @@ pub struct StreamNode {
 
 impl Label for StreamNode {
     fn get_label(&self) -> String {
-        self.operator_name.clone()
+        format!("{}({})", self.operator_name, self.id.0)
     }
 }
 
