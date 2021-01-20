@@ -6,9 +6,9 @@ use crate::api::function::{
 use crate::api::runtime::TaskId;
 use crate::channel::{ElementReceiver, TryRecvError};
 use crate::dag::execution_graph::ExecutionEdge;
-use crate::io::{memory, network};
+use crate::pub_sub::{memory, network};
 
-pub struct SystemInputFormat {
+pub(crate) struct SystemInputFormat {
     memory_receiver: Option<ElementReceiver>,
     network_receiver: Option<ElementReceiver>,
 

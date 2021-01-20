@@ -4,7 +4,7 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 
 use crate::api::env::{StreamApp, StreamExecutionEnvironment};
-use crate::io::network;
+use crate::pub_sub::network;
 use crate::runtime::context::Context;
 use crate::runtime::worker::checkpoint::start_report_checkpoint;
 use crate::runtime::worker::heart_beat::{start_heart_beat_timer, status_heartbeat};

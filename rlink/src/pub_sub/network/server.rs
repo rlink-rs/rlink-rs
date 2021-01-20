@@ -17,8 +17,8 @@ use tokio_util::codec::LengthDelimitedCodec;
 use crate::api::element::{Element, Serde};
 use crate::api::runtime::{ChannelKey, TaskId};
 use crate::channel::{mb, named_bounded, ElementReceiver, ElementSender, TryRecvError};
-use crate::io::network::{ElementRequest, ResponseCode};
 use crate::metrics::Tag;
+use crate::pub_sub::network::{ElementRequest, ResponseCode};
 use crate::utils::get_runtime;
 
 lazy_static! {

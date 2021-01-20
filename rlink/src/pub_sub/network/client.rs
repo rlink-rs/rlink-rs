@@ -21,8 +21,8 @@ use crate::channel::{
     bounded, mb, named_bounded, ElementReceiver, ElementSender, Receiver, Sender, TryRecvError,
     TrySendError,
 };
-use crate::io::network::{ElementRequest, ResponseCode};
 use crate::metrics::{register_counter, Tag};
+use crate::pub_sub::network::{ElementRequest, ResponseCode};
 use crate::runtime::ApplicationDescriptor;
 use crate::utils::get_runtime;
 

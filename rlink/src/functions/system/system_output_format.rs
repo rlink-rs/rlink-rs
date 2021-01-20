@@ -7,10 +7,10 @@ use crate::api::function::{Context, Function, OutputFormat};
 use crate::api::runtime::{ChannelKey, JobId, TaskId};
 use crate::channel::ElementSender;
 use crate::dag::execution_graph::ExecutionEdge;
-use crate::io::{memory, network, ChannelType};
+use crate::pub_sub::{memory, network, ChannelType};
 
 /// support job's Multiplexing, but only one channel mode(memory/network) support
-pub struct SystemOutputFormat {
+pub(crate) struct SystemOutputFormat {
     task_id: TaskId,
     channel_type: ChannelType,
     job_senders: Vec<(JobId, Vec<(TaskId, ElementSender)>)>,

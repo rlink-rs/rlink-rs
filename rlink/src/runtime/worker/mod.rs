@@ -21,7 +21,6 @@ use crate::utils::timer::WindowTimer;
 
 pub mod checkpoint;
 pub mod heart_beat;
-// pub mod io;
 pub mod runnable;
 
 pub(crate) type FunctionContext = crate::api::function::Context;

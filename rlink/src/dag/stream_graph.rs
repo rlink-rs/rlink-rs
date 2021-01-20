@@ -10,9 +10,9 @@ use crate::api::operator::{
 use crate::api::runtime::OperatorId;
 use crate::dag::utils::JsonDag;
 use crate::dag::{DagError, Label, OperatorType};
-use crate::functions::keyed_state_flat_map::KeyedStateFlatMapFunction;
-use crate::io::system_input_format::SystemInputFormat;
-use crate::io::system_output_format::SystemOutputFormat;
+use crate::functions::system::keyed_state_flat_map::KeyedStateFlatMapFunction;
+use crate::functions::system::system_input_format::SystemInputFormat;
+use crate::functions::system::system_output_format::SystemOutputFormat;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct StreamNode {

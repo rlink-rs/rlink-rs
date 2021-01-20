@@ -11,7 +11,7 @@ extern crate anyhow;
 mod macros;
 mod dag;
 mod deployment;
-mod io;
+mod pub_sub;
 mod runtime;
 mod storage;
 
