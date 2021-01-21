@@ -9,16 +9,16 @@ use crate::api::runtime::OperatorId;
 use crate::dag::RawStreamGraph;
 use crate::runtime;
 
-/// define a stream job
-pub trait StreamJob: Send + Sync + Clone {
-    /// prepare job properties
-    /// only invoke once on the `Coordinator`
-    /// All initialization operations should be handled in this method
+/// define a stream application
+pub trait StreamApp: Send + Sync + Clone {
+    /// prepare job properties,
+    /// only invoke once on the `Coordinator`,
+    /// All initialization operations should be handled in this method.
     fn prepare_properties(&self, properties: &mut Properties);
 
-    /// build job stream
-    /// will invoke many times on the `Coordinator` and `Worker`
-    /// ensure the method is stateless
+    /// build application stream,
+    /// will invoke multiple times on the `Coordinator` and `Worker`,
+    /// ensure the method is stateless.
     fn build_stream(&self, properties: &Properties, env: &mut StreamExecutionEnvironment);
 }
 
@@ -48,21 +48,14 @@ impl StreamExecutionEnvironment {
         );
         DataStream::new(stream_builder)
     }
-
-    // pub(crate) fn build_stream<S>(&self, stream_job: S, job_properties: &Properties)
-    // where
-    //     S: StreamJob + 'static,
-    // {
-    //     stream_job.build_stream(job_properties, self);
-    // }
 }
 
-pub fn execute<S>(job_name: &str, stream_job: S)
+pub fn execute<S>(application_name: &str, stream_app: S)
 where
-    S: StreamJob + 'static,
+    S: StreamApp + 'static,
 {
-    let stream_env = StreamExecutionEnvironment::new(job_name.to_string());
-    match runtime::run(stream_env, stream_job) {
+    let stream_env = StreamExecutionEnvironment::new(application_name.to_string());
+    match runtime::run(stream_env, stream_app) {
         Ok(_) => {}
         Err(e) => {
             panic!(
@@ -70,28 +63,6 @@ where
                 e
             );
         }
-    }
-}
-
-pub(crate) const ROOT_ID: u32 = 100;
-
-#[derive(Debug, Clone)]
-pub struct IdGen {
-    id: u32,
-}
-
-impl IdGen {
-    pub fn new() -> Self {
-        IdGen { id: ROOT_ID }
-    }
-
-    pub fn get(&self) -> u32 {
-        self.id
-    }
-
-    pub fn next(&mut self) -> u32 {
-        self.id += 1;
-        self.id
     }
 }
 

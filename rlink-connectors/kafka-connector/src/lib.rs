@@ -20,7 +20,6 @@ use std::collections::HashMap;
 use rdkafka::ClientConfig;
 use rlink::api::element::BufferReader;
 use rlink::api::element::Record;
-use rlink::api::properties::Properties;
 
 pub const BOOTSTRAP_SERVERS: &str = "bootstrap.servers";
 pub const TOPICS: &str = "topics";
@@ -107,39 +106,52 @@ pub fn field(field_name: &str) -> String {
     format!("KAFKA_SOURCE.{}", field_name)
 }
 
-pub fn create_input_format_from_prop(properties: &Properties) -> KafkaInputFormat {
-    let mut conf_map = HashMap::new();
-    conf_map.insert(
-        BOOTSTRAP_SERVERS.to_string(),
-        properties
-            .get_string(field(BOOTSTRAP_SERVERS).as_str())
-            .unwrap(),
-    );
-
-    let topics = properties.get_string(field(TOPICS).as_str()).unwrap();
-    let topics: Vec<&str> = topics.split(",").collect();
-    let topics = topics.iter().map(|topic| topic.to_string()).collect();
-
-    create_input_format(conf_map, topics)
-}
+// pub fn create_input_format_from_prop(properties: &Properties) -> KafkaInputFormat {
+//     let mut conf_map = HashMap::new();
+//     conf_map.insert(
+//         BOOTSTRAP_SERVERS.to_string(),
+//         properties
+//             .get_string(field(BOOTSTRAP_SERVERS).as_str())
+//             .unwrap(),
+//     );
+//
+//     let topics = properties.get_string(field(TOPICS).as_str()).unwrap();
+//     let topics: Vec<&str> = topics.split(",").collect();
+//     let topics = topics.iter().map(|topic| topic.to_string()).collect();
+//
+//     create_input_format(conf_map, topics)
+// }
 
 pub fn create_input_format(
     conf_map: HashMap<String, String>,
     topics: Vec<String>,
+    buffer_size: Option<usize>,
 ) -> KafkaInputFormat {
     let mut client_config = ClientConfig::new();
     for (key, val) in conf_map {
         client_config.set(key.as_str(), val.as_str());
     }
 
-    KafkaInputFormat::new(client_config, topics)
+    KafkaInputFormat::new(
+        client_config,
+        topics,
+        buffer_size.unwrap_or(SOURCE_CHANNEL_SIZE),
+    )
 }
 
-pub fn create_output_format(conf_map: HashMap<String, String>, topic: String) -> KafkaOutputFormat {
+pub fn create_output_format(
+    conf_map: HashMap<String, String>,
+    topic: String,
+    buffer_size: Option<usize>,
+) -> KafkaOutputFormat {
     let mut client_config = ClientConfig::new();
     for (key, val) in conf_map {
         client_config.set(key.as_str(), val.as_str());
     }
 
-    KafkaOutputFormat::new(client_config, topic)
+    KafkaOutputFormat::new(
+        client_config,
+        topic,
+        buffer_size.unwrap_or(SINK_CHANNEL_SIZE),
+    )
 }

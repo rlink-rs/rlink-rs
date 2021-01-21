@@ -2,11 +2,8 @@
 //! stream_graph -> job_graph -> execution_graph
 
 use std::borrow::BorrowMut;
-use std::collections::HashMap;
 use std::fmt::Debug;
-use std::ops::Index;
 
-use daggy::{Dag, NodeIndex, Walker};
 use serde::Serialize;
 use thiserror::Error;
 
@@ -196,106 +193,6 @@ impl DagManager {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub(crate) struct JsonNode<N>
-where
-    N: Serialize,
-{
-    id: String,
-    label: String,
-    #[serde(rename = "type")]
-    ty: String,
-    detail: Option<N>,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub(crate) struct JsonEdge<E>
-where
-    E: Serialize,
-{
-    source: String,
-    target: String,
-    label: String,
-    detail: Option<E>,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub(crate) struct JsonDag<N, E>
-where
-    N: Clone + Label + Serialize,
-    E: Clone + Label + Serialize,
-{
-    nodes: Vec<JsonNode<N>>,
-    edges: Vec<JsonEdge<E>>,
-}
-
-impl<N, E> JsonDag<N, E>
-where
-    N: Clone + Label + Serialize,
-    E: Clone + Label + Serialize,
-{
-    fn get_node_type(dag: &Dag<N, E>, node_index: NodeIndex) -> &str {
-        let parent_count = dag.parents(node_index).iter(dag).count();
-        if parent_count == 0 {
-            "begin"
-        } else {
-            let child_count = dag.children(node_index).iter(dag).count();
-            if child_count == 0 {
-                "end"
-            } else {
-                ""
-            }
-        }
-    }
-
-    fn crate_json_node(dag: &Dag<N, E>, node_index: NodeIndex) -> JsonNode<N> {
-        let n = dag.index(node_index);
-        let label = n.get_label();
-        let id = node_index.index().to_string();
-        let ty = JsonDag::get_node_type(dag, node_index);
-
-        JsonNode {
-            id,
-            label,
-            ty: ty.to_string(),
-            detail: Some(n.clone()),
-        }
-    }
-
-    pub(crate) fn dag_json(dag: &Dag<N, E>) -> Self {
-        let mut node_map = HashMap::new();
-        let mut edges = Vec::new();
-
-        for edge in dag.raw_edges() {
-            let source_json_node = JsonDag::crate_json_node(dag, edge.source());
-            let target_json_node = JsonDag::crate_json_node(dag, edge.target());
-
-            let json_edge = {
-                let label = edge.weight.get_label();
-                JsonEdge {
-                    source: source_json_node.id.clone(),
-                    target: target_json_node.id.clone(),
-                    label,
-                    detail: Some(edge.weight.clone()),
-                }
-            };
-
-            node_map.insert(source_json_node.id.clone(), source_json_node);
-            node_map.insert(target_json_node.id.clone(), target_json_node);
-
-            edges.push(json_edge);
-        }
-
-        let nodes = node_map.into_iter().map(|(_, node)| node).collect();
-
-        JsonDag { nodes, edges }
-    }
-
-    pub(crate) fn to_string(&self) -> String {
-        serde_json::to_string(self).unwrap_or("".to_string())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
@@ -313,7 +210,8 @@ mod tests {
     use crate::api::properties::Properties;
     use crate::api::watermark::{BoundedOutOfOrdernessTimestampExtractor, TimestampAssigner};
     use crate::api::window::SlidingEventTimeWindows;
-    use crate::dag::{DagManager, JsonDag};
+    use crate::dag::utils::JsonDag;
+    use crate::dag::DagManager;
 
     #[test]
     pub fn data_stream_test() {

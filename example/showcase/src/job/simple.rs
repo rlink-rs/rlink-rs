@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use rlink::api::backend::KeyedStateBackend;
 use rlink::api::data_stream::{TDataStream, TKeyedStream, TWindowedStream};
-use rlink::api::env::{StreamExecutionEnvironment, StreamJob};
+use rlink::api::env::{StreamApp, StreamExecutionEnvironment};
 use rlink::api::properties::{Properties, SystemProperties};
 use rlink::api::watermark::BoundedOutOfOrdernessTimestampExtractor;
 use rlink::api::window::SlidingEventTimeWindows;
@@ -17,9 +17,9 @@ use crate::buffer_gen::model::FIELD_TYPE;
 use crate::job::functions::{MyFilterFunction, MyFlatMapFunction, TestInputFormat};
 
 #[derive(Clone, Debug)]
-pub struct MyStreamJob {}
+pub struct SimpleStreamApp {}
 
-impl StreamJob for MyStreamJob {
+impl StreamApp for SimpleStreamApp {
     fn prepare_properties(&self, properties: &mut Properties) {
         properties.set_keyed_state_backend(KeyedStateBackend::Memory);
     }

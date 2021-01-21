@@ -7,7 +7,8 @@ use daggy::{Dag, EdgeIndex, NodeIndex, Walker};
 use crate::api::operator::DEFAULT_PARALLELISM;
 use crate::api::runtime::{JobId, OperatorId};
 use crate::dag::stream_graph::{StreamGraph, StreamNode};
-use crate::dag::{utils, DagError, JsonDag, Label, OperatorType};
+use crate::dag::utils::JsonDag;
+use crate::dag::{utils, DagError, Label, OperatorType};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum JobEdge {
@@ -41,7 +42,7 @@ impl Label for JobNode {
             .map(|x| x.operator_name.as_str())
             .collect();
         let names: String = op_names.join(",\n");
-        format!("{:?}(p{})\n[{}]", self.job_id, self.parallelism, names)
+        format!("{:?}(p{})\n{}", self.job_id, self.parallelism, names)
     }
 }
 

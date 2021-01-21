@@ -51,7 +51,10 @@ impl Runnable for FlatMapRunnable {
                 context.task_descriptor.task_id.task_number.to_string(),
             ),
         ];
-        let metric_name = format!("Map_{}", self.stream_map.operator_fn.as_ref().get_name());
+        let metric_name = format!(
+            "FlatMap_{}",
+            self.stream_map.operator_fn.as_ref().get_name()
+        );
         register_counter(metric_name.as_str(), tags, self.counter.clone());
 
         Ok(())
@@ -59,18 +62,15 @@ impl Runnable for FlatMapRunnable {
 
     fn run(&mut self, element: Element) {
         if element.is_record() {
-            let records = self
+            let elements = self
                 .stream_map
                 .operator_fn
                 .as_mut()
-                .flat_map(element.into_record());
+                .flat_map_element(element);
 
             let mut len = 0;
-            for record in records {
-                self.next_runnable
-                    .as_mut()
-                    .unwrap()
-                    .run(Element::Record(record));
+            for ele in elements {
+                self.next_runnable.as_mut().unwrap().run(ele);
                 len += 1;
             }
 

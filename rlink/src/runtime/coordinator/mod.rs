@@ -5,7 +5,7 @@ use std::time::Duration;
 use crate::api::checkpoint::CheckpointHandle;
 use crate::api::cluster::MetadataStorageType;
 use crate::api::cluster::TaskResourceInfo;
-use crate::api::env::{StreamExecutionEnvironment, StreamJob};
+use crate::api::env::{StreamApp, StreamExecutionEnvironment};
 use crate::api::properties::{Properties, SYSTEM_CLUSTER_MODE};
 use crate::dag::DagManager;
 use crate::deployment::ResourceManager;
@@ -28,11 +28,11 @@ pub mod task_distribution;
 
 pub(crate) struct CoordinatorTask<S, R>
 where
-    S: StreamJob + 'static,
+    S: StreamApp + 'static,
     R: ResourceManager + 'static,
 {
     context: Context,
-    stream_job: S,
+    stream_app: S,
     metadata_storage_mode: MetadataStorageType,
     resource_manager: R,
     stream_env: StreamExecutionEnvironment,
@@ -40,12 +40,12 @@ where
 
 impl<S, R> CoordinatorTask<S, R>
 where
-    S: StreamJob + 'static,
+    S: StreamApp + 'static,
     R: ResourceManager + 'static,
 {
     pub fn new(
         context: Context,
-        stream_job: S,
+        stream_app: S,
         resource_manager: R,
         stream_env: StreamExecutionEnvironment,
     ) -> Self {
@@ -53,7 +53,7 @@ where
 
         CoordinatorTask {
             context,
-            stream_job,
+            stream_app,
             metadata_storage_mode,
             resource_manager,
             stream_env,
@@ -65,7 +65,7 @@ where
 
         let application_properties = self.prepare_properties();
 
-        self.stream_job
+        self.stream_app
             .build_stream(&application_properties, self.stream_env.borrow_mut());
 
         let dag_manager = {
@@ -136,7 +136,7 @@ where
             format!("{}", self.context.cluster_mode).as_str(),
         );
 
-        self.stream_job
+        self.stream_app
             .prepare_properties(job_properties.borrow_mut());
 
         for (k, v) in job_properties.as_map() {
@@ -234,7 +234,7 @@ where
 
     fn allocate_worker(&self) -> Vec<TaskResourceInfo> {
         self.resource_manager
-            .worker_allocate(&self.stream_job, &self.stream_env)
+            .worker_allocate(&self.stream_app, &self.stream_env)
             .expect("try allocate worker error")
     }
 

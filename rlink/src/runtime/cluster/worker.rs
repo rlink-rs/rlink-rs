@@ -3,8 +3,8 @@ use std::net::SocketAddr;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-use crate::api::env::{StreamExecutionEnvironment, StreamJob};
-use crate::io::network;
+use crate::api::env::{StreamApp, StreamExecutionEnvironment};
+use crate::pub_sub::network;
 use crate::runtime::context::Context;
 use crate::runtime::worker::checkpoint::start_report_checkpoint;
 use crate::runtime::worker::heart_beat::{start_heart_beat_timer, status_heartbeat};
@@ -13,9 +13,9 @@ use crate::storage::metadata::MetadataLoader;
 use crate::utils;
 use crate::utils::timer::{start_window_timer, WindowTimer};
 
-pub(crate) fn run<S>(context: Context, stream_env: StreamExecutionEnvironment, stream_job: S)
+pub(crate) fn run<S>(context: Context, stream_env: StreamExecutionEnvironment, stream_app: S)
 where
-    S: StreamJob + 'static,
+    S: StreamApp + 'static,
 {
     let mut metadata_loader = MetadataLoader::new(context.coordinator_address.as_str());
 
@@ -45,7 +45,7 @@ where
         metadata_loader,
         window_timer,
         stream_env,
-        stream_job,
+        stream_app,
     );
     info!("all task has bootstrap");
 
@@ -136,10 +136,10 @@ fn run_tasks<S>(
     metadata_loader: MetadataLoader,
     window_timer: WindowTimer,
     stream_env: StreamExecutionEnvironment,
-    stream_job: S,
+    stream_app: S,
 ) -> Vec<JoinHandle<()>>
 where
-    S: StreamJob + 'static,
+    S: StreamApp + 'static,
 {
     let task_manager_id = context.task_manager_id.as_str();
     // todo error check
@@ -154,7 +154,7 @@ where
                 context.clone(),
                 metadata_loader.clone(),
                 task_descriptor.clone(),
-                stream_job.clone(),
+                stream_app.clone(),
                 &stream_env,
                 window_timer.clone(),
             )

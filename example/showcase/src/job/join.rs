@@ -3,7 +3,7 @@ use std::time::Duration;
 use rlink::api::backend::KeyedStateBackend;
 use rlink::api::data_stream::CoStream;
 use rlink::api::data_stream::{TConnectedStreams, TDataStream, TKeyedStream, TWindowedStream};
-use rlink::api::env::{StreamExecutionEnvironment, StreamJob};
+use rlink::api::env::{StreamApp, StreamExecutionEnvironment};
 use rlink::api::properties::{Properties, SystemProperties};
 use rlink::api::watermark::BoundedOutOfOrdernessTimestampExtractor;
 use rlink::api::window::SlidingEventTimeWindows;
@@ -22,11 +22,12 @@ use crate::job::functions::{
 };
 
 #[derive(Clone, Debug)]
-pub struct MyStreamJob {}
+pub struct JoinStreamApp {}
 
-impl StreamJob for MyStreamJob {
+impl StreamApp for JoinStreamApp {
     fn prepare_properties(&self, properties: &mut Properties) {
         properties.set_keyed_state_backend(KeyedStateBackend::Memory);
+        properties.set_pub_sub_channel_size(64);
     }
 
     fn build_stream(&self, properties: &Properties, env: &mut StreamExecutionEnvironment) {

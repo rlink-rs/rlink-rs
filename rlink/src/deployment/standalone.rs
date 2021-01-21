@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::api::cluster::{BatchExecuteRequest, ResponseCode, StdResponse, TaskResourceInfo};
-use crate::api::env::{StreamExecutionEnvironment, StreamJob};
+use crate::api::env::{StreamApp, StreamExecutionEnvironment};
 use crate::deployment::{Resource, ResourceManager};
 use crate::runtime::context::Context;
 use crate::runtime::{ApplicationDescriptor, ManagerType};
@@ -29,11 +29,11 @@ impl ResourceManager for StandaloneResourceManager {
 
     fn worker_allocate<S>(
         &self,
-        _stream_job_clone: &S,
+        _stream_app_clone: &S,
         _stream_env: &StreamExecutionEnvironment,
     ) -> anyhow::Result<Vec<TaskResourceInfo>>
     where
-        S: StreamJob + 'static,
+        S: StreamApp + 'static,
     {
         let job_descriptor = self.job_descriptor.as_ref().unwrap();
 

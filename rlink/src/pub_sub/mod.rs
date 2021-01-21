@@ -1,8 +1,7 @@
-pub mod system_input_format;
-pub mod system_output_format;
-
 pub mod memory;
 pub mod network;
+
+pub(crate) const DEFAULT_CHANNEL_SIZE: usize = 1024;
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum ChannelType {

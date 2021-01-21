@@ -8,10 +8,11 @@ use crate::api::operator::{
     FunctionCreator, StreamOperator, StreamOperatorWrap, TStreamOperator, DEFAULT_PARALLELISM,
 };
 use crate::api::runtime::OperatorId;
-use crate::dag::{DagError, JsonDag, Label, OperatorType};
-use crate::functions::keyed_state_flat_map::KeyedStateFlatMapFunction;
-use crate::io::system_input_format::SystemInputFormat;
-use crate::io::system_output_format::SystemOutputFormat;
+use crate::dag::utils::JsonDag;
+use crate::dag::{DagError, Label, OperatorType};
+use crate::functions::system::keyed_state_flat_map::KeyedStateFlatMapFunction;
+use crate::functions::system::system_input_format::SystemInputFormat;
+use crate::functions::system::system_output_format::SystemOutputFormat;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct StreamNode {
@@ -26,7 +27,7 @@ pub struct StreamNode {
 
 impl Label for StreamNode {
     fn get_label(&self) -> String {
-        self.operator_name.clone()
+        format!("{}({})", self.operator_name, self.id.0)
     }
 }
 

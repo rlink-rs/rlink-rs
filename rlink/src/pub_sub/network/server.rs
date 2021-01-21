@@ -17,8 +17,8 @@ use tokio_util::codec::LengthDelimitedCodec;
 use crate::api::element::{Element, Serde};
 use crate::api::runtime::{ChannelKey, TaskId};
 use crate::channel::{mb, named_bounded, ElementReceiver, ElementSender, TryRecvError};
-use crate::io::network::{ElementRequest, ResponseCode};
 use crate::metrics::Tag;
+use crate::pub_sub::network::{ElementRequest, ResponseCode};
 use crate::utils::get_runtime;
 
 lazy_static! {
@@ -28,6 +28,7 @@ lazy_static! {
 pub(crate) fn publish(
     source_task_id: &TaskId,
     target_task_ids: &Vec<TaskId>,
+    channel_size: usize,
 ) -> Vec<(ChannelKey, ElementSender)> {
     let mut senders = Vec::new();
     for target_task_id in target_task_ids {
@@ -37,7 +38,7 @@ pub(crate) fn publish(
         };
 
         let (sender, receiver) = named_bounded(
-            "Network_Publish",
+            "NetworkPublish",
             vec![
                 Tag::new(
                     "source_job_id".to_string(),
@@ -52,7 +53,7 @@ pub(crate) fn publish(
                     target_task_id.task_number.to_string(),
                 ),
             ],
-            100000,
+            channel_size,
             mb(10),
         );
 

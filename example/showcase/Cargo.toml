@@ -1,6 +1,6 @@
 [package]
 name = "rlink-showcase"
-version = "0.2.0-alpha.2"
+version = "0.2.0-alpha.3"
 authors = ["yorkart <wangyue11.4@163.com>>"]
 edition = "2018"
 description = "High performance Stream Processing Framework"
@@ -9,9 +9,9 @@ repository = "https://github.com/yorkart/rlink.git"
 license = "MIT/Apache-2.0"
 
 [dependencies]
-rlink = {path = "../../rlink", version = "0.2.0-alpha.2"}
-rlink-derive = {path = "../../rlink-derive", version = "0.2.0-alpha.2"}
-rlink-kafka-connector= {path = "../../rlink-connectors/kafka-connector", version = "0.2.0-alpha.2"}
+rlink = {path = "../../rlink", version = "0.2.0-alpha.3"}
+rlink-derive = {path = "../../rlink-derive", version = "0.2.0-alpha.3"}
+rlink-kafka-connector= {path = "../../rlink-connectors/kafka-connector", version = "0.2.0-alpha.3"}
 
 serbuffer = "1.0"
 

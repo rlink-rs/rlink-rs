@@ -13,6 +13,7 @@ lazy_static! {
 pub(crate) fn publish(
     source_task_id: &TaskId,
     target_task_ids: &Vec<TaskId>,
+    channel_size: usize,
 ) -> Vec<(ChannelKey, ElementSender)> {
     let mut senders = Vec::new();
     for target_task_id in target_task_ids {
@@ -20,21 +21,25 @@ pub(crate) fn publish(
             source_task_id: source_task_id.clone(),
             target_task_id: target_task_id.clone(),
         };
-        let sender = get(*target_task_id).0;
+        let sender = get(*target_task_id, channel_size).0;
         senders.push((channel_key, sender));
     }
     senders
 }
 
-pub(crate) fn subscribe(source_task_ids: &Vec<TaskId>, target_task_id: &TaskId) -> ElementReceiver {
+pub(crate) fn subscribe(
+    source_task_ids: &Vec<TaskId>,
+    target_task_id: &TaskId,
+    channel_size: usize,
+) -> ElementReceiver {
     if source_task_ids.len() == 0 {
         panic!("source TaskId not found");
     }
 
-    get(*target_task_id).1
+    get(*target_task_id, channel_size).1
 }
 
-pub(crate) fn get(target_task_id: TaskId) -> (ElementSender, ElementReceiver) {
+pub(crate) fn get(target_task_id: TaskId, channel_size: usize) -> (ElementSender, ElementReceiver) {
     let memory_channels: &Mutex<HashMap<TaskId, (ElementSender, ElementReceiver)>> =
         &*MEMORY_CHANNELS;
     let mut guard = memory_channels.lock().unwrap();
@@ -51,7 +56,7 @@ pub(crate) fn get(target_task_id: TaskId) -> (ElementSender, ElementReceiver) {
                     target_task_id.task_number.to_string(),
                 ),
             ],
-            100000,
+            channel_size,
             mb(10),
         )
     });

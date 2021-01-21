@@ -6,7 +6,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::api::cluster::TaskResourceInfo;
-use crate::api::env::{StreamExecutionEnvironment, StreamJob};
+use crate::api::env::{StreamApp, StreamExecutionEnvironment};
 use crate::channel::{bounded, Receiver, Sender};
 use crate::deployment::ResourceManager;
 use crate::runtime::context::Context;
@@ -40,11 +40,11 @@ impl ResourceManager for YarnResourceManager {
 
     fn worker_allocate<S>(
         &self,
-        _stream_job: &S,
+        _stream_app: &S,
         _stream_env: &StreamExecutionEnvironment,
     ) -> anyhow::Result<Vec<TaskResourceInfo>>
     where
-        S: StreamJob + 'static,
+        S: StreamApp + 'static,
     {
         let application_descriptor = self.job_descriptor.as_ref().unwrap();
 
