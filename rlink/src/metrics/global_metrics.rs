@@ -34,7 +34,7 @@ lazy_static! {
     pub(crate) static ref MANAGER_ID: RwLock<Option<String>> = RwLock::new(None);
 }
 
-pub fn set_manager_id(manager_id: &str, ip: &str) {
+pub(crate) fn set_manager_id(manager_id: &str, ip: &str) {
     let manager_id_rw: &RwLock<Option<String>> = &*MANAGER_ID;
     let mut n = manager_id_rw.write().unwrap();
     *n = Some(format!("{}-{}", manager_id, ip))

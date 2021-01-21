@@ -48,13 +48,6 @@ impl StreamExecutionEnvironment {
         );
         DataStream::new(stream_builder)
     }
-
-    // pub(crate) fn build_stream<S>(&self, stream_app: S, job_properties: &Properties)
-    // where
-    //     S: StreamJob + 'static,
-    // {
-    //     stream_app.build_stream(job_properties, self);
-    // }
 }
 
 pub fn execute<S>(application_name: &str, stream_app: S)
@@ -70,28 +63,6 @@ where
                 e
             );
         }
-    }
-}
-
-pub(crate) const ROOT_ID: u32 = 100;
-
-#[derive(Debug, Clone)]
-pub struct IdGen {
-    id: u32,
-}
-
-impl IdGen {
-    pub fn new() -> Self {
-        IdGen { id: ROOT_ID }
-    }
-
-    pub fn get(&self) -> u32 {
-        self.id
-    }
-
-    pub fn next(&mut self) -> u32 {
-        self.id += 1;
-        self.id
     }
 }
 
