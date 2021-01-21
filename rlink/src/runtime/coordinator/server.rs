@@ -363,8 +363,8 @@ text {
     fill: #fff;
 }
 .edgePath path {
-    stroke: #f00;
-    fill: #f00;
+    stroke: #d9822b;
+    fill: #d9822b;
     stroke-width: 1.5px;
 }
 .node circle {
@@ -418,7 +418,7 @@ let height = document.getElementById("tree").offsetHeight;
 let g = new dagreD3.graphlib.Graph().setGraph({
     rankdir: 'TB',
     edgesep: 100,
-    ranksep: 150
+    ranksep: 80
 });
 
 let dag = DAG_PLACE_HOLDER;
@@ -444,7 +444,7 @@ dag.edges.forEach(function(edge) {
     g.setEdge(source_node_id, target_node_id, {
         label: label,
         lineInterpolate: 'basis',
-        style: "fill: none; stroke: red"
+        style: "fill: none; stroke: #d9822b"
     });
 });
 
