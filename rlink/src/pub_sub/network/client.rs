@@ -30,7 +30,7 @@ lazy_static! {
     static ref C: (
         Sender<(ChannelKey, ElementSender)>,
         Receiver<(ChannelKey, ElementSender)>
-    ) = bounded(1024);
+    ) = bounded(32);
 }
 
 pub(crate) fn subscribe(
@@ -89,6 +89,8 @@ async fn subscribe_listen(application_descriptor: ApplicationDescriptor) {
     ) = &*C;
 
     let delay = Duration::from_millis(100);
+    let mut idle_counter = 0usize;
+    let mut join_handles = Vec::new();
     loop {
         match c.1.try_recv() {
             Ok((channel_key, sender)) => {
@@ -98,15 +100,32 @@ async fn subscribe_listen(application_descriptor: ApplicationDescriptor) {
                 let addr = SocketAddr::from_str(&worker_manager_descriptor.task_manager_address)
                     .expect("parse address error");
 
-                tokio::spawn(async move {
+                let join_handle = tokio::spawn(async move {
                     let mut client = Client::new(channel_key, sender, addr, 6000).await.unwrap();
                     client.send().await.unwrap();
                 });
+                join_handles.push(join_handle);
+
+                idle_counter = 0;
             }
             Err(TryRecvError::Empty) => {
-                tokio::time::delay_for(delay).await;
+                idle_counter += 1;
+                if idle_counter < 10 * 60 {
+                    tokio::time::delay_for(delay).await;
+                } else {
+                    // all task registration must be completed within 1 minute
+                    info!("subscribe listen task finish");
+                    break;
+                }
             }
-            Err(TryRecvError::Disconnected) => {}
+            Err(TryRecvError::Disconnected) => panic!("channel is Disconnected"),
+        }
+    }
+
+    for join_handle in join_handles {
+        match join_handle.await {
+            Ok(_) => {}
+            Err(e) => error!("Client task error. {}", e),
         }
     }
 }
