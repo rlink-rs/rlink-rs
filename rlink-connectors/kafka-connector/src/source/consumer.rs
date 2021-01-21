@@ -7,7 +7,7 @@ use rdkafka::consumer::{Consumer, DefaultConsumerContext, StreamConsumer};
 use rdkafka::{ClientConfig, Message, Offset, TopicPartitionList};
 use rlink::channel::TrySendError;
 use rlink::utils;
-use rlink::utils::get_runtime;
+use rlink::utils::thread::get_runtime;
 
 use crate::build_kafka_record;
 use crate::source::handover::Handover;
@@ -55,7 +55,7 @@ pub(crate) fn create_kafka_consumer(
     }
 
     let handover_clone = handover.clone();
-    utils::spawn("kafka-source-block", move || {
+    utils::thread::spawn("kafka-source-block", move || {
         get_runtime().block_on(async {
             let mut kafka_consumer =
                 KafkaConsumerThread::new(client_config, partition_offsets, handover_clone);

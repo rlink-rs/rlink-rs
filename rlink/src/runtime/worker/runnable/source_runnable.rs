@@ -10,9 +10,9 @@ use crate::api::operator::{FunctionCreator, StreamOperator, TStreamOperator};
 use crate::api::properties::SystemProperties;
 use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::metrics::{register_counter, Tag};
+use crate::runtime::timer::TimerChannel;
 use crate::runtime::worker::checkpoint::report_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
-use crate::utils::timer::TimerChannel;
 
 #[derive(Debug)]
 pub(crate) struct SourceRunnable {

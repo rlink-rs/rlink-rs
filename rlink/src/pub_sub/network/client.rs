@@ -18,13 +18,13 @@ use tokio_util::codec::{BytesCodec, FramedWrite};
 use crate::api::element::{Element, Serde};
 use crate::api::runtime::{ChannelKey, TaskId};
 use crate::channel::{
-    bounded, mb, named_bounded, ElementReceiver, ElementSender, Receiver, Sender, TryRecvError,
+    bounded, named_bounded, ElementReceiver, ElementSender, Receiver, Sender, TryRecvError,
     TrySendError,
 };
 use crate::metrics::{register_counter, Tag};
 use crate::pub_sub::network::{ElementRequest, ResponseCode};
 use crate::runtime::ApplicationDescriptor;
-use crate::utils::get_runtime;
+use crate::utils::thread::get_runtime;
 
 lazy_static! {
     static ref C: (
@@ -55,7 +55,6 @@ pub(crate) fn subscribe(
             ),
         ],
         channel_size,
-        mb(10),
     );
 
     for source_task_id in source_task_ids {

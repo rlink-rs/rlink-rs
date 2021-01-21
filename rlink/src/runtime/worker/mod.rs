@@ -10,6 +10,7 @@ use crate::api::operator::{StreamOperator, StreamOperatorWrap};
 use crate::api::runtime::{JobId, OperatorId};
 use crate::dag::{DagManager, OperatorType};
 use crate::runtime::context::Context;
+use crate::runtime::timer::WindowTimer;
 use crate::runtime::worker::runnable::co_process_runnable::CoProcessRunnable;
 use crate::runtime::worker::runnable::{
     FilterRunnable, FlatMapRunnable, KeyByRunnable, ReduceRunnable, Runnable, RunnableContext,
@@ -17,7 +18,6 @@ use crate::runtime::worker::runnable::{
 };
 use crate::runtime::{ApplicationDescriptor, TaskDescriptor};
 use crate::storage::metadata::MetadataLoader;
-use crate::utils::timer::WindowTimer;
 
 pub mod checkpoint;
 pub mod heart_beat;

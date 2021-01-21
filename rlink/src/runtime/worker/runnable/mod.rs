@@ -2,9 +2,9 @@ use std::fmt::Debug;
 
 use crate::api::checkpoint::FunctionSnapshotContext;
 use crate::api::element::Element;
+use crate::runtime::timer::WindowTimer;
 use crate::runtime::worker::FunctionContext;
 use crate::runtime::{ApplicationDescriptor, TaskDescriptor};
-use crate::utils::timer::WindowTimer;
 
 pub mod co_process_runnable;
 pub mod filter_runnable;

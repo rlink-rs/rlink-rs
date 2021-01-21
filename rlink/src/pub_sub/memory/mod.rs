@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use crate::api::runtime::{ChannelKey, TaskId};
-use crate::channel::{mb, named_bounded, ElementReceiver, ElementSender};
+use crate::channel::{named_bounded, ElementReceiver, ElementSender};
 use crate::metrics::Tag;
 
 lazy_static! {
@@ -57,7 +57,6 @@ pub(crate) fn get(target_task_id: TaskId, channel_size: usize) -> (ElementSender
                 ),
             ],
             channel_size,
-            mb(10),
         )
     });
     (sender.clone(), receiver.clone())

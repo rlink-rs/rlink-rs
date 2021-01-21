@@ -13,8 +13,8 @@ pub struct Handover {
 }
 
 impl Handover {
-    pub fn new(name: &str, tags: Vec<Tag>, buffer_size: usize, max_capacity: i64) -> Self {
-        let (sender, receiver) = named_bounded(name, tags, buffer_size, max_capacity);
+    pub fn new(name: &str, tags: Vec<Tag>, buffer_size: usize) -> Self {
+        let (sender, receiver) = named_bounded(name, tags, buffer_size);
         Handover { sender, receiver }
     }
 

@@ -3,8 +3,9 @@ use std::time::Duration;
 use crate::api::checkpoint::Checkpoint;
 use crate::api::cluster::StdResponse;
 use crate::channel::{bounded, Receiver, Sender, TryRecvError, TrySendError};
+use crate::utils::date_time;
 use crate::utils::http_client::post;
-use crate::utils::{date_time, get_runtime};
+use crate::utils::thread::get_runtime;
 
 pub struct CheckpointChannel {
     sender: Sender<Checkpoint>,
@@ -25,7 +26,7 @@ lazy_static! {
 pub(crate) fn report_checkpoint(ck: Checkpoint) -> Option<Checkpoint> {
     let ck_channel = &*CK_CHANNEL;
 
-    debug!(">>>>>> report checkpoint: {:?}", &ck);
+    debug!("report checkpoint: {:?}", &ck);
     match ck_channel.sender.try_send(ck) {
         Ok(_) => None,
         Err(TrySendError::Full(ck)) => Some(ck),
@@ -35,7 +36,7 @@ pub(crate) fn report_checkpoint(ck: Checkpoint) -> Option<Checkpoint> {
 
 pub(crate) fn start_report_checkpoint(coordinator_address: &str) {
     let coordinator_address = coordinator_address.to_string();
-    crate::utils::spawn("checkpoint", move || {
+    crate::utils::thread::spawn("checkpoint", move || {
         get_runtime().block_on(async {
             let ck_channel = &*CK_CHANNEL;
 

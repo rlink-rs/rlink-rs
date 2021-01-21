@@ -1,7 +1,7 @@
 use rdkafka::ClientConfig;
 use rlink::api::element::Record;
 use rlink::api::function::{Context, Function, OutputFormat};
-use rlink::utils::get_runtime;
+use rlink::utils::thread::get_runtime;
 use rlink::{api, utils};
 
 use crate::sink::handover::Handover;
@@ -40,7 +40,7 @@ impl OutputFormat for KafkaOutputFormat {
         let topic = self.topic.clone();
         let client_config = self.client_config.clone();
         let handover = self.handover.as_ref().unwrap().clone();
-        utils::spawn("kafka-sink-block", move || {
+        utils::thread::spawn("kafka-sink-block", move || {
             get_runtime().block_on(async {
                 let mut kafka_consumer = KafkaProducerThread::new(topic, client_config, handover);
                 kafka_consumer.run().await;

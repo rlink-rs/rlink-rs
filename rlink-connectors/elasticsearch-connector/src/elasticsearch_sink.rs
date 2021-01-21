@@ -12,10 +12,9 @@ use elasticsearch::http::Url;
 use elasticsearch::{BulkParts, Elasticsearch};
 use rlink::api::element::Record;
 use rlink::api::function::{Context, Function, OutputFormat};
-use rlink::channel::mb;
+use rlink::channel::handover::Handover;
 use rlink::metrics::Tag;
-use rlink::utils::get_runtime;
-use rlink::utils::handover::Handover;
+use rlink::utils::thread::get_runtime;
 use rlink::{api, utils};
 use serde_json::Value;
 use thiserror::Error;
@@ -88,7 +87,7 @@ impl OutputFormat for ElasticsearchOutputFormat {
                 context.task_id.task_number().to_string(),
             ),
         ];
-        self.handover = Some(Handover::new(self.get_name(), tags, 100000, mb(10)));
+        self.handover = Some(Handover::new(self.get_name(), tags, 10000));
 
         let mut write_thead = ElasticsearchWriteThread::new(
             self.address.as_str(),
@@ -99,7 +98,7 @@ impl OutputFormat for ElasticsearchOutputFormat {
         .expect("build elasticsearch connection error");
 
         let convert = self.builder.clone();
-        utils::spawn("elastic-sink-block", move || {
+        utils::thread::spawn("elastic-sink-block", move || {
             get_runtime().block_on(async {
                 write_thead.run(convert, 5).await;
             });

@@ -29,31 +29,23 @@ pub fn bounded<T>(cap: usize) -> (Sender<T>, Receiver<T>) {
     crossbeam::channel::bounded(cap)
 }
 
+pub mod handover;
 pub mod receiver;
 pub mod sender;
 
 pub type ElementReceiver = ChannelReceiver<Element>;
 pub type ElementSender = ChannelSender<Element>;
 
-pub fn mb(n_mb: usize) -> i64 {
-    (n_mb * 1024 * 1024) as i64
-}
-
 pub fn named_bounded<T>(
     name: &str,
     tags: Vec<Tag>,
     buffer_size: usize,
-    max_capacity: i64,
 ) -> (ChannelSender<T>, ChannelReceiver<T>)
 where
     T: Clone,
 {
-    info!(
-        "Create channel named with {} and capacity {}",
-        name, max_capacity
-    );
+    info!("Create channel named with {}", name);
 
-    let capacity = Arc::new(AtomicI64::new(0));
     let size = Arc::new(AtomicI64::new(0));
     let accepted_counter = Arc::new(AtomicU64::new(0));
     let drain_counter = Arc::new(AtomicU64::new(0));
@@ -64,11 +56,6 @@ where
         (CHANNEL_SIZE_PREFIX.to_owned() + name).as_str(),
         tags.clone(),
         size.clone(),
-    );
-    crate::metrics::global_metrics::register_gauge(
-        (CHANNEL_CAPACITY_PREFIX.to_owned() + name).as_str(),
-        tags.clone(),
-        capacity.clone(),
     );
     crate::metrics::global_metrics::register_counter(
         (CHANNEL_ACCEPTED_PREFIX.to_owned() + name).as_str(),
@@ -82,20 +69,7 @@ where
     );
 
     (
-        ChannelSender::new(
-            name,
-            max_capacity,
-            sender,
-            capacity.clone(),
-            size.clone(),
-            accepted_counter,
-        ),
-        ChannelReceiver::new(
-            name,
-            receiver,
-            capacity.clone(),
-            size.clone(),
-            drain_counter,
-        ),
+        ChannelSender::new(name, sender, size.clone(), accepted_counter),
+        ChannelReceiver::new(name, receiver, size.clone(), drain_counter),
     )
 }

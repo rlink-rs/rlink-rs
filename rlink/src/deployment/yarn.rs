@@ -205,7 +205,7 @@ impl YarnCliCommand {
         &self,
         task_args: Vec<HashMap<String, String>>,
     ) -> anyhow::Result<Vec<TaskResourceInfo>> {
-        let cmd_id = utils::gen_id();
+        let cmd_id = utils::generator::gen_with_ts();
         let command = Command::new("allocate".to_string(), cmd_id.to_string(), task_args);
         let command_json = serde_json::to_string(&command).unwrap();
 
@@ -245,7 +245,7 @@ mod tests {
         let mut task_args: Vec<HashMap<String, String>> = Vec::new();
         task_args.push(map);
 
-        let cmd_id = utils::gen_id();
+        let cmd_id = utils::generator::gen_with_ts();
         let command = Data::new("allocate".to_string(), cmd_id, task_args);
         let command_json = serde_json::to_string(&command).unwrap();
 
