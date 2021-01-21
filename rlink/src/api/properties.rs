@@ -25,6 +25,9 @@ pub trait SystemProperties {
     fn get_checkpoint(&self) -> anyhow::Result<CheckpointBackend>;
 
     fn get_cluster_mode(&self) -> anyhow::Result<ClusterMode>;
+
+    fn set_pub_sub_channel_size(&mut self, channel_size: usize);
+    fn get_pub_sub_channel_size(&self) -> anyhow::Result<usize>;
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -109,6 +112,7 @@ pub(crate) const SYSTEM_OPERATOR_STATE_BACKEND: &str = "SYSTEM_OPERATOR_STATE_BA
 pub(crate) const SYSTEM_CHECKPOINT: &str = "SYSTEM_CHECKPOINT";
 pub(crate) const SYSTEM_CHECKPOINT_INTERNAL: &str = "SYSTEM_CHECKPOINT_INTERNAL";
 pub(crate) const SYSTEM_CLUSTER_MODE: &str = "SYSTEM_CLUSTER_MODE";
+pub(crate) const SYSTEM_PUB_SUB_CHANNEL_SIZE: &str = "SYSTEM_PUB_SUB_CHANNEL_SIZE";
 
 impl SystemProperties for Properties {
     fn set_metadata_mode(&mut self, metadata_storage_mode: MetadataStorageType) {
@@ -166,6 +170,16 @@ impl SystemProperties for Properties {
     fn get_cluster_mode(&self) -> anyhow::Result<ClusterMode> {
         let value = self.get_string(SYSTEM_CLUSTER_MODE)?;
         ClusterMode::try_from(value.as_str())
+    }
+
+    fn set_pub_sub_channel_size(&mut self, channel_size: usize) {
+        let value = channel_size.to_string();
+        self.set_string(SYSTEM_PUB_SUB_CHANNEL_SIZE.to_string(), value);
+    }
+
+    fn get_pub_sub_channel_size(&self) -> anyhow::Result<usize> {
+        let value = self.get_string(SYSTEM_PUB_SUB_CHANNEL_SIZE)?;
+        usize::from_str(value.as_str()).map_err(|e| anyhow!(e))
     }
 }
 

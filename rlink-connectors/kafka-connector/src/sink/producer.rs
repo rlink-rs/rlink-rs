@@ -147,7 +147,7 @@ mod tests {
         let mut client_config = ClientConfig::new();
         client_config.set(BOOTSTRAP_SERVERS, "localhost:9092");
 
-        let handover = Handover::new("test", topic, JobId(0), 0);
+        let handover = Handover::new("test", topic, JobId(0), 0, 32);
 
         let handover_c = handover.clone();
         std::thread::spawn(move || {

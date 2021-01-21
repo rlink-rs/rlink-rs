@@ -33,7 +33,11 @@ lazy_static! {
     ) = bounded(1024);
 }
 
-pub(crate) fn subscribe(source_task_ids: &Vec<TaskId>, target_task_id: &TaskId) -> ElementReceiver {
+pub(crate) fn subscribe(
+    source_task_ids: &Vec<TaskId>,
+    target_task_id: &TaskId,
+    channel_size: usize,
+) -> ElementReceiver {
     let (sender, receiver) = named_bounded(
         "NetworkSubscribe",
         vec![
@@ -50,7 +54,7 @@ pub(crate) fn subscribe(source_task_ids: &Vec<TaskId>, target_task_id: &TaskId) 
                 target_task_id.task_number.to_string(),
             ),
         ],
-        100000,
+        channel_size,
         mb(10),
     );
 

@@ -4,10 +4,11 @@ use std::time::Duration;
 
 use crate::api::element::{Element, Partition, Record};
 use crate::api::function::{Context, Function, OutputFormat};
+use crate::api::properties::SystemProperties;
 use crate::api::runtime::{ChannelKey, JobId, TaskId};
 use crate::channel::ElementSender;
 use crate::dag::execution_graph::ExecutionEdge;
-use crate::pub_sub::{memory, network, ChannelType};
+use crate::pub_sub::{memory, network, ChannelType, DEFAULT_CHANNEL_SIZE};
 
 /// support job's Multiplexing, but only one channel mode(memory/network) support
 pub(crate) struct SystemOutputFormat {
@@ -42,6 +43,11 @@ impl OutputFormat for SystemOutputFormat {
             .collect();
         info!("publish\n  {}", parents.join("\n  "));
 
+        let channel_size = context
+            .application_properties
+            .get_pub_sub_channel_size()
+            .unwrap_or(DEFAULT_CHANNEL_SIZE);
+
         let mut memory_jobs = Vec::new();
         let mut network_jobs = Vec::new();
 
@@ -64,7 +70,7 @@ impl OutputFormat for SystemOutputFormat {
         if memory_jobs.len() > 0 {
             self.channel_type = ChannelType::Memory;
 
-            let task_senders = memory::publish(&context.task_id, &memory_jobs);
+            let task_senders = memory::publish(&context.task_id, &memory_jobs, channel_size);
 
             let mut job_senders = HashMap::new();
             for (channel_key, sender) in task_senders {
@@ -90,7 +96,7 @@ impl OutputFormat for SystemOutputFormat {
 
         if network_jobs.len() > 0 {
             self.channel_type = ChannelType::Network;
-            let task_senders = network::publish(&context.task_id, &network_jobs);
+            let task_senders = network::publish(&context.task_id, &network_jobs, channel_size);
 
             let child_parallelism = task_senders[0].0.target_task_id.num_tasks;
 

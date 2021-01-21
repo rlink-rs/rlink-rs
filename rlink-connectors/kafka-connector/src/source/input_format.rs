@@ -22,6 +22,8 @@ use crate::KafkaRecord;
 pub struct KafkaInputFormat {
     client_config: ClientConfig,
     topics: Vec<String>,
+
+    buffer_size: usize,
     handover: Option<Handover>,
 
     state_mode: Option<OperatorStateBackend>,
@@ -31,10 +33,11 @@ pub struct KafkaInputFormat {
 }
 
 impl KafkaInputFormat {
-    pub fn new(client_config: ClientConfig, topics: Vec<String>) -> Self {
+    pub fn new(client_config: ClientConfig, topics: Vec<String>, buffer_size: usize) -> Self {
         KafkaInputFormat {
             client_config,
             topics,
+            buffer_size,
             handover: None,
             state_mode: None,
             checkpoint: None,
@@ -72,7 +75,7 @@ impl InputFormat for KafkaInputFormat {
             let topic = input_split.get_properties().get_string("topic").unwrap();
             let partition = input_split.get_properties().get_i32("partition").unwrap();
 
-            self.handover = Some(Handover::new(topic.as_str(), partition));
+            self.handover = Some(Handover::new(topic.as_str(), partition, self.buffer_size));
 
             let partition_offset =
                 self.checkpoint

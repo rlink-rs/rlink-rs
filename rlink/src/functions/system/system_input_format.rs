@@ -3,10 +3,11 @@ use crate::api::element::{Element, Record};
 use crate::api::function::{
     Context, Function, InputFormat, InputSplit, InputSplitAssigner, InputSplitSource,
 };
+use crate::api::properties::SystemProperties;
 use crate::api::runtime::TaskId;
 use crate::channel::{ElementReceiver, TryRecvError};
 use crate::dag::execution_graph::ExecutionEdge;
-use crate::pub_sub::{memory, network};
+use crate::pub_sub::{memory, network, DEFAULT_CHANNEL_SIZE};
 
 pub(crate) struct SystemInputFormat {
     memory_receiver: Option<ElementReceiver>,
@@ -40,6 +41,11 @@ impl InputFormat for SystemInputFormat {
             .collect();
         info!("subscribe\n  {}", parents.join("\n  "));
 
+        let channel_size = context
+            .application_properties
+            .get_pub_sub_channel_size()
+            .unwrap_or(DEFAULT_CHANNEL_SIZE);
+
         let mut memory_jobs = Vec::new();
         let mut network_jobs = Vec::new();
         context
@@ -51,11 +57,11 @@ impl InputFormat for SystemInputFormat {
             });
 
         if memory_jobs.len() > 0 {
-            let rx = memory::subscribe(&memory_jobs, &context.task_id);
+            let rx = memory::subscribe(&memory_jobs, &context.task_id, channel_size);
             self.memory_receiver = Some(rx);
         }
         if network_jobs.len() > 0 {
-            let rx = network::subscribe(&network_jobs, &context.task_id);
+            let rx = network::subscribe(&network_jobs, &context.task_id, channel_size);
             self.network_receiver = Some(rx);
         }
 

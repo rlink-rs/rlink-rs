@@ -28,6 +28,7 @@ lazy_static! {
 pub(crate) fn publish(
     source_task_id: &TaskId,
     target_task_ids: &Vec<TaskId>,
+    channel_size: usize,
 ) -> Vec<(ChannelKey, ElementSender)> {
     let mut senders = Vec::new();
     for target_task_id in target_task_ids {
@@ -52,7 +53,7 @@ pub(crate) fn publish(
                     target_task_id.task_number.to_string(),
                 ),
             ],
-            100000,
+            channel_size,
             mb(10),
         );
 

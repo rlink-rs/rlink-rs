@@ -11,14 +11,17 @@ use crate::sink::producer::KafkaProducerThread;
 pub struct KafkaOutputFormat {
     client_config: ClientConfig,
     topic: String,
+
+    buffer_size: usize,
     handover: Option<Handover>,
 }
 
 impl KafkaOutputFormat {
-    pub fn new(client_config: ClientConfig, topic: String) -> Self {
+    pub fn new(client_config: ClientConfig, topic: String, buffer_size: usize) -> Self {
         KafkaOutputFormat {
             client_config,
             topic,
+            buffer_size,
             handover: None,
         }
     }
@@ -31,6 +34,7 @@ impl OutputFormat for KafkaOutputFormat {
             self.topic.as_str(),
             context.task_id.job_id(),
             context.task_id.task_number(),
+            self.buffer_size,
         ));
 
         let topic = self.topic.clone();
