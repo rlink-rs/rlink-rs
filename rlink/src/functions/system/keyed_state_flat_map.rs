@@ -4,7 +4,7 @@ use crate::api::function::{Context, FlatMapFunction, Function};
 use crate::api::properties::SystemProperties;
 use crate::api::runtime::{CheckpointId, JobId};
 use crate::api::window::{TWindow, Window};
-use crate::storage::keyed_state::{ReducingState, ReducingStateWrap, StateKey};
+use crate::storage::keyed_state::{ReducingState, StateKey, TReducingState};
 
 pub(crate) struct KeyedStateFlatMapFunction {
     parent_job_id: JobId,
@@ -55,7 +55,7 @@ impl FlatMapFunction for KeyedStateFlatMapFunction {
         let window = record.trigger_window.unwrap();
 
         let state_key = StateKey::new(window.clone(), self.parent_job_id, self.task_number);
-        let reducing_state = ReducingStateWrap::new(&state_key, self.state_mode);
+        let reducing_state = ReducingState::new(&state_key, self.state_mode);
         match reducing_state {
             Some(reducing_state) => {
                 let state_iter = reducing_state.iter();

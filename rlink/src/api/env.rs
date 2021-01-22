@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use crate::api::data_stream::{DataStream, StreamBuilder};
 use crate::api::function::InputFormat;
-use crate::api::operator::StreamOperatorWrap;
+use crate::api::operator::StreamOperator;
 use crate::api::properties::Properties;
 use crate::api::runtime::OperatorId;
 use crate::dag::RawStreamGraph;
@@ -80,7 +80,7 @@ impl StreamManager {
 
     pub fn add_operator(
         &self,
-        operator: StreamOperatorWrap,
+        operator: StreamOperator,
         parent_operator_ids: Vec<OperatorId>,
     ) -> OperatorId {
         self.stream_graph

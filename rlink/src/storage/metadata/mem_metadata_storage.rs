@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 use std::sync::Mutex;
 
 use crate::runtime::{ApplicationDescriptor, TaskManagerStatus};
-use crate::storage::metadata::MetadataStorage;
+use crate::storage::metadata::TMetadataStorage;
 use crate::utils;
 
 lazy_static! {
@@ -18,7 +18,7 @@ impl MemoryMetadataStorage {
     }
 }
 
-impl MetadataStorage for MemoryMetadataStorage {
+impl TMetadataStorage for MemoryMetadataStorage {
     fn save_job_descriptor(
         &mut self,
         metadata: ApplicationDescriptor,

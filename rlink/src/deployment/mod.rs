@@ -23,7 +23,7 @@ impl Resource {
     }
 }
 
-pub(crate) trait ResourceManager
+pub(crate) trait TResourceManager
 where
     Self: Debug,
 {
@@ -43,36 +43,34 @@ where
 }
 
 #[derive(Debug)]
-pub(crate) enum ResourceManagerWrap {
+pub(crate) enum ResourceManager {
     LocalResourceManager(LocalResourceManager),
     StandaloneResourceManager(StandaloneResourceManager),
     YarnResourceManager(YarnResourceManager),
 }
 
-impl ResourceManagerWrap {
+impl ResourceManager {
     pub fn new(context: &Context) -> Self {
         match context.cluster_mode {
-            ClusterMode::Local => ResourceManagerWrap::LocalResourceManager(
-                LocalResourceManager::new(context.clone()),
-            ),
-            ClusterMode::Standalone => ResourceManagerWrap::StandaloneResourceManager(
+            ClusterMode::Local => {
+                ResourceManager::LocalResourceManager(LocalResourceManager::new(context.clone()))
+            }
+            ClusterMode::Standalone => ResourceManager::StandaloneResourceManager(
                 StandaloneResourceManager::new(context.clone()),
             ),
             ClusterMode::YARN => {
-                ResourceManagerWrap::YarnResourceManager(YarnResourceManager::new(context.clone()))
+                ResourceManager::YarnResourceManager(YarnResourceManager::new(context.clone()))
             }
         }
     }
 }
 
-impl ResourceManager for ResourceManagerWrap {
+impl TResourceManager for ResourceManager {
     fn prepare(&mut self, context: &Context, job_descriptor: &ApplicationDescriptor) {
         match self {
-            ResourceManagerWrap::LocalResourceManager(rm) => rm.prepare(context, job_descriptor),
-            ResourceManagerWrap::StandaloneResourceManager(rm) => {
-                rm.prepare(context, job_descriptor)
-            }
-            ResourceManagerWrap::YarnResourceManager(rm) => rm.prepare(context, job_descriptor),
+            ResourceManager::LocalResourceManager(rm) => rm.prepare(context, job_descriptor),
+            ResourceManager::StandaloneResourceManager(rm) => rm.prepare(context, job_descriptor),
+            ResourceManager::YarnResourceManager(rm) => rm.prepare(context, job_descriptor),
         }
     }
 
@@ -85,23 +83,19 @@ impl ResourceManager for ResourceManagerWrap {
         S: StreamApp + 'static,
     {
         match self {
-            ResourceManagerWrap::LocalResourceManager(rm) => {
+            ResourceManager::LocalResourceManager(rm) => rm.worker_allocate(stream_app, stream_env),
+            ResourceManager::StandaloneResourceManager(rm) => {
                 rm.worker_allocate(stream_app, stream_env)
             }
-            ResourceManagerWrap::StandaloneResourceManager(rm) => {
-                rm.worker_allocate(stream_app, stream_env)
-            }
-            ResourceManagerWrap::YarnResourceManager(rm) => {
-                rm.worker_allocate(stream_app, stream_env)
-            }
+            ResourceManager::YarnResourceManager(rm) => rm.worker_allocate(stream_app, stream_env),
         }
     }
 
     fn stop_workers(&self, task_ids: Vec<TaskResourceInfo>) -> anyhow::Result<()> {
         match self {
-            ResourceManagerWrap::LocalResourceManager(rm) => rm.stop_workers(task_ids),
-            ResourceManagerWrap::StandaloneResourceManager(rm) => rm.stop_workers(task_ids),
-            ResourceManagerWrap::YarnResourceManager(rm) => rm.stop_workers(task_ids),
+            ResourceManager::LocalResourceManager(rm) => rm.stop_workers(task_ids),
+            ResourceManager::StandaloneResourceManager(rm) => rm.stop_workers(task_ids),
+            ResourceManager::YarnResourceManager(rm) => rm.stop_workers(task_ids),
         }
     }
 }

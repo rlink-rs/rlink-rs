@@ -8,7 +8,7 @@ use crate::api::cluster::TaskResourceInfo;
 use crate::api::env::{StreamApp, StreamExecutionEnvironment};
 use crate::api::properties::{Properties, SYSTEM_CLUSTER_MODE};
 use crate::dag::DagManager;
-use crate::deployment::ResourceManager;
+use crate::deployment::TResourceManager;
 use crate::runtime::context::Context;
 use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
 use crate::runtime::coordinator::server::web_launch;
@@ -16,7 +16,7 @@ use crate::runtime::coordinator::task_distribution::build_job_descriptor;
 use crate::runtime::{ApplicationDescriptor, TaskManagerStatus};
 use crate::storage::metadata::{
     loop_delete_job_descriptor, loop_read_job_descriptor, loop_save_job_descriptor,
-    loop_update_job_status, MetadataStorageWrap,
+    loop_update_job_status, MetadataStorage,
 };
 use crate::utils::date_time::timestamp_str;
 
@@ -29,7 +29,7 @@ pub mod task_distribution;
 pub(crate) struct CoordinatorTask<S, R>
 where
     S: StreamApp + 'static,
-    R: ResourceManager + 'static,
+    R: TResourceManager + 'static,
 {
     context: Context,
     stream_app: S,
@@ -41,7 +41,7 @@ where
 impl<S, R> CoordinatorTask<S, R>
 where
     S: StreamApp + 'static,
-    R: ResourceManager + 'static,
+    R: TResourceManager + 'static,
 {
     pub fn new(
         context: Context,
@@ -157,13 +157,13 @@ where
             job_properties,
             &self.context,
         );
-        // let mut metadata_storage = MetadataStorageWrap::new(&self.metadata_storage_mode);
+        // let mut metadata_storage = MetadataStorage::new(&self.metadata_storage_mode);
         // loop_save_job_descriptor(metadata_storage.borrow_mut(), job_descriptor.clone());
         application_descriptor
     }
 
     fn save_metadata(&self, application_descriptor: ApplicationDescriptor) {
-        let mut metadata_storage = MetadataStorageWrap::new(&self.metadata_storage_mode);
+        let mut metadata_storage = MetadataStorage::new(&self.metadata_storage_mode);
         loop_save_job_descriptor(
             metadata_storage.borrow_mut(),
             application_descriptor.clone(),
@@ -171,7 +171,7 @@ where
     }
 
     fn clear_metadata(&self) {
-        let mut metadata_storage = MetadataStorageWrap::new(&self.metadata_storage_mode);
+        let mut metadata_storage = MetadataStorage::new(&self.metadata_storage_mode);
         loop_delete_job_descriptor(metadata_storage.borrow_mut());
     }
 
@@ -239,7 +239,7 @@ where
     }
 
     fn waiting_worker_status_fine(&self /*, metadata_storage: Box<dyn MetadataStorage>*/) {
-        let mut metadata_storage = MetadataStorageWrap::new(&self.metadata_storage_mode);
+        let mut metadata_storage = MetadataStorage::new(&self.metadata_storage_mode);
         loop {
             info!("waiting all workers status fine...");
 

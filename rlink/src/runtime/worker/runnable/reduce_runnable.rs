@@ -7,13 +7,13 @@ use std::sync::Arc;
 use crate::api::backend::KeyedStateBackend;
 use crate::api::element::{Barrier, Element, Record, Watermark};
 use crate::api::function::{KeySelectorFunction, ReduceFunction};
-use crate::api::operator::StreamOperator;
+use crate::api::operator::DefaultStreamOperator;
 use crate::api::properties::SystemProperties;
 use crate::api::runtime::{CheckpointId, OperatorId};
 use crate::api::window::{TWindow, Window};
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
-use crate::storage::keyed_state::{WindowState, WindowStateWrap};
+use crate::storage::keyed_state::{TWindowState, WindowState};
 use crate::utils::date_time::timestamp_str;
 
 #[derive(Debug)]
@@ -22,11 +22,11 @@ pub(crate) struct ReduceRunnable {
     task_number: u16,
     dependency_parallelism: u16,
 
-    stream_key_by: Option<StreamOperator<dyn KeySelectorFunction>>,
-    stream_reduce: StreamOperator<dyn ReduceFunction>,
+    stream_key_by: Option<DefaultStreamOperator<dyn KeySelectorFunction>>,
+    stream_reduce: DefaultStreamOperator<dyn ReduceFunction>,
     next_runnable: Option<Box<dyn Runnable>>,
 
-    state: Option<WindowStateWrap>, // HashMap<Vec<u8>, Record>, // HashMap<TimeWindow, HashMap<Record, Record>>,
+    state: Option<WindowState>, // HashMap<Vec<u8>, Record>, // HashMap<TimeWindow, HashMap<Record, Record>>,
 
     current_checkpoint_id: CheckpointId,
     reached_barriers: Vec<Barrier>,
@@ -43,8 +43,8 @@ pub(crate) struct ReduceRunnable {
 impl ReduceRunnable {
     pub fn new(
         operator_id: OperatorId,
-        stream_key_by: Option<StreamOperator<dyn KeySelectorFunction>>,
-        stream_reduce: StreamOperator<dyn ReduceFunction>,
+        stream_key_by: Option<DefaultStreamOperator<dyn KeySelectorFunction>>,
+        stream_reduce: DefaultStreamOperator<dyn ReduceFunction>,
         next_runnable: Option<Box<dyn Runnable>>,
     ) -> Self {
         ReduceRunnable {
@@ -93,7 +93,7 @@ impl Runnable for ReduceRunnable {
             .get_keyed_state_backend()
             .unwrap_or(KeyedStateBackend::Memory);
 
-        self.state = Some(WindowStateWrap::new(
+        self.state = Some(WindowState::new(
             context
                 .application_descriptor
                 .coordinator_manager

@@ -1,20 +1,20 @@
 use crate::api::element::Element;
 use crate::api::function::FilterFunction;
-use crate::api::operator::StreamOperator;
+use crate::api::operator::DefaultStreamOperator;
 use crate::api::runtime::{CheckpointId, OperatorId};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
 #[derive(Debug)]
 pub(crate) struct FilterRunnable {
     operator_id: OperatorId,
-    stream_filter: StreamOperator<dyn FilterFunction>,
+    stream_filter: DefaultStreamOperator<dyn FilterFunction>,
     next_runnable: Option<Box<dyn Runnable>>,
 }
 
 impl FilterRunnable {
     pub fn new(
         operator_id: OperatorId,
-        stream_filter: StreamOperator<dyn FilterFunction>,
+        stream_filter: DefaultStreamOperator<dyn FilterFunction>,
         next_runnable: Option<Box<dyn Runnable>>,
     ) -> Self {
         info!("Create FilterRunnable");

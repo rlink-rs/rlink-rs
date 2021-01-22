@@ -49,7 +49,7 @@ impl Iterator for StateIterator {
 }
 
 /// See flink `ReducingState`
-pub trait ReducingState: Debug {
+pub trait TReducingState: Debug {
     fn get_mut(&mut self, key: &Record) -> Option<&mut Record>;
     fn insert(&mut self, key: Record, val: Record);
     fn flush(&mut self);
@@ -61,70 +61,70 @@ pub trait ReducingState: Debug {
 }
 
 #[derive(Debug)]
-pub enum ReducingStateWrap {
+pub enum ReducingState {
     MemoryReducingState(MemoryReducingState),
 }
 
-impl ReducingStateWrap {
-    pub fn new(state_key: &StateKey, mode: KeyedStateBackend) -> Option<ReducingStateWrap> {
+impl ReducingState {
+    pub fn new(state_key: &StateKey, mode: KeyedStateBackend) -> Option<ReducingState> {
         match mode {
             KeyedStateBackend::Memory => MemoryReducingState::from(state_key)
-                .map(|state| ReducingStateWrap::MemoryReducingState(state)),
+                .map(|state| ReducingState::MemoryReducingState(state)),
         }
     }
 }
 
-impl ReducingState for ReducingStateWrap {
+impl TReducingState for ReducingState {
     fn get_mut(&mut self, key: &Record) -> Option<&mut Record> {
         match self {
-            ReducingStateWrap::MemoryReducingState(state) => state.get_mut(key),
+            ReducingState::MemoryReducingState(state) => state.get_mut(key),
         }
     }
 
     fn insert(&mut self, key: Record, val: Record) {
         match self {
-            ReducingStateWrap::MemoryReducingState(state) => state.insert(key, val),
+            ReducingState::MemoryReducingState(state) => state.insert(key, val),
         }
     }
 
     fn flush(&mut self) {
         match self {
-            ReducingStateWrap::MemoryReducingState(state) => state.flush(),
+            ReducingState::MemoryReducingState(state) => state.flush(),
         }
     }
 
     fn snapshot(&mut self) {
         match self {
-            ReducingStateWrap::MemoryReducingState(state) => state.snapshot(),
+            ReducingState::MemoryReducingState(state) => state.snapshot(),
         }
     }
 
     fn close(self) {
         match self {
-            ReducingStateWrap::MemoryReducingState(state) => state.close(),
+            ReducingState::MemoryReducingState(state) => state.close(),
         }
     }
 
     fn destroy(self) {
         match self {
-            ReducingStateWrap::MemoryReducingState(state) => state.destroy(),
+            ReducingState::MemoryReducingState(state) => state.destroy(),
         }
     }
 
     fn iter(self) -> StateIterator {
         match self {
-            ReducingStateWrap::MemoryReducingState(state) => state.iter(),
+            ReducingState::MemoryReducingState(state) => state.iter(),
         }
     }
 
     fn len(&self) -> usize {
         match self {
-            ReducingStateWrap::MemoryReducingState(state) => state.len(),
+            ReducingState::MemoryReducingState(state) => state.len(),
         }
     }
 }
 
-pub trait WindowState: Debug {
+pub trait TWindowState: Debug {
     fn windows(&self) -> Vec<Window>;
 
     fn merge<F>(&mut self, key: Record, record: Record, reduce_fun: F)
@@ -137,11 +137,11 @@ pub trait WindowState: Debug {
 }
 
 #[derive(Debug)]
-pub enum WindowStateWrap {
+pub enum WindowState {
     MemoryWindowState(MemoryWindowState),
 }
 
-impl WindowStateWrap {
+impl WindowState {
     pub fn new(
         application_id: String,
         job_id: JobId,
@@ -149,17 +149,19 @@ impl WindowStateWrap {
         mode: KeyedStateBackend,
     ) -> Self {
         match mode {
-            KeyedStateBackend::Memory => WindowStateWrap::MemoryWindowState(
-                MemoryWindowState::new(application_id, job_id, task_number),
-            ),
+            KeyedStateBackend::Memory => WindowState::MemoryWindowState(MemoryWindowState::new(
+                application_id,
+                job_id,
+                task_number,
+            )),
         }
     }
 }
 
-impl WindowState for WindowStateWrap {
+impl TWindowState for WindowState {
     fn windows(&self) -> Vec<Window> {
         match self {
-            WindowStateWrap::MemoryWindowState(state) => state.windows(),
+            WindowState::MemoryWindowState(state) => state.windows(),
         }
     }
 
@@ -168,19 +170,19 @@ impl WindowState for WindowStateWrap {
         F: Fn(Option<&mut Record>, &mut Record) -> Record,
     {
         match self {
-            WindowStateWrap::MemoryWindowState(state) => state.merge(key, record, reduce_fun),
+            WindowState::MemoryWindowState(state) => state.merge(key, record, reduce_fun),
         }
     }
 
     fn drop_window(&mut self, window: &Window) {
         match self {
-            WindowStateWrap::MemoryWindowState(state) => state.drop_window(window),
+            WindowState::MemoryWindowState(state) => state.drop_window(window),
         }
     }
 
     fn snapshot(&mut self, barrier: Barrier) {
         match self {
-            WindowStateWrap::MemoryWindowState(state) => state.snapshot(barrier),
+            WindowState::MemoryWindowState(state) => state.snapshot(barrier),
         }
     }
 }

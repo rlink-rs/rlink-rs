@@ -13,7 +13,7 @@ use crate::dag::DagManager;
 use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
 use crate::runtime::TaskManagerStatus;
 use crate::storage::metadata::MetadataStorage;
-use crate::storage::metadata::MetadataStorageWrap;
+use crate::storage::metadata::TMetadataStorage;
 use crate::utils::VERSION;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -207,7 +207,7 @@ pub(crate) async fn heartbeat(
     heartbeat_model: web::Json<HeartbeatModel>,
     context: Data<WebContext>,
 ) -> Result<HttpResponse, Error> {
-    let metadata_storage = MetadataStorageWrap::new(&context.metadata_mode);
+    let metadata_storage = MetadataStorage::new(&context.metadata_mode);
 
     if !heartbeat_model.status.eq("ok") {
         error!("heart beat status: {}", heartbeat_model.status.as_str());
@@ -232,7 +232,7 @@ pub(crate) async fn get_context(context: Data<WebContext>) -> Result<HttpRespons
 }
 
 pub(crate) async fn get_metadata(context: Data<WebContext>) -> Result<HttpResponse, Error> {
-    let metadata_storage = MetadataStorageWrap::new(&context.metadata_mode);
+    let metadata_storage = MetadataStorage::new(&context.metadata_mode);
     let job_descriptor = metadata_storage.read_job_descriptor().unwrap();
 
     let response = StdResponse::new(ResponseCode::OK, Some(job_descriptor));

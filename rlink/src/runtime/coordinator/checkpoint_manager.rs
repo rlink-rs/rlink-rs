@@ -8,7 +8,7 @@ use crate::api::runtime::{CheckpointId, JobId, OperatorId};
 use crate::dag::DagManager;
 use crate::runtime::context::Context;
 use crate::runtime::ApplicationDescriptor;
-use crate::storage::checkpoint::{CheckpointStorage, CheckpointStorageWrap};
+use crate::storage::checkpoint::{CheckpointStorage, TCheckpointStorage};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct OperatorCheckpoint {
@@ -20,7 +20,7 @@ pub(crate) struct OperatorCheckpoint {
     parallelism: u16,
 
     #[serde(skip_serializing, skip_deserializing)]
-    storage: Option<CheckpointStorageWrap>,
+    storage: Option<CheckpointStorage>,
 
     current_ck_id: CheckpointId,
     /// Map<task_num, Checkpoint>
@@ -36,7 +36,7 @@ impl OperatorCheckpoint {
         operator_id: OperatorId,
         operator_name: String,
         parallelism: u16,
-        storage: Option<CheckpointStorageWrap>,
+        storage: Option<CheckpointStorage>,
     ) -> Self {
         OperatorCheckpoint {
             application_name,
@@ -190,7 +190,7 @@ impl CheckpointManager {
                 let operator_name = stream_node.operator_name.clone();
                 let storage = checkpoint_backend
                     .as_ref()
-                    .map(|ck_backend| CheckpointStorageWrap::new(ck_backend));
+                    .map(|ck_backend| CheckpointStorage::new(ck_backend));
 
                 let operator_ck = OperatorCheckpoint::new(
                     application_name.clone(),

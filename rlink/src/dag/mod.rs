@@ -8,7 +8,7 @@ use serde::Serialize;
 use thiserror::Error;
 
 use crate::api::function::InputSplit;
-use crate::api::operator::StreamOperatorWrap;
+use crate::api::operator::StreamOperator;
 use crate::api::runtime::{JobId, OperatorId, TaskId};
 use crate::dag::execution_graph::{ExecutionEdge, ExecutionGraph, ExecutionNode};
 use crate::dag::job_graph::{JobEdge, JobGraph, JobNode};
@@ -51,18 +51,18 @@ pub(crate) enum OperatorType {
     Sink,
 }
 
-impl<'a> From<&'a StreamOperatorWrap> for OperatorType {
-    fn from(op: &'a StreamOperatorWrap) -> Self {
+impl<'a> From<&'a StreamOperator> for OperatorType {
+    fn from(op: &'a StreamOperator) -> Self {
         match op {
-            StreamOperatorWrap::StreamSource(_) => OperatorType::Source,
-            StreamOperatorWrap::StreamFlatMap(_) => OperatorType::FlatMap,
-            StreamOperatorWrap::StreamFilter(_) => OperatorType::Filter,
-            StreamOperatorWrap::StreamCoProcess(_) => OperatorType::CoProcess,
-            StreamOperatorWrap::StreamKeyBy(_) => OperatorType::KeyBy,
-            StreamOperatorWrap::StreamReduce(_) => OperatorType::Reduce,
-            StreamOperatorWrap::StreamWatermarkAssigner(_) => OperatorType::WatermarkAssigner,
-            StreamOperatorWrap::StreamWindowAssigner(_) => OperatorType::WindowAssigner,
-            StreamOperatorWrap::StreamSink(_) => OperatorType::Sink,
+            StreamOperator::StreamSource(_) => OperatorType::Source,
+            StreamOperator::StreamFlatMap(_) => OperatorType::FlatMap,
+            StreamOperator::StreamFilter(_) => OperatorType::Filter,
+            StreamOperator::StreamCoProcess(_) => OperatorType::CoProcess,
+            StreamOperator::StreamKeyBy(_) => OperatorType::KeyBy,
+            StreamOperator::StreamReduce(_) => OperatorType::Reduce,
+            StreamOperator::StreamWatermarkAssigner(_) => OperatorType::WatermarkAssigner,
+            StreamOperator::StreamWindowAssigner(_) => OperatorType::WindowAssigner,
+            StreamOperator::StreamSink(_) => OperatorType::Sink,
         }
     }
 }

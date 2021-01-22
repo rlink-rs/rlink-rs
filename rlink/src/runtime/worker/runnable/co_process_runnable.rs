@@ -2,14 +2,14 @@ use std::collections::HashMap;
 
 use crate::api::element::Element;
 use crate::api::function::CoProcessFunction;
-use crate::api::operator::StreamOperator;
+use crate::api::operator::DefaultStreamOperator;
 use crate::api::runtime::{CheckpointId, JobId, OperatorId};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
 #[derive(Debug)]
 pub(crate) struct CoProcessRunnable {
     operator_id: OperatorId,
-    stream_co_process: StreamOperator<dyn CoProcessFunction>,
+    stream_co_process: DefaultStreamOperator<dyn CoProcessFunction>,
     next_runnable: Option<Box<dyn Runnable>>,
 
     /// key: JobId,
@@ -20,7 +20,7 @@ pub(crate) struct CoProcessRunnable {
 impl CoProcessRunnable {
     pub fn new(
         operator_id: OperatorId,
-        stream_co_process: StreamOperator<dyn CoProcessFunction>,
+        stream_co_process: DefaultStreamOperator<dyn CoProcessFunction>,
         next_runnable: Option<Box<dyn Runnable>>,
     ) -> Self {
         info!("Create FilterRunnable");

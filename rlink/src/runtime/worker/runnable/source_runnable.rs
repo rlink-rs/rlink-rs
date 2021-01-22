@@ -6,7 +6,7 @@ use std::time::Duration;
 use crate::api::checkpoint::Checkpoint;
 use crate::api::element::Element;
 use crate::api::function::{InputFormat, InputSplit};
-use crate::api::operator::{FunctionCreator, StreamOperator, TStreamOperator};
+use crate::api::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
 use crate::api::properties::SystemProperties;
 use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::metrics::{register_counter, Tag};
@@ -21,7 +21,7 @@ pub(crate) struct SourceRunnable {
 
     task_id: TaskId,
 
-    stream_source: StreamOperator<dyn InputFormat>,
+    stream_source: DefaultStreamOperator<dyn InputFormat>,
     next_runnable: Option<Box<dyn Runnable>>,
 
     stream_status_timer: Option<TimerChannel>,
@@ -34,7 +34,7 @@ impl SourceRunnable {
     pub fn new(
         operator_id: OperatorId,
         input_split: InputSplit,
-        stream_source: StreamOperator<dyn InputFormat>,
+        stream_source: DefaultStreamOperator<dyn InputFormat>,
         next_runnable: Option<Box<dyn Runnable>>,
     ) -> Self {
         info!("Create SourceRunnable input_split={:?}", &input_split);

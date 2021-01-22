@@ -1,5 +1,5 @@
 use crate::api::env::{StreamApp, StreamExecutionEnvironment};
-use crate::deployment::ResourceManagerWrap;
+use crate::deployment::ResourceManager;
 use crate::runtime::context::Context;
 use crate::runtime::ManagerType;
 
@@ -12,7 +12,7 @@ where
 {
     match context.manager_type {
         ManagerType::Coordinator => {
-            let resource_manager = ResourceManagerWrap::new(&context);
+            let resource_manager = ResourceManager::new(&context);
             coordinator::run(context, stream_env, stream_app, resource_manager);
         }
         ManagerType::Standby => {}

@@ -6,7 +6,7 @@ use crate::api::runtime::JobId;
 use crate::api::window::Window;
 use crate::storage::keyed_state::mem_reducing_state::MemoryReducingState;
 use crate::storage::keyed_state::mem_storage::{append_drop_window, StorageKey};
-use crate::storage::keyed_state::{ReducingState, StateKey, WindowState};
+use crate::storage::keyed_state::{StateKey, TReducingState, TWindowState};
 
 #[derive(Clone, Debug)]
 pub struct MemoryWindowState {
@@ -52,7 +52,7 @@ impl MemoryWindowState {
     }
 }
 
-impl WindowState for MemoryWindowState {
+impl TWindowState for MemoryWindowState {
     fn windows(&self) -> Vec<Window> {
         let mut windows = Vec::new();
         for entry in &self.windows {

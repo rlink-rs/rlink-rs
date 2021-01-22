@@ -5,7 +5,7 @@ use std::ops::Index;
 use daggy::{Dag, EdgeIndex, NodeIndex};
 
 use crate::api::operator::{
-    FunctionCreator, StreamOperator, StreamOperatorWrap, TStreamOperator, DEFAULT_PARALLELISM,
+    DefaultStreamOperator, FunctionCreator, StreamOperator, TStreamOperator, DEFAULT_PARALLELISM,
 };
 use crate::api::runtime::OperatorId;
 use crate::dag::utils::JsonDag;
@@ -81,7 +81,7 @@ pub(crate) struct RawStreamGraph {
     stream_edges: Vec<EdgeIndex>,
 
     id_gen: OperatorId,
-    operators: HashMap<OperatorId, (NodeIndex, StreamOperatorWrap)>,
+    operators: HashMap<OperatorId, (NodeIndex, StreamOperator)>,
 
     pub(crate) sources: Vec<NodeIndex>,
     pub(crate) user_sources: Vec<NodeIndex>,
@@ -106,7 +106,7 @@ impl RawStreamGraph {
         }
     }
 
-    pub fn pop_operators(&mut self) -> HashMap<OperatorId, StreamOperatorWrap> {
+    pub fn pop_operators(&mut self) -> HashMap<OperatorId, StreamOperator> {
         let operator_ids: Vec<OperatorId> = self.operators.iter().map(|(x, _)| *x).collect();
 
         let mut operators = HashMap::new();
@@ -118,7 +118,7 @@ impl RawStreamGraph {
         operators
     }
 
-    pub fn get_operators(&self) -> HashMap<OperatorId, &StreamOperatorWrap> {
+    pub fn get_operators(&self) -> HashMap<OperatorId, &StreamOperator> {
         let operator_ids: Vec<OperatorId> = self.operators.iter().map(|(x, _)| *x).collect();
 
         let mut operators = HashMap::new();
@@ -130,27 +130,27 @@ impl RawStreamGraph {
         operators
     }
 
-    fn create_virtual_flat_map(&mut self, parallelism: u16) -> StreamOperatorWrap {
+    fn create_virtual_flat_map(&mut self, parallelism: u16) -> StreamOperator {
         let map_format = Box::new(KeyedStateFlatMapFunction::new());
-        StreamOperatorWrap::StreamFlatMap(StreamOperator::new(
+        StreamOperator::StreamFlatMap(DefaultStreamOperator::new(
             parallelism,
             FunctionCreator::System,
             map_format,
         ))
     }
 
-    fn create_virtual_source(&mut self, parallelism: u16) -> StreamOperatorWrap {
+    fn create_virtual_source(&mut self, parallelism: u16) -> StreamOperator {
         let input_format = Box::new(SystemInputFormat::new());
-        StreamOperatorWrap::StreamSource(StreamOperator::new(
+        StreamOperator::StreamSource(DefaultStreamOperator::new(
             parallelism,
             FunctionCreator::System,
             input_format,
         ))
     }
 
-    fn create_virtual_sink(&mut self, parallelism: u16) -> StreamOperatorWrap {
+    fn create_virtual_sink(&mut self, parallelism: u16) -> StreamOperator {
         let output_format = Box::new(SystemOutputFormat::new());
-        StreamOperatorWrap::StreamSink(StreamOperator::new(
+        StreamOperator::StreamSink(DefaultStreamOperator::new(
             parallelism,
             FunctionCreator::System,
             output_format,
@@ -159,7 +159,7 @@ impl RawStreamGraph {
 
     fn add_operator0(
         &mut self,
-        operator: StreamOperatorWrap,
+        operator: StreamOperator,
         parent_operator_ids: Vec<OperatorId>,
         parallelism: u16,
     ) -> Result<OperatorId, DagError> {
@@ -212,7 +212,7 @@ impl RawStreamGraph {
 
     pub fn add_operator(
         &mut self,
-        operator: StreamOperatorWrap,
+        operator: StreamOperator,
         parent_operator_ids: Vec<OperatorId>,
     ) -> Result<OperatorId, DagError> {
         let parallelism = operator.get_parallelism();

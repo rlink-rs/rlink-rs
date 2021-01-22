@@ -10,7 +10,7 @@ pub mod mem_metadata_storage;
 pub mod metadata_loader;
 pub use metadata_loader::MetadataLoader;
 
-pub trait MetadataStorage: Debug {
+pub trait TMetadataStorage: Debug {
     fn save_job_descriptor(
         &mut self,
         metadata: ApplicationDescriptor,
@@ -31,52 +31,42 @@ pub trait MetadataStorage: Debug {
 }
 
 #[derive(Debug)]
-pub enum MetadataStorageWrap {
+pub enum MetadataStorage {
     MemoryMetadataStorage(MemoryMetadataStorage),
-    // EtcdMetadataStorage(EtcdMetadataStorage),
 }
 
-impl MetadataStorageWrap {
+impl MetadataStorage {
     pub fn new(mode: &MetadataStorageType) -> Self {
         match mode {
             MetadataStorageType::Memory => {
                 let storage = MemoryMetadataStorage::new();
-                MetadataStorageWrap::MemoryMetadataStorage(storage)
+                MetadataStorage::MemoryMetadataStorage(storage)
             }
-            // MetadataStorageMode::Etcd { job_id, endpoints } => {
-            //     let storage = EtcdMetadataStorage::new(job_id.clone(), endpoints.clone());
-            //     MetadataStorageWrap::EtcdMetadataStorage(storage)
-            // }
-            // _ => panic!("Unsupported MetadataStorageMode"),
         }
     }
 }
 
-impl MetadataStorage for MetadataStorageWrap {
+impl TMetadataStorage for MetadataStorage {
     fn save_job_descriptor(
         &mut self,
         metadata: ApplicationDescriptor,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         match self {
-            MetadataStorageWrap::MemoryMetadataStorage(storage) => {
+            MetadataStorage::MemoryMetadataStorage(storage) => {
                 storage.save_job_descriptor(metadata)
-            } // MetadataStorageWrap::EtcdMetadataStorage(storage) => {
-              //     storage.save_job_descriptor(metadata)
-              // }
+            }
         }
     }
 
     fn delete_job_descriptor(&mut self) -> Result<(), Box<dyn Error + Send + Sync>> {
         match self {
-            MetadataStorageWrap::MemoryMetadataStorage(storage) => storage.delete_job_descriptor(),
-            // MetadataStorageWrap::EtcdMetadataStorage(storage) => storage.delete_job_descriptor(),
+            MetadataStorage::MemoryMetadataStorage(storage) => storage.delete_job_descriptor(),
         }
     }
 
     fn read_job_descriptor(&self) -> Result<ApplicationDescriptor, Box<dyn Error + Send + Sync>> {
         match self {
-            MetadataStorageWrap::MemoryMetadataStorage(storage) => storage.read_job_descriptor(),
-            // MetadataStorageWrap::EtcdMetadataStorage(storage) => storage.read_job_descriptor(),
+            MetadataStorage::MemoryMetadataStorage(storage) => storage.read_job_descriptor(),
         }
     }
 
@@ -85,11 +75,9 @@ impl MetadataStorage for MetadataStorageWrap {
         job_manager_status: TaskManagerStatus,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         match self {
-            MetadataStorageWrap::MemoryMetadataStorage(storage) => {
+            MetadataStorage::MemoryMetadataStorage(storage) => {
                 storage.update_job_status(job_manager_status)
-            } // MetadataStorageWrap::EtcdMetadataStorage(storage) => {
-              //     storage.update_job_status(job_manager_status)
-              // }
+            }
         }
     }
 
@@ -101,24 +89,18 @@ impl MetadataStorage for MetadataStorageWrap {
         metrics_address: &str,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         match self {
-            MetadataStorageWrap::MemoryMetadataStorage(storage) => storage.update_task_status(
+            MetadataStorage::MemoryMetadataStorage(storage) => storage.update_task_status(
                 task_manager_id,
                 task_manager_address,
                 task_manager_status,
                 metrics_address,
             ),
-            // MetadataStorageWrap::EtcdMetadataStorage(storage) => storage.update_task_status(
-            //     task_manager_id,
-            //     task_manager_address,
-            //     task_manager_status,
-            //     metrics_address,
-            // ),
         }
     }
 }
 
 pub(crate) fn loop_read_job_descriptor(
-    metadata_storage: &MetadataStorageWrap,
+    metadata_storage: &MetadataStorage,
 ) -> ApplicationDescriptor {
     loop_fn!(
         metadata_storage.read_job_descriptor(),
@@ -127,7 +109,7 @@ pub(crate) fn loop_read_job_descriptor(
 }
 
 pub(crate) fn loop_save_job_descriptor(
-    metadata_storage: &mut MetadataStorageWrap,
+    metadata_storage: &mut MetadataStorage,
     application_descriptor: ApplicationDescriptor,
 ) {
     loop_fn!(
@@ -136,7 +118,7 @@ pub(crate) fn loop_save_job_descriptor(
     );
 }
 
-pub(crate) fn loop_delete_job_descriptor(metadata_storage: &mut MetadataStorageWrap) {
+pub(crate) fn loop_delete_job_descriptor(metadata_storage: &mut MetadataStorage) {
     loop_fn!(
         metadata_storage.delete_job_descriptor(),
         std::time::Duration::from_secs(2)
@@ -144,7 +126,7 @@ pub(crate) fn loop_delete_job_descriptor(metadata_storage: &mut MetadataStorageW
 }
 
 pub(crate) fn loop_update_job_status(
-    metadata_storage: &mut MetadataStorageWrap,
+    metadata_storage: &mut MetadataStorage,
     job_manager_status: TaskManagerStatus,
 ) {
     loop_fn!(

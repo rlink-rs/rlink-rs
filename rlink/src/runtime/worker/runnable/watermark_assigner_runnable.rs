@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::sync::Arc;
 
 use crate::api::element::Element;
-use crate::api::operator::StreamOperator;
+use crate::api::operator::DefaultStreamOperator;
 use crate::api::runtime::{CheckpointId, OperatorId};
 use crate::api::watermark::{Watermark, WatermarkAssigner, MAX_WATERMARK, MIN_WATERMARK};
 use crate::metrics::{register_counter, register_gauge, Tag};
@@ -15,7 +15,7 @@ pub(crate) struct WatermarkAssignerRunnable {
     task_number: u16,
     num_tasks: u16,
 
-    stream_watermark: StreamOperator<dyn WatermarkAssigner>,
+    stream_watermark: DefaultStreamOperator<dyn WatermarkAssigner>,
     next_runnable: Option<Box<dyn Runnable>>,
     watermark: Watermark,
 
@@ -26,7 +26,7 @@ pub(crate) struct WatermarkAssignerRunnable {
 impl WatermarkAssignerRunnable {
     pub fn new(
         operator_id: OperatorId,
-        stream_watermark: StreamOperator<dyn WatermarkAssigner>,
+        stream_watermark: DefaultStreamOperator<dyn WatermarkAssigner>,
         next_runnable: Option<Box<dyn Runnable>>,
     ) -> Self {
         info!("Create WatermarkAssignerRunnable");

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::api::cluster::{BatchExecuteRequest, ResponseCode, StdResponse, TaskResourceInfo};
 use crate::api::env::{StreamApp, StreamExecutionEnvironment};
-use crate::deployment::{Resource, ResourceManager};
+use crate::deployment::{Resource, TResourceManager};
 use crate::runtime::context::Context;
 use crate::runtime::{ApplicationDescriptor, ManagerType};
 use crate::utils::http_client;
@@ -22,7 +22,7 @@ impl StandaloneResourceManager {
     }
 }
 
-impl ResourceManager for StandaloneResourceManager {
+impl TResourceManager for StandaloneResourceManager {
     fn prepare(&mut self, _context: &Context, job_descriptor: &ApplicationDescriptor) {
         self.job_descriptor = Some(job_descriptor.clone());
     }

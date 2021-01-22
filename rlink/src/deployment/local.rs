@@ -1,6 +1,6 @@
 use crate::api::cluster::TaskResourceInfo;
 use crate::api::env::{StreamApp, StreamExecutionEnvironment};
-use crate::deployment::{Resource, ResourceManager};
+use crate::deployment::{Resource, TResourceManager};
 use crate::runtime::context::Context;
 use crate::runtime::{cluster, ApplicationDescriptor, ManagerType};
 
@@ -19,7 +19,7 @@ impl LocalResourceManager {
     }
 }
 
-impl ResourceManager for LocalResourceManager {
+impl TResourceManager for LocalResourceManager {
     fn prepare(&mut self, _context: &Context, job_descriptor: &ApplicationDescriptor) {
         self.application_descriptor = Some(job_descriptor.clone());
     }
