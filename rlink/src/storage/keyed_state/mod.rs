@@ -4,7 +4,7 @@ use std::fmt::Debug;
 use crate::api::backend::KeyedStateBackend;
 use crate::api::element::{Barrier, Record};
 use crate::api::runtime::JobId;
-use crate::api::window::WindowWrap;
+use crate::api::window::Window;
 use crate::storage::keyed_state::mem_reducing_state::MemoryReducingState;
 use crate::storage::keyed_state::mem_window_state::MemoryWindowState;
 
@@ -14,13 +14,13 @@ pub mod mem_window_state;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct StateKey {
-    pub(crate) window: WindowWrap,
+    pub(crate) window: Window,
     pub(crate) job_id: JobId,
     pub(crate) task_number: u16,
 }
 
 impl StateKey {
-    pub fn new(window: WindowWrap, job_id: JobId, task_number: u16) -> Self {
+    pub fn new(window: Window, job_id: JobId, task_number: u16) -> Self {
         StateKey {
             window,
             job_id,
@@ -30,7 +30,7 @@ impl StateKey {
 }
 
 pub enum StateIterator {
-    HashMap(WindowWrap, IntoIter<Record, Record>),
+    HashMap(Window, IntoIter<Record, Record>),
 }
 
 impl Iterator for StateIterator {
@@ -125,13 +125,13 @@ impl ReducingState for ReducingStateWrap {
 }
 
 pub trait WindowState: Debug {
-    fn windows(&self) -> Vec<WindowWrap>;
+    fn windows(&self) -> Vec<Window>;
 
     fn merge<F>(&mut self, key: Record, record: Record, reduce_fun: F)
     where
         F: Fn(Option<&mut Record>, &mut Record) -> Record;
 
-    fn drop_window(&mut self, window: &WindowWrap);
+    fn drop_window(&mut self, window: &Window);
 
     fn snapshot(&mut self, barrier: Barrier);
 }
@@ -157,7 +157,7 @@ impl WindowStateWrap {
 }
 
 impl WindowState for WindowStateWrap {
-    fn windows(&self) -> Vec<WindowWrap> {
+    fn windows(&self) -> Vec<Window> {
         match self {
             WindowStateWrap::MemoryWindowState(state) => state.windows(),
         }
@@ -172,7 +172,7 @@ impl WindowState for WindowStateWrap {
         }
     }
 
-    fn drop_window(&mut self, window: &WindowWrap) {
+    fn drop_window(&mut self, window: &Window) {
         match self {
             WindowStateWrap::MemoryWindowState(state) => state.drop_window(window),
         }

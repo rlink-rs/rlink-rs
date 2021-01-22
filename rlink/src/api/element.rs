@@ -4,10 +4,10 @@ use std::fmt::Debug;
 use bytes::{Buf, BufMut, BytesMut};
 
 use crate::api::runtime::{ChannelKey, CheckpointId};
-use crate::api::window::WindowWrap;
+use crate::api::window::Window;
 
 lazy_static! {
-    static ref EMPTY_VEC: Vec<WindowWrap> = Vec::with_capacity(0);
+    static ref EMPTY_VEC: Vec<Window> = Vec::with_capacity(0);
 }
 
 pub type Buffer = serbuffer::Buffer;
@@ -43,8 +43,8 @@ pub struct Record {
     pub(crate) timestamp: u64,
 
     pub(crate) channel_key: ChannelKey,
-    pub(crate) location_windows: Option<Vec<WindowWrap>>,
-    pub(crate) trigger_window: Option<WindowWrap>,
+    pub(crate) location_windows: Option<Vec<Window>>,
+    pub(crate) trigger_window: Option<Window>,
 
     pub(crate) values: Buffer,
 }
@@ -80,22 +80,22 @@ impl Record {
         self.values.extend(&record.values)
     }
 
-    pub(crate) fn set_location_windows(&mut self, windows: Vec<WindowWrap>) {
+    pub(crate) fn set_location_windows(&mut self, windows: Vec<Window>) {
         self.location_windows = Some(windows);
     }
 
-    pub(crate) fn get_location_windows(&self) -> &Vec<WindowWrap> {
+    pub(crate) fn get_location_windows(&self) -> &Vec<Window> {
         self.location_windows.as_ref().unwrap_or(&EMPTY_VEC)
     }
 
-    pub(crate) fn get_min_location_windows(&self) -> Option<&WindowWrap> {
+    pub(crate) fn get_min_location_windows(&self) -> Option<&Window> {
         match &self.location_windows {
             Some(windows) => windows.get(0),
             None => None,
         }
     }
 
-    pub(crate) fn get_max_location_windows(&self) -> Option<&WindowWrap> {
+    pub(crate) fn get_max_location_windows(&self) -> Option<&Window> {
         match &self.location_windows {
             Some(windows) => {
                 if windows.len() > 0 {
@@ -108,11 +108,11 @@ impl Record {
         }
     }
 
-    pub fn set_window_trigger(&mut self, window: WindowWrap) {
+    pub fn set_window_trigger(&mut self, window: Window) {
         self.trigger_window = Some(window);
     }
 
-    pub fn get_trigger_window(&self) -> Option<WindowWrap> {
+    pub fn get_trigger_window(&self) -> Option<Window> {
         self.trigger_window.clone()
     }
 
@@ -198,9 +198,9 @@ pub struct Watermark {
     pub(crate) timestamp: u64,
 
     // watermark timestamp location windows based on assign function
-    pub(crate) location_windows: Option<Vec<WindowWrap>>,
+    pub(crate) location_windows: Option<Vec<Window>>,
     pub(crate) downstream: bool,
-    pub(crate) drop_windows: Option<Vec<WindowWrap>>,
+    pub(crate) drop_windows: Option<Vec<Window>>,
 }
 
 impl Watermark {
@@ -222,11 +222,11 @@ impl Watermark {
         }
     }
 
-    pub(crate) fn set_location_windows(&mut self, windows: Vec<WindowWrap>) {
+    pub(crate) fn set_location_windows(&mut self, windows: Vec<Window>) {
         self.location_windows = Some(windows);
     }
 
-    pub(crate) fn get_min_location_windows(&self) -> Option<&WindowWrap> {
+    pub(crate) fn get_min_location_windows(&self) -> Option<&Window> {
         match &self.location_windows {
             Some(windows) => windows.get(0),
             None => None,

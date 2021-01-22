@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use crate::api::element::{Barrier, Record};
 use crate::api::runtime::JobId;
-use crate::api::window::WindowWrap;
+use crate::api::window::Window;
 use crate::storage::keyed_state::mem_reducing_state::MemoryReducingState;
 use crate::storage::keyed_state::mem_storage::{append_drop_window, StorageKey};
 use crate::storage::keyed_state::{ReducingState, StateKey, WindowState};
@@ -14,7 +14,7 @@ pub struct MemoryWindowState {
     job_id: JobId,
     task_number: u16,
 
-    windows: HashMap<WindowWrap, MemoryReducingState>,
+    windows: HashMap<Window, MemoryReducingState>,
     suggest_state_capacity: usize,
 }
 
@@ -29,13 +29,8 @@ impl MemoryWindowState {
         }
     }
 
-    fn merge_value<F>(
-        &mut self,
-        window: &WindowWrap,
-        key: Record,
-        record: &mut Record,
-        reduce_fun: F,
-    ) where
+    fn merge_value<F>(&mut self, window: &Window, key: Record, record: &mut Record, reduce_fun: F)
+    where
         F: Fn(Option<&mut Record>, &mut Record) -> Record,
     {
         match self.windows.get_mut(window) {
@@ -58,7 +53,7 @@ impl MemoryWindowState {
 }
 
 impl WindowState for MemoryWindowState {
-    fn windows(&self) -> Vec<WindowWrap> {
+    fn windows(&self) -> Vec<Window> {
         let mut windows = Vec::new();
         for entry in &self.windows {
             windows.push(entry.0.clone())
@@ -85,7 +80,7 @@ impl WindowState for MemoryWindowState {
         }
     }
 
-    fn drop_window(&mut self, window: &WindowWrap) {
+    fn drop_window(&mut self, window: &Window) {
         match self.windows.remove(&window) {
             Some(state) => {
                 let len = state.len() as f32;

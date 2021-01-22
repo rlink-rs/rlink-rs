@@ -3,7 +3,7 @@ use crate::api::element::{Barrier, Element, Record};
 use crate::api::function::{Context, FlatMapFunction, Function};
 use crate::api::properties::SystemProperties;
 use crate::api::runtime::{CheckpointId, JobId};
-use crate::api::window::{Window, WindowWrap};
+use crate::api::window::{TWindow, Window};
 use crate::storage::keyed_state::{ReducingState, ReducingStateWrap, StateKey};
 
 pub(crate) struct KeyedStateFlatMapFunction {
@@ -83,14 +83,14 @@ where
 {
     end: bool,
     iterator: T,
-    window: WindowWrap,
+    window: Window,
 }
 
 impl<T> BatchIterator<T>
 where
     T: Iterator<Item = Record>,
 {
-    pub fn new(iterator: T, window: WindowWrap) -> Self {
+    pub fn new(iterator: T, window: Window) -> Self {
         BatchIterator {
             end: false,
             iterator,
