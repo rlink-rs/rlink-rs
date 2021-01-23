@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::api::checkpoint::Checkpoint;
 use crate::api::runtime::{CheckpointId, JobId, OperatorId};
-use crate::storage::checkpoint::CheckpointStorage;
+use crate::storage::checkpoint::TCheckpointStorage;
 
 #[derive(Debug)]
 pub struct MemoryCheckpointStorage {
@@ -17,7 +17,7 @@ impl MemoryCheckpointStorage {
     }
 }
 
-impl CheckpointStorage for MemoryCheckpointStorage {
+impl TCheckpointStorage for MemoryCheckpointStorage {
     fn save(
         &mut self,
         _application_name: &str,

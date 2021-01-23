@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use crate::api::element::Element;
 use crate::api::function::FlatMapFunction;
-use crate::api::operator::StreamOperator;
+use crate::api::operator::DefaultStreamOperator;
 use crate::api::runtime::{CheckpointId, OperatorId};
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
@@ -12,7 +12,7 @@ use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 #[derive(Debug)]
 pub(crate) struct FlatMapRunnable {
     operator_id: OperatorId,
-    stream_map: StreamOperator<dyn FlatMapFunction>,
+    stream_map: DefaultStreamOperator<dyn FlatMapFunction>,
     next_runnable: Option<Box<dyn Runnable>>,
 
     counter: Arc<AtomicU64>,
@@ -21,7 +21,7 @@ pub(crate) struct FlatMapRunnable {
 impl FlatMapRunnable {
     pub fn new(
         operator_id: OperatorId,
-        stream_map: StreamOperator<dyn FlatMapFunction>,
+        stream_map: DefaultStreamOperator<dyn FlatMapFunction>,
         next_runnable: Option<Box<dyn Runnable>>,
     ) -> Self {
         info!("Create FlatMapRunnable");

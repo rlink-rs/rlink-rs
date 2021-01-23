@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use crate::api::backend::{OperatorState, OperatorStateBackend};
 use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
-use crate::storage::operator_state::{OperatorStateManager, OperatorStateManagerWrap};
+use crate::storage::operator_state::{OperatorStateManager, TOperatorStateManager};
 
 #[derive(Clone, Debug)]
 pub struct FunctionSnapshotContext {
@@ -26,7 +26,7 @@ impl FunctionSnapshotContext {
         application_id: String,
         task_id: TaskId,
     ) -> Box<dyn OperatorState> {
-        OperatorStateManagerWrap::new(task_id, state).create_state(application_id, task_id)
+        OperatorStateManager::new(task_id, state).create_state(application_id, task_id)
     }
 }
 

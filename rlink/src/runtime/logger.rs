@@ -12,7 +12,7 @@ use log4rs::config::{Appender, Config, Logger, Root};
 use log4rs::encode::pattern::PatternEncoder;
 
 use crate::runtime::ClusterMode;
-use crate::utils::get_work_space;
+use crate::utils::process::get_work_space;
 
 /// init log4r
 /// cluster_mode: for appender build

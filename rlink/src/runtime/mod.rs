@@ -11,6 +11,7 @@ pub mod cluster;
 pub mod context;
 pub mod coordinator;
 pub mod logger;
+pub mod timer;
 pub mod worker;
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, Eq, PartialEq)]

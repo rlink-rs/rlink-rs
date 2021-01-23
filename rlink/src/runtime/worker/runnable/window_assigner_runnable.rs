@@ -1,7 +1,7 @@
 use std::borrow::BorrowMut;
 
 use crate::api::element::Element;
-use crate::api::operator::StreamOperator;
+use crate::api::operator::DefaultStreamOperator;
 use crate::api::runtime::{CheckpointId, OperatorId};
 use crate::api::window::{WindowAssigner, WindowAssignerContext};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
@@ -9,14 +9,14 @@ use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 #[derive(Debug)]
 pub(crate) struct WindowAssignerRunnable {
     operator_id: OperatorId,
-    stream_window: StreamOperator<dyn WindowAssigner>,
+    stream_window: DefaultStreamOperator<dyn WindowAssigner>,
     next_runnable: Option<Box<dyn Runnable>>,
 }
 
 impl WindowAssignerRunnable {
     pub fn new(
         operator_id: OperatorId,
-        stream_window: StreamOperator<dyn WindowAssigner>,
+        stream_window: DefaultStreamOperator<dyn WindowAssigner>,
         next_runnable: Option<Box<dyn Runnable>>,
     ) -> Self {
         info!("Create WindowAssignerRunnable");

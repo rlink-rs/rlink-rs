@@ -5,7 +5,7 @@ use metrics_runtime::observers::PrometheusBuilder;
 use metrics_runtime::Receiver;
 use rand::prelude::*;
 
-use crate::utils::get_runtime;
+use crate::utils::thread::get_runtime;
 // use metrics_exporter_http::HttpExporter;
 use crate::channel::bounded;
 use crate::metrics::exporter_http::HttpExporter;

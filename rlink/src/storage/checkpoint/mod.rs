@@ -7,7 +7,7 @@ use crate::storage::checkpoint::mysql_checkpoint_storage::MySqlCheckpointStorage
 pub mod memory_checkpoint_storage;
 pub mod mysql_checkpoint_storage;
 
-pub trait CheckpointStorage {
+pub trait TCheckpointStorage {
     fn save(
         &mut self,
         application_name: &str,
@@ -25,19 +25,19 @@ pub trait CheckpointStorage {
 }
 
 #[derive(Debug)]
-pub enum CheckpointStorageWrap {
+pub enum CheckpointStorage {
     MemoryCheckpointStorage(MemoryCheckpointStorage),
     MySqlCheckpointStorage(MySqlCheckpointStorage),
 }
 
-impl CheckpointStorageWrap {
+impl CheckpointStorage {
     pub fn new(checkpoint_backend: &CheckpointBackend) -> Self {
         match checkpoint_backend {
             CheckpointBackend::Memory => {
-                CheckpointStorageWrap::MemoryCheckpointStorage(MemoryCheckpointStorage::new())
+                CheckpointStorage::MemoryCheckpointStorage(MemoryCheckpointStorage::new())
             }
             CheckpointBackend::MySql { endpoint, table } => {
-                CheckpointStorageWrap::MySqlCheckpointStorage(MySqlCheckpointStorage::new(
+                CheckpointStorage::MySqlCheckpointStorage(MySqlCheckpointStorage::new(
                     endpoint.clone(),
                     table.clone(),
                 ))
@@ -46,7 +46,7 @@ impl CheckpointStorageWrap {
     }
 }
 
-impl CheckpointStorage for CheckpointStorageWrap {
+impl TCheckpointStorage for CheckpointStorage {
     fn save(
         &mut self,
         application_name: &str,
@@ -56,14 +56,14 @@ impl CheckpointStorage for CheckpointStorageWrap {
         ttl: u64,
     ) -> anyhow::Result<()> {
         match self {
-            CheckpointStorageWrap::MemoryCheckpointStorage(storage) => storage.save(
+            CheckpointStorage::MemoryCheckpointStorage(storage) => storage.save(
                 application_name,
                 application_id,
                 checkpoint_id,
                 finish_cks,
                 ttl,
             ),
-            CheckpointStorageWrap::MySqlCheckpointStorage(storage) => storage.save(
+            CheckpointStorage::MySqlCheckpointStorage(storage) => storage.save(
                 application_name,
                 application_id,
                 checkpoint_id,
@@ -80,10 +80,10 @@ impl CheckpointStorage for CheckpointStorageWrap {
         operator_id: OperatorId,
     ) -> anyhow::Result<Vec<Checkpoint>> {
         match self {
-            CheckpointStorageWrap::MemoryCheckpointStorage(storage) => {
+            CheckpointStorage::MemoryCheckpointStorage(storage) => {
                 storage.load(application_name, job_id, operator_id)
             }
-            CheckpointStorageWrap::MySqlCheckpointStorage(storage) => {
+            CheckpointStorage::MySqlCheckpointStorage(storage) => {
                 storage.load(application_name, job_id, operator_id)
             }
         }

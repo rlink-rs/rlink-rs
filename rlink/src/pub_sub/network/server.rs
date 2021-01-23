@@ -16,10 +16,10 @@ use tokio_util::codec::LengthDelimitedCodec;
 
 use crate::api::element::{Element, Serde};
 use crate::api::runtime::{ChannelKey, TaskId};
-use crate::channel::{mb, named_bounded, ElementReceiver, ElementSender, TryRecvError};
+use crate::channel::{named_bounded, ElementReceiver, ElementSender, TryRecvError};
 use crate::metrics::Tag;
 use crate::pub_sub::network::{ElementRequest, ResponseCode};
-use crate::utils::get_runtime;
+use crate::utils::thread::get_runtime;
 
 lazy_static! {
     static ref NETWORK_CHANNELS: DashMap<ChannelKey, ElementReceiver> = DashMap::new();
@@ -54,7 +54,6 @@ pub(crate) fn publish(
                 ),
             ],
             channel_size,
-            mb(10),
         );
 
         senders.push((channel_key.clone(), sender));

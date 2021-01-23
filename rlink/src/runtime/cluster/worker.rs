@@ -6,12 +6,12 @@ use std::time::Duration;
 use crate::api::env::{StreamApp, StreamExecutionEnvironment};
 use crate::pub_sub::network;
 use crate::runtime::context::Context;
+use crate::runtime::timer::{start_window_timer, WindowTimer};
 use crate::runtime::worker::checkpoint::start_report_checkpoint;
 use crate::runtime::worker::heart_beat::{start_heart_beat_timer, status_heartbeat};
 use crate::runtime::{worker, ApplicationDescriptor, TaskManagerStatus, WorkerManagerDescriptor};
 use crate::storage::metadata::MetadataLoader;
 use crate::utils;
-use crate::utils::timer::{start_window_timer, WindowTimer};
 
 pub(crate) fn run<S>(context: Context, stream_env: StreamExecutionEnvironment, stream_app: S)
 where
@@ -71,7 +71,7 @@ fn get_task_manager_descriptor(
 fn bootstrap_publish_serve(bind_ip: String) -> SocketAddr {
     let worker_service = network::Server::new(bind_ip);
     let worker_service_clone = worker_service.clone();
-    utils::spawn("publish_serve", move || worker_service_clone.serve_sync());
+    utils::thread::spawn("publish_serve", move || worker_service_clone.serve_sync());
     loop {
         match worker_service.get_bind_addr_sync() {
             Some(addr) => {
@@ -84,7 +84,7 @@ fn bootstrap_publish_serve(bind_ip: String) -> SocketAddr {
 
 fn bootstrap_subscribe_client(application_descriptor: &ApplicationDescriptor) {
     let application_descriptor = application_descriptor.clone();
-    utils::spawn("subscribe_client", move || {
+    utils::thread::spawn("subscribe_client", move || {
         network::run_subscribe(application_descriptor)
     });
 }

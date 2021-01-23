@@ -1,7 +1,7 @@
 use rlink::api::element::Record;
 use rlink::channel::receiver::ChannelReceiver;
 use rlink::channel::sender::ChannelSender;
-use rlink::channel::{mb, named_bounded, TryRecvError, TrySendError};
+use rlink::channel::{named_bounded, TryRecvError, TrySendError};
 use rlink::metrics::Tag;
 
 #[derive(Clone)]
@@ -17,7 +17,7 @@ impl Handover {
             Tag("partition".to_string(), format!("{}", partition)),
         ];
 
-        let (sender, receiver) = named_bounded("KafkaSource_Handover", tags, buffer_size, mb(100));
+        let (sender, receiver) = named_bounded("KafkaSource_Handover", tags, buffer_size);
         Handover { sender, receiver }
     }
 

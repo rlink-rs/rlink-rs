@@ -7,13 +7,13 @@ use std::sync::Arc;
 use crate::api::backend::KeyedStateBackend;
 use crate::api::element::{Barrier, Element, Record, Watermark};
 use crate::api::function::{KeySelectorFunction, ReduceFunction};
-use crate::api::operator::StreamOperator;
+use crate::api::operator::DefaultStreamOperator;
 use crate::api::properties::SystemProperties;
 use crate::api::runtime::{CheckpointId, OperatorId};
-use crate::api::window::{Window, WindowWrap};
+use crate::api::window::{TWindow, Window};
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
-use crate::storage::keyed_state::{WindowState, WindowStateWrap};
+use crate::storage::keyed_state::{TWindowState, WindowState};
 use crate::utils::date_time::timestamp_str;
 
 #[derive(Debug)]
@@ -22,11 +22,11 @@ pub(crate) struct ReduceRunnable {
     task_number: u16,
     dependency_parallelism: u16,
 
-    stream_key_by: Option<StreamOperator<dyn KeySelectorFunction>>,
-    stream_reduce: StreamOperator<dyn ReduceFunction>,
+    stream_key_by: Option<DefaultStreamOperator<dyn KeySelectorFunction>>,
+    stream_reduce: DefaultStreamOperator<dyn ReduceFunction>,
     next_runnable: Option<Box<dyn Runnable>>,
 
-    state: Option<WindowStateWrap>, // HashMap<Vec<u8>, Record>, // HashMap<TimeWindow, HashMap<Record, Record>>,
+    state: Option<WindowState>, // HashMap<Vec<u8>, Record>, // HashMap<TimeWindow, HashMap<Record, Record>>,
 
     current_checkpoint_id: CheckpointId,
     reached_barriers: Vec<Barrier>,
@@ -34,7 +34,7 @@ pub(crate) struct ReduceRunnable {
     max_watermark_status_timestamp: u64,
     watermark_align: Option<WatermarkAlign>,
     // the Record can be operate after this window(include this window's time)
-    limited_watermark_window: Option<WindowWrap>,
+    limited_watermark_window: Option<Window>,
 
     counter: Arc<AtomicU64>,
     expire_counter: Arc<AtomicU64>,
@@ -43,8 +43,8 @@ pub(crate) struct ReduceRunnable {
 impl ReduceRunnable {
     pub fn new(
         operator_id: OperatorId,
-        stream_key_by: Option<StreamOperator<dyn KeySelectorFunction>>,
-        stream_reduce: StreamOperator<dyn ReduceFunction>,
+        stream_key_by: Option<DefaultStreamOperator<dyn KeySelectorFunction>>,
+        stream_reduce: DefaultStreamOperator<dyn ReduceFunction>,
         next_runnable: Option<Box<dyn Runnable>>,
     ) -> Self {
         ReduceRunnable {
@@ -93,7 +93,7 @@ impl Runnable for ReduceRunnable {
             .get_keyed_state_backend()
             .unwrap_or(KeyedStateBackend::Memory);
 
-        self.state = Some(WindowStateWrap::new(
+        self.state = Some(WindowState::new(
             context
                 .application_descriptor
                 .coordinator_manager
@@ -476,7 +476,7 @@ impl WatermarkAlign {
 #[cfg(test)]
 mod tests {
     use crate::api::element::{StreamStatus, Watermark};
-    use crate::api::window::{TimeWindow, WindowWrap};
+    use crate::api::window::{TimeWindow, Window};
     use crate::runtime::worker::runnable::reduce_runnable::WatermarkAlign;
 
     #[test]
@@ -492,7 +492,7 @@ mod tests {
             let timestamp = base_timestamp;
             let mut watermark = Watermark::new(0, num_tasks, timestamp, &stream_statue);
             let window = TimeWindow::new(timestamp, timestamp + 3000);
-            watermark.set_location_windows(vec![WindowWrap::TimeWindow(window)]);
+            watermark.set_location_windows(vec![Window::TimeWindow(window)]);
 
             align.insert(watermark);
         }
@@ -501,7 +501,7 @@ mod tests {
             let timestamp = base_timestamp + 1000;
             let mut watermark = Watermark::new(1, num_tasks, timestamp, &stream_statue);
             let window = TimeWindow::new(timestamp, timestamp + 3000);
-            watermark.set_location_windows(vec![WindowWrap::TimeWindow(window)]);
+            watermark.set_location_windows(vec![Window::TimeWindow(window)]);
 
             align.insert(watermark);
         }
@@ -510,7 +510,7 @@ mod tests {
             let timestamp = base_timestamp + 2000;
             let mut watermark = Watermark::new(2, num_tasks, timestamp, &stream_statue);
             let window = TimeWindow::new(timestamp, timestamp + 3000);
-            watermark.set_location_windows(vec![WindowWrap::TimeWindow(window)]);
+            watermark.set_location_windows(vec![Window::TimeWindow(window)]);
 
             align.insert(watermark);
         }
@@ -533,7 +533,7 @@ mod tests {
             let timestamp = base_timestamp;
             let mut watermark = Watermark::new(0, num_tasks, timestamp, &stream_statue);
             let window = TimeWindow::new(timestamp, timestamp + 3000);
-            watermark.set_location_windows(vec![WindowWrap::TimeWindow(window)]);
+            watermark.set_location_windows(vec![Window::TimeWindow(window)]);
 
             align.insert(watermark);
         }
@@ -542,7 +542,7 @@ mod tests {
             let timestamp = base_timestamp + 1000;
             let mut watermark = Watermark::new(1, num_tasks, timestamp, &stream_statue);
             let window = TimeWindow::new(timestamp, timestamp + 3000);
-            watermark.set_location_windows(vec![WindowWrap::TimeWindow(window)]);
+            watermark.set_location_windows(vec![Window::TimeWindow(window)]);
 
             align.insert(watermark);
         }
@@ -564,7 +564,7 @@ mod tests {
             let timestamp = base_timestamp;
             let mut watermark = Watermark::new(0, num_tasks, timestamp, &stream_statue);
             let window = TimeWindow::new(timestamp, timestamp + 3000);
-            watermark.set_location_windows(vec![WindowWrap::TimeWindow(window)]);
+            watermark.set_location_windows(vec![Window::TimeWindow(window)]);
 
             align.insert(watermark);
         }
@@ -573,7 +573,7 @@ mod tests {
             let timestamp = base_timestamp + 1000 + timeout_ms;
             let mut watermark = Watermark::new(1, num_tasks, timestamp, &stream_statue);
             let window = TimeWindow::new(timestamp, timestamp + 3000);
-            watermark.set_location_windows(vec![WindowWrap::TimeWindow(window)]);
+            watermark.set_location_windows(vec![Window::TimeWindow(window)]);
 
             align.insert(watermark);
         }
@@ -597,7 +597,7 @@ mod tests {
             let timestamp = base_timestamp;
             let mut watermark = Watermark::new(0, num_tasks, timestamp, &stream_statue);
             let window = TimeWindow::new(timestamp, timestamp + 3000);
-            watermark.set_location_windows(vec![WindowWrap::TimeWindow(window)]);
+            watermark.set_location_windows(vec![Window::TimeWindow(window)]);
 
             align.insert(watermark);
         }
@@ -608,7 +608,7 @@ mod tests {
             let timestamp = base_timestamp + 1000 + timeout_ms;
             let mut watermark = Watermark::new(1, num_tasks, timestamp, &stream_statue);
             let window = TimeWindow::new(timestamp, timestamp + 3000);
-            watermark.set_location_windows(vec![WindowWrap::TimeWindow(window)]);
+            watermark.set_location_windows(vec![Window::TimeWindow(window)]);
 
             align.insert(watermark);
         }

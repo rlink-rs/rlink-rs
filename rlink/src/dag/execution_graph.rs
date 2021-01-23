@@ -4,7 +4,7 @@ use std::ops::Index;
 use daggy::{Dag, EdgeIndex, NodeIndex, Walker};
 
 use crate::api::function::InputSplit;
-use crate::api::operator::StreamOperatorWrap;
+use crate::api::operator::StreamOperator;
 use crate::api::runtime::{JobId, OperatorId};
 use crate::dag::job_graph::{JobEdge, JobGraph};
 use crate::dag::stream_graph::StreamNode;
@@ -104,7 +104,7 @@ impl ExecutionGraph {
     pub fn build(
         &mut self,
         job_graph: &JobGraph,
-        operators: &mut HashMap<OperatorId, &StreamOperatorWrap>,
+        operators: &mut HashMap<OperatorId, &StreamOperator>,
     ) -> Result<(), DagError> {
         let execution_node_indies = self.build_nodes(job_graph, operators)?;
         self.build_edges(job_graph, execution_node_indies)
@@ -113,7 +113,7 @@ impl ExecutionGraph {
     pub fn build_nodes(
         &mut self,
         job_graph: &JobGraph,
-        operators: &mut HashMap<OperatorId, &StreamOperatorWrap>,
+        operators: &mut HashMap<OperatorId, &StreamOperator>,
     ) -> Result<HashMap<JobId, Vec<NodeIndex>>, DagError> {
         let job_dag = &job_graph.dag;
 
@@ -124,7 +124,7 @@ impl ExecutionGraph {
             let source_stream_node = &job_node.stream_nodes[0];
 
             let operator = operators.get_mut(&source_stream_node.id).unwrap();
-            if let StreamOperatorWrap::StreamSource(op) = operator {
+            if let StreamOperator::StreamSource(op) = operator {
                 let input_splits = op.operator_fn.create_input_splits(job_node.parallelism);
                 if input_splits.len() != job_node.parallelism as usize {
                     return Err(DagError::IllegalInputSplitSize(format!(

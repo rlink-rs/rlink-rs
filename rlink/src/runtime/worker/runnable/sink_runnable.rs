@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use crate::api::element::Element;
 use crate::api::function::OutputFormat;
-use crate::api::operator::{FunctionCreator, StreamOperator, TStreamOperator};
+use crate::api::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
 use crate::api::runtime::{CheckpointId, OperatorId};
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
@@ -15,13 +15,16 @@ pub(crate) struct SinkRunnable {
     task_number: u16,
     num_tasks: u16,
 
-    stream_sink: StreamOperator<dyn OutputFormat>,
+    stream_sink: DefaultStreamOperator<dyn OutputFormat>,
 
     counter: Arc<AtomicU64>,
 }
 
 impl SinkRunnable {
-    pub fn new(operator_id: OperatorId, stream_sink: StreamOperator<dyn OutputFormat>) -> Self {
+    pub fn new(
+        operator_id: OperatorId,
+        stream_sink: DefaultStreamOperator<dyn OutputFormat>,
+    ) -> Self {
         SinkRunnable {
             operator_id,
             task_number: 0,

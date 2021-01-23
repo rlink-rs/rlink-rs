@@ -3,7 +3,7 @@ use mysql::*;
 
 use crate::api::checkpoint::{Checkpoint, CheckpointHandle};
 use crate::api::runtime::{CheckpointId, JobId, OperatorId, TaskId};
-use crate::storage::checkpoint::CheckpointStorage;
+use crate::storage::checkpoint::TCheckpointStorage;
 use crate::utils::date_time::{current_timestamp, fmt_date_time};
 
 const DEFAULT_TABLE_NAME: &'static str = "rlink_ck";
@@ -23,7 +23,7 @@ impl MySqlCheckpointStorage {
     }
 }
 
-impl CheckpointStorage for MySqlCheckpointStorage {
+impl TCheckpointStorage for MySqlCheckpointStorage {
     fn save(
         &mut self,
         application_name: &str,
@@ -136,7 +136,7 @@ mod tests {
     use crate::api::checkpoint::{Checkpoint, CheckpointHandle};
     use crate::api::runtime::{CheckpointId, JobId, OperatorId, TaskId};
     use crate::storage::checkpoint::mysql_checkpoint_storage::MySqlCheckpointStorage;
-    use crate::storage::checkpoint::CheckpointStorage;
+    use crate::storage::checkpoint::TCheckpointStorage;
 
     #[test]
     pub fn mysql_storage_test() {

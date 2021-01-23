@@ -6,10 +6,11 @@ use std::thread::JoinHandle;
 use crate::api::element::{Element, Record};
 use crate::api::env::{StreamApp, StreamExecutionEnvironment};
 use crate::api::function::KeySelectorFunction;
-use crate::api::operator::{StreamOperator, StreamOperatorWrap};
+use crate::api::operator::{DefaultStreamOperator, StreamOperator};
 use crate::api::runtime::{JobId, OperatorId};
 use crate::dag::{DagManager, OperatorType};
 use crate::runtime::context::Context;
+use crate::runtime::timer::WindowTimer;
 use crate::runtime::worker::runnable::co_process_runnable::CoProcessRunnable;
 use crate::runtime::worker::runnable::{
     FilterRunnable, FlatMapRunnable, KeyByRunnable, ReduceRunnable, Runnable, RunnableContext,
@@ -17,7 +18,6 @@ use crate::runtime::worker::runnable::{
 };
 use crate::runtime::{ApplicationDescriptor, TaskDescriptor};
 use crate::storage::metadata::MetadataLoader;
-use crate::utils::timer::WindowTimer;
 
 pub mod checkpoint;
 pub mod heart_beat;
@@ -132,7 +132,7 @@ where
     fn build_invoke_chain(
         &self,
         dag_manager: &DagManager,
-        mut operators: HashMap<OperatorId, StreamOperatorWrap>,
+        mut operators: HashMap<OperatorId, StreamOperator>,
     ) -> Box<dyn Runnable> {
         let job_node = dag_manager
             .get_job_node(&self.task_descriptor.task_id)
@@ -143,7 +143,7 @@ where
             let operator_id = job_node.stream_nodes[index].id;
             let operator = operators.remove(&operator_id).expect("operator not found");
             let invoke_operator = match operator {
-                StreamOperatorWrap::StreamSource(stream_operator) => {
+                StreamOperator::StreamSource(stream_operator) => {
                     let op = SourceRunnable::new(
                         operator_id,
                         self.task_descriptor.input_split.clone(),
@@ -153,27 +153,27 @@ where
                     let op: Box<dyn Runnable> = Box::new(op);
                     op
                 }
-                StreamOperatorWrap::StreamFlatMap(stream_operator) => {
+                StreamOperator::StreamFlatMap(stream_operator) => {
                     let op = FlatMapRunnable::new(operator_id, stream_operator, None);
                     let op: Box<dyn Runnable> = Box::new(op);
                     op
                 }
-                StreamOperatorWrap::StreamFilter(stream_operator) => {
+                StreamOperator::StreamFilter(stream_operator) => {
                     let op = FilterRunnable::new(operator_id, stream_operator, None);
                     let op: Box<dyn Runnable> = Box::new(op);
                     op
                 }
-                StreamOperatorWrap::StreamCoProcess(stream_operator) => {
+                StreamOperator::StreamCoProcess(stream_operator) => {
                     let op = CoProcessRunnable::new(operator_id, stream_operator, None);
                     let op: Box<dyn Runnable> = Box::new(op);
                     op
                 }
-                StreamOperatorWrap::StreamKeyBy(stream_operator) => {
+                StreamOperator::StreamKeyBy(stream_operator) => {
                     let op = KeyByRunnable::new(operator_id, stream_operator, None);
                     let op: Box<dyn Runnable> = Box::new(op);
                     op
                 }
-                StreamOperatorWrap::StreamReduce(stream_operator) => {
+                StreamOperator::StreamReduce(stream_operator) => {
                     let stream_key_by = self.get_dependency_key_by(
                         &dag_manager,
                         operators.borrow_mut(),
@@ -183,17 +183,17 @@ where
                     let op: Box<dyn Runnable> = Box::new(op);
                     op
                 }
-                StreamOperatorWrap::StreamWatermarkAssigner(stream_operator) => {
+                StreamOperator::StreamWatermarkAssigner(stream_operator) => {
                     let op = WatermarkAssignerRunnable::new(operator_id, stream_operator, None);
                     let op: Box<dyn Runnable> = Box::new(op);
                     op
                 }
-                StreamOperatorWrap::StreamWindowAssigner(stream_operator) => {
+                StreamOperator::StreamWindowAssigner(stream_operator) => {
                     let op = WindowAssignerRunnable::new(operator_id, stream_operator, None);
                     let op: Box<dyn Runnable> = Box::new(op);
                     op
                 }
-                StreamOperatorWrap::StreamSink(stream_operator) => {
+                StreamOperator::StreamSink(stream_operator) => {
                     let op = SinkRunnable::new(operator_id, stream_operator);
                     let op: Box<dyn Runnable> = Box::new(op);
                     op
@@ -221,9 +221,9 @@ where
     fn get_dependency_key_by(
         &self,
         dag_manager: &DagManager,
-        operators: &mut HashMap<OperatorId, StreamOperatorWrap>,
+        operators: &mut HashMap<OperatorId, StreamOperator>,
         job_id: JobId,
-    ) -> Option<StreamOperator<dyn KeySelectorFunction>> {
+    ) -> Option<DefaultStreamOperator<dyn KeySelectorFunction>> {
         let job_parents = dag_manager.get_job_parents(job_id);
         if job_parents.len() == 0 {
             error!("key by not found");
@@ -239,7 +239,7 @@ where
                 .find(|x| x.operator_type == OperatorType::KeyBy)
                 .unwrap();
             let key_by_operator = operators.remove(&stream_node.id).unwrap();
-            if let StreamOperatorWrap::StreamKeyBy(stream_operator) = key_by_operator {
+            if let StreamOperator::StreamKeyBy(stream_operator) = key_by_operator {
                 Some(stream_operator)
             } else {
                 error!("dependency StreamKeyBy not found");

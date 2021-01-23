@@ -1,11 +1,11 @@
 use dashmap::DashMap;
 
 use crate::api::runtime::JobId;
-use crate::api::window::WindowWrap;
+use crate::api::window::Window;
 use crate::storage::keyed_state::mem_reducing_state::MemoryReducingState;
 
 lazy_static! {
-    static ref DROP_WINDOW_STATE_STORAGE: DashMap<StorageKey, DashMap<WindowWrap, MemoryReducingState>> =
+    static ref DROP_WINDOW_STATE_STORAGE: DashMap<StorageKey, DashMap<Window, MemoryReducingState>> =
         DashMap::new();
 }
 
@@ -26,10 +26,10 @@ impl StorageKey {
 
 pub(crate) fn append_drop_window(
     storage_key: StorageKey,
-    window: WindowWrap,
+    window: Window,
     state: MemoryReducingState,
 ) {
-    let drop_window_states: &DashMap<StorageKey, DashMap<WindowWrap, MemoryReducingState>> =
+    let drop_window_states: &DashMap<StorageKey, DashMap<Window, MemoryReducingState>> =
         &*DROP_WINDOW_STATE_STORAGE;
 
     let task_storage = drop_window_states
@@ -41,9 +41,9 @@ pub(crate) fn append_drop_window(
 pub(crate) fn remove_drop_window(
     job_id: JobId,
     task_number: u16,
-    window: WindowWrap,
+    window: Window,
 ) -> Option<MemoryReducingState> {
-    let drop_window_states: &DashMap<StorageKey, DashMap<WindowWrap, MemoryReducingState>> =
+    let drop_window_states: &DashMap<StorageKey, DashMap<Window, MemoryReducingState>> =
         &*DROP_WINDOW_STATE_STORAGE;
 
     let key = StorageKey::new(job_id, task_number);

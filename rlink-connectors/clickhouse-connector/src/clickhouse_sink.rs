@@ -6,10 +6,9 @@ use std::time::Duration;
 use clickhouse_rs::{ClientHandle, Options, Pool};
 use rlink::api::element::Record;
 use rlink::api::function::{Context, Function, OutputFormat};
-use rlink::channel::mb;
+use rlink::channel::handover::Handover;
 use rlink::metrics::Tag;
-use rlink::utils::get_runtime;
-use rlink::utils::handover::Handover;
+use rlink::utils::thread::get_runtime;
 use rlink::{api, utils};
 
 pub type CkBlock = clickhouse_rs::Block;
@@ -64,7 +63,7 @@ impl OutputFormat for ClickhouseSink {
                 context.task_id.task_number().to_string(),
             ),
         ];
-        self.handover = Some(Handover::new(self.get_name(), tags, 100000, mb(10)));
+        self.handover = Some(Handover::new(self.get_name(), tags, 10000));
 
         let urls: Vec<&str> = self.url.split(",").collect();
         let url = if urls.len() > 1 {
@@ -85,7 +84,7 @@ impl OutputFormat for ClickhouseSink {
             self.handover.as_ref().unwrap().clone(),
         );
         let tasks = self.tasks;
-        utils::spawn("clickhouse-sink-block", move || {
+        utils::thread::spawn("clickhouse-sink-block", move || {
             get_runtime().block_on(async {
                 task.run(tasks).await;
             });

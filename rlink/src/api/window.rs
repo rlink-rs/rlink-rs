@@ -5,7 +5,7 @@ use std::time::Duration;
 use crate::api::function::Function;
 use crate::utils;
 
-pub trait Window: Debug + Clone {
+pub trait TWindow: Debug + Clone {
     fn max_timestamp(&self) -> u64;
     fn min_timestamp(&self) -> u64;
 }
@@ -48,7 +48,7 @@ impl TimeWindow {
     }
 }
 
-impl Window for TimeWindow {
+impl TWindow for TimeWindow {
     fn max_timestamp(&self) -> u64 {
         self.end
     }
@@ -59,20 +59,20 @@ impl Window for TimeWindow {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub enum WindowWrap {
+pub enum Window {
     TimeWindow(TimeWindow),
 }
 
-impl Window for WindowWrap {
+impl TWindow for Window {
     fn max_timestamp(&self) -> u64 {
         match self {
-            WindowWrap::TimeWindow(time_window) => time_window.max_timestamp(),
+            Window::TimeWindow(time_window) => time_window.max_timestamp(),
         }
     }
 
     fn min_timestamp(&self) -> u64 {
         match self {
-            WindowWrap::TimeWindow(time_window) => time_window.min_timestamp(),
+            Window::TimeWindow(time_window) => time_window.min_timestamp(),
         }
     }
 }
@@ -90,7 +90,7 @@ pub trait WindowAssigner
 where
     Self: Function + Debug,
 {
-    fn assign_windows(&self, timestamp: u64, context: WindowAssignerContext) -> Vec<WindowWrap>;
+    fn assign_windows(&self, timestamp: u64, context: WindowAssignerContext) -> Vec<Window>;
 }
 
 #[derive(Debug)]
@@ -120,7 +120,7 @@ impl SlidingEventTimeWindows {
 }
 
 impl WindowAssigner for SlidingEventTimeWindows {
-    fn assign_windows(&self, timestamp: u64, _context: WindowAssignerContext) -> Vec<WindowWrap> {
+    fn assign_windows(&self, timestamp: u64, _context: WindowAssignerContext) -> Vec<Window> {
         let mut windows = Vec::with_capacity((self.size / self.slide) as usize);
         let last_start =
             TimeWindow::get_window_start_with_offset(timestamp, self.offset, self.slide);
@@ -130,7 +130,7 @@ impl WindowAssigner for SlidingEventTimeWindows {
             if start > timestamp - self.size {
                 let window = TimeWindow::new(start, start + self.size);
                 // info!("Create window: {}", window);
-                windows.push(WindowWrap::TimeWindow(window));
+                windows.push(Window::TimeWindow(window));
                 start -= self.slide;
             } else {
                 break;

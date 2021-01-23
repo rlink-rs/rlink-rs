@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::api::element::Record;
 use crate::storage::keyed_state::mem_storage::remove_drop_window;
-use crate::storage::keyed_state::{ReducingState, StateIterator, StateKey};
+use crate::storage::keyed_state::{StateIterator, StateKey, TReducingState};
 
 // type RecordBuildHasher = std::hash::BuildHasherDefault<RecordHasher>;
 
@@ -40,7 +40,7 @@ impl MemoryReducingState {
     }
 }
 
-impl ReducingState for MemoryReducingState {
+impl TReducingState for MemoryReducingState {
     fn get_mut(&mut self, key: &Record) -> Option<&mut Record> {
         self.kv.get_mut(key)
     }

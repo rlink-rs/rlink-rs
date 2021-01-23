@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use crate::api::cluster::MetadataStorageType;
 use crate::runtime::ApplicationDescriptor;
-use crate::storage::metadata::{loop_read_job_descriptor, MetadataStorageWrap};
+use crate::storage::metadata::{loop_read_job_descriptor, MetadataStorage};
 use crate::utils;
 
 lazy_static! {
@@ -24,7 +24,7 @@ pub(crate) fn get_global_job_descriptor() -> Option<ApplicationDescriptor> {
 }
 
 pub(crate) fn start_heart_beat_timer(metadata_storage_mode: MetadataStorageType) {
-    let metadata_storage = MetadataStorageWrap::new(&metadata_storage_mode);
+    let metadata_storage = MetadataStorage::new(&metadata_storage_mode);
     loop {
         std::thread::sleep(Duration::from_secs(5));
 

@@ -8,7 +8,7 @@ use serde::Serialize;
 use crate::api::cluster::TaskResourceInfo;
 use crate::api::env::{StreamApp, StreamExecutionEnvironment};
 use crate::channel::{bounded, Receiver, Sender};
-use crate::deployment::ResourceManager;
+use crate::deployment::TResourceManager;
 use crate::runtime::context::Context;
 use crate::runtime::{ApplicationDescriptor, ManagerType};
 use crate::utils;
@@ -31,7 +31,7 @@ impl YarnResourceManager {
     }
 }
 
-impl ResourceManager for YarnResourceManager {
+impl TResourceManager for YarnResourceManager {
     fn prepare(&mut self, context: &Context, job_descriptor: &ApplicationDescriptor) {
         self.job_descriptor = Some(job_descriptor.clone());
 
@@ -205,7 +205,7 @@ impl YarnCliCommand {
         &self,
         task_args: Vec<HashMap<String, String>>,
     ) -> anyhow::Result<Vec<TaskResourceInfo>> {
-        let cmd_id = utils::gen_id();
+        let cmd_id = utils::generator::gen_with_ts();
         let command = Command::new("allocate".to_string(), cmd_id.to_string(), task_args);
         let command_json = serde_json::to_string(&command).unwrap();
 
@@ -245,7 +245,7 @@ mod tests {
         let mut task_args: Vec<HashMap<String, String>> = Vec::new();
         task_args.push(map);
 
-        let cmd_id = utils::gen_id();
+        let cmd_id = utils::generator::gen_with_ts();
         let command = Data::new("allocate".to_string(), cmd_id, task_args);
         let command_json = serde_json::to_string(&command).unwrap();
 

@@ -4,7 +4,7 @@ use rlink::api::element::Record;
 use rlink::api::runtime::JobId;
 use rlink::channel::receiver::ChannelReceiver;
 use rlink::channel::sender::ChannelSender;
-use rlink::channel::{mb, named_bounded, TryRecvError};
+use rlink::channel::{named_bounded, TryRecvError};
 use rlink::metrics::Tag;
 
 #[derive(Clone)]
@@ -26,7 +26,7 @@ impl Handover {
             Tag("job_id".to_string(), format!("{}", job_id.0)),
             Tag("task_number".to_string(), format!("{}", task_number)),
         ];
-        let (sender, receiver) = named_bounded(name, tags, buffer_size, mb(100));
+        let (sender, receiver) = named_bounded(name, tags, buffer_size);
         Handover { sender, receiver }
     }
 

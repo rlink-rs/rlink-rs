@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use crate::api::element::Element;
 use crate::api::function::KeySelectorFunction;
-use crate::api::operator::StreamOperator;
+use crate::api::operator::DefaultStreamOperator;
 use crate::api::runtime::{CheckpointId, OperatorId};
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
@@ -14,7 +14,7 @@ use crate::utils;
 #[derive(Debug)]
 pub(crate) struct KeyByRunnable {
     operator_id: OperatorId,
-    stream_key_by: StreamOperator<dyn KeySelectorFunction>,
+    stream_key_by: DefaultStreamOperator<dyn KeySelectorFunction>,
     next_runnable: Option<Box<dyn Runnable>>,
     partition_size: u16,
 
@@ -24,7 +24,7 @@ pub(crate) struct KeyByRunnable {
 impl KeyByRunnable {
     pub fn new(
         operator_id: OperatorId,
-        stream_key_by: StreamOperator<dyn KeySelectorFunction>,
+        stream_key_by: DefaultStreamOperator<dyn KeySelectorFunction>,
         next_runnable: Option<Box<dyn Runnable>>,
     ) -> Self {
         KeyByRunnable {

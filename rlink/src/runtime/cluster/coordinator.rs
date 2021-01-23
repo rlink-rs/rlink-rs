@@ -1,5 +1,5 @@
 use crate::api::env::{StreamApp, StreamExecutionEnvironment};
-use crate::deployment::ResourceManager;
+use crate::deployment::TResourceManager;
 use crate::runtime::context::Context;
 use crate::runtime::coordinator::CoordinatorTask;
 
@@ -10,7 +10,7 @@ pub(crate) fn run<S, R>(
     resource_manager: R,
 ) where
     S: StreamApp + 'static,
-    R: ResourceManager + 'static,
+    R: TResourceManager + 'static,
 {
     let mut coordinator_task =
         CoordinatorTask::new(context, stream_app, resource_manager, stream_env);
