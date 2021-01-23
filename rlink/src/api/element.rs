@@ -442,14 +442,14 @@ impl Element {
 
     /// Checks whether this element is a watermark.
     /// return `True`, if this element is a watermark, false otherwise.
-    pub(crate) fn is_watermark(&self) -> bool {
+    pub(crate) fn _is_watermark(&self) -> bool {
         match self {
             Element::Watermark(_) => true,
             _ => false,
         }
     }
 
-    pub(crate) fn as_watermark(&self) -> &Watermark {
+    pub(crate) fn _as_watermark(&self) -> &Watermark {
         match self {
             Element::Watermark(water_mark) => water_mark,
             _ => panic!("Element is not Watermark"),

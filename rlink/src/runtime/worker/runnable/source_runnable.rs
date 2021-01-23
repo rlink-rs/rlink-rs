@@ -1,5 +1,5 @@
-use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -9,6 +9,8 @@ use crate::api::function::{InputFormat, InputSplit};
 use crate::api::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
 use crate::api::properties::SystemProperties;
 use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
+use crate::channel::named_bounded;
+use crate::channel::sender::ChannelSender;
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::timer::TimerChannel;
 use crate::runtime::worker::checkpoint::report_checkpoint;
@@ -51,6 +53,60 @@ impl SourceRunnable {
 
             counter: Arc::new(AtomicU64::new(0)),
         }
+    }
+
+    fn poll_input_element(&mut self, sender: ChannelSender<Element>, running: Arc<AtomicBool>) {
+        let iterator = self.stream_source.operator_fn.element_iter();
+        std::thread::spawn(move || {
+            for record in iterator {
+                sender.send(record).unwrap();
+            }
+
+            running.store(false, Ordering::Relaxed);
+        });
+    }
+
+    fn poll_stream_status(&mut self, sender: ChannelSender<Element>, running: Arc<AtomicBool>) {
+        let stream_status_timer = self.stream_status_timer.as_ref().unwrap().clone();
+        std::thread::spawn(move || loop {
+            let running = running.load(Ordering::Relaxed);
+            match stream_status_timer.recv() {
+                Ok(window_time) => {
+                    debug!("Trigger StreamStatus");
+                    let stream_status = Element::new_stream_status(window_time, !running);
+
+                    sender.send(stream_status).unwrap();
+                }
+                Err(_e) => {}
+            }
+
+            if !running {
+                info!("StreamStatus WindowTimer stop");
+                break;
+            }
+        });
+    }
+
+    fn poll_checkpoint(&mut self, sender: ChannelSender<Element>, running: Arc<AtomicBool>) {
+        let checkpoint_timer = self.checkpoint_timer.as_ref().unwrap().clone();
+        std::thread::spawn(move || loop {
+            let running = running.load(Ordering::Relaxed);
+            match checkpoint_timer.recv() {
+                Ok(window_time) => {
+                    debug!("Trigger Checkpoint");
+                    let checkpoint_id = CheckpointId(window_time);
+                    let barrier = Element::new_barrier(checkpoint_id);
+
+                    sender.send(barrier).unwrap();
+                }
+                Err(_e) => {}
+            }
+
+            if !running {
+                info!("Checkpoint WindowTimer stop");
+                break;
+            }
+        });
     }
 }
 
@@ -116,88 +172,23 @@ impl Runnable for SourceRunnable {
 
         let fn_creator = self.stream_source.get_fn_creator();
 
-        let mut idle_counter = 0u32;
-        let idle_delay_10 = Duration::from_millis(10);
-        let idle_delay_300 = Duration::from_millis(300);
+        let running = Arc::new(AtomicBool::new(true));
+        let (sender, receiver) = named_bounded("", vec![], 1024);
 
-        let mut end = false;
-        loop {
-            let mut counter = 0;
-            for _ in 0..1000 {
-                if end {
-                    break;
-                }
+        self.poll_input_element(sender.clone(), running.clone());
 
-                end = self.stream_source.operator_fn.as_mut().reached_end();
-                if end {
-                    break;
-                }
+        if let FunctionCreator::User = fn_creator {
+            self.poll_stream_status(sender.clone(), running.clone());
+            self.poll_checkpoint(sender.clone(), running.clone());
+        }
 
-                match self.stream_source.operator_fn.as_mut().next_element() {
-                    Some(row) => {
-                        if row.is_watermark() {
-                            debug!(
-                                "Source `next_element` get Watermark({})",
-                                row.as_watermark().timestamp
-                            );
-                        } else if row.is_barrier() {
-                            // if `InputFormat` return the Barrier, fire checkpoint immediately
-                            self.checkpoint(row.as_barrier().checkpoint_id);
-                        }
-
-                        self.next_runnable.as_mut().unwrap().run(row);
-                        counter += 1;
-                    }
-                    None => break,
-                }
+        while let Ok(element) = receiver.recv() {
+            if element.is_barrier() {
+                let checkpoint_id = element.as_barrier().checkpoint_id;
+                self.checkpoint(checkpoint_id);
             }
 
-            if counter > 0 {
-                self.counter.fetch_add(counter as u64, Ordering::Relaxed);
-            }
-
-            if let FunctionCreator::User = fn_creator {
-                if let Ok(window_time) = self.stream_status_timer.as_ref().unwrap().try_recv() {
-                    debug!("Trigger StreamStatus");
-                    let stream_status = Element::new_stream_status(window_time, end);
-                    self.next_runnable.as_mut().unwrap().run(stream_status);
-                };
-
-                if let Ok(window_time) = self.checkpoint_timer.as_ref().unwrap().try_recv() {
-                    debug!("Trigger Checkpoint");
-                    let checkpoint_id = CheckpointId(window_time);
-                    let barrier = Element::new_barrier(checkpoint_id);
-
-                    self.checkpoint(checkpoint_id);
-
-                    self.next_runnable.as_mut().unwrap().run(barrier);
-                };
-            }
-
-            if end {
-                // info!("source end");
-                std::thread::sleep(Duration::from_secs(1));
-                // break;
-            }
-
-            if counter == 0 {
-                idle_counter += 1;
-
-                // idle timeout = sleep(10millis) * 100 * 60 = 1min
-                if idle_counter > 100 * 60 {
-                    idle_counter = 0;
-                    info!("{} idle", self.stream_source.operator_fn.get_name());
-                }
-
-                // empty loop tolerate
-                if idle_counter < 30 {
-                    std::thread::sleep(idle_delay_10);
-                } else {
-                    std::thread::sleep(idle_delay_300);
-                }
-            } else {
-                idle_counter = 0;
-            }
+            self.next_runnable.as_mut().unwrap().run(element);
         }
     }
 

@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicI64, AtomicU64};
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::channel::{SendTimeoutError, Sender, TrySendError, CHANNEL_SIZE_PREFIX};
+use crate::channel::{SendError, SendTimeoutError, Sender, TrySendError, CHANNEL_SIZE_PREFIX};
 
 #[derive(Clone, Debug)]
 pub struct ChannelSender<T>
@@ -55,6 +55,13 @@ where
 
     pub fn send_timeout(&self, event: T, timeout: Duration) -> Result<(), SendTimeoutError<T>> {
         self.sender.send_timeout(event, timeout).map(|r| {
+            self.on_success();
+            r
+        })
+    }
+
+    pub fn send(&self, event: T) -> Result<(), SendError<T>> {
+        self.sender.send(event).map(|r| {
             self.on_success();
             r
         })

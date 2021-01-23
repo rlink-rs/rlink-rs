@@ -1,5 +1,6 @@
-use std::collections::HashMap;
+use std::sync::Arc;
 
+use dashmap::DashMap;
 use rdkafka::Offset;
 use serde::Serialize;
 
@@ -16,15 +17,15 @@ pub struct OffsetMetadata {
     pub(crate) offset: i64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct KafkaSourceStateCache {
-    partition_offsets: HashMap<PartitionMetadata, OffsetMetadata>,
+    partition_offsets: Arc<DashMap<PartitionMetadata, OffsetMetadata>>,
 }
 
 impl KafkaSourceStateCache {
     pub fn new() -> Self {
         KafkaSourceStateCache {
-            partition_offsets: HashMap::new(),
+            partition_offsets: Arc::new(DashMap::new()),
         }
     }
 
@@ -42,8 +43,9 @@ impl KafkaSourceStateCache {
         self.partition_offsets.insert(key, val);
     }
 
-    pub fn snapshot(&self) -> HashMap<PartitionMetadata, OffsetMetadata> {
-        self.partition_offsets.clone()
+    pub fn snapshot(&self) -> DashMap<PartitionMetadata, OffsetMetadata> {
+        let partition_offsets = &*self.partition_offsets;
+        partition_offsets.clone()
     }
 
     pub fn get(&self, topic: String, partition: i32, default_offset: Offset) -> OffsetMetadata {

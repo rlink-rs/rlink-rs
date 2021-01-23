@@ -20,6 +20,7 @@ pub type SendError<T> = crossbeam::channel::SendError<T>;
 
 pub type Receiver<T> = crossbeam::channel::Receiver<T>;
 pub type Sender<T> = crossbeam::channel::Sender<T>;
+pub type Select<'a> = crossbeam::channel::Select<'a>;
 
 pub fn unbounded<T>() -> (Sender<T>, Receiver<T>) {
     crossbeam::channel::unbounded()
@@ -31,6 +32,7 @@ pub fn bounded<T>(cap: usize) -> (Sender<T>, Receiver<T>) {
 
 pub mod handover;
 pub mod receiver;
+pub mod select;
 pub mod sender;
 
 pub type ElementReceiver = ChannelReceiver<Element>;

@@ -16,6 +16,7 @@ use rlink::channel::TryRecvError;
 use crate::source::checkpoint::KafkaCheckpointed;
 use crate::source::consumer::{create_kafka_consumer, get_kafka_consumer_handover};
 use crate::source::handover::Handover;
+use crate::source::iterator::KafkaRecordIterator;
 use crate::KafkaRecord;
 
 #[derive(Function)]
@@ -112,7 +113,7 @@ impl InputFormat for KafkaInputFormat {
     fn next_record(&mut self) -> Option<Record> {
         match self.handover.as_ref() {
             Some(handover) => {
-                match handover.poll_next() {
+                match handover.try_poll_next() {
                     Ok(mut record) => {
                         // save to state
                         let mut reader = KafkaRecord::new(record.borrow_mut());
@@ -146,6 +147,13 @@ impl InputFormat for KafkaInputFormat {
             }
             None => None,
         }
+    }
+
+    fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record> + Send> {
+        Box::new(KafkaRecordIterator::new(
+            self.handover.as_ref().unwrap().clone(),
+            self.checkpoint.as_ref().unwrap().clone(),
+        ))
     }
 
     fn close(&mut self) -> api::Result<()> {

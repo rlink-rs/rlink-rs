@@ -324,6 +324,10 @@ mod tests {
             None
         }
 
+        fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record>> {
+            unimplemented!()
+        }
+
         fn close(&mut self) -> api::Result<()> {
             Ok(())
         }

@@ -1,7 +1,7 @@
 use rlink::api::element::Record;
 use rlink::channel::receiver::ChannelReceiver;
 use rlink::channel::sender::ChannelSender;
-use rlink::channel::{named_bounded, TryRecvError, TrySendError};
+use rlink::channel::{named_bounded, RecvError, TryRecvError, TrySendError};
 use rlink::metrics::Tag;
 
 #[derive(Clone)]
@@ -22,8 +22,13 @@ impl Handover {
     }
 
     #[inline]
-    pub fn poll_next(&self) -> Result<Record, TryRecvError> {
+    pub fn try_poll_next(&self) -> Result<Record, TryRecvError> {
         self.receiver.try_recv()
+    }
+
+    #[inline]
+    pub fn poll_next(&self) -> Result<Record, RecvError> {
+        self.receiver.recv()
     }
 
     #[inline]

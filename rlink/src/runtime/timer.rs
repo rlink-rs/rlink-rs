@@ -4,7 +4,7 @@ use tokio::time::{interval_at, Duration, Instant};
 
 use crate::channel::receiver::ChannelReceiver;
 use crate::channel::sender::ChannelSender;
-use crate::channel::{named_bounded, TryRecvError, TrySendError};
+use crate::channel::{named_bounded, RecvError, TryRecvError, TrySendError};
 use crate::utils;
 
 #[derive(Clone, Debug)]
@@ -28,8 +28,12 @@ impl TimerChannel {
         }
     }
 
-    pub fn try_recv(&self) -> Result<u64, TryRecvError> {
+    pub fn _try_recv(&self) -> Result<u64, TryRecvError> {
         self.receiver.try_recv()
+    }
+
+    pub fn recv(&self) -> Result<u64, RecvError> {
+        self.receiver.recv()
     }
 
     pub fn get_interval(&self) -> Duration {

@@ -109,6 +109,10 @@ where
     fn next_element(&mut self) -> Option<Element> {
         self.next_record().map(|record| Element::Record(record))
     }
+    fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record> + Send>;
+    fn element_iter(&mut self) -> Box<dyn Iterator<Item = Element> + Send> {
+        Box::new(ElementIterator::new(self.record_iter()))
+    }
     fn close(&mut self) -> crate::api::Result<()>;
 
     fn get_checkpoint(&mut self) -> Option<Box<&mut dyn CheckpointedFunction>> {

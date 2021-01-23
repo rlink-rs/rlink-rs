@@ -7,6 +7,7 @@ use crate::api::properties::SystemProperties;
 use crate::api::runtime::TaskId;
 use crate::channel::{ElementReceiver, TryRecvError};
 use crate::dag::execution_graph::ExecutionEdge;
+use crate::functions::iterator::{ChannelIterator, MultiChannelIterator};
 use crate::pub_sub::{memory, network, DEFAULT_CHANNEL_SIZE};
 
 pub(crate) struct SystemInputFormat {
@@ -106,6 +107,26 @@ impl InputFormat for SystemInputFormat {
         }
     }
 
+    fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record> + Send> {
+        unimplemented!()
+    }
+
+    fn element_iter(&mut self) -> Box<dyn Iterator<Item = Element> + Send> {
+        let mut receivers = Vec::new();
+        if let Some(n) = &self.memory_receiver {
+            receivers.push(n.clone());
+        }
+        if let Some(n) = &self.network_receiver {
+            receivers.push(n.clone());
+        }
+
+        match receivers.len() {
+            0 => panic!("unsupported"),
+            1 => Box::new(ChannelIterator::new(receivers.remove(0))),
+            _ => Box::new(MultiChannelIterator::new(receivers)),
+        }
+    }
+
     fn close(&mut self) -> crate::api::Result<()> {
         Ok(())
     }
@@ -120,5 +141,24 @@ impl InputSplitSource for SystemInputFormat {
 impl Function for SystemInputFormat {
     fn get_name(&self) -> &str {
         "SystemInputFormat"
+    }
+}
+
+struct SubscribeIterator {
+    receiver: ElementReceiver,
+}
+
+impl Iterator for SubscribeIterator {
+    type Item = Element;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.receiver.recv() {
+            Ok(element) => {
+                return Some(element);
+            }
+            Err(_e) => {
+                panic!("network_receiver Disconnected");
+            }
+        }
     }
 }

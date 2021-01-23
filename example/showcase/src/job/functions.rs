@@ -127,6 +127,10 @@ impl InputFormat for TestInputFormat {
         }
     }
 
+    fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record> + Send> {
+        Box::new(self.gen_row().into_iter())
+    }
+
     fn close(&mut self) -> api::Result<()> {
         Ok(())
     }
@@ -193,6 +197,10 @@ impl InputFormat for ConfigInputFormat {
         } else {
             None
         }
+    }
+
+    fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record> + Send> {
+        Box::new(self.gen_row().into_iter())
     }
 
     fn close(&mut self) -> api::Result<()> {

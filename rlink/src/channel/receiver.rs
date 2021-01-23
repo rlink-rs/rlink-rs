@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicI64, AtomicU64};
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::channel::{Receiver, RecvTimeoutError, TryRecvError, CHANNEL_SIZE_PREFIX};
+use crate::channel::{Receiver, RecvError, RecvTimeoutError, TryRecvError, CHANNEL_SIZE_PREFIX};
 
 #[derive(Clone, Debug)]
 pub struct ChannelReceiver<T>
@@ -13,7 +13,7 @@ where
     name: String,
     guava_size_name: String,
 
-    receiver: Receiver<T>,
+    pub(crate) receiver: Receiver<T>,
 
     size: Arc<AtomicI64>,
     drain_counter: Arc<AtomicU64>,
@@ -46,6 +46,13 @@ where
 
     pub fn try_recv(&self) -> Result<T, TryRecvError> {
         self.receiver.try_recv().map(|event| {
+            self.on_success();
+            event
+        })
+    }
+
+    pub fn recv(&self) -> Result<T, RecvError> {
+        self.receiver.recv().map(|event| {
             self.on_success();
             event
         })
