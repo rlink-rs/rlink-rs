@@ -1,11 +1,9 @@
 use crate::api;
 use crate::api::element::{Element, Record};
-use crate::api::function::{
-    Context, Function, InputFormat, InputSplit, InputSplitAssigner, InputSplitSource,
-};
+use crate::api::function::{Context, Function, InputFormat, InputSplit, InputSplitSource};
 use crate::api::properties::SystemProperties;
 use crate::api::runtime::TaskId;
-use crate::channel::{ElementReceiver, TryRecvError};
+use crate::channel::ElementReceiver;
 use crate::dag::execution_graph::ExecutionEdge;
 use crate::functions::iterator::{ChannelIterator, MultiChannelIterator};
 use crate::pub_sub::{memory, network, DEFAULT_CHANNEL_SIZE};
@@ -69,44 +67,6 @@ impl InputFormat for SystemInputFormat {
         Ok(())
     }
 
-    fn reached_end(&self) -> bool {
-        false
-    }
-
-    fn next_record(&mut self) -> Option<Record> {
-        None
-    }
-
-    fn next_element(&mut self) -> Option<Element> {
-        match &self.network_receiver {
-            Some(network_receiver) => match network_receiver.try_recv() {
-                Ok(element) => {
-                    debug!("receive element {:?}", &self.task_id);
-                    return Some(element);
-                }
-                Err(TryRecvError::Empty) => {}
-                Err(TryRecvError::Disconnected) => {
-                    panic!("network_receiver Disconnected");
-                }
-            },
-            None => {}
-        }
-
-        match &self.memory_receiver {
-            Some(memory_receiver) => match memory_receiver.try_recv() {
-                Ok(element) => {
-                    debug!("receive element {:?}", &self.task_id);
-                    Some(element)
-                }
-                Err(TryRecvError::Empty) => None,
-                Err(TryRecvError::Disconnected) => {
-                    panic!("memory_receiver Disconnected");
-                }
-            },
-            None => None,
-        }
-    }
-
     fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record> + Send> {
         unimplemented!()
     }
@@ -132,11 +92,7 @@ impl InputFormat for SystemInputFormat {
     }
 }
 
-impl InputSplitSource for SystemInputFormat {
-    fn get_input_split_assigner(&self, _input_splits: Vec<InputSplit>) -> InputSplitAssigner {
-        unimplemented!()
-    }
-}
+impl InputSplitSource for SystemInputFormat {}
 
 impl Function for SystemInputFormat {
     fn get_name(&self) -> &str {

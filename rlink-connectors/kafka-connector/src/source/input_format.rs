@@ -1,4 +1,3 @@
-use std::borrow::BorrowMut;
 use std::time::Duration;
 
 use rdkafka::consumer::{BaseConsumer, Consumer};
@@ -7,17 +6,13 @@ use rlink::api;
 use rlink::api::backend::OperatorStateBackend;
 use rlink::api::checkpoint::CheckpointedFunction;
 use rlink::api::element::Record;
-use rlink::api::function::{
-    Context, InputFormat, InputSplit, InputSplitAssigner, InputSplitSource,
-};
+use rlink::api::function::{Context, InputFormat, InputSplit, InputSplitSource};
 use rlink::api::properties::{Properties, SystemProperties};
-use rlink::channel::TryRecvError;
 
 use crate::source::checkpoint::KafkaCheckpointed;
 use crate::source::consumer::{create_kafka_consumer, get_kafka_consumer_handover};
 use crate::source::handover::Handover;
 use crate::source::iterator::KafkaRecordIterator;
-use crate::KafkaRecord;
 
 #[derive(Function)]
 pub struct KafkaInputFormat {
@@ -29,8 +24,6 @@ pub struct KafkaInputFormat {
 
     state_mode: Option<OperatorStateBackend>,
     checkpoint: Option<KafkaCheckpointed>,
-
-    counter: u64,
 }
 
 impl KafkaInputFormat {
@@ -42,7 +35,6 @@ impl KafkaInputFormat {
             handover: None,
             state_mode: None,
             checkpoint: None,
-            counter: 0,
         }
     }
 }
@@ -104,49 +96,6 @@ impl InputFormat for KafkaInputFormat {
         }
 
         Ok(())
-    }
-
-    fn reached_end(&self) -> bool {
-        false
-    }
-
-    fn next_record(&mut self) -> Option<Record> {
-        match self.handover.as_ref() {
-            Some(handover) => {
-                match handover.try_poll_next() {
-                    Ok(mut record) => {
-                        // save to state
-                        let mut reader = KafkaRecord::new(record.borrow_mut());
-
-                        // same as `self.counter % 4096`
-                        if self.counter & 4095 == 0 {
-                            match self.checkpoint.as_mut() {
-                                Some(checkpoint) => {
-                                    checkpoint.get_state().update(
-                                        reader.get_kafka_topic().unwrap(),
-                                        reader.get_kafka_partition().unwrap(),
-                                        reader.get_kafka_offset().unwrap(),
-                                    );
-                                }
-                                None => {}
-                            }
-                        }
-
-                        self.counter += 1;
-
-                        Some(record)
-                    }
-                    Err(TryRecvError::Empty) => {
-                        self.counter = 0;
-                        None
-                    }
-                    Err(TryRecvError::Disconnected) => {
-                        panic!("kafka input recv channel disconnected");
-                    }
-                }
-            }
-            None => None,
-        }
     }
 
     fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record> + Send> {
@@ -226,9 +175,5 @@ impl InputSplitSource for KafkaInputFormat {
         }
 
         input_splits
-    }
-
-    fn get_input_split_assigner(&self, _input_splits: Vec<InputSplit>) -> InputSplitAssigner {
-        unimplemented!()
     }
 }

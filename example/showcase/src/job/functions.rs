@@ -115,20 +115,8 @@ impl InputFormat for TestInputFormat {
         Ok(())
     }
 
-    fn reached_end(&self) -> bool {
-        self.data.len() == 0
-    }
-
-    fn next_record(&mut self) -> Option<Record> {
-        if self.data.len() > 0 {
-            Some(self.data.remove(0))
-        } else {
-            None
-        }
-    }
-
     fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record> + Send> {
-        Box::new(self.gen_row().into_iter())
+        Box::new(self.data.clone().into_iter())
     }
 
     fn close(&mut self) -> api::Result<()> {
@@ -139,15 +127,11 @@ impl InputFormat for TestInputFormat {
 #[derive(Debug, Function)]
 pub struct ConfigInputFormat {
     name: &'static str,
-    data: Vec<Record>,
 }
 
 impl ConfigInputFormat {
     pub fn new(name: &'static str) -> Self {
-        ConfigInputFormat {
-            name,
-            data: Vec::new(),
-        }
+        ConfigInputFormat { name }
     }
 
     fn gen_row(&self) -> Vec<Record> {
@@ -181,22 +165,7 @@ impl InputFormat for ConfigInputFormat {
         let partition_num = input_split.get_split_number();
         info!("open split number = {}", partition_num);
 
-        let data = self.gen_row();
-
-        self.data.extend(data);
         Ok(())
-    }
-
-    fn reached_end(&self) -> bool {
-        false
-    }
-
-    fn next_record(&mut self) -> Option<Record> {
-        if self.data.len() > 0 {
-            Some(self.data.remove(0))
-        } else {
-            None
-        }
     }
 
     fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record> + Send> {
