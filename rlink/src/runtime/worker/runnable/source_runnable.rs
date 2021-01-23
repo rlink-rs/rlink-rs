@@ -57,7 +57,7 @@ impl SourceRunnable {
 
     fn poll_input_element(&mut self, sender: ChannelSender<Element>, running: Arc<AtomicBool>) {
         let iterator = self.stream_source.operator_fn.element_iter();
-        std::thread::spawn(move || {
+        crate::utils::thread::spawn("poll_input_element", move || {
             for record in iterator {
                 sender.send(record).unwrap();
             }
@@ -68,7 +68,7 @@ impl SourceRunnable {
 
     fn poll_stream_status(&mut self, sender: ChannelSender<Element>, running: Arc<AtomicBool>) {
         let stream_status_timer = self.stream_status_timer.as_ref().unwrap().clone();
-        std::thread::spawn(move || loop {
+        crate::utils::thread::spawn("poll_stream_status", move || loop {
             let running = running.load(Ordering::Relaxed);
             match stream_status_timer.recv() {
                 Ok(window_time) => {
@@ -89,7 +89,7 @@ impl SourceRunnable {
 
     fn poll_checkpoint(&mut self, sender: ChannelSender<Element>, running: Arc<AtomicBool>) {
         let checkpoint_timer = self.checkpoint_timer.as_ref().unwrap().clone();
-        std::thread::spawn(move || loop {
+        crate::utils::thread::spawn("poll_checkpoint", move || loop {
             let running = running.load(Ordering::Relaxed);
             match checkpoint_timer.recv() {
                 Ok(window_time) => {
