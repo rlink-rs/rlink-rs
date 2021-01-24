@@ -173,7 +173,19 @@ impl Runnable for SourceRunnable {
         let fn_creator = self.stream_source.get_fn_creator();
 
         let running = Arc::new(AtomicBool::new(true));
-        let (sender, receiver) = named_bounded("", vec![], 1024);
+
+        let tags = vec![
+            Tag("job_id".to_string(), self.task_id.job_id.0.to_string()),
+            Tag(
+                "task_number".to_string(),
+                self.task_id.task_number.to_string(),
+            ),
+        ];
+        let metric_name = format!(
+            "Source_{}",
+            self.stream_source.operator_fn.as_ref().get_name()
+        );
+        let (sender, receiver) = named_bounded(metric_name.as_str(), tags, 10240);
 
         self.poll_input_element(sender.clone(), running.clone());
 

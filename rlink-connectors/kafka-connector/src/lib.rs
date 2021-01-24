@@ -25,7 +25,7 @@ pub const BOOTSTRAP_SERVERS: &str = "bootstrap.servers";
 pub const TOPICS: &str = "topics";
 pub const GROUP_ID: &str = "group.id";
 
-pub const SOURCE_CHANNEL_SIZE: usize = 100000;
+pub const SOURCE_CHANNEL_SIZE: usize = 50000;
 pub const SINK_CHANNEL_SIZE: usize = 50000;
 
 pub static KAFKA_DATA_TYPES: [u8; 6] = [

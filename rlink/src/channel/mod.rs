@@ -75,3 +75,35 @@ where
         ChannelReceiver::new(name, receiver, size.clone(), drain_counter),
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::channel::bounded;
+    use crate::utils::date_time::current_timestamp;
+    use crate::utils::thread::spawn;
+    use std::time::Duration;
+
+    #[test]
+    pub fn bounded_test() {
+        let (sender, receiver) = bounded(0);
+
+        std::thread::sleep(Duration::from_secs(3));
+        let begin = current_timestamp();
+        for n in 0..10 {
+            let sender = sender.clone();
+            spawn(n.to_string().as_str(), move || {
+                for i in 0..10000 {
+                    sender.send(i.to_string()).unwrap();
+                }
+            });
+        }
+        {
+            let _a = sender;
+        }
+
+        while let Ok(_n) = receiver.recv() {}
+
+        let end = current_timestamp();
+        println!("{}", end.checked_sub(begin).unwrap().as_nanos());
+    }
+}
