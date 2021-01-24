@@ -1,5 +1,5 @@
+use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
-use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -11,7 +11,7 @@ use crate::api::properties::SystemProperties;
 use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::channel::named_bounded;
 use crate::channel::sender::ChannelSender;
-use crate::metrics::{register_counter, Tag};
+use crate::metrics::Tag;
 use crate::runtime::timer::TimerChannel;
 use crate::runtime::worker::checkpoint::report_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
@@ -28,8 +28,6 @@ pub(crate) struct SourceRunnable {
 
     stream_status_timer: Option<TimerChannel>,
     checkpoint_timer: Option<TimerChannel>,
-
-    counter: Arc<AtomicU64>,
 }
 
 impl SourceRunnable {
@@ -50,8 +48,6 @@ impl SourceRunnable {
 
             stream_status_timer: None,
             checkpoint_timer: None,
-
-            counter: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -146,24 +142,7 @@ impl Runnable for SourceRunnable {
             self.checkpoint_timer = Some(checkpoint_timer);
         }
 
-        let tags = vec![
-            Tag(
-                "job_id".to_string(),
-                context.task_descriptor.task_id.job_id.0.to_string(),
-            ),
-            Tag(
-                "task_number".to_string(),
-                context.task_descriptor.task_id.task_number.to_string(),
-            ),
-        ];
-        let metric_name = format!(
-            "Source_{}",
-            self.stream_source.operator_fn.as_ref().get_name()
-        );
-        register_counter(metric_name.as_str(), tags, self.counter.clone());
-
         info!("Operator(SourceOperator) open");
-
         Ok(())
     }
 
