@@ -201,7 +201,7 @@ impl ClickhouseSinkTask {
         let begin_timestamp = utils::date_time::current_timestamp();
         let mut size = 0;
         for n in 0..self.batch_size {
-            match self.handover.poll_next() {
+            match self.handover.try_poll_next() {
                 Ok(record) => {
                     batch_block.append(record);
                     size = n;
