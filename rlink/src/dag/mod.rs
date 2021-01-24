@@ -316,7 +316,7 @@ mod tests {
             Ok(())
         }
 
-        fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record>> {
+        fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record> + Send> {
             unimplemented!()
         }
 

@@ -82,7 +82,7 @@ impl SourceRunnable {
 
             if !running {
                 info!("StreamStatus WindowTimer stop");
-                break;
+                // break;
             }
         });
     }
@@ -104,7 +104,7 @@ impl SourceRunnable {
 
             if !running {
                 info!("Checkpoint WindowTimer stop");
-                break;
+                // break;
             }
         });
     }

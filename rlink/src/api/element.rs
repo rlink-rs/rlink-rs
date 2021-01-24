@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::borrow::BorrowMut;
 use std::fmt::Debug;
 
@@ -449,7 +451,7 @@ impl Element {
         }
     }
 
-    pub(crate) fn _as_watermark(&self) -> &Watermark {
+    pub(crate) fn as_watermark(&self) -> &Watermark {
         match self {
             Element::Watermark(water_mark) => water_mark,
             _ => panic!("Element is not Watermark"),
