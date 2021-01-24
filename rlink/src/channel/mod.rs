@@ -46,7 +46,10 @@ pub fn named_bounded<T>(
 where
     T: Clone,
 {
-    info!("Create channel named with {}", name);
+    info!(
+        "Create channel named with {}, capacity: {}",
+        name, buffer_size
+    );
 
     let size = Arc::new(AtomicI64::new(0));
     let accepted_counter = Arc::new(AtomicU64::new(0));
@@ -78,18 +81,19 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::channel::bounded;
+    use crate::channel::unbounded;
     use crate::utils::date_time::current_timestamp;
     use crate::utils::thread::spawn;
     use std::time::Duration;
 
     #[test]
     pub fn bounded_test() {
-        let (sender, receiver) = bounded(0);
+        let (sender, receiver) = unbounded();
+        // let (sender, receiver) = bounded(102400);
 
-        std::thread::sleep(Duration::from_secs(3));
+        std::thread::sleep(Duration::from_secs(2));
         let begin = current_timestamp();
-        for n in 0..10 {
+        for n in 0..100 {
             let sender = sender.clone();
             spawn(n.to_string().as_str(), move || {
                 for i in 0..10000 {
