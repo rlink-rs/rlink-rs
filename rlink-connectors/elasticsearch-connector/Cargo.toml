@@ -5,7 +5,7 @@ authors = ["yorkart <wangyue11.4@163.com>>"]
 edition = "2018"
 description = "High performance Stream Processing Framework"
 keywords = ["stream", "window", "flink", "spark", "elasticsearch"]
-repository = "https://github.com/yorkart/rlink.git"
+repository = "https://github.com/rlink-rs/rlink-rs.git"
 license = "MIT/Apache-2.0"
 
 [lib]
