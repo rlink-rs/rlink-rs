@@ -1,8 +1,10 @@
-use crate::source::checkpoint::KafkaCheckpointed;
-use crate::source::handover::Handover;
-use crate::KafkaRecord;
-use rlink::api::element::Record;
 use std::borrow::BorrowMut;
+
+use rlink::api::element::Record;
+use rlink::channel::handover::Handover;
+
+use crate::source::checkpoint::KafkaCheckpointed;
+use crate::KafkaRecord;
 
 pub struct KafkaRecordIterator {
     handover: Handover,

@@ -108,7 +108,7 @@ impl OutputFormat for ElasticsearchOutputFormat {
     }
 
     fn write_record(&mut self, record: Record) {
-        self.handover.as_ref().unwrap().produce_always(record);
+        self.handover.as_ref().unwrap().produce(record).unwrap();
     }
 
     fn close(&mut self) -> api::Result<()> {

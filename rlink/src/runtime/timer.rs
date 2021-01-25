@@ -4,7 +4,7 @@ use tokio::time::{interval_at, Duration, Instant};
 
 use crate::channel::receiver::ChannelReceiver;
 use crate::channel::sender::ChannelSender;
-use crate::channel::{named_bounded, RecvError, TryRecvError, TrySendError};
+use crate::channel::{named_channel, RecvError, TryRecvError, TrySendError};
 use crate::utils;
 
 #[derive(Clone, Debug)]
@@ -18,7 +18,7 @@ pub struct TimerChannel {
 
 impl TimerChannel {
     pub fn new(name: &str, interval: Duration) -> Self {
-        let (sender, receiver) = named_bounded("TimerChannelNotify", vec![], 1);
+        let (sender, receiver) = named_channel("TimerChannelNotify", vec![], 1);
         TimerChannel {
             name: name.to_string(),
             sender,
@@ -70,7 +70,7 @@ impl WindowTimer {
 
 pub fn start_window_timer() -> WindowTimer {
     let (sender, receiver): (ChannelSender<TimerChannel>, ChannelReceiver<TimerChannel>) =
-        named_bounded("WindowTimerRegister", vec![], 1000);
+        named_channel("WindowTimerRegister", vec![], 1000);
 
     utils::thread::spawn("window-timer", move || {
         utils::thread::get_runtime().block_on(async move {

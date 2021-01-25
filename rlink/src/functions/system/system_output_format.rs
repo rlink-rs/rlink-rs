@@ -1,6 +1,5 @@
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
-use std::time::Duration;
 
 use crate::api::element::{Element, Partition, Record};
 use crate::api::function::{Context, Function, OutputFormat};
@@ -151,7 +150,7 @@ impl OutputFormat for SystemOutputFormat {
                         }
                         _ => {}
                     }
-                    sender.try_send_loop(element, Duration::from_secs(1))
+                    sender.send(element).unwrap()
                 } else {
                     for (_job, task_senders) in &self.job_senders {
                         let (task_id, sender) = &task_senders[0];
@@ -164,7 +163,7 @@ impl OutputFormat for SystemOutputFormat {
                             }
                             _ => {}
                         }
-                        sender.try_send_loop(element.clone(), Duration::from_secs(1))
+                        sender.send(element.clone()).unwrap()
                     }
                 }
             }
@@ -173,12 +172,12 @@ impl OutputFormat for SystemOutputFormat {
                     let (_job_id, task_senders) = &self.job_senders[0];
                     let (_task_id, sender) =
                         task_senders.get(element.get_partition() as usize).unwrap();
-                    sender.try_send_loop(element, Duration::from_secs(1));
+                    sender.send(element).unwrap();
                 } else {
                     for (_job, task_senders) in &self.job_senders {
                         let (_task_id, sender) =
                             task_senders.get(element.get_partition() as usize).unwrap();
-                        sender.try_send_loop(element.clone(), Duration::from_secs(1))
+                        sender.send(element.clone()).unwrap()
                     }
                 }
             }

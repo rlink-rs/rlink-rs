@@ -18,7 +18,7 @@ use tokio_util::codec::{BytesCodec, FramedWrite};
 use crate::api::element::{Element, Serde};
 use crate::api::runtime::{ChannelKey, TaskId};
 use crate::channel::{
-    bounded, named_bounded, ElementReceiver, ElementSender, Receiver, Sender, TryRecvError,
+    bounded, named_channel, ElementReceiver, ElementSender, Receiver, Sender, TryRecvError,
     TrySendError,
 };
 use crate::metrics::{register_counter, Tag};
@@ -38,7 +38,7 @@ pub(crate) fn subscribe(
     target_task_id: &TaskId,
     channel_size: usize,
 ) -> ElementReceiver {
-    let (sender, receiver) = named_bounded(
+    let (sender, receiver) = named_channel(
         "NetworkSubscribe",
         vec![
             Tag::new(

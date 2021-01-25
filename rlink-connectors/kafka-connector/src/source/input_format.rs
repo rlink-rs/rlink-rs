@@ -8,10 +8,11 @@ use rlink::api::checkpoint::CheckpointedFunction;
 use rlink::api::element::Record;
 use rlink::api::function::{Context, InputFormat, InputSplit, InputSplitSource};
 use rlink::api::properties::{Properties, SystemProperties};
+use rlink::channel::handover::Handover;
+use rlink::metrics::Tag;
 
 use crate::source::checkpoint::KafkaCheckpointed;
 use crate::source::consumer::{create_kafka_consumer, get_kafka_consumer_handover};
-use crate::source::handover::Handover;
 use crate::source::iterator::KafkaRecordIterator;
 
 #[derive(Function)]
@@ -68,7 +69,15 @@ impl InputFormat for KafkaInputFormat {
             let topic = input_split.get_properties().get_string("topic").unwrap();
             let partition = input_split.get_properties().get_i32("partition").unwrap();
 
-            self.handover = Some(Handover::new(topic.as_str(), partition, self.buffer_size));
+            let tags = vec![
+                Tag("topic".to_string(), topic.to_string()),
+                Tag("partition".to_string(), format!("{}", partition)),
+            ];
+            self.handover = Some(Handover::new(
+                "KafkaSource_Handover",
+                tags,
+                self.buffer_size,
+            ));
 
             let partition_offset =
                 self.checkpoint
