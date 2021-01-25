@@ -5,10 +5,10 @@ use std::time::Duration;
 
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use rdkafka::ClientConfig;
+use rlink::channel::handover::Handover;
 use rlink::channel::TryRecvError;
 use rlink::utils::EMPTY_SLICE;
 
-use crate::sink::handover::Handover;
 use crate::KafkaRecord;
 
 #[derive(Clone)]
@@ -121,12 +121,12 @@ mod tests {
 
     use rdkafka::ClientConfig;
     use rlink::api::element::Record;
+    use rlink::api::runtime::JobId;
+    use rlink::channel::handover::Handover;
     use rlink::utils::date_time::current_timestamp_millis;
 
-    use crate::sink::handover::Handover;
     use crate::sink::producer::KafkaProducerThread;
     use crate::{build_kafka_record, BOOTSTRAP_SERVERS};
-    use rlink::api::runtime::JobId;
 
     fn get_record() -> Record {
         build_kafka_record(
@@ -147,7 +147,7 @@ mod tests {
         let mut client_config = ClientConfig::new();
         client_config.set(BOOTSTRAP_SERVERS, "localhost:9092");
 
-        let handover = Handover::new("test", topic, JobId(0), 0, 32);
+        let handover = Handover::new("test", vec![], 32);
 
         let handover_c = handover.clone();
         std::thread::spawn(move || {

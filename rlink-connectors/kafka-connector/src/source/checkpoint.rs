@@ -1,7 +1,7 @@
 use rlink::api::checkpoint::{CheckpointHandle, CheckpointedFunction, FunctionSnapshotContext};
+use rlink::api::runtime::JobId;
 
 use crate::state::{KafkaSourceStateCache, OffsetMetadata};
-use rlink::api::runtime::JobId;
 
 #[derive(Debug, Clone)]
 pub struct KafkaCheckpointed {

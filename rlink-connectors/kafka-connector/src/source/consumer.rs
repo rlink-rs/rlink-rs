@@ -10,9 +10,9 @@ use rlink::utils;
 use rlink::utils::thread::get_runtime;
 
 use crate::build_kafka_record;
-use crate::source::handover::Handover;
 use crate::state::OffsetMetadata;
 use rlink::api::runtime::JobId;
+use rlink::channel::handover::Handover;
 
 struct TaskHandover {
     task_number: u16,
@@ -155,7 +155,7 @@ impl KafkaConsumerThread {
 
                     let mut loops = 0;
                     loop {
-                        match self.handover.produce(record) {
+                        match self.handover.try_produce(record) {
                             Ok(_) => {
                                 break;
                             }
