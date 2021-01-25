@@ -45,7 +45,7 @@ impl KafkaProducerThread {
             let mut future_queue = Vec::with_capacity(batch);
             let mut discard_counter = 0;
             for _n in 0..batch {
-                match self.handover.poll_next() {
+                match self.handover.try_poll_next() {
                     Ok(mut record) => {
                         let mut reader = KafkaRecord::new(record.borrow_mut());
 

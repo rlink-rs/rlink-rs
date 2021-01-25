@@ -31,7 +31,7 @@ impl Handover {
     }
 
     #[inline]
-    pub fn poll_next(&self) -> Result<Record, TryRecvError> {
+    pub fn try_poll_next(&self) -> Result<Record, TryRecvError> {
         self.receiver.try_recv()
     }
 

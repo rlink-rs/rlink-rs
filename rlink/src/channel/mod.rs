@@ -20,6 +20,7 @@ pub type SendError<T> = crossbeam::channel::SendError<T>;
 
 pub type Receiver<T> = crossbeam::channel::Receiver<T>;
 pub type Sender<T> = crossbeam::channel::Sender<T>;
+pub type Select<'a> = crossbeam::channel::Select<'a>;
 
 pub fn unbounded<T>() -> (Sender<T>, Receiver<T>) {
     crossbeam::channel::unbounded()
@@ -31,6 +32,7 @@ pub fn bounded<T>(cap: usize) -> (Sender<T>, Receiver<T>) {
 
 pub mod handover;
 pub mod receiver;
+pub mod select;
 pub mod sender;
 
 pub type ElementReceiver = ChannelReceiver<Element>;
@@ -39,17 +41,17 @@ pub type ElementSender = ChannelSender<Element>;
 pub fn named_bounded<T>(
     name: &str,
     tags: Vec<Tag>,
-    buffer_size: usize,
+    cap: usize,
 ) -> (ChannelSender<T>, ChannelReceiver<T>)
 where
     T: Clone,
 {
-    info!("Create channel named with {}", name);
+    info!("Create channel named with {}, capacity: {}", name, cap);
 
     let size = Arc::new(AtomicI64::new(0));
     let accepted_counter = Arc::new(AtomicU64::new(0));
     let drain_counter = Arc::new(AtomicU64::new(0));
-    let (sender, receiver) = bounded(buffer_size);
+    let (sender, receiver) = if cap <= 32 { bounded(cap) } else { unbounded() };
 
     // add_channel_metric(name.to_string(), size.clone(), capacity.clone());
     crate::metrics::global_metrics::register_gauge(
@@ -69,7 +71,41 @@ where
     );
 
     (
-        ChannelSender::new(name, sender, size.clone(), accepted_counter),
+        ChannelSender::new(name, sender, cap, size.clone(), accepted_counter),
         ChannelReceiver::new(name, receiver, size.clone(), drain_counter),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use crate::utils::date_time::current_timestamp;
+    use crate::utils::thread::spawn;
+
+    #[test]
+    pub fn bounded_test() {
+        // let (sender, receiver) = crate::channel::unbounded();
+        let (sender, receiver) = crate::channel::bounded(10000 * 100);
+
+        std::thread::sleep(Duration::from_secs(2));
+
+        for n in 0..100 {
+            let sender = sender.clone();
+            spawn(n.to_string().as_str(), move || {
+                for i in 0..10000 {
+                    sender.send(i.to_string()).unwrap();
+                }
+            });
+        }
+        {
+            let _a = sender;
+        }
+
+        let begin = current_timestamp();
+        while let Ok(_n) = receiver.recv() {}
+        let end = current_timestamp();
+
+        println!("{}", end.checked_sub(begin).unwrap().as_nanos());
+    }
 }

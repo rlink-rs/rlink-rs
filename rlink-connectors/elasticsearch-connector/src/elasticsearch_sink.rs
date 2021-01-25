@@ -194,7 +194,7 @@ impl ElasticsearchWriteThread {
     ) -> Result<usize, Box<dyn std::error::Error + Send>> {
         let mut bulk_bodies = Vec::with_capacity(self.batch_size);
         for _ in 0..self.batch_size {
-            match self.handover.poll_next() {
+            match self.handover.try_poll_next() {
                 Ok(mut record) => {
                     let ElasticsearchModel {
                         index,

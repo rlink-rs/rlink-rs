@@ -316,12 +316,8 @@ mod tests {
             Ok(())
         }
 
-        fn reached_end(&self) -> bool {
-            false
-        }
-
-        fn next_record(&mut self) -> Option<Record> {
-            None
+        fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record> + Send> {
+            unimplemented!()
         }
 
         fn close(&mut self) -> api::Result<()> {

@@ -67,6 +67,7 @@ pub(crate) fn create_kafka_consumer(
 }
 
 pub(crate) fn get_kafka_consumer_handover(job_id: JobId) -> Option<Handover> {
+    // todo why??? for debug?
     std::thread::sleep(Duration::from_secs(5));
 
     let kafka_consumer: &Mutex<HashMap<JobId, Vec<TaskHandover>>> = &*KAFKA_CONSUMERS;

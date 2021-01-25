@@ -18,7 +18,7 @@ use rlink::functions::schema_base::FunctionSchema;
 use crate::buffer_gen::model;
 use crate::buffer_gen::model::FIELD_TYPE;
 use crate::job::functions::{
-    ConfigInputFormat, MyCoProcessFunction, MyFilterFunction, MyFlatMapFunction, TestInputFormat,
+    ConfigInputFormat, MyCoProcessFunction, MyFilterFunction, MyFlatMapFunction, RandInputFormat,
 };
 
 #[derive(Clone, Debug)]
@@ -27,10 +27,10 @@ pub struct JoinStreamApp {}
 impl StreamApp for JoinStreamApp {
     fn prepare_properties(&self, properties: &mut Properties) {
         properties.set_keyed_state_backend(KeyedStateBackend::Memory);
-        properties.set_pub_sub_channel_size(64);
+        properties.set_pub_sub_channel_size(100000);
     }
 
-    fn build_stream(&self, properties: &Properties, env: &mut StreamExecutionEnvironment) {
+    fn build_stream(&self, _properties: &Properties, env: &mut StreamExecutionEnvironment) {
         let key_selector = SchemaBaseKeySelector::new(vec![model::index::name], &FIELD_TYPE);
         let reduce_function =
             SchemaBaseReduceFunction::new(vec![sum_i64(model::index::value)], &FIELD_TYPE);
@@ -44,7 +44,7 @@ impl StreamApp for JoinStreamApp {
         };
 
         let data_stream_left = env
-            .register_source(TestInputFormat::new(properties.clone()), 2)
+            .register_source(RandInputFormat::new(), 2)
             .flat_map(MyFlatMapFunction::new())
             .filter(MyFilterFunction::new())
             .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(

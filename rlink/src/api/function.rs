@@ -104,10 +104,9 @@ where
 {
     // fn configure(&mut self, properties: HashMap<String, String>);
     fn open(&mut self, input_split: InputSplit, context: &Context) -> crate::api::Result<()>;
-    fn reached_end(&self) -> bool;
-    fn next_record(&mut self) -> Option<Record>;
-    fn next_element(&mut self) -> Option<Element> {
-        self.next_record().map(|record| Element::Record(record))
+    fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record> + Send>;
+    fn element_iter(&mut self) -> Box<dyn Iterator<Item = Element> + Send> {
+        Box::new(ElementIterator::new(self.record_iter()))
     }
     fn close(&mut self) -> crate::api::Result<()>;
 

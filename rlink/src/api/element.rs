@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::borrow::BorrowMut;
 use std::fmt::Debug;
 
@@ -442,7 +444,7 @@ impl Element {
 
     /// Checks whether this element is a watermark.
     /// return `True`, if this element is a watermark, false otherwise.
-    pub(crate) fn is_watermark(&self) -> bool {
+    pub(crate) fn _is_watermark(&self) -> bool {
         match self {
             Element::Watermark(_) => true,
             _ => false,

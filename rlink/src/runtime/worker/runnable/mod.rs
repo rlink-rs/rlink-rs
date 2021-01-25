@@ -1,7 +1,13 @@
 use std::fmt::Debug;
+use std::time::Duration;
 
 use crate::api::checkpoint::FunctionSnapshotContext;
 use crate::api::element::Element;
+use crate::api::properties::SystemProperties;
+use crate::api::runtime::{CheckpointId, OperatorId};
+use crate::dag::job_graph::{JobEdge, JobNode};
+use crate::dag::stream_graph::StreamNode;
+use crate::dag::DagManager;
 use crate::runtime::timer::WindowTimer;
 use crate::runtime::worker::FunctionContext;
 use crate::runtime::{ApplicationDescriptor, TaskDescriptor};
@@ -16,10 +22,6 @@ pub mod source_runnable;
 pub mod watermark_assigner_runnable;
 pub mod window_assigner_runnable;
 
-use crate::api::runtime::{CheckpointId, OperatorId};
-use crate::dag::job_graph::{JobEdge, JobNode};
-use crate::dag::stream_graph::StreamNode;
-use crate::dag::DagManager;
 pub(crate) use filter_runnable::FilterRunnable;
 pub(crate) use flat_map_runnable::FlatMapRunnable;
 pub(crate) use key_by_runnable::KeyByRunnable;
@@ -63,6 +65,14 @@ impl RunnableContext {
         checkpoint_id: CheckpointId,
     ) -> FunctionSnapshotContext {
         FunctionSnapshotContext::new(operator_id, self.task_descriptor.task_id, checkpoint_id)
+    }
+
+    pub(crate) fn get_checkpoint_internal(&self, default_value: Duration) -> Duration {
+        self.application_descriptor
+            .coordinator_manager
+            .application_properties
+            .get_checkpoint_internal()
+            .unwrap_or(default_value)
     }
 
     pub(crate) fn get_parent_parallelism(&self) -> u16 {

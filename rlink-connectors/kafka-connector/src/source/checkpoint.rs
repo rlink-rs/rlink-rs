@@ -3,7 +3,7 @@ use rlink::api::checkpoint::{CheckpointHandle, CheckpointedFunction, FunctionSna
 use crate::state::{KafkaSourceStateCache, OffsetMetadata};
 use rlink::api::runtime::JobId;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct KafkaCheckpointed {
     pub(crate) state_cache: Option<KafkaSourceStateCache>,
     pub(crate) application_id: String,
@@ -63,9 +63,8 @@ impl CheckpointedFunction for KafkaCheckpointed {
             "Checkpoint snapshot: {:?}, context: {:?}",
             offset_snapshot, context
         );
-
         let snapshot_serial: Vec<OffsetMetadata> =
-            offset_snapshot.values().map(|x| x.clone()).collect();
+            offset_snapshot.into_iter().map(|kv_ref| kv_ref.1).collect();
 
         let json = serde_json::to_string(&snapshot_serial).unwrap();
 
