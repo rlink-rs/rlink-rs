@@ -41,20 +41,17 @@ pub type ElementSender = ChannelSender<Element>;
 pub fn named_bounded<T>(
     name: &str,
     tags: Vec<Tag>,
-    buffer_size: usize,
+    cap: usize,
 ) -> (ChannelSender<T>, ChannelReceiver<T>)
 where
     T: Clone,
 {
-    info!(
-        "Create channel named with {}, capacity: {}",
-        name, buffer_size
-    );
+    info!("Create channel named with {}, capacity: {}", name, cap);
 
     let size = Arc::new(AtomicI64::new(0));
     let accepted_counter = Arc::new(AtomicU64::new(0));
     let drain_counter = Arc::new(AtomicU64::new(0));
-    let (sender, receiver) = bounded(buffer_size);
+    let (sender, receiver) = if cap <= 32 { bounded(cap) } else { unbounded() };
 
     // add_channel_metric(name.to_string(), size.clone(), capacity.clone());
     crate::metrics::global_metrics::register_gauge(
@@ -74,22 +71,22 @@ where
     );
 
     (
-        ChannelSender::new(name, sender, size.clone(), accepted_counter),
+        ChannelSender::new(name, sender, cap, size.clone(), accepted_counter),
         ChannelReceiver::new(name, receiver, size.clone(), drain_counter),
     )
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::channel::bounded;
+    use std::time::Duration;
+
     use crate::utils::date_time::current_timestamp;
     use crate::utils::thread::spawn;
-    use std::time::Duration;
 
     #[test]
     pub fn bounded_test() {
-        // let (sender, receiver) = unbounded();
-        let (sender, receiver) = bounded(10000 * 100);
+        // let (sender, receiver) = crate::channel::unbounded();
+        let (sender, receiver) = crate::channel::bounded(10000 * 100);
 
         std::thread::sleep(Duration::from_secs(2));
 
