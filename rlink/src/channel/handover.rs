@@ -1,9 +1,7 @@
-use std::time::Duration;
-
 use crate::api::element::Record;
 use crate::channel::receiver::ChannelReceiver;
 use crate::channel::sender::ChannelSender;
-use crate::channel::{named_bounded, RecvError, TryRecvError, TrySendError};
+use crate::channel::{named_bounded, RecvError, SendError, TryRecvError, TrySendError};
 use crate::metrics::Tag;
 
 #[derive(Clone, Debug)]
@@ -29,8 +27,8 @@ impl Handover {
     }
 
     #[inline]
-    pub fn produce(&self, record: Record) {
-        self.sender.try_send_loop(record, Duration::from_secs(1))
+    pub fn produce(&self, record: Record) -> Result<(), SendError<Record>> {
+        self.sender.send(record)
     }
 
     #[inline]

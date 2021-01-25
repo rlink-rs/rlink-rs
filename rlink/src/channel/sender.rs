@@ -99,31 +99,31 @@ where
         })
     }
 
-    pub fn try_send_loop(&self, event: T, mut timeout: Duration) {
-        let mut event = event;
-        let mut times = 0;
-        loop {
-            event = match self.try_send(event) {
-                Ok(()) => return,
-                Err(TrySendError::Full(event_back)) => event_back,
-                Err(TrySendError::Disconnected(_event_back)) => {
-                    panic!("channel Disconnected, {}", self.name)
-                }
-            };
-
-            std::thread::sleep(timeout);
-            times += 1;
-            if times % 100 == 0 {
-                if times <= 300 {
-                    timeout = timeout + timeout;
-                }
-                warn!(
-                    "death loop in {} over {} times, timeout={}s",
-                    self.name,
-                    times,
-                    timeout.as_secs()
-                );
-            }
-        }
-    }
+    // pub fn try_send_loop(&self, event: T, mut timeout: Duration) {
+    //     let mut event = event;
+    //     let mut times = 0;
+    //     loop {
+    //         event = match self.try_send(event) {
+    //             Ok(()) => return,
+    //             Err(TrySendError::Full(event_back)) => event_back,
+    //             Err(TrySendError::Disconnected(_event_back)) => {
+    //                 panic!("channel Disconnected, {}", self.name)
+    //             }
+    //         };
+    //
+    //         std::thread::sleep(timeout);
+    //         times += 1;
+    //         if times % 100 == 0 {
+    //             if times <= 300 {
+    //                 timeout = timeout + timeout;
+    //             }
+    //             warn!(
+    //                 "death loop in {} over {} times, timeout={}s",
+    //                 self.name,
+    //                 times,
+    //                 timeout.as_secs()
+    //             );
+    //         }
+    //     }
+    // }
 }

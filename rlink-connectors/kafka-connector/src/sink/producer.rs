@@ -153,7 +153,7 @@ mod tests {
         std::thread::spawn(move || {
             let record = get_record();
             for _n in 0..1000000 {
-                handover_c.produce(record.clone());
+                handover_c.produce(record.clone()).unwrap();
             }
             println!("finish");
         });

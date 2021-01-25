@@ -80,6 +80,7 @@ where
 mod tests {
     use std::time::Duration;
 
+    use crate::channel::named_bounded;
     use crate::utils::date_time::current_timestamp;
     use crate::utils::thread::spawn;
 
@@ -107,5 +108,24 @@ mod tests {
         let end = current_timestamp();
 
         println!("{}", end.checked_sub(begin).unwrap().as_nanos());
+    }
+
+    #[test]
+    pub fn channel_sender_test() {
+        let (sender, receiver) = named_bounded("", vec![], 33);
+
+        spawn("", move || {
+            std::thread::sleep(Duration::from_secs(30));
+            while let Ok(n) = receiver.recv() {
+                println!("recv: {}", n);
+            }
+        });
+
+        for n in 0..33 * 2 {
+            sender.send(n).unwrap();
+            println!("send: {}", n);
+        }
+
+        println!("finish");
     }
 }
