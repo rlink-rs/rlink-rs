@@ -29,12 +29,12 @@ impl Handover {
     }
 
     #[inline]
-    pub fn try_produce(&self, record: Record) -> Result<(), TrySendError<Record>> {
-        self.sender.try_send(record)
+    pub fn produce(&self, record: Record) {
+        self.sender.try_send_loop(record, Duration::from_secs(1))
     }
 
     #[inline]
-    pub fn produce_always(&self, record: Record) {
-        self.sender.try_send_loop(record, Duration::from_secs(1))
+    pub fn try_produce(&self, record: Record) -> Result<(), TrySendError<Record>> {
+        self.sender.try_send(record)
     }
 }

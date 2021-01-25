@@ -57,7 +57,7 @@ impl OutputFormat for KafkaOutputFormat {
     }
 
     fn write_record(&mut self, record: Record) {
-        self.handover.as_ref().unwrap().produce_always(record);
+        self.handover.as_ref().unwrap().produce(record);
     }
 
     fn close(&mut self) -> api::Result<()> {

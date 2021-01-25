@@ -65,6 +65,10 @@ where
                         std::thread::sleep(Duration::from_millis(10));
                     } else {
                         std::thread::sleep(Duration::from_secs(1));
+
+                        if times == 130 {
+                            warn!("death loop in {} over {} times", self.name, times,);
+                        }
                     }
 
                     if self.size.load(Ordering::Relaxed) < self.cap as i64 {
