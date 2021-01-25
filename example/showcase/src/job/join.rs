@@ -27,7 +27,7 @@ pub struct JoinStreamApp {}
 impl StreamApp for JoinStreamApp {
     fn prepare_properties(&self, properties: &mut Properties) {
         properties.set_keyed_state_backend(KeyedStateBackend::Memory);
-        properties.set_pub_sub_channel_size(64);
+        properties.set_pub_sub_channel_size(100000);
     }
 
     fn build_stream(&self, properties: &Properties, env: &mut StreamExecutionEnvironment) {

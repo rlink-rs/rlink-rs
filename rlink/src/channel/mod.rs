@@ -81,18 +81,18 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::channel::unbounded;
+    use crate::channel::bounded;
     use crate::utils::date_time::current_timestamp;
     use crate::utils::thread::spawn;
     use std::time::Duration;
 
     #[test]
     pub fn bounded_test() {
-        let (sender, receiver) = unbounded();
-        // let (sender, receiver) = bounded(102400);
+        // let (sender, receiver) = unbounded();
+        let (sender, receiver) = bounded(10000 * 100);
 
         std::thread::sleep(Duration::from_secs(2));
-        let begin = current_timestamp();
+
         for n in 0..100 {
             let sender = sender.clone();
             spawn(n.to_string().as_str(), move || {
@@ -105,9 +105,10 @@ mod tests {
             let _a = sender;
         }
 
+        let begin = current_timestamp();
         while let Ok(_n) = receiver.recv() {}
-
         let end = current_timestamp();
+
         println!("{}", end.checked_sub(begin).unwrap().as_nanos());
     }
 }
