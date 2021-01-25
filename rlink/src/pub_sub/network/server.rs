@@ -16,7 +16,7 @@ use tokio_util::codec::LengthDelimitedCodec;
 
 use crate::api::element::{Element, Serde};
 use crate::api::runtime::{ChannelKey, TaskId};
-use crate::channel::{named_bounded, ElementReceiver, ElementSender, TryRecvError};
+use crate::channel::{named_channel, ElementReceiver, ElementSender, TryRecvError};
 use crate::metrics::Tag;
 use crate::pub_sub::network::{ElementRequest, ResponseCode};
 use crate::utils::thread::get_runtime;
@@ -37,7 +37,7 @@ pub(crate) fn publish(
             target_task_id: target_task_id.clone(),
         };
 
-        let (sender, receiver) = named_bounded(
+        let (sender, receiver) = named_channel(
             "NetworkPublish",
             vec![
                 Tag::new(

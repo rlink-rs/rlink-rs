@@ -121,7 +121,6 @@ mod tests {
 
     use rdkafka::ClientConfig;
     use rlink::api::element::Record;
-    use rlink::api::runtime::JobId;
     use rlink::channel::handover::Handover;
     use rlink::utils::date_time::current_timestamp_millis;
 

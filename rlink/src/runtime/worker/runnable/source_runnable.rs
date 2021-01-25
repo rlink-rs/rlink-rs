@@ -8,7 +8,7 @@ use crate::api::element::Element;
 use crate::api::function::{InputFormat, InputSplit};
 use crate::api::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
 use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
-use crate::channel::named_bounded;
+use crate::channel::named_channel;
 use crate::channel::sender::ChannelSender;
 use crate::metrics::Tag;
 use crate::runtime::timer::TimerChannel;
@@ -180,7 +180,7 @@ impl Runnable for SourceRunnable {
             "Source_{}",
             self.stream_source.operator_fn.as_ref().get_name()
         );
-        let (sender, receiver) = named_bounded(metric_name.as_str(), tags, 10240);
+        let (sender, receiver) = named_channel(metric_name.as_str(), tags, 10240);
         let running = Arc::new(AtomicBool::new(true));
 
         self.poll_input_element(sender.clone(), running.clone());

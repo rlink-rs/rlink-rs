@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use crate::api::runtime::{ChannelKey, TaskId};
-use crate::channel::{named_bounded, ElementReceiver, ElementSender};
+use crate::channel::{named_channel, ElementReceiver, ElementSender};
 use crate::metrics::Tag;
 
 lazy_static! {
@@ -44,7 +44,7 @@ pub(crate) fn get(target_task_id: TaskId, channel_size: usize) -> (ElementSender
         &*MEMORY_CHANNELS;
     let mut guard = memory_channels.lock().unwrap();
     let (sender, receiver) = guard.entry(target_task_id).or_insert_with(|| {
-        named_bounded(
+        named_channel(
             "Memory_PubSub",
             vec![
                 Tag::new(

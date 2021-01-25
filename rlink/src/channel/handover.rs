@@ -1,7 +1,7 @@
 use crate::api::element::Record;
 use crate::channel::receiver::ChannelReceiver;
 use crate::channel::sender::ChannelSender;
-use crate::channel::{named_bounded, RecvError, SendError, TryRecvError, TrySendError};
+use crate::channel::{named_channel, RecvError, SendError, TryRecvError, TrySendError};
 use crate::metrics::Tag;
 
 #[derive(Clone, Debug)]
@@ -12,7 +12,7 @@ pub struct Handover {
 
 impl Handover {
     pub fn new(name: &str, tags: Vec<Tag>, buffer_size: usize) -> Self {
-        let (sender, receiver) = named_bounded(name, tags, buffer_size);
+        let (sender, receiver) = named_channel(name, tags, buffer_size);
         Handover { sender, receiver }
     }
 

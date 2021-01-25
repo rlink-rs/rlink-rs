@@ -38,7 +38,7 @@ pub mod sender;
 pub type ElementReceiver = ChannelReceiver<Element>;
 pub type ElementSender = ChannelSender<Element>;
 
-pub fn named_bounded<T>(
+pub fn named_channel<T>(
     name: &str,
     tags: Vec<Tag>,
     cap: usize,
@@ -80,7 +80,7 @@ where
 mod tests {
     use std::time::Duration;
 
-    use crate::channel::named_bounded;
+    use crate::channel::named_channel;
     use crate::utils::date_time::current_timestamp;
     use crate::utils::thread::spawn;
 
@@ -112,7 +112,7 @@ mod tests {
 
     #[test]
     pub fn channel_sender_test() {
-        let (sender, receiver) = named_bounded("", vec![], 33);
+        let (sender, receiver) = named_channel("", vec![], 33);
 
         spawn("", move || {
             std::thread::sleep(Duration::from_secs(30));
