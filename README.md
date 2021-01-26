@@ -13,7 +13,7 @@ Framework tested on Linux/MacOS/Windows, requires stable Rust.
 ## Streaming Example
 
 ```yaml
-rlink = "0.2.0-alpha.5"
+rlink = "0.2.0"
 ```
 
 ```rust
