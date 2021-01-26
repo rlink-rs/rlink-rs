@@ -133,3 +133,8 @@ hadoop jar rlink-yarn-client-0.2.0-alpha.5.jar rlink.yarn.client.Client \
   --manager_type Coordinator \
   --num_task_managers 80
 ```
+
+## TODO
+* Stream multiplexing output
+* Reduce operator checkpoint
+* Multi-Stream join
