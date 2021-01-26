@@ -26,6 +26,8 @@ use crate::pub_sub::network::{ElementRequest, ResponseCode};
 use crate::runtime::ApplicationDescriptor;
 use crate::utils::thread::get_runtime;
 
+const BATCH_PULL_SIZE: u16 = 6000;
+
 lazy_static! {
     static ref C: (
         Sender<(ChannelKey, ElementSender)>,
@@ -87,7 +89,7 @@ async fn subscribe_listen(application_descriptor: ApplicationDescriptor) {
         Receiver<(ChannelKey, ElementSender)>,
     ) = &*C;
 
-    let delay = Duration::from_millis(100);
+    let delay = Duration::from_millis(50);
     let mut idle_counter = 0usize;
     let mut join_handles = Vec::new();
     loop {
@@ -100,7 +102,9 @@ async fn subscribe_listen(application_descriptor: ApplicationDescriptor) {
                     .expect("parse address error");
 
                 let join_handle = tokio::spawn(async move {
-                    let mut client = Client::new(channel_key, sender, addr, 6000).await.unwrap();
+                    let mut client = Client::new(channel_key, sender, addr, BATCH_PULL_SIZE)
+                        .await
+                        .unwrap();
                     client.send().await.unwrap();
                 });
                 join_handles.push(join_handle);
@@ -109,10 +113,10 @@ async fn subscribe_listen(application_descriptor: ApplicationDescriptor) {
             }
             Err(TryRecvError::Empty) => {
                 idle_counter += 1;
-                if idle_counter < 10 * 60 {
+                if idle_counter < 20 * 120 {
                     tokio::time::delay_for(delay).await;
                 } else {
-                    // all task registration must be completed within 1 minute
+                    // all task registration must be completed within 2 minute
                     info!("subscribe listen task finish");
                     break;
                 }
