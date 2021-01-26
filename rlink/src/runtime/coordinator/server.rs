@@ -169,7 +169,7 @@ async fn serve(
 
 fn index() -> HttpResponse {
     let html = r#"<html>
-        <head><title>rlink UI</title></head>
+        <head><title>rlink-rs Home</title></head>
         <body>
             <h1>rlink api</h1>
             <ul>
@@ -334,10 +334,11 @@ async fn get_execution_graph_page(dag_manager: Data<DagManager>) -> Result<HttpR
 const DAG_TEMPLATE: &'static str = r##"
 <!DOCTYPE html>
 <html lang="en">
-<title>Home · dagrejs/dagre-d3 Wiki</title>
+<title>rlink-rs DAG</title>
 <head>
 <script src="https://d3js.org/d3.v3.min.js" charset="utf-8"></script>
-<script src="https://cdn.bootcss.com/dagre-d3/0.4.17/dagre-d3.js"></script>
+<script src="https://cdn.bootcss.com/dagre-d3/0.6.4/dagre-d3.js"></script>
+<!--<script src="https://dagrejs.github.io/project/dagre-d3/v0.6.4/dagre-d3.min.js"></script>-->
 <style>
 html,
 body {
