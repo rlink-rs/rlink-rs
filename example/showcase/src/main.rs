@@ -7,5 +7,5 @@ mod app;
 mod buffer_gen;
 
 pub fn main() {
-    rlink::api::env::execute("showcase", crate::app::JoinStreamApp {});
+    rlink::api::env::execute("showcase", crate::app::ConnectStreamApp {});
 }

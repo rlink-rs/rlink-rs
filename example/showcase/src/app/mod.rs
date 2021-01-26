@@ -62,9 +62,9 @@ impl StreamApp for SimpleStreamApp {
 }
 
 #[derive(Clone, Debug)]
-pub struct JoinStreamApp {}
+pub struct ConnectStreamApp {}
 
-impl StreamApp for JoinStreamApp {
+impl StreamApp for ConnectStreamApp {
     fn prepare_properties(&self, properties: &mut Properties) {
         properties.set_keyed_state_backend(KeyedStateBackend::Memory);
         properties.set_pub_sub_channel_size(100000);
