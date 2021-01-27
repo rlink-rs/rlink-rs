@@ -147,7 +147,9 @@ impl YarnCliCommand {
                                     Err(e) => error!("stdin write error. {}", e),
                                 }
                             }
-                            Err(e) => error!("stdin recv error. {}", e),
+                            Err(e) => {
+                                panic!(format!("stdin recv error. {}", e));
+                            }
                         }
                     }
                 });
