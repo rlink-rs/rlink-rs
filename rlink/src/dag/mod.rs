@@ -209,6 +209,7 @@ impl DagManager {
 #[cfg(test)]
 mod tests {
     use std::convert::TryFrom;
+    use std::ops::Deref;
     use std::time::Duration;
 
     use crate::api;
@@ -278,7 +279,8 @@ mod tests {
             .flat_map(MyFlatMapFunction::new())
             .add_sink(MyOutputFormat::new(Properties::new()));
 
-        let dag_manager = DagManager::try_from(&env.stream_manager.stream_graph.borrow()).unwrap();
+        let dag_manager =
+            DagManager::try_from(env.stream_manager.stream_graph.borrow().deref()).unwrap();
         {
             let dag = &dag_manager.stream_graph().dag;
             println!("{:?}", dag);
