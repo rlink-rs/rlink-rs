@@ -123,7 +123,9 @@ impl ExecutionGraph {
             let job_node = job_dag.index(*node_index);
             let source_stream_node = &job_node.stream_nodes[0];
 
-            let operator = operators.get_mut(&source_stream_node.id).unwrap();
+            let operator = operators
+                .get_mut(&source_stream_node.id)
+                .ok_or(DagError::OperatorNotFound(source_stream_node.id))?;
             if let StreamOperator::StreamSource(op) = operator {
                 let input_splits = op.operator_fn.create_input_splits(job_node.parallelism);
                 if input_splits.len() != job_node.parallelism as usize {
@@ -169,7 +171,10 @@ impl ExecutionGraph {
         let job_dag = &job_graph.dag;
 
         for (job_id, execution_node_indies) in &execution_node_index_map {
-            let job_node_index = job_graph.job_node_indies.get(job_id).unwrap();
+            let job_node_index = job_graph
+                .job_node_indies
+                .get(job_id)
+                .ok_or(DagError::JobNotFound(*job_id))?;
 
             let children: Vec<(EdgeIndex, NodeIndex)> =
                 job_dag.children(*job_node_index).iter(job_dag).collect();
@@ -178,7 +183,7 @@ impl ExecutionGraph {
                 let child_job_node = job_dag.index(child_node_index);
                 let child_execution_node_indies = execution_node_index_map
                     .get(&child_job_node.job_id)
-                    .unwrap();
+                    .ok_or(DagError::JobNotFound(child_job_node.job_id))?;
 
                 let job_edge = job_dag.index(edge_index);
                 match job_edge {
@@ -189,7 +194,7 @@ impl ExecutionGraph {
                             let child_node_index = child_execution_node_indies[number];
                             self.dag
                                 .add_edge(node_index, child_node_index, ExecutionEdge::Memory)
-                                .unwrap();
+                                .map_err(|_e| DagError::WouldCycle)?;
                         }
                     }
                     JobEdge::ReBalance => {
@@ -202,7 +207,7 @@ impl ExecutionGraph {
                                         *child_node_index,
                                         ExecutionEdge::Network,
                                     )
-                                    .unwrap();
+                                    .map_err(|_e| DagError::WouldCycle)?;
                             }
                         }
                     }

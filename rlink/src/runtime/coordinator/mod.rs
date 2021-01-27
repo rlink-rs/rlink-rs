@@ -1,4 +1,5 @@
 use std::borrow::BorrowMut;
+use std::convert::TryFrom;
 use std::ops::Deref;
 use std::time::Duration;
 
@@ -70,7 +71,7 @@ where
 
         let dag_manager = {
             let raw_stream_graph = self.stream_env.stream_manager.stream_graph.borrow();
-            DagManager::new(raw_stream_graph.deref())
+            DagManager::try_from(raw_stream_graph.deref()).unwrap()
         };
         info!("StreamGraph: {}", dag_manager.stream_graph().to_string());
         info!("JobGraph: {}", dag_manager.job_graph().to_string());

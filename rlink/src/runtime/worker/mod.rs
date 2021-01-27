@@ -1,5 +1,6 @@
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::ops::Deref;
 use std::thread::JoinHandle;
 
@@ -104,7 +105,7 @@ where
             .build_stream(application_properties, self.stream_env.borrow_mut());
 
         let mut raw_stream_graph = self.stream_env.stream_manager.stream_graph.borrow_mut();
-        let dag_manager = DagManager::new(raw_stream_graph.deref());
+        let dag_manager = DagManager::try_from(raw_stream_graph.deref())?;
         let operators = raw_stream_graph.pop_operators();
 
         let mut operator_invoke_chain = self.build_invoke_chain(&dag_manager, operators);

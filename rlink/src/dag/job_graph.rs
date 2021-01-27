@@ -136,28 +136,31 @@ impl JobGraph {
 
     pub fn build_job_edges(&mut self) -> Result<(), DagError> {
         let node_indies: Vec<NodeIndex> = self.job_node_indies.values().map(|x| *x).collect();
-        node_indies.into_iter().for_each(|job_node_index| {
-            self.build_job_edge(job_node_index);
-        });
+        for job_node_index in node_indies {
+            self.build_job_edge(job_node_index)?;
+        }
 
         Ok(())
     }
 
-    fn build_job_edge(&mut self, job_node_index: NodeIndex) {
+    fn build_job_edge(&mut self, job_node_index: NodeIndex) -> Result<(), DagError> {
         let job_node = self.dag.index(job_node_index).clone();
         if job_node.child_job_ids.len() == 0 {
-            return;
+            return Ok(());
         }
 
         for child_job_id in &job_node.child_job_ids {
-            let child_node_index = self.job_node_indies.get(child_job_id).unwrap();
+            let child_node_index = self
+                .job_node_indies
+                .get(child_job_id)
+                .ok_or(DagError::JobNotFound(*child_job_id))?;
             let child_job_node = self.dag.index(*child_node_index);
 
             let job_edge = if child_job_node.is_reduce_job() {
                 JobEdge::ReBalance
             } else if job_node.is_reduce_job() {
                 if job_node.parallelism != child_job_node.parallelism {
-                    unimplemented!("unsupported")
+                    return Err(DagError::ReduceOutputParallelismConflict);
                 }
 
                 JobEdge::Forward
@@ -171,8 +174,10 @@ impl JobGraph {
 
             self.dag
                 .add_edge(job_node_index, *child_node_index, job_edge)
-                .unwrap();
+                .map_err(|_e| DagError::WouldCycle)?;
         }
+
+        Ok(())
     }
 
     pub fn build_job_nodes(&mut self, stream_graph: &StreamGraph) -> Result<(), DagError> {
@@ -196,7 +201,10 @@ impl JobGraph {
         }
 
         for (child_job_id, parent_job_ids) in job_id_map {
-            let node_index = self.job_node_indies.get(&child_job_id).unwrap();
+            let node_index = self
+                .job_node_indies
+                .get(&child_job_id)
+                .ok_or(DagError::JobNotFound(child_job_id))?;
 
             // update `parent_job_ids`
             {
@@ -210,7 +218,9 @@ impl JobGraph {
                 // the latest OperatorId is the left OperatorId
                 let left_parent_id = {
                     let source_parent_ids = &job_node.stream_nodes[0].parent_ids;
-                    *source_parent_ids.get(source_parent_ids.len() - 1).unwrap()
+                    *source_parent_ids
+                        .get(source_parent_ids.len() - 1)
+                        .ok_or(DagError::ConnectParentNotFound)?
                 };
 
                 // update the parallelism with parent left operator's parallelism
@@ -233,11 +243,14 @@ impl JobGraph {
                     }
                 }
             } else if job_node.is_reduce_job() {
-                job_node.child_job_ids.iter().for_each(|child_job_id| {
-                    let child_node_index = self.job_node_indies.get(child_job_id).unwrap();
+                for child_job_id in &job_node.child_job_ids {
+                    let child_node_index = self
+                        .job_node_indies
+                        .get(child_job_id)
+                        .ok_or(DagError::JobNotFound(*child_job_id))?;
                     let child_node_stream = self.dag.index_mut(*child_node_index);
                     child_node_stream.parallelism = job_node.parallelism;
-                })
+                }
             }
         }
 

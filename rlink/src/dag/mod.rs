@@ -21,6 +21,7 @@ pub(crate) mod physic_graph;
 pub(crate) mod stream_graph;
 pub(crate) mod utils;
 
+use std::convert::TryFrom;
 pub(crate) use stream_graph::RawStreamGraph;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -85,12 +86,18 @@ impl std::fmt::Display for OperatorType {
 
 #[derive(Error, Debug)]
 pub enum DagError {
+    #[error("DAG wold cycle")]
+    WouldCycle,
     #[error("source not found")]
     SourceNotFound,
     #[error("source not at staring")]
     SourceNotAtStarting,
     #[error("source not at ending")]
     SinkNotAtEnding,
+    #[error("reduce and child output's parallelism is conflict")]
+    ReduceOutputParallelismConflict,
+    #[error("connect parent not found")]
+    ConnectParentNotFound,
     #[error("the operator is not combine operator")]
     NotCombineOperator,
     #[error("parent operator not found")]
@@ -101,6 +108,10 @@ pub enum DagError {
     MultiChildrenInPipeline,
     #[error("illegal Vec<InputSplit> len. {0}")]
     IllegalInputSplitSize(String),
+    #[error("operator not found. {0:?}")]
+    OperatorNotFound(OperatorId),
+    #[error("job not found. {0:?}")]
+    JobNotFound(JobId),
 }
 
 pub(crate) trait Label {
@@ -115,32 +126,38 @@ pub(crate) struct DagManager {
     physic_graph: PhysicGraph,
 }
 
-impl DagManager {
-    pub fn new(raw_stream_graph: &RawStreamGraph) -> Self {
+impl<'a> TryFrom<&'a RawStreamGraph> for DagManager {
+    type Error = DagError;
+
+    fn try_from(raw_stream_graph: &'a RawStreamGraph) -> Result<Self, Self::Error> {
         let stream_graph = StreamGraph::new(
             raw_stream_graph.sources.clone(),
             raw_stream_graph.dag.clone(),
         );
 
         let mut job_graph = JobGraph::new();
-        job_graph.build(&stream_graph).unwrap();
+        job_graph.build(&stream_graph)?;
+        println!(
+            "{}",
+            serde_json::to_string(&crate::dag::utils::JsonDag::dag_json(&job_graph.dag)).unwrap()
+        );
 
         let mut execution_graph = ExecutionGraph::new();
-        execution_graph
-            .build(&job_graph, raw_stream_graph.get_operators().borrow_mut())
-            .unwrap();
+        execution_graph.build(&job_graph, raw_stream_graph.get_operators().borrow_mut())?;
 
         let mut physic_graph = PhysicGraph::new();
         physic_graph.build(&execution_graph);
 
-        DagManager {
+        Ok(DagManager {
             stream_graph,
             job_graph,
             execution_graph,
             physic_graph,
-        }
+        })
     }
+}
 
+impl DagManager {
     pub fn stream_graph(&self) -> &StreamGraph {
         &self.stream_graph
     }
@@ -156,12 +173,6 @@ impl DagManager {
     pub fn physic_graph(&self) -> &PhysicGraph {
         &self.physic_graph
     }
-
-    // pub fn get_stream_parents(&self, operator_id: u32) -> Vec<StreamNode> {
-    //     let parents = self.stream_graph.get_parents(operator_id);
-    //     let parents: Vec<StreamNode> = parents.into_iter().map(|x| x.clone()).collect();
-    //     parents
-    // }
 
     pub fn get_stream(&self, operator_id: OperatorId) -> Option<StreamNode> {
         self.stream_graph
@@ -195,6 +206,7 @@ impl DagManager {
 
 #[cfg(test)]
 mod tests {
+    use std::convert::TryFrom;
     use std::time::Duration;
 
     use crate::api;
@@ -264,7 +276,7 @@ mod tests {
             .flat_map(MyFlatMapFunction::new())
             .add_sink(MyOutputFormat::new(Properties::new()));
 
-        let dag_manager = DagManager::new(&env.stream_manager.stream_graph.borrow());
+        let dag_manager = DagManager::try_from(&env.stream_manager.stream_graph.borrow()).unwrap();
         {
             let dag = &dag_manager.stream_graph().dag;
             println!("{:?}", dag);
