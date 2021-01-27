@@ -118,7 +118,6 @@ impl Context {
 
         let task_manager_id = match manager_type {
             ManagerType::Coordinator => "coordinator".to_string(),
-            ManagerType::Standby => "standby".to_string(),
             ManagerType::Worker => parse_arg("task_manager_id")?,
         };
         set_manager_id(task_manager_id.as_str(), bind_ip.as_str());

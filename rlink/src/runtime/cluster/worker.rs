@@ -13,7 +13,11 @@ use crate::runtime::{worker, ApplicationDescriptor, TaskManagerStatus, WorkerMan
 use crate::storage::metadata::MetadataLoader;
 use crate::utils;
 
-pub(crate) fn run<S>(context: Context, stream_env: StreamExecutionEnvironment, stream_app: S)
+pub(crate) fn run<S>(
+    context: Context,
+    stream_env: StreamExecutionEnvironment,
+    stream_app: S,
+) -> anyhow::Result<()>
 where
     S: StreamApp + 'static,
 {
@@ -53,6 +57,7 @@ where
         join_handle.join().unwrap();
     });
     info!("work end");
+    Ok(())
 }
 
 fn get_task_manager_descriptor(

@@ -61,7 +61,7 @@ where
         }
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&mut self) -> anyhow::Result<()> {
         info!("coordinator start with mode {}", self.context.manager_type);
 
         let application_properties = self.prepare_properties();
@@ -71,7 +71,7 @@ where
 
         let dag_manager = {
             let raw_stream_graph = self.stream_env.stream_manager.stream_graph.borrow();
-            DagManager::try_from(raw_stream_graph.deref()).unwrap()
+            DagManager::try_from(raw_stream_graph.deref())?
         };
         info!("StreamGraph: {}", dag_manager.stream_graph().to_string());
         info!("JobGraph: {}", dag_manager.job_graph().to_string());

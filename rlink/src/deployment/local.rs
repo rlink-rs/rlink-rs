@@ -60,7 +60,12 @@ impl TResourceManager for LocalResourceManager {
                 ))
                 .spawn(move || {
                     let stream_env = StreamExecutionEnvironment::new(application_name);
-                    cluster::run_task(context_clone, stream_env, stream_app_clone);
+                    match cluster::run_task(context_clone, stream_env, stream_app_clone) {
+                        Ok(_) => {}
+                        Err(e) => {
+                            panic!(format!("TaskManager error. {}", e))
+                        }
+                    }
                 })
                 .unwrap();
         }
