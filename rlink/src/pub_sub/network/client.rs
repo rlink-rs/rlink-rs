@@ -101,12 +101,8 @@ async fn subscribe_listen(application_descriptor: ApplicationDescriptor) {
                 let addr = SocketAddr::from_str(&worker_manager_descriptor.task_manager_address)
                     .expect("parse address error");
 
-                let join_handle = tokio::spawn(async move {
-                    let mut client = Client::new(channel_key, sender, addr, BATCH_PULL_SIZE)
-                        .await
-                        .unwrap();
-                    client.send().await.unwrap();
-                });
+                let join_handle =
+                    tokio::spawn(loop_client_task(channel_key, sender, addr, BATCH_PULL_SIZE));
                 join_handles.push(join_handle);
 
                 idle_counter = 0;
@@ -130,6 +126,45 @@ async fn subscribe_listen(application_descriptor: ApplicationDescriptor) {
             Ok(_) => {}
             Err(e) => error!("Client task error. {}", e),
         }
+    }
+}
+
+async fn client_task(
+    channel_key: ChannelKey,
+    sender: ElementSender,
+    addr: SocketAddr,
+    batch_pull_size: u16,
+) -> anyhow::Result<()> {
+    let mut client = Client::new(channel_key, sender.clone(), addr, batch_pull_size).await?;
+    match client.send().await {
+        Ok(()) => {
+            client.close_rough();
+            Ok(())
+        }
+        Err(e) => {
+            client.close_rough();
+            Err(e)
+        }
+    }
+}
+
+async fn loop_client_task(
+    channel_key: ChannelKey,
+    sender: ElementSender,
+    addr: SocketAddr,
+    batch_pull_size: u16,
+) {
+    loop {
+        match client_task(channel_key, sender.clone(), addr, batch_pull_size).await {
+            Ok(_) => {
+                error!("client({}) unreached code", addr)
+            }
+            Err(e) => {
+                error!("client({}) task error. {}", addr, e)
+            }
+        }
+
+        tokio::time::delay_for(Duration::from_secs(3)).await;
     }
 }
 

@@ -210,7 +210,11 @@ pub(crate) async fn heartbeat(
     let metadata_storage = MetadataStorage::new(&context.metadata_mode);
 
     if !heartbeat_model.status.eq("ok") {
-        error!("heart beat status: {}", heartbeat_model.status.as_str());
+        error!(
+            "heartbeat status: {}, model: {:?} ",
+            heartbeat_model.status.as_str(),
+            heartbeat_model
+        );
     }
 
     metadata_storage
