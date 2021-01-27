@@ -60,6 +60,7 @@ pub(crate) struct Context {
     pub coordinator_address: String,
 
     /// on yarn arg
+    pub yarn_manager_main_class: String,
     pub worker_process_path: String,
     pub memory_mb: usize,
     pub v_cores: usize,
@@ -77,6 +78,7 @@ impl Context {
         cluster_config: ClusterConfig,
         metric_addr: String,
         coordinator_address: String,
+        yarn_manager_main_class: String,
         worker_process_path: String,
         memory_mb: usize,
         v_cores: usize,
@@ -92,6 +94,7 @@ impl Context {
             cluster_config,
             metric_addr,
             coordinator_address,
+            yarn_manager_main_class,
             worker_process_path,
             memory_mb,
             v_cores,
@@ -155,9 +158,11 @@ impl Context {
             ClusterMode::YARN => ClusterConfig::new_local(),
         };
 
-        let (worker_process_path, memory_mb, v_cores) = match cluster_mode {
+        let (yarn_manager_main_class, worker_process_path, memory_mb, v_cores) = match cluster_mode
+        {
             ClusterMode::YARN => match manager_type {
                 ManagerType::Coordinator => {
+                    let yarn_manager_main_class = parse_arg("yarn_manager_main_class")?;
                     let worker_process_path = parse_arg("worker_process_path")?;
 
                     let memory_mb = parse_arg("memory_mb")?;
@@ -169,11 +174,16 @@ impl Context {
                     let v_cores = usize::from_str(v_cores.as_str())
                         .map_err(|_e| anyhow!("parse `v_cores`=`{}` to usize error", v_cores))?;
 
-                    (worker_process_path, memory_mb, v_cores)
+                    (
+                        yarn_manager_main_class,
+                        worker_process_path,
+                        memory_mb,
+                        v_cores,
+                    )
                 }
-                _ => ("".to_string(), 0, 0),
+                _ => ("".to_string(), "".to_string(), 0, 0),
             },
-            _ => ("".to_string(), 0, 0),
+            _ => ("".to_string(), "".to_string(), 0, 0),
         };
 
         logger::init_log(&cluster_mode, "info");
@@ -196,6 +206,7 @@ impl Context {
             cluster_config,
             metric_addr,
             coordinator_address,
+            yarn_manager_main_class,
             worker_process_path,
             memory_mb,
             v_cores,

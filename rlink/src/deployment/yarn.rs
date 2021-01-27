@@ -109,7 +109,8 @@ impl YarnCliCommand {
     pub fn new(context: &Context, job_descriptor: &ApplicationDescriptor) -> Self {
         let child = std::process::Command::new("java")
             .arg("-Xmx256M")
-            .arg("rlink.yarn.manager.ResourceManagerCli")
+            // .arg("rlink.yarn.manager.ResourceManagerCli")
+            .arg(context.yarn_manager_main_class.as_str())
             .arg("--coordinator_address")
             .arg(
                 job_descriptor
