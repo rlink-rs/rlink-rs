@@ -137,11 +137,15 @@ impl ExecutionGraph {
                     )));
                 }
 
+                if job_node.parallelism == 0 {
+                    return Err(DagError::JobParallelismNotFound);
+                }
+
                 for task_number in 0..job_node.parallelism {
                     let task_id = TaskId {
                         job_id: job_node.job_id,
-                        task_number: task_number as u16,
-                        num_tasks: job_node.parallelism as u16,
+                        task_number,
+                        num_tasks: job_node.parallelism,
                     };
                     let execution_node = ExecutionNode {
                         task_id: task_id.clone(),
@@ -157,6 +161,8 @@ impl ExecutionGraph {
                         .or_insert(Vec::new())
                         .push(node_index);
                 }
+            } else {
+                return Err(DagError::SourceNotFound);
             }
         }
 

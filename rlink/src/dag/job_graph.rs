@@ -254,6 +254,36 @@ impl JobGraph {
             }
         }
 
+        // parallelism ==0 check, and inherit to parent's parallelism
+        loop {
+            let no_parallelism_jobs: Vec<(JobId, u16)> = self
+                .job_node_indies
+                .iter()
+                .map(|(_job_id, node_index)| self.dag.index(*node_index))
+                .filter(|job_node| job_node.parallelism == 0)
+                .map(|job_node| {
+                    if job_node.parent_job_ids.len() != 1 {
+                        unimplemented!()
+                    }
+                    let parent_job_id = job_node.parent_job_ids.get(0).unwrap();
+
+                    let parent_job_index = self.job_node_indies.get(parent_job_id).unwrap();
+                    let parent_parallelism = self.dag.index(*parent_job_index).parallelism;
+                    (job_node.job_id, parent_parallelism)
+                })
+                .collect();
+
+            if no_parallelism_jobs.len() == 0 {
+                break;
+            }
+
+            for (job_id, parent_parallelism) in no_parallelism_jobs {
+                let node_index = self.job_node_indies.get(&job_id).unwrap();
+                let job_node = self.dag.index_mut(*node_index);
+                job_node.parallelism = parent_parallelism
+            }
+        }
+
         Ok(())
     }
 

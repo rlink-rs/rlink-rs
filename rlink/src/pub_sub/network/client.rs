@@ -157,7 +157,7 @@ impl Client {
                 batch_pull_size,
                 stream,
             }),
-            Err(e) => Err(anyhow::Error::new(e)),
+            Err(e) => Err(anyhow!(e)),
         }
     }
 

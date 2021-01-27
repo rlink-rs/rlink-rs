@@ -112,6 +112,8 @@ pub enum DagError {
     OperatorNotFound(OperatorId),
     #[error("job not found. {0:?}")]
     JobNotFound(JobId),
+    #[error("job parallelism not found")]
+    JobParallelismNotFound,
 }
 
 pub(crate) trait Label {

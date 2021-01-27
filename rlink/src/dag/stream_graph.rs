@@ -263,10 +263,13 @@ impl RawStreamGraph {
                 return Err(DagError::NotCombineOperator);
             }
 
+            let mut is_reduce_parent = false;
             let mut new_p_operator_ids = Vec::new();
             for p_operator_id in parent_operator_ids {
                 let (p_node_index, _) = self.operators.get(&p_operator_id).unwrap();
                 let p_stream_node = self.dag.index(*p_node_index);
+
+                is_reduce_parent = p_stream_node.operator_type == OperatorType::Reduce;
 
                 let p_parallelism = p_stream_node.parallelism;
                 let vir_sink = self.create_virtual_sink(0);
@@ -279,6 +282,13 @@ impl RawStreamGraph {
             let vir_source = self.create_virtual_source(0);
             let vir_operator_id =
                 self.add_operator0(vir_source, new_p_operator_ids, parallelism)?;
+
+            let vir_operator_id = if is_reduce_parent {
+                let vir_map = self.create_virtual_flat_map(parallelism);
+                self.add_operator0(vir_map, vec![vir_operator_id], parallelism)?
+            } else {
+                vir_operator_id
+            };
 
             self.add_operator0(operator, vec![vir_operator_id], parallelism)
         };
