@@ -60,14 +60,6 @@ impl StreamGraph {
         self.dag.index(node_index)
     }
 
-    // pub fn get_stream_node_by_operator_id(&self, operator_id: OperatorId) -> Option<&StreamNode> {
-    //     self.dag
-    //         .raw_nodes()
-    //         .iter()
-    //         .find(|x| x.weight.id == operator_id)
-    //         .map(|x| &x.weight)
-    // }
-
     pub(crate) fn to_string(&self) -> String {
         JsonDag::from(&self.dag).to_string()
     }
