@@ -119,8 +119,15 @@ impl RunnableContext {
             .collect()
     }
 
-    pub(crate) fn get_stream(&self, operator_id: OperatorId) -> StreamNode {
-        self.dag_metadata.get_stream(operator_id).unwrap().clone()
+    #[allow(dead_code)]
+    pub(crate) fn get_stream_node(&self, operator_id: OperatorId) -> &StreamNode {
+        self.dag_metadata.get_stream_node(operator_id).unwrap()
+    }
+
+    pub(crate) fn get_job_node(&self) -> &JobNode {
+        self.dag_metadata
+            .get_job_node(self.task_descriptor.task_id.job_id)
+            .unwrap()
     }
 }
 

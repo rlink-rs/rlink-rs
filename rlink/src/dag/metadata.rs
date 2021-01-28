@@ -35,11 +35,11 @@ impl DagMetadata {
 }
 
 impl DagMetadata {
-    pub fn get_stream(&self, operator_id: OperatorId) -> Option<&StreamNode> {
-        self.get_stream0(operator_id).map(|node| node.detail())
+    pub fn get_stream_node(&self, operator_id: OperatorId) -> Option<&StreamNode> {
+        self.get_stream_node0(operator_id).map(|node| node.detail())
     }
 
-    fn get_stream0(&self, operator_id: OperatorId) -> Option<&JsonNode<StreamNode>> {
+    fn get_stream_node0(&self, operator_id: OperatorId) -> Option<&JsonNode<StreamNode>> {
         self.stream_graph
             .nodes()
             .iter()
