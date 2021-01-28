@@ -19,13 +19,13 @@ impl MetadataLoader {
         }
     }
 
-    pub fn get_application_descriptor_from_cache(&mut self) -> ApplicationDescriptor {
-        if let Some(a) = &self.application_descriptor_cache {
-            a.clone()
-        } else {
-            self.get_application_descriptor()
-        }
-    }
+    // pub fn get_application_descriptor_from_cache(&mut self) -> ApplicationDescriptor {
+    //     if let Some(a) = &self.application_descriptor_cache {
+    //         a.clone()
+    //     } else {
+    //         self.get_application_descriptor()
+    //     }
+    // }
 
     pub fn get_application_descriptor(&mut self) -> ApplicationDescriptor {
         let url = format!("{}/metadata", self.coordinator_address);

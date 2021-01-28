@@ -4,6 +4,7 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 
 use crate::api::env::{StreamApp, StreamExecutionEnvironment};
+use crate::dag::metadata::DagMetadata;
 use crate::pub_sub::network;
 use crate::runtime::context::Context;
 use crate::runtime::timer::{start_window_timer, WindowTimer};
@@ -39,15 +40,15 @@ where
 
     // after all task fine. and reload `ApplicationDescriptor` from metadata
     let application_descriptor = metadata_loader.get_application_descriptor();
-    metadata_loader.get_dag_metadata();
+    let dag_metadata = metadata_loader.get_dag_metadata();
 
     bootstrap_subscribe_client(&application_descriptor);
     info!("bootstrap subscribe client");
 
     let join_handles = run_tasks(
         &application_descriptor,
+        &dag_metadata,
         &context,
-        metadata_loader,
         window_timer,
         stream_env,
         stream_app,
@@ -138,8 +139,8 @@ fn waiting_all_task_manager_fine(metadata_loader: &mut MetadataLoader) {
 
 fn run_tasks<S>(
     application_descriptor: &ApplicationDescriptor,
+    dag_metadata: &DagMetadata,
     context: &Context,
-    metadata_loader: MetadataLoader,
     window_timer: WindowTimer,
     stream_env: StreamExecutionEnvironment,
     stream_app: S,
@@ -158,7 +159,8 @@ where
         .map(|task_descriptor| {
             worker::run(
                 context.clone(),
-                metadata_loader.clone(),
+                dag_metadata.clone(),
+                application_descriptor.clone(),
                 task_descriptor.clone(),
                 stream_app.clone(),
                 &stream_env,

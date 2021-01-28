@@ -9,6 +9,7 @@ use crate::api::env::{StreamApp, StreamExecutionEnvironment};
 use crate::api::function::KeySelectorFunction;
 use crate::api::operator::{DefaultStreamOperator, StreamOperator};
 use crate::api::runtime::{JobId, OperatorId};
+use crate::dag::metadata::DagMetadata;
 use crate::dag::{DagManager, OperatorType};
 use crate::runtime::context::Context;
 use crate::runtime::timer::WindowTimer;
@@ -18,7 +19,6 @@ use crate::runtime::worker::runnable::{
     SinkRunnable, SourceRunnable, WatermarkAssignerRunnable, WindowAssignerRunnable,
 };
 use crate::runtime::{ApplicationDescriptor, TaskDescriptor};
-use crate::storage::metadata::MetadataLoader;
 
 pub mod checkpoint;
 pub mod heart_beat;
@@ -28,7 +28,8 @@ pub(crate) type FunctionContext = crate::api::function::Context;
 
 pub(crate) fn run<S>(
     context: Context,
-    metadata_loader: MetadataLoader,
+    dag_metadata: DagMetadata,
+    application_descriptor: ApplicationDescriptor,
     task_descriptor: TaskDescriptor,
     stream_app: S,
     stream_env: &StreamExecutionEnvironment,
@@ -47,8 +48,9 @@ where
             let stream_env = StreamExecutionEnvironment::new(application_name);
             let worker_task = WorkerTask::new(
                 context,
+                dag_metadata,
+                application_descriptor,
                 task_descriptor,
-                metadata_loader,
                 stream_app,
                 stream_env,
                 window_timer,
@@ -65,9 +67,9 @@ where
     S: StreamApp + 'static,
 {
     context: Context,
-    task_descriptor: TaskDescriptor,
+    dag_metadata: DagMetadata,
     application_descriptor: ApplicationDescriptor,
-    metadata_loader: MetadataLoader,
+    task_descriptor: TaskDescriptor,
     stream_app: S,
     stream_env: StreamExecutionEnvironment,
     window_timer: WindowTimer,
@@ -79,17 +81,18 @@ where
 {
     pub(crate) fn new(
         context: Context,
+        dag_metadata: DagMetadata,
+        application_descriptor: ApplicationDescriptor,
         task_descriptor: TaskDescriptor,
-        mut metadata_loader: MetadataLoader,
         stream_app: S,
         stream_env: StreamExecutionEnvironment,
         window_timer: WindowTimer,
     ) -> Self {
         WorkerTask {
             context,
+            dag_metadata,
+            application_descriptor,
             task_descriptor,
-            application_descriptor: metadata_loader.get_application_descriptor_from_cache(),
-            metadata_loader,
             stream_app,
             stream_env,
             window_timer,
