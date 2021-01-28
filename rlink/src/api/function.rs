@@ -80,12 +80,12 @@ pub trait InputSplitSource {
     /// Create InputSplits by system parallelism[`min_num_splits`]
     ///
     /// Returns a InputSplit vec
-    fn create_input_splits(&self, min_num_splits: u16) -> Vec<InputSplit> {
+    fn create_input_splits(&self, min_num_splits: u16) -> crate::api::Result<Vec<InputSplit>> {
         let mut input_splits = Vec::with_capacity(min_num_splits as usize);
         for task_number in 0..min_num_splits {
             input_splits.push(InputSplit::new(task_number, Properties::new()));
         }
-        input_splits
+        Ok(input_splits)
     }
 
     /// Create InputSplitAssigner by InputSplits['input_splits']

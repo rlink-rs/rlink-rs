@@ -17,6 +17,7 @@ rlink-derive = {path = "../../rlink-derive", version = "0.2.1-alpha.2"}
 
 log = "0.4"
 lazy_static = "1.4.0"
+anyhow = "1.0"
 dashmap = "3.11"
 
 # serde

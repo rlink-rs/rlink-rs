@@ -127,7 +127,7 @@ impl InputFormat for KafkaInputFormat {
 }
 
 impl InputSplitSource for KafkaInputFormat {
-    fn create_input_splits(&self, min_num_splits: u16) -> Vec<InputSplit> {
+    fn create_input_splits(&self, min_num_splits: u16) -> api::Result<Vec<InputSplit>> {
         let timeout = Duration::from_secs(3);
 
         info!("kafka config {:?}", self.client_config);
@@ -135,18 +135,18 @@ impl InputSplitSource for KafkaInputFormat {
         let consumer: BaseConsumer = self
             .client_config
             .create()
-            .expect("Consumer creation failed");
+            .map_err(|e| anyhow!("Consumer creation failed. {}", e))?;
 
         let mut input_splits = Vec::new();
         let mut index = 0;
         for topic in &self.topics {
             let metadata = consumer
                 .fetch_metadata(Some(topic.as_str()), timeout)
-                .expect("Failed to fetch metadata");
+                .map_err(|e| anyhow!("Failed to fetch metadata. {}", e))?;
             let metadata_topic = metadata
                 .topics()
                 .get(0)
-                .expect(format!("Topic({}) not found", topic).as_str());
+                .ok_or(anyhow!("Topic({}) not found", topic))?;
 
             for partition in metadata_topic.partitions() {
                 let mut properties = Properties::new();
@@ -165,7 +165,9 @@ impl InputSplitSource for KafkaInputFormat {
         }
 
         if input_splits.len() > min_num_splits as usize {
-            panic!("kafka `input_splits.len()` != `min_num_splits`")
+            return Err(rlink::api::Error::from(
+                "kafka `input_splits.len()` != `min_num_splits`",
+            ));
         }
 
         if input_splits.len() < min_num_splits as usize {
@@ -183,6 +185,6 @@ impl InputSplitSource for KafkaInputFormat {
             input_splits.extend_from_slice(extend_input_splits.as_slice());
         }
 
-        input_splits
+        Ok(input_splits)
     }
 }
