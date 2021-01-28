@@ -216,7 +216,7 @@ pub(crate) async fn heartbeat(
     }
 
     metadata_storage
-        .update_task_status(
+        .update_task_manager_status(
             heartbeat_model.task_manager_id.as_str(),
             heartbeat_model.task_manager_address.as_str(),
             TaskManagerStatus::Registered,

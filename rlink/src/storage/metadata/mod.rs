@@ -15,11 +15,11 @@ pub trait TMetadataStorage: Debug {
         -> Result<(), Box<dyn Error + Send + Sync>>;
     fn delete(&mut self) -> Result<(), Box<dyn Error + Send + Sync>>;
     fn load(&self) -> Result<ApplicationDescriptor, Box<dyn Error + Send + Sync>>;
-    fn update_job_status(
+    fn update_application_status(
         &self,
         job_manager_status: TaskManagerStatus,
     ) -> Result<(), Box<dyn Error + Send + Sync>>;
-    fn update_task_status(
+    fn update_task_manager_status(
         &self,
         task_manager_id: &str,
         task_manager_address: &str,
@@ -66,18 +66,18 @@ impl TMetadataStorage for MetadataStorage {
         }
     }
 
-    fn update_job_status(
+    fn update_application_status(
         &self,
         job_manager_status: TaskManagerStatus,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         match self {
             MetadataStorage::MemoryMetadataStorage(storage) => {
-                storage.update_job_status(job_manager_status)
+                storage.update_application_status(job_manager_status)
             }
         }
     }
 
-    fn update_task_status(
+    fn update_task_manager_status(
         &self,
         task_manager_id: &str,
         task_manager_address: &str,
@@ -85,7 +85,7 @@ impl TMetadataStorage for MetadataStorage {
         metrics_address: &str,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         match self {
-            MetadataStorage::MemoryMetadataStorage(storage) => storage.update_task_status(
+            MetadataStorage::MemoryMetadataStorage(storage) => storage.update_task_manager_status(
                 task_manager_id,
                 task_manager_address,
                 task_manager_status,
@@ -115,12 +115,12 @@ pub(crate) fn loop_delete_job_descriptor(metadata_storage: &mut MetadataStorage)
     loop_fn!(metadata_storage.delete(), std::time::Duration::from_secs(2));
 }
 
-pub(crate) fn loop_update_job_status(
+pub(crate) fn loop_update_application_status(
     metadata_storage: &mut MetadataStorage,
     job_manager_status: TaskManagerStatus,
 ) {
     loop_fn!(
-        metadata_storage.update_job_status(job_manager_status.clone()),
+        metadata_storage.update_application_status(job_manager_status.clone()),
         std::time::Duration::from_secs(2)
     );
 }

@@ -49,7 +49,7 @@ impl TMetadataStorage for MemoryMetadataStorage {
         Ok(lock.clone().unwrap())
     }
 
-    fn update_job_status(
+    fn update_application_status(
         &self,
         job_manager_status: TaskManagerStatus,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -63,7 +63,7 @@ impl TMetadataStorage for MemoryMetadataStorage {
         Ok(())
     }
 
-    fn update_task_status(
+    fn update_task_manager_status(
         &self,
         task_manager_id: &str,
         task_manager_address: &str,

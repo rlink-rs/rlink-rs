@@ -18,7 +18,7 @@ use crate::runtime::coordinator::task_distribution::build_application_descriptor
 use crate::runtime::{ApplicationDescriptor, TaskManagerStatus};
 use crate::storage::metadata::{
     loop_delete_job_descriptor, loop_read_job_descriptor, loop_save_job_descriptor,
-    loop_update_job_status, MetadataStorage,
+    loop_update_application_status, MetadataStorage,
 };
 use crate::utils::date_time::timestamp_str;
 
@@ -258,7 +258,7 @@ where
                 .find(|x| x.task_status.ne(&TaskManagerStatus::Registered));
 
             if unregister_worker.is_none() {
-                loop_update_job_status(
+                loop_update_application_status(
                     metadata_storage.borrow_mut(),
                     TaskManagerStatus::Registered,
                 );
