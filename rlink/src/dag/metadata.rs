@@ -60,12 +60,12 @@ impl DagMetadata {
             .find(|node| node.detail().job_id.eq(&job_id))
     }
 
-    pub fn get_job_parents(&self, job_id: JobId) -> Vec<(&JobNode, &JobEdge)> {
-        self.get_jobs(job_id, true)
+    pub fn get_job_parents(&self, child_job_id: JobId) -> Vec<(&JobNode, &JobEdge)> {
+        self.get_jobs(child_job_id, true)
     }
 
-    pub fn get_job_children(&self, job_id: JobId) -> Vec<(&JobNode, &JobEdge)> {
-        self.get_jobs(job_id, false)
+    pub fn get_job_children(&self, parent_job_id: JobId) -> Vec<(&JobNode, &JobEdge)> {
+        self.get_jobs(parent_job_id, false)
     }
 
     pub fn get_jobs(&self, job_id: JobId, parent: bool) -> Vec<(&JobNode, &JobEdge)> {
@@ -98,16 +98,26 @@ impl DagMetadata {
     ////////////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
-    pub fn get_task_parents(&self, task_id: &TaskId) -> Vec<(&ExecutionNode, &ExecutionEdge)> {
-        self.get_tasks(task_id, true)
+    pub fn get_execution_parents(
+        &self,
+        child_task_id: &TaskId,
+    ) -> Vec<(&ExecutionNode, &ExecutionEdge)> {
+        self.get_executions(child_task_id, true)
     }
 
-    pub fn get_task_children(&self, task_id: &TaskId) -> Vec<(&ExecutionNode, &ExecutionEdge)> {
-        self.get_tasks(task_id, false)
+    pub fn get_execution_children(
+        &self,
+        parent_task_id: &TaskId,
+    ) -> Vec<(&ExecutionNode, &ExecutionEdge)> {
+        self.get_executions(parent_task_id, false)
     }
 
-    fn get_tasks(&self, task_id: &TaskId, parent: bool) -> Vec<(&ExecutionNode, &ExecutionEdge)> {
-        match self.get_task_node0(task_id) {
+    fn get_executions(
+        &self,
+        task_id: &TaskId,
+        parent: bool,
+    ) -> Vec<(&ExecutionNode, &ExecutionEdge)> {
+        match self.get_execution_node0(task_id) {
             Some(node) => {
                 let job_nodes: Vec<(&ExecutionNode, &ExecutionEdge)> = self
                     .execution_graph
@@ -133,7 +143,7 @@ impl DagMetadata {
         }
     }
 
-    fn get_task_node0(&self, task_id: &TaskId) -> Option<&JsonNode<ExecutionNode>> {
+    fn get_execution_node0(&self, task_id: &TaskId) -> Option<&JsonNode<ExecutionNode>> {
         self.execution_graph
             .nodes()
             .iter()

@@ -44,13 +44,13 @@ impl RunnableContext {
         let coordinator_manager = &self.application_descriptor.coordinator_manager;
         let parents = self
             .dag_metadata
-            .get_task_parents(&self.task_descriptor.task_id)
+            .get_execution_parents(&self.task_descriptor.task_id)
             .into_iter()
             .map(|(node, edge)| (node.clone(), edge.clone()))
             .collect();
         let children = self
             .dag_metadata
-            .get_task_children(&self.task_descriptor.task_id)
+            .get_execution_children(&self.task_descriptor.task_id)
             .into_iter()
             .map(|(node, edge)| (node.clone(), edge.clone()))
             .collect();
