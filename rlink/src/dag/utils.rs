@@ -6,15 +6,15 @@ use serde::Serialize;
 
 use crate::dag::Label;
 
-pub(crate) fn get_nodes<N, E>(dag: &Dag<N, E>) -> Vec<N>
-where
-    N: Clone,
-{
-    dag.raw_nodes()
-        .iter()
-        .map(|node| node.weight.clone())
-        .collect()
-}
+// pub(crate) fn get_nodes<N, E>(dag: &Dag<N, E>) -> Vec<N>
+// where
+//     N: Clone,
+// {
+//     dag.raw_nodes()
+//         .iter()
+//         .map(|node| node.weight.clone())
+//         .collect()
+// }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub(crate) struct JsonNode<N>
@@ -25,8 +25,17 @@ where
     label: String,
     #[serde(rename = "type")]
     ty: String,
-    detail: Option<N>,
+    detail: N,
     dept: isize,
+}
+
+impl<N> JsonNode<N>
+where
+    N: Serialize,
+{
+    pub fn detail(&self) -> &N {
+        &self.detail
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -39,8 +48,7 @@ where
     /// target JsonNode id
     target: String,
     label: String,
-    detail: Option<E>,
-    dept: isize,
+    detail: E,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -72,8 +80,7 @@ where
                     source: source_json_node.id.clone(),
                     target: target_json_node.id.clone(),
                     label,
-                    detail: Some(edge.weight.clone()),
-                    dept: -1,
+                    detail: edge.weight.clone(),
                 }
             };
 
@@ -118,7 +125,7 @@ where
             id,
             label,
             ty: ty.to_string(),
-            detail: Some(n.clone()),
+            detail: n.clone(),
             dept: -1,
         }
     }
@@ -136,7 +143,7 @@ where
     pub fn nodes(&self) -> &Vec<JsonNode<N>> {
         &self.nodes
     }
-    pub fn edges(&self) -> &Vec<JsonEdge<E>> {
-        &self.edges
-    }
+    // pub fn edges(&self) -> &Vec<JsonEdge<E>> {
+    //     &self.edges
+    // }
 }

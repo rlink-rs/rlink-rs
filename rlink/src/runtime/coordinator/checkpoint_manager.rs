@@ -5,7 +5,7 @@ use std::time::Duration;
 use crate::api::checkpoint::Checkpoint;
 use crate::api::properties::SystemProperties;
 use crate::api::runtime::{CheckpointId, JobId, OperatorId};
-use crate::dag::DagManager;
+use crate::dag::metadata::DagMetadata;
 use crate::runtime::context::Context;
 use crate::runtime::ApplicationDescriptor;
 use crate::storage::checkpoint::{CheckpointStorage, TCheckpointStorage};
@@ -167,7 +167,7 @@ pub(crate) struct CheckpointManager {
 
 impl CheckpointManager {
     pub fn new(
-        dag_manager: &DagManager,
+        dag_manager: &DagMetadata,
         context: &Context,
         application_descriptor: &ApplicationDescriptor,
     ) -> Self {
@@ -179,13 +179,15 @@ impl CheckpointManager {
             .unwrap_or(None);
 
         let operator_cks = dashmap::DashMap::new();
-        for job_node in dag_manager.job_graph().get_nodes() {
+        for node in dag_manager.job_graph().nodes() {
             let application_name = context.application_name.clone();
             let application_id = context.application_id.clone();
+
+            let job_node = node.detail();
             let parallelism = job_node.parallelism;
             let job_id = job_node.job_id;
 
-            for stream_node in job_node.stream_nodes {
+            for stream_node in &job_node.stream_nodes {
                 let operator_id = stream_node.id;
                 let operator_name = stream_node.operator_name.clone();
                 let storage = checkpoint_backend

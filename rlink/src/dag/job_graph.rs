@@ -8,7 +8,7 @@ use crate::api::operator::DEFAULT_PARALLELISM;
 use crate::api::runtime::{JobId, OperatorId};
 use crate::dag::stream_graph::{StreamGraph, StreamNode};
 use crate::dag::utils::JsonDag;
-use crate::dag::{utils, DagError, Label, OperatorType};
+use crate::dag::{DagError, Label, OperatorType};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum JobEdge {
@@ -83,9 +83,9 @@ impl JobGraph {
         }
     }
 
-    pub(crate) fn get_nodes(&self) -> Vec<JobNode> {
-        utils::get_nodes(&self.dag)
-    }
+    // pub(crate) fn get_nodes(&self) -> Vec<JobNode> {
+    //     utils::get_nodes(&self.dag)
+    // }
 
     pub(crate) fn get_job_node(&self, job_id: JobId) -> Option<JobNode> {
         self.job_node_indies.get(&job_id).map(|node_index| {

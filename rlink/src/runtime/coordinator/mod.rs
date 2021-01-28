@@ -8,6 +8,7 @@ use crate::api::cluster::MetadataStorageType;
 use crate::api::cluster::TaskResourceInfo;
 use crate::api::env::{StreamApp, StreamExecutionEnvironment};
 use crate::api::properties::{Properties, SYSTEM_CLUSTER_MODE};
+use crate::dag::metadata::DagMetadata;
 use crate::dag::DagManager;
 use crate::deployment::TResourceManager;
 use crate::runtime::context::Context;
@@ -79,6 +80,7 @@ where
             "ExecutionGraph: {}",
             dag_manager.execution_graph().to_string()
         );
+        let dag_metadata = DagMetadata::from(&dag_manager);
 
         let mut application_descriptor = self.build_metadata(&dag_manager, &application_properties);
         info!(
@@ -87,10 +89,14 @@ where
         );
 
         let ck_manager =
-            self.build_checkpoint_manager(&dag_manager, application_descriptor.borrow_mut());
+            self.build_checkpoint_manager(&dag_metadata, application_descriptor.borrow_mut());
         info!("CheckpointManager create");
 
-        self.web_serve(application_descriptor.borrow_mut(), ck_manager, dag_manager);
+        self.web_serve(
+            application_descriptor.borrow_mut(),
+            ck_manager,
+            dag_metadata,
+        );
         info!(
             "serve coordinator web ui {}",
             &application_descriptor
@@ -178,7 +184,7 @@ where
 
     fn build_checkpoint_manager(
         &self,
-        dag_manager: &DagManager,
+        dag_manager: &DagMetadata,
         application_descriptor: &mut ApplicationDescriptor,
     ) -> CheckpointManager {
         let mut ck_manager =
@@ -217,7 +223,7 @@ where
         &self,
         application_descriptor: &mut ApplicationDescriptor,
         checkpoint_manager: CheckpointManager,
-        dag_manager: DagManager,
+        dag_metadata: DagMetadata,
     ) {
         let context = self.context.clone();
         let metadata_storage_mode = self.metadata_storage_mode.clone();
@@ -226,7 +232,7 @@ where
             context,
             metadata_storage_mode,
             checkpoint_manager,
-            dag_manager,
+            dag_metadata,
         );
         application_descriptor
             .coordinator_manager
