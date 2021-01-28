@@ -124,17 +124,20 @@ hadoop jar rlink-yarn-client-0.2.0-alpha.5.jar rlink.yarn.client.Client \
   --applicationName rlink-showcase \
   --worker_process_path hdfs://nn/path/to/rlink-showcase \
   --java_manager_path hdfs://nn/path/to/rlink-yarn-manager-0.2.0-alpha.5-jar-with-dependencies.jar \
-  --master_memory_mb 4096 \
-  --master_v_cores 2 \
-  --memory_mb 4096 \
-  --v_cores 2 \
+  --yarn_manager_main_class rlink.yarn.manager.ResourceManagerCli \
+  --master_memory_mb 256 \
+  --master_v_cores 1 \
+  --memory_mb 256 \
+  --v_cores 1 \
   --queue root.default \
   --cluster_mode YARN \
   --manager_type Coordinator \
-  --num_task_managers 80
+  --num_task_managers 80 \
+  --application_process_arg xxx
 ```
 
 ## TODO
 * Stream multiplexing output
 * Reduce operator checkpoint
 * Multi-Stream join
+* Flink Sql support
