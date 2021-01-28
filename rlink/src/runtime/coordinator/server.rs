@@ -134,6 +134,7 @@ async fn serve(
                 .service(web::resource("/heartbeat").route(web::post().to(heartbeat)))
                 .service(web::resource("/context").route(web::get().to(get_context)))
                 .service(web::resource("/metadata").route(web::get().to(get_metadata)))
+                .service(web::resource("/dag_metadata").route(web::get().to(get_dag_metadata)))
                 .service(web::resource("/checkpoint").route(web::post().to(register_checkpoint)))
                 .service(web::resource("/checkpoints").route(web::get().to(get_checkpoint)))
                 .service(web::resource("/dag/stream_graph").route(web::get().to(get_stream_graph)))
@@ -174,6 +175,7 @@ fn index() -> HttpResponse {
             <ul>
                 <li><a href="context">context</a></li>
                 <li><a href="metadata">metadata</a></li>
+                <li><a href="dag_metadata">dag_metadata</a></li>
                 <li><a href="checkpoints">checkpoints</a></li>
                 <li><a href="dag/stream_graph">dag:stream_graph</a></li>
                 <li><a href="dag/job_graph">dag:job_graph</a></li>
@@ -267,6 +269,15 @@ pub(crate) async fn get_checkpoint(
     let cks = ck_manager.get_ref().get();
 
     let response = StdResponse::new(ResponseCode::OK, Some(cks));
+    Ok(HttpResponse::Ok().json(response))
+}
+
+pub(crate) async fn get_dag_metadata(
+    dag_metadata: Data<DagMetadata>,
+) -> Result<HttpResponse, Error> {
+    let json_dag = dag_metadata.get_ref().clone();
+
+    let response = StdResponse::new(ResponseCode::OK, Some(json_dag));
     Ok(HttpResponse::Ok().json(response))
 }
 
