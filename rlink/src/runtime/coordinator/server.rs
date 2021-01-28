@@ -17,7 +17,7 @@ use crate::utils::VERSION;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct WebContext {
-    job_context: crate::runtime::context::Context,
+    app_context: crate::runtime::context::Context,
     metadata_mode: MetadataStorageType,
 }
 
@@ -71,18 +71,18 @@ pub(crate) fn serve_sync(
 }
 
 async fn serve(
-    job_context: crate::runtime::context::Context,
+    app_context: crate::runtime::context::Context,
     metadata_mode: MetadataStorageType,
     rt_address: Arc<Mutex<Option<String>>>,
     checkpoint_manager: CheckpointManager,
     dag_metadata: DagMetadata,
 ) -> std::io::Result<()> {
     let context = WebContext {
-        job_context,
+        app_context,
         metadata_mode,
     };
 
-    let ip = context.job_context.bind_ip.clone();
+    let ip = context.app_context.bind_ip.clone();
 
     let mut rng = rand::thread_rng();
     for _ in 0..30 {
@@ -229,7 +229,7 @@ pub(crate) async fn heartbeat(
 }
 
 pub(crate) async fn get_context(context: Data<WebContext>) -> Result<HttpResponse, Error> {
-    let response = StdResponse::new(ResponseCode::OK, Some(context.job_context.clone()));
+    let response = StdResponse::new(ResponseCode::OK, Some(context.app_context.clone()));
     Ok(HttpResponse::Ok().json(response))
 }
 

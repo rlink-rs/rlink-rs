@@ -39,6 +39,7 @@ where
 
     // after all task fine. and reload `ApplicationDescriptor` from metadata
     let application_descriptor = metadata_loader.get_application_descriptor();
+    metadata_loader.get_dag_metadata();
 
     bootstrap_subscribe_client(&application_descriptor);
     info!("bootstrap subscribe client");

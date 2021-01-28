@@ -88,7 +88,7 @@ where
         WorkerTask {
             context,
             task_descriptor,
-            application_descriptor: metadata_loader.get_job_descriptor_from_cache(),
+            application_descriptor: metadata_loader.get_application_descriptor_from_cache(),
             metadata_loader,
             stream_app,
             stream_env,

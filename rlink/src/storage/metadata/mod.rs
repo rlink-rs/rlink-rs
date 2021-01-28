@@ -7,7 +7,7 @@ use crate::storage::metadata::mem_metadata_storage::MemoryMetadataStorage;
 pub mod mem_metadata_storage;
 
 pub mod metadata_loader;
-pub use metadata_loader::MetadataLoader;
+pub(crate) use metadata_loader::MetadataLoader;
 
 pub trait TMetadataStorage: Debug {
     fn save(&mut self, metadata: ApplicationDescriptor) -> anyhow::Result<()>;
