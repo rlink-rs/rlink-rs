@@ -61,45 +61,45 @@ impl ExecutionGraph {
         }
     }
 
-    pub(crate) fn get_parents(
-        &self,
-        task_id: &TaskId,
-    ) -> Option<Vec<(ExecutionNode, ExecutionEdge)>> {
-        self.node_indies.get(task_id).map(|node_index| {
-            let job_nodes: Vec<(ExecutionNode, ExecutionEdge)> = self
-                .dag
-                .parents(*node_index)
-                .iter(&self.dag)
-                .map(|(edge_index, node_index)| {
-                    (
-                        self.dag.index(node_index).clone(),
-                        self.dag.index(edge_index).clone(),
-                    )
-                })
-                .collect();
-            job_nodes
-        })
-    }
+    // pub(crate) fn get_parents(
+    //     &self,
+    //     task_id: &TaskId,
+    // ) -> Option<Vec<(ExecutionNode, ExecutionEdge)>> {
+    //     self.node_indies.get(task_id).map(|node_index| {
+    //         let job_nodes: Vec<(ExecutionNode, ExecutionEdge)> = self
+    //             .dag
+    //             .parents(*node_index)
+    //             .iter(&self.dag)
+    //             .map(|(edge_index, node_index)| {
+    //                 (
+    //                     self.dag.index(node_index).clone(),
+    //                     self.dag.index(edge_index).clone(),
+    //                 )
+    //             })
+    //             .collect();
+    //         job_nodes
+    //     })
+    // }
 
-    pub(crate) fn get_children(
-        &self,
-        task_id: &TaskId,
-    ) -> Option<Vec<(ExecutionNode, ExecutionEdge)>> {
-        self.node_indies.get(&task_id).map(|node_index| {
-            let job_nodes: Vec<(ExecutionNode, ExecutionEdge)> = self
-                .dag
-                .children(*node_index)
-                .iter(&self.dag)
-                .map(|(edge_index, node_index)| {
-                    (
-                        self.dag.index(node_index).clone(),
-                        self.dag.index(edge_index).clone(),
-                    )
-                })
-                .collect();
-            job_nodes
-        })
-    }
+    // pub(crate) fn get_children(
+    //     &self,
+    //     task_id: &TaskId,
+    // ) -> Option<Vec<(ExecutionNode, ExecutionEdge)>> {
+    //     self.node_indies.get(&task_id).map(|node_index| {
+    //         let job_nodes: Vec<(ExecutionNode, ExecutionEdge)> = self
+    //             .dag
+    //             .children(*node_index)
+    //             .iter(&self.dag)
+    //             .map(|(edge_index, node_index)| {
+    //                 (
+    //                     self.dag.index(node_index).clone(),
+    //                     self.dag.index(edge_index).clone(),
+    //                 )
+    //             })
+    //             .collect();
+    //         job_nodes
+    //     })
+    // }
 
     pub fn build(
         &mut self,

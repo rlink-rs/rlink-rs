@@ -87,46 +87,46 @@ impl JobGraph {
     //     utils::get_nodes(&self.dag)
     // }
 
-    pub(crate) fn get_job_node(&self, job_id: JobId) -> Option<JobNode> {
-        self.job_node_indies.get(&job_id).map(|node_index| {
-            let job_node = self.dag.index(*node_index);
-            job_node.clone()
-        })
-    }
+    // pub(crate) fn get_job_node(&self, job_id: JobId) -> Option<JobNode> {
+    //     self.job_node_indies.get(&job_id).map(|node_index| {
+    //         let job_node = self.dag.index(*node_index);
+    //         job_node.clone()
+    //     })
+    // }
 
-    pub(crate) fn get_parents(&self, job_id: JobId) -> Option<Vec<(JobNode, JobEdge)>> {
-        self.job_node_indies.get(&job_id).map(|node_index| {
-            let job_nodes: Vec<(JobNode, JobEdge)> = self
-                .dag
-                .parents(*node_index)
-                .iter(&self.dag)
-                .map(|(edge_index, node_index)| {
-                    (
-                        self.dag.index(node_index).clone(),
-                        self.dag.index(edge_index).clone(),
-                    )
-                })
-                .collect();
-            job_nodes
-        })
-    }
+    // pub(crate) fn get_parents(&self, job_id: JobId) -> Option<Vec<(JobNode, JobEdge)>> {
+    //     self.job_node_indies.get(&job_id).map(|node_index| {
+    //         let job_nodes: Vec<(JobNode, JobEdge)> = self
+    //             .dag
+    //             .parents(*node_index)
+    //             .iter(&self.dag)
+    //             .map(|(edge_index, node_index)| {
+    //                 (
+    //                     self.dag.index(node_index).clone(),
+    //                     self.dag.index(edge_index).clone(),
+    //                 )
+    //             })
+    //             .collect();
+    //         job_nodes
+    //     })
+    // }
 
-    pub(crate) fn get_children(&self, job_id: JobId) -> Option<Vec<(JobNode, JobEdge)>> {
-        self.job_node_indies.get(&job_id).map(|node_index| {
-            let job_nodes: Vec<(JobNode, JobEdge)> = self
-                .dag
-                .children(*node_index)
-                .iter(&self.dag)
-                .map(|(edge_index, node_index)| {
-                    (
-                        self.dag.index(node_index).clone(),
-                        self.dag.index(edge_index).clone(),
-                    )
-                })
-                .collect();
-            job_nodes
-        })
-    }
+    // pub(crate) fn get_children(&self, job_id: JobId) -> Option<Vec<(JobNode, JobEdge)>> {
+    //     self.job_node_indies.get(&job_id).map(|node_index| {
+    //         let job_nodes: Vec<(JobNode, JobEdge)> = self
+    //             .dag
+    //             .children(*node_index)
+    //             .iter(&self.dag)
+    //             .map(|(edge_index, node_index)| {
+    //                 (
+    //                     self.dag.index(node_index).clone(),
+    //                     self.dag.index(edge_index).clone(),
+    //                 )
+    //             })
+    //             .collect();
+    //         job_nodes
+    //     })
+    // }
 
     pub fn build(&mut self, stream_graph: &StreamGraph) -> Result<(), DagError> {
         self.build_job_nodes(stream_graph)?;

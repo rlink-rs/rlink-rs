@@ -33,6 +33,10 @@ impl<N> JsonNode<N>
 where
     N: Serialize,
 {
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
     pub fn detail(&self) -> &N {
         &self.detail
     }
@@ -49,6 +53,23 @@ where
     target: String,
     label: String,
     detail: E,
+}
+
+impl<E> JsonEdge<E>
+where
+    E: Serialize,
+{
+    pub fn source(&self) -> &str {
+        &self.source
+    }
+
+    pub fn target(&self) -> &str {
+        &self.target
+    }
+
+    pub fn detail(&self) -> &E {
+        &self.detail
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -130,6 +151,10 @@ where
         }
     }
 
+    pub(crate) fn get_node(&self, id: &str) -> Option<&JsonNode<N>> {
+        self.nodes.iter().find(|node| node.id.eq(id))
+    }
+
     pub(crate) fn to_string(&self) -> String {
         serde_json::to_string(self).unwrap_or("".to_string())
     }
@@ -143,7 +168,8 @@ where
     pub fn nodes(&self) -> &Vec<JsonNode<N>> {
         &self.nodes
     }
-    // pub fn edges(&self) -> &Vec<JsonEdge<E>> {
-    //     &self.edges
-    // }
+
+    pub fn edges(&self) -> &Vec<JsonEdge<E>> {
+        &self.edges
+    }
 }

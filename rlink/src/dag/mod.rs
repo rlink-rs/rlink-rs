@@ -11,8 +11,8 @@ use thiserror::Error;
 use crate::api::function::InputSplit;
 use crate::api::operator::StreamOperator;
 use crate::api::runtime::{JobId, OperatorId, TaskId};
-use crate::dag::execution_graph::{ExecutionEdge, ExecutionGraph, ExecutionNode};
-use crate::dag::job_graph::{JobEdge, JobGraph, JobNode};
+use crate::dag::execution_graph::ExecutionGraph;
+use crate::dag::job_graph::JobGraph;
 use crate::dag::physic_graph::PhysicGraph;
 use crate::dag::stream_graph::{StreamGraph, StreamNode};
 
@@ -177,34 +177,34 @@ impl DagManager {
         &self.physic_graph
     }
 
-    pub fn get_stream(&self, operator_id: OperatorId) -> Option<StreamNode> {
-        self.stream_graph
-            .get_stream_node_by_operator_id(operator_id)
-            .map(|stream_node| stream_node.clone())
-    }
+    // pub fn get_stream(&self, operator_id: OperatorId) -> Option<StreamNode> {
+    //     self.stream_graph
+    //         .get_stream_node_by_operator_id(operator_id)
+    //         .map(|stream_node| stream_node.clone())
+    // }
 
-    #[inline]
-    pub fn get_job_node(&self, task_id: &TaskId) -> Option<JobNode> {
-        self.job_graph.get_job_node(task_id.job_id)
-    }
+    // #[inline]
+    // pub fn get_job_node(&self, task_id: &TaskId) -> Option<JobNode> {
+    //     self.job_graph.get_job_node(task_id.job_id)
+    // }
 
-    #[inline]
-    pub(crate) fn get_job_parents(&self, job_id: JobId) -> Vec<(JobNode, JobEdge)> {
-        self.job_graph.get_parents(job_id).unwrap_or(vec![])
-    }
+    // #[inline]
+    // pub(crate) fn get_job_parents(&self, job_id: JobId) -> Vec<(JobNode, JobEdge)> {
+    //     self.job_graph.get_parents(job_id).unwrap_or(vec![])
+    // }
 
-    #[inline]
-    pub(crate) fn get_job_children(&self, job_id: JobId) -> Vec<(JobNode, JobEdge)> {
-        self.job_graph.get_children(job_id).unwrap_or(vec![])
-    }
+    // #[inline]
+    // pub(crate) fn get_job_children(&self, job_id: JobId) -> Vec<(JobNode, JobEdge)> {
+    //     self.job_graph.get_children(job_id).unwrap_or(vec![])
+    // }
 
-    pub fn get_task_parents(&self, task_id: &TaskId) -> Vec<(ExecutionNode, ExecutionEdge)> {
-        self.execution_graph.get_parents(task_id).unwrap_or(vec![])
-    }
+    // pub fn get_task_parents(&self, task_id: &TaskId) -> Vec<(ExecutionNode, ExecutionEdge)> {
+    //     self.execution_graph.get_parents(task_id).unwrap_or(vec![])
+    // }
 
-    pub fn get_task_children(&self, task_id: &TaskId) -> Vec<(ExecutionNode, ExecutionEdge)> {
-        self.execution_graph.get_children(task_id).unwrap_or(vec![])
-    }
+    // pub fn get_task_children(&self, task_id: &TaskId) -> Vec<(ExecutionNode, ExecutionEdge)> {
+    //     self.execution_graph.get_children(task_id).unwrap_or(vec![])
+    // }
 }
 
 #[cfg(test)]

@@ -1,7 +1,5 @@
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::ops::Deref;
 use std::thread::JoinHandle;
 
 use crate::api::element::{Element, Record};
@@ -10,7 +8,7 @@ use crate::api::function::KeySelectorFunction;
 use crate::api::operator::{DefaultStreamOperator, StreamOperator};
 use crate::api::runtime::{JobId, OperatorId};
 use crate::dag::metadata::DagMetadata;
-use crate::dag::{DagManager, OperatorType};
+use crate::dag::OperatorType;
 use crate::runtime::context::Context;
 use crate::runtime::timer::WindowTimer;
 use crate::runtime::worker::runnable::co_process_runnable::CoProcessRunnable;
@@ -108,14 +106,13 @@ where
             .build_stream(application_properties, self.stream_env.borrow_mut());
 
         let mut raw_stream_graph = self.stream_env.stream_manager.stream_graph.borrow_mut();
-        let dag_manager = DagManager::try_from(raw_stream_graph.deref())?;
         let operators = raw_stream_graph.pop_operators();
 
-        let mut operator_invoke_chain = self.build_invoke_chain(&dag_manager, operators);
+        let mut operator_invoke_chain = self.build_invoke_chain(operators);
         debug!("Invoke: {:?}", operator_invoke_chain);
 
         let runnable_context = RunnableContext {
-            dag_manager,
+            dag_metadata: self.dag_metadata.clone(),
             application_descriptor: self.application_descriptor.clone(),
             task_descriptor: self.task_descriptor.clone(),
             window_timer: self.window_timer.clone(),
@@ -135,11 +132,11 @@ where
 
     fn build_invoke_chain(
         &self,
-        dag_manager: &DagManager,
         mut operators: HashMap<OperatorId, StreamOperator>,
     ) -> Box<dyn Runnable> {
-        let job_node = dag_manager
-            .get_job_node(&self.task_descriptor.task_id)
+        let job_node = self
+            .dag_metadata
+            .get_job_node(self.task_descriptor.task_id.job_id)
             .expect(format!("Job={:?} is not found", &self.task_descriptor).as_str());
 
         let mut invoke_operators = Vec::new();
@@ -178,11 +175,8 @@ where
                     op
                 }
                 StreamOperator::StreamReduce(stream_operator) => {
-                    let stream_key_by = self.get_dependency_key_by(
-                        &dag_manager,
-                        operators.borrow_mut(),
-                        job_node.job_id,
-                    );
+                    let stream_key_by =
+                        self.get_dependency_key_by(operators.borrow_mut(), job_node.job_id);
                     let op = ReduceRunnable::new(operator_id, stream_key_by, stream_operator, None);
                     let op: Box<dyn Runnable> = Box::new(op);
                     op
@@ -224,11 +218,10 @@ where
 
     fn get_dependency_key_by(
         &self,
-        dag_manager: &DagManager,
         operators: &mut HashMap<OperatorId, StreamOperator>,
         job_id: JobId,
     ) -> Option<DefaultStreamOperator<dyn KeySelectorFunction>> {
-        let job_parents = dag_manager.get_job_parents(job_id);
+        let job_parents = self.dag_metadata.get_job_parents(job_id);
         if job_parents.len() == 0 {
             error!("key by not found");
             None
@@ -236,7 +229,7 @@ where
             error!("multi key by parents");
             None
         } else {
-            let (job_node, _) = &job_parents[0];
+            let (job_node, _) = job_parents[0];
             let stream_node = job_node
                 .stream_nodes
                 .iter()

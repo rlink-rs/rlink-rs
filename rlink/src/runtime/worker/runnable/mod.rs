@@ -6,8 +6,8 @@ use crate::api::element::Element;
 use crate::api::properties::SystemProperties;
 use crate::api::runtime::{CheckpointId, OperatorId};
 use crate::dag::job_graph::{JobEdge, JobNode};
+use crate::dag::metadata::DagMetadata;
 use crate::dag::stream_graph::StreamNode;
-use crate::dag::DagManager;
 use crate::runtime::timer::WindowTimer;
 use crate::runtime::worker::FunctionContext;
 use crate::runtime::{ApplicationDescriptor, TaskDescriptor};
@@ -33,7 +33,7 @@ pub(crate) use window_assigner_runnable::WindowAssignerRunnable;
 
 #[derive(Clone, Debug)]
 pub(crate) struct RunnableContext {
-    pub(crate) dag_manager: DagManager,
+    pub(crate) dag_metadata: DagMetadata,
     pub(crate) application_descriptor: ApplicationDescriptor,
     pub(crate) task_descriptor: TaskDescriptor,
     pub(crate) window_timer: WindowTimer,
@@ -42,6 +42,19 @@ pub(crate) struct RunnableContext {
 impl RunnableContext {
     pub(crate) fn to_fun_context(&self, operator_id: OperatorId) -> FunctionContext {
         let coordinator_manager = &self.application_descriptor.coordinator_manager;
+        let parents = self
+            .dag_metadata
+            .get_task_parents(&self.task_descriptor.task_id)
+            .into_iter()
+            .map(|(node, edge)| (node.clone(), edge.clone()))
+            .collect();
+        let children = self
+            .dag_metadata
+            .get_task_children(&self.task_descriptor.task_id)
+            .into_iter()
+            .map(|(node, edge)| (node.clone(), edge.clone()))
+            .collect();
+
         FunctionContext {
             application_id: coordinator_manager.application_id.clone(),
             application_properties: coordinator_manager.application_properties.clone(),
@@ -50,12 +63,8 @@ impl RunnableContext {
             checkpoint_id: self.task_descriptor.checkpoint_id,
             checkpoint_handle: self.task_descriptor.checkpoint_handle.clone(),
 
-            parents: self
-                .dag_manager
-                .get_task_parents(&self.task_descriptor.task_id),
-            children: self
-                .dag_manager
-                .get_task_children(&self.task_descriptor.task_id),
+            parents,
+            children,
         }
     }
 
@@ -81,7 +90,7 @@ impl RunnableContext {
     }
 
     pub(crate) fn get_parents_parallelism(&self) -> Vec<u16> {
-        self.dag_manager
+        self.dag_metadata
             .get_job_parents(self.task_descriptor.task_id.job_id)
             .iter()
             .map(|(job_node, _)| job_node.parallelism)
@@ -94,27 +103,23 @@ impl RunnableContext {
     }
 
     pub(crate) fn get_children_parallelism(&self) -> Vec<u16> {
-        self.dag_manager
+        self.dag_metadata
             .get_job_children(self.task_descriptor.task_id.job_id)
-            .iter()
+            .into_iter()
             .map(|(job_node, _)| job_node.parallelism)
             .collect()
     }
 
     pub(crate) fn get_parent_jobs(&self) -> Vec<(JobNode, JobEdge)> {
-        self.dag_manager
+        self.dag_metadata
             .get_job_parents(self.task_descriptor.task_id.job_id)
-            .iter()
+            .into_iter()
             .map(|(job_node, job_edge)| (job_node.clone(), job_edge.clone()))
             .collect()
     }
 
-    // pub(crate) fn get_parent_streams(&self, operator_id: u32) -> Vec<StreamNode> {
-    //     self.dag_manager.get_stream_parents(operator_id)
-    // }
-
     pub(crate) fn get_stream(&self, operator_id: OperatorId) -> StreamNode {
-        self.dag_manager.get_stream(operator_id).unwrap()
+        self.dag_metadata.get_stream(operator_id).unwrap().clone()
     }
 }
 
