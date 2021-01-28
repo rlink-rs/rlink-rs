@@ -6,6 +6,7 @@ use crate::api::function::InputSplit;
 use crate::api::properties::Properties;
 use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::utils::panic::panic_notify;
+use std::sync::Arc;
 
 pub mod cluster;
 pub mod context;
@@ -151,5 +152,5 @@ where
     let context = context::Context::parse_node_arg(stream_env.application_name.as_str())?;
     info!("Context: {:?}", context);
 
-    cluster::run_task(context, stream_env, stream_app)
+    cluster::run_task(Arc::new(context), stream_env, stream_app)
 }

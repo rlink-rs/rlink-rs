@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::api::checkpoint::FunctionSnapshotContext;
@@ -33,8 +34,8 @@ pub(crate) use window_assigner_runnable::WindowAssignerRunnable;
 
 #[derive(Clone, Debug)]
 pub(crate) struct RunnableContext {
-    pub(crate) dag_metadata: DagMetadata,
-    pub(crate) application_descriptor: ApplicationDescriptor,
+    pub(crate) dag_metadata: Arc<DagMetadata>,
+    pub(crate) application_descriptor: Arc<ApplicationDescriptor>,
     pub(crate) task_descriptor: TaskDescriptor,
     pub(crate) window_timer: WindowTimer,
 }

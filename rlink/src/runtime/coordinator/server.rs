@@ -14,15 +14,16 @@ use crate::runtime::TaskManagerStatus;
 use crate::storage::metadata::MetadataStorage;
 use crate::storage::metadata::TMetadataStorage;
 use crate::utils::VERSION;
+use std::ops::Deref;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub(crate) struct WebContext {
-    app_context: crate::runtime::context::Context,
+    app_context: Arc<crate::runtime::context::Context>,
     metadata_mode: MetadataStorageType,
 }
 
 pub(crate) fn web_launch(
-    context: crate::runtime::context::Context,
+    context: Arc<crate::runtime::context::Context>,
     metadata_mode: MetadataStorageType,
     checkpoint_manager: CheckpointManager,
     dag_metadata: DagMetadata,
@@ -53,7 +54,7 @@ pub(crate) fn web_launch(
 }
 
 pub(crate) fn serve_sync(
-    job_context: crate::runtime::context::Context,
+    job_context: Arc<crate::runtime::context::Context>,
     metadata_mode: MetadataStorageType,
     address: Arc<Mutex<Option<String>>>,
     checkpoint_manager: CheckpointManager,
@@ -71,7 +72,7 @@ pub(crate) fn serve_sync(
 }
 
 async fn serve(
-    app_context: crate::runtime::context::Context,
+    app_context: Arc<crate::runtime::context::Context>,
     metadata_mode: MetadataStorageType,
     rt_address: Arc<Mutex<Option<String>>>,
     checkpoint_manager: CheckpointManager,
@@ -231,7 +232,7 @@ pub(crate) async fn heartbeat(
 }
 
 pub(crate) async fn get_context(context: Data<WebContext>) -> Result<HttpResponse, Error> {
-    let response = StdResponse::new(ResponseCode::OK, Some(context.app_context.clone()));
+    let response = StdResponse::new(ResponseCode::OK, Some(context.app_context.deref().clone()));
     Ok(HttpResponse::Ok().json(response))
 }
 

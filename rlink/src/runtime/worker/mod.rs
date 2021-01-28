@@ -17,6 +17,7 @@ use crate::runtime::worker::runnable::{
     SinkRunnable, SourceRunnable, WatermarkAssignerRunnable, WindowAssignerRunnable,
 };
 use crate::runtime::{ApplicationDescriptor, TaskDescriptor};
+use std::sync::Arc;
 
 pub mod checkpoint;
 pub mod heart_beat;
@@ -25,9 +26,9 @@ pub mod runnable;
 pub(crate) type FunctionContext = crate::api::function::Context;
 
 pub(crate) fn run<S>(
-    context: Context,
-    dag_metadata: DagMetadata,
-    application_descriptor: ApplicationDescriptor,
+    context: Arc<Context>,
+    dag_metadata: Arc<DagMetadata>,
+    application_descriptor: Arc<ApplicationDescriptor>,
     task_descriptor: TaskDescriptor,
     stream_app: S,
     stream_env: &StreamExecutionEnvironment,
@@ -64,9 +65,9 @@ pub struct WorkerTask<S>
 where
     S: StreamApp + 'static,
 {
-    context: Context,
-    dag_metadata: DagMetadata,
-    application_descriptor: ApplicationDescriptor,
+    context: Arc<Context>,
+    dag_metadata: Arc<DagMetadata>,
+    application_descriptor: Arc<ApplicationDescriptor>,
     task_descriptor: TaskDescriptor,
     stream_app: S,
     stream_env: StreamExecutionEnvironment,
@@ -78,9 +79,9 @@ where
     S: StreamApp + 'static,
 {
     pub(crate) fn new(
-        context: Context,
-        dag_metadata: DagMetadata,
-        application_descriptor: ApplicationDescriptor,
+        context: Arc<Context>,
+        dag_metadata: Arc<DagMetadata>,
+        application_descriptor: Arc<ApplicationDescriptor>,
         task_descriptor: TaskDescriptor,
         stream_app: S,
         stream_env: StreamExecutionEnvironment,

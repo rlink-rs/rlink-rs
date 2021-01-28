@@ -1,6 +1,7 @@
 use std::borrow::BorrowMut;
 use std::convert::TryFrom;
 use std::ops::Deref;
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::api::checkpoint::CheckpointHandle;
@@ -33,7 +34,7 @@ where
     S: StreamApp + 'static,
     R: TResourceManager + 'static,
 {
-    context: Context,
+    context: Arc<Context>,
     stream_app: S,
     metadata_storage_mode: MetadataStorageType,
     resource_manager: R,
@@ -46,7 +47,7 @@ where
     R: TResourceManager + 'static,
 {
     pub fn new(
-        context: Context,
+        context: Arc<Context>,
         stream_app: S,
         resource_manager: R,
         stream_env: StreamExecutionEnvironment,

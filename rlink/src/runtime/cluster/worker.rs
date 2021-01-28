@@ -1,4 +1,4 @@
-use std::borrow::BorrowMut;
+use std::borrow::{Borrow, BorrowMut};
 use std::net::SocketAddr;
 use std::thread::JoinHandle;
 use std::time::Duration;
@@ -13,9 +13,11 @@ use crate::runtime::worker::heart_beat::{start_heart_beat_timer, status_heartbea
 use crate::runtime::{worker, ApplicationDescriptor, TaskManagerStatus, WorkerManagerDescriptor};
 use crate::storage::metadata::MetadataLoader;
 use crate::utils;
+use std::ops::Deref;
+use std::sync::Arc;
 
 pub(crate) fn run<S>(
-    context: Context,
+    context: Arc<Context>,
     stream_env: StreamExecutionEnvironment,
     stream_app: S,
 ) -> anyhow::Result<()>
@@ -25,30 +27,30 @@ where
     let mut metadata_loader = MetadataLoader::new(context.coordinator_address.as_str());
 
     let application_descriptor = metadata_loader.get_application_descriptor();
+    info!("preload `ApplicationDescriptor`");
 
     let server_addr = bootstrap_publish_serve(context.bind_ip.to_string());
     info!("bootstrap publish server, listen: {}", server_addr);
 
-    bootstrap_timer_task(&application_descriptor, &context, server_addr);
+    bootstrap_timer_task(&application_descriptor, context.deref(), server_addr);
     info!("bootstrap timer task");
 
     let window_timer = start_window_timer();
     info!("bootstrap window timer");
 
-    waiting_all_task_manager_fine(metadata_loader.borrow_mut());
+    let application_descriptor = waiting_all_task_manager_fine(metadata_loader.borrow_mut());
     info!("all task manager is fine");
 
-    // after all task fine. and reload `ApplicationDescriptor` from metadata
-    let application_descriptor = metadata_loader.get_application_descriptor();
-    let dag_metadata = metadata_loader.get_dag_metadata();
+    let dag_metadata = load_dag_metadata(metadata_loader.borrow_mut());
+    info!("load dag metadata success");
 
-    bootstrap_subscribe_client(&application_descriptor);
+    bootstrap_subscribe_client(application_descriptor.clone());
     info!("bootstrap subscribe client");
 
     let join_handles = run_tasks(
-        &application_descriptor,
-        &dag_metadata,
-        &context,
+        application_descriptor,
+        dag_metadata,
+        context,
         window_timer,
         stream_env,
         stream_app,
@@ -89,8 +91,7 @@ fn bootstrap_publish_serve(bind_ip: String) -> SocketAddr {
     }
 }
 
-fn bootstrap_subscribe_client(application_descriptor: &ApplicationDescriptor) {
-    let application_descriptor = application_descriptor.clone();
+fn bootstrap_subscribe_client(application_descriptor: Arc<ApplicationDescriptor>) {
     utils::thread::spawn("subscribe_client", move || {
         network::run_subscribe(application_descriptor)
     });
@@ -125,22 +126,35 @@ fn bootstrap_timer_task(
     start_report_checkpoint(coordinator_address);
 }
 
-fn waiting_all_task_manager_fine(metadata_loader: &mut MetadataLoader) {
+fn waiting_all_task_manager_fine(
+    metadata_loader: &mut MetadataLoader,
+) -> Arc<ApplicationDescriptor> {
+    Arc::new(waiting_all_task_manager_fine0(metadata_loader))
+}
+
+fn waiting_all_task_manager_fine0(metadata_loader: &mut MetadataLoader) -> ApplicationDescriptor {
     loop {
-        let job_descriptor = metadata_loader.get_application_descriptor();
-        match job_descriptor.coordinator_manager.coordinator_status {
+        let application_descriptor = metadata_loader.get_application_descriptor();
+        match application_descriptor
+            .coordinator_manager
+            .coordinator_status
+        {
             TaskManagerStatus::Registered => {
-                break;
+                return application_descriptor;
             }
             _ => std::thread::sleep(Duration::from_secs(2)),
         }
     }
 }
 
+fn load_dag_metadata(metadata_loader: &mut MetadataLoader) -> Arc<DagMetadata> {
+    Arc::new(metadata_loader.get_dag_metadata())
+}
+
 fn run_tasks<S>(
-    application_descriptor: &ApplicationDescriptor,
-    dag_metadata: &DagMetadata,
-    context: &Context,
+    application_descriptor: Arc<ApplicationDescriptor>,
+    dag_metadata: Arc<DagMetadata>,
+    context: Arc<Context>,
     window_timer: WindowTimer,
     stream_env: StreamExecutionEnvironment,
     stream_app: S,
@@ -151,7 +165,7 @@ where
     let task_manager_id = context.task_manager_id.as_str();
     // todo error check
     let task_manager_descriptors =
-        get_task_manager_descriptor(task_manager_id, &application_descriptor).unwrap();
+        get_task_manager_descriptor(task_manager_id, application_descriptor.borrow()).unwrap();
 
     task_manager_descriptors
         .task_descriptors

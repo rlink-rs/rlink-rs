@@ -7,6 +7,7 @@ use crate::deployment::standalone::StandaloneResourceManager;
 use crate::deployment::yarn::YarnResourceManager;
 use crate::runtime::context::Context;
 use crate::runtime::{ApplicationDescriptor, ClusterMode};
+use std::sync::Arc;
 
 pub mod local;
 pub mod standalone;
@@ -50,7 +51,7 @@ pub(crate) enum ResourceManager {
 }
 
 impl ResourceManager {
-    pub fn new(context: &Context) -> Self {
+    pub fn new(context: Arc<Context>) -> Self {
         match context.cluster_mode {
             ClusterMode::Local => {
                 ResourceManager::LocalResourceManager(LocalResourceManager::new(context.clone()))

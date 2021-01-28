@@ -79,11 +79,11 @@ fn subscribe_post(channel_key: ChannelKey, sender: ElementSender) {
     c.0.send((channel_key, sender)).unwrap()
 }
 
-pub(crate) fn run_subscribe(application_descriptor: ApplicationDescriptor) {
+pub(crate) fn run_subscribe(application_descriptor: Arc<ApplicationDescriptor>) {
     get_runtime().block_on(subscribe_listen(application_descriptor));
 }
 
-async fn subscribe_listen(application_descriptor: ApplicationDescriptor) {
+async fn subscribe_listen(application_descriptor: Arc<ApplicationDescriptor>) {
     let c: &(
         Sender<(ChannelKey, ElementSender)>,
         Receiver<(ChannelKey, ElementSender)>,
