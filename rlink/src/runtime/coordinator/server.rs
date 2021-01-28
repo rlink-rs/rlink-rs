@@ -235,7 +235,7 @@ pub(crate) async fn get_context(context: Data<WebContext>) -> Result<HttpRespons
 
 pub(crate) async fn get_metadata(context: Data<WebContext>) -> Result<HttpResponse, Error> {
     let metadata_storage = MetadataStorage::new(&context.metadata_mode);
-    let job_descriptor = metadata_storage.read_job_descriptor().unwrap();
+    let job_descriptor = metadata_storage.load().unwrap();
 
     let response = StdResponse::new(ResponseCode::OK, Some(job_descriptor));
     Ok(HttpResponse::Ok().json(response))

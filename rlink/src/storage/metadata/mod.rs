@@ -11,12 +11,10 @@ pub mod metadata_loader;
 pub use metadata_loader::MetadataLoader;
 
 pub trait TMetadataStorage: Debug {
-    fn save_job_descriptor(
-        &mut self,
-        metadata: ApplicationDescriptor,
-    ) -> Result<(), Box<dyn Error + Send + Sync>>;
-    fn delete_job_descriptor(&mut self) -> Result<(), Box<dyn Error + Send + Sync>>;
-    fn read_job_descriptor(&self) -> Result<ApplicationDescriptor, Box<dyn Error + Send + Sync>>;
+    fn save(&mut self, metadata: ApplicationDescriptor)
+        -> Result<(), Box<dyn Error + Send + Sync>>;
+    fn delete(&mut self) -> Result<(), Box<dyn Error + Send + Sync>>;
+    fn load(&self) -> Result<ApplicationDescriptor, Box<dyn Error + Send + Sync>>;
     fn update_job_status(
         &self,
         job_manager_status: TaskManagerStatus,
@@ -47,26 +45,24 @@ impl MetadataStorage {
 }
 
 impl TMetadataStorage for MetadataStorage {
-    fn save_job_descriptor(
+    fn save(
         &mut self,
         metadata: ApplicationDescriptor,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         match self {
-            MetadataStorage::MemoryMetadataStorage(storage) => {
-                storage.save_job_descriptor(metadata)
-            }
+            MetadataStorage::MemoryMetadataStorage(storage) => storage.save(metadata),
         }
     }
 
-    fn delete_job_descriptor(&mut self) -> Result<(), Box<dyn Error + Send + Sync>> {
+    fn delete(&mut self) -> Result<(), Box<dyn Error + Send + Sync>> {
         match self {
-            MetadataStorage::MemoryMetadataStorage(storage) => storage.delete_job_descriptor(),
+            MetadataStorage::MemoryMetadataStorage(storage) => storage.delete(),
         }
     }
 
-    fn read_job_descriptor(&self) -> Result<ApplicationDescriptor, Box<dyn Error + Send + Sync>> {
+    fn load(&self) -> Result<ApplicationDescriptor, Box<dyn Error + Send + Sync>> {
         match self {
-            MetadataStorage::MemoryMetadataStorage(storage) => storage.read_job_descriptor(),
+            MetadataStorage::MemoryMetadataStorage(storage) => storage.load(),
         }
     }
 
@@ -102,10 +98,7 @@ impl TMetadataStorage for MetadataStorage {
 pub(crate) fn loop_read_job_descriptor(
     metadata_storage: &MetadataStorage,
 ) -> ApplicationDescriptor {
-    loop_fn!(
-        metadata_storage.read_job_descriptor(),
-        std::time::Duration::from_secs(2)
-    )
+    loop_fn!(metadata_storage.load(), std::time::Duration::from_secs(2))
 }
 
 pub(crate) fn loop_save_job_descriptor(
@@ -113,16 +106,13 @@ pub(crate) fn loop_save_job_descriptor(
     application_descriptor: ApplicationDescriptor,
 ) {
     loop_fn!(
-        metadata_storage.save_job_descriptor(application_descriptor.clone()),
+        metadata_storage.save(application_descriptor.clone()),
         std::time::Duration::from_secs(2)
     );
 }
 
 pub(crate) fn loop_delete_job_descriptor(metadata_storage: &mut MetadataStorage) {
-    loop_fn!(
-        metadata_storage.delete_job_descriptor(),
-        std::time::Duration::from_secs(2)
-    );
+    loop_fn!(metadata_storage.delete(), std::time::Duration::from_secs(2));
 }
 
 pub(crate) fn loop_update_job_status(

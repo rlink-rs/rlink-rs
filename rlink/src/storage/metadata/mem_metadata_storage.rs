@@ -19,7 +19,7 @@ impl MemoryMetadataStorage {
 }
 
 impl TMetadataStorage for MemoryMetadataStorage {
-    fn save_job_descriptor(
+    fn save(
         &mut self,
         metadata: ApplicationDescriptor,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -32,7 +32,7 @@ impl TMetadataStorage for MemoryMetadataStorage {
         Ok(())
     }
 
-    fn delete_job_descriptor(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    fn delete(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut lock = METADATA_STORAGE
             .lock()
             .expect("METADATA_STORAGE lock failed");
@@ -42,9 +42,7 @@ impl TMetadataStorage for MemoryMetadataStorage {
         Ok(())
     }
 
-    fn read_job_descriptor(
-        &self,
-    ) -> Result<ApplicationDescriptor, Box<dyn std::error::Error + Send + Sync>> {
+    fn load(&self) -> Result<ApplicationDescriptor, Box<dyn std::error::Error + Send + Sync>> {
         let lock = METADATA_STORAGE
             .lock()
             .expect("METADATA_STORAGE lock failed");
