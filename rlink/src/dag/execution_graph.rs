@@ -87,11 +87,10 @@ impl ExecutionGraph {
                 .get_mut(&source_stream_node.id)
                 .ok_or(DagError::OperatorNotFound(source_stream_node.id))?;
             if let StreamOperator::StreamSource(op) = operator {
-                // todo replace `unwrap` with ?
                 let input_splits = op
                     .operator_fn
                     .create_input_splits(job_node.parallelism)
-                    .unwrap();
+                    .map_err(|e| DagError::OtherApiError(e))?;
                 if input_splits.len() != job_node.parallelism as usize {
                     return Err(DagError::IllegalInputSplitSize(format!(
                         "{}'s parallelism = {}, but input_splits size = {}",

@@ -23,6 +23,7 @@ pub(crate) mod physic_graph;
 pub(crate) mod stream_graph;
 pub(crate) mod utils;
 
+use crate::api;
 pub(crate) use stream_graph::RawStreamGraph;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -115,6 +116,8 @@ pub enum DagError {
     JobNotFound(JobId),
     #[error("job parallelism not found")]
     JobParallelismNotFound,
+    #[error(transparent)]
+    OtherApiError(#[from] api::Error),
 }
 
 pub(crate) trait Label {
