@@ -1,4 +1,3 @@
-use std::convert::TryFrom;
 use std::sync::Mutex;
 
 use crate::runtime::{ApplicationDescriptor, TaskManagerStatus};
@@ -19,10 +18,7 @@ impl MemoryMetadataStorage {
 }
 
 impl TMetadataStorage for MemoryMetadataStorage {
-    fn save(
-        &mut self,
-        metadata: ApplicationDescriptor,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    fn save(&mut self, metadata: ApplicationDescriptor) -> anyhow::Result<()> {
         let mut lock = METADATA_STORAGE
             .lock()
             .expect("METADATA_STORAGE lock failed");
@@ -32,7 +28,7 @@ impl TMetadataStorage for MemoryMetadataStorage {
         Ok(())
     }
 
-    fn delete(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    fn delete(&mut self) -> anyhow::Result<()> {
         let mut lock = METADATA_STORAGE
             .lock()
             .expect("METADATA_STORAGE lock failed");
@@ -42,7 +38,7 @@ impl TMetadataStorage for MemoryMetadataStorage {
         Ok(())
     }
 
-    fn load(&self) -> Result<ApplicationDescriptor, Box<dyn std::error::Error + Send + Sync>> {
+    fn load(&self) -> anyhow::Result<ApplicationDescriptor> {
         let lock = METADATA_STORAGE
             .lock()
             .expect("METADATA_STORAGE lock failed");
@@ -52,7 +48,7 @@ impl TMetadataStorage for MemoryMetadataStorage {
     fn update_application_status(
         &self,
         job_manager_status: TaskManagerStatus,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    ) -> anyhow::Result<()> {
         let mut lock = METADATA_STORAGE
             .lock()
             .expect("METADATA_STORAGE lock failed");
@@ -69,7 +65,7 @@ impl TMetadataStorage for MemoryMetadataStorage {
         task_manager_address: &str,
         task_manager_status: TaskManagerStatus,
         metrics_address: &str,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    ) -> anyhow::Result<()> {
         let mut update_success = false;
 
         let mut lock = METADATA_STORAGE
@@ -98,11 +94,7 @@ impl TMetadataStorage for MemoryMetadataStorage {
                 "TaskManager(task_manager_id={}) metadata not found",
                 task_manager_id
             );
-            Err(Box::try_from(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "metadata not found",
-            ))
-            .unwrap())
+            Err(anyhow!("metadata not found"))
         }
     }
 }

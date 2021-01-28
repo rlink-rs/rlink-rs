@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::fmt::Debug;
 
 use crate::api::cluster::MetadataStorageType;
@@ -11,21 +10,20 @@ pub mod metadata_loader;
 pub use metadata_loader::MetadataLoader;
 
 pub trait TMetadataStorage: Debug {
-    fn save(&mut self, metadata: ApplicationDescriptor)
-        -> Result<(), Box<dyn Error + Send + Sync>>;
-    fn delete(&mut self) -> Result<(), Box<dyn Error + Send + Sync>>;
-    fn load(&self) -> Result<ApplicationDescriptor, Box<dyn Error + Send + Sync>>;
+    fn save(&mut self, metadata: ApplicationDescriptor) -> anyhow::Result<()>;
+    fn delete(&mut self) -> anyhow::Result<()>;
+    fn load(&self) -> anyhow::Result<ApplicationDescriptor>;
     fn update_application_status(
         &self,
         job_manager_status: TaskManagerStatus,
-    ) -> Result<(), Box<dyn Error + Send + Sync>>;
+    ) -> anyhow::Result<()>;
     fn update_task_manager_status(
         &self,
         task_manager_id: &str,
         task_manager_address: &str,
         task_manager_status: TaskManagerStatus,
         metrics_address: &str,
-    ) -> Result<(), Box<dyn Error + Send + Sync>>;
+    ) -> anyhow::Result<()>;
 }
 
 #[derive(Debug)]
@@ -45,22 +43,19 @@ impl MetadataStorage {
 }
 
 impl TMetadataStorage for MetadataStorage {
-    fn save(
-        &mut self,
-        metadata: ApplicationDescriptor,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
+    fn save(&mut self, metadata: ApplicationDescriptor) -> anyhow::Result<()> {
         match self {
             MetadataStorage::MemoryMetadataStorage(storage) => storage.save(metadata),
         }
     }
 
-    fn delete(&mut self) -> Result<(), Box<dyn Error + Send + Sync>> {
+    fn delete(&mut self) -> anyhow::Result<()> {
         match self {
             MetadataStorage::MemoryMetadataStorage(storage) => storage.delete(),
         }
     }
 
-    fn load(&self) -> Result<ApplicationDescriptor, Box<dyn Error + Send + Sync>> {
+    fn load(&self) -> anyhow::Result<ApplicationDescriptor> {
         match self {
             MetadataStorage::MemoryMetadataStorage(storage) => storage.load(),
         }
@@ -69,7 +64,7 @@ impl TMetadataStorage for MetadataStorage {
     fn update_application_status(
         &self,
         job_manager_status: TaskManagerStatus,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
+    ) -> anyhow::Result<()> {
         match self {
             MetadataStorage::MemoryMetadataStorage(storage) => {
                 storage.update_application_status(job_manager_status)
@@ -83,7 +78,7 @@ impl TMetadataStorage for MetadataStorage {
         task_manager_address: &str,
         task_manager_status: TaskManagerStatus,
         metrics_address: &str,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
+    ) -> anyhow::Result<()> {
         match self {
             MetadataStorage::MemoryMetadataStorage(storage) => storage.update_task_manager_status(
                 task_manager_id,
