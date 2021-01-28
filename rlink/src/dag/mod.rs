@@ -141,7 +141,7 @@ impl<'a> TryFrom<&'a RawStreamGraph> for DagManager {
         job_graph.build(&stream_graph)?;
         println!(
             "{}",
-            serde_json::to_string(&crate::dag::utils::JsonDag::dag_json(&job_graph.dag)).unwrap()
+            serde_json::to_string(&crate::dag::utils::JsonDag::from(&job_graph.dag)).unwrap()
         );
 
         let mut execution_graph = ExecutionGraph::new();
@@ -284,27 +284,18 @@ mod tests {
         {
             let dag = &dag_manager.stream_graph().dag;
             println!("{:?}", dag);
-            println!(
-                "{}",
-                serde_json::to_string(&JsonDag::dag_json(dag)).unwrap()
-            )
+            println!("{}", serde_json::to_string(&JsonDag::from(dag)).unwrap())
         }
         {
             let dag = &dag_manager.job_graph().dag;
             println!("{:?}", dag);
-            println!(
-                "{}",
-                serde_json::to_string(&JsonDag::dag_json(dag)).unwrap()
-            )
+            println!("{}", serde_json::to_string(&JsonDag::from(dag)).unwrap())
         }
 
         {
             let dag = &dag_manager.execution_graph().dag;
             println!("{:?}", dag);
-            println!(
-                "{}",
-                serde_json::to_string(&JsonDag::dag_json(dag)).unwrap()
-            )
+            println!("{}", serde_json::to_string(&JsonDag::from(dag)).unwrap())
         }
 
         println!("{:?}", &dag_manager.physic_graph());

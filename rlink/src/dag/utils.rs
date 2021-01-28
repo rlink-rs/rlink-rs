@@ -53,6 +53,42 @@ where
     edges: Vec<JsonEdge<E>>,
 }
 
+impl<'a, N, E> From<&'a Dag<N, E>> for JsonDag<N, E>
+where
+    N: Clone + Label + Serialize,
+    E: Clone + Label + Serialize,
+{
+    fn from(dag: &'a Dag<N, E, u32>) -> Self {
+        let mut node_map = HashMap::new();
+        let mut edges = Vec::new();
+
+        for edge in dag.raw_edges() {
+            let source_json_node = JsonDag::crate_json_node(dag, edge.source());
+            let target_json_node = JsonDag::crate_json_node(dag, edge.target());
+
+            let json_edge = {
+                let label = edge.weight.get_label();
+                JsonEdge {
+                    source: source_json_node.id.clone(),
+                    target: target_json_node.id.clone(),
+                    label,
+                    detail: Some(edge.weight.clone()),
+                    dept: -1,
+                }
+            };
+
+            node_map.insert(source_json_node.id.clone(), source_json_node);
+            node_map.insert(target_json_node.id.clone(), target_json_node);
+
+            edges.push(json_edge);
+        }
+
+        let nodes = node_map.into_iter().map(|(_, node)| node).collect();
+
+        JsonDag { nodes, edges }
+    }
+}
+
 impl<N, E> JsonDag<N, E>
 where
     N: Clone + Label + Serialize,
@@ -85,36 +121,6 @@ where
             detail: Some(n.clone()),
             dept: -1,
         }
-    }
-
-    pub(crate) fn dag_json(dag: &Dag<N, E>) -> Self {
-        let mut node_map = HashMap::new();
-        let mut edges = Vec::new();
-
-        for edge in dag.raw_edges() {
-            let source_json_node = JsonDag::crate_json_node(dag, edge.source());
-            let target_json_node = JsonDag::crate_json_node(dag, edge.target());
-
-            let json_edge = {
-                let label = edge.weight.get_label();
-                JsonEdge {
-                    source: source_json_node.id.clone(),
-                    target: target_json_node.id.clone(),
-                    label,
-                    detail: Some(edge.weight.clone()),
-                    dept: -1,
-                }
-            };
-
-            node_map.insert(source_json_node.id.clone(), source_json_node);
-            node_map.insert(target_json_node.id.clone(), target_json_node);
-
-            edges.push(json_edge);
-        }
-
-        let nodes = node_map.into_iter().map(|(_, node)| node).collect();
-
-        JsonDag { nodes, edges }
     }
 
     pub(crate) fn to_string(&self) -> String {

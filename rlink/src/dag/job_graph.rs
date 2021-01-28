@@ -342,6 +342,6 @@ impl JobGraph {
     }
 
     pub(crate) fn to_string(&self) -> String {
-        JsonDag::dag_json(&self.dag).to_string()
+        JsonDag::from(&self.dag).to_string()
     }
 }

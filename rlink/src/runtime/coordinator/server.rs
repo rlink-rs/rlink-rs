@@ -274,7 +274,7 @@ pub(crate) async fn get_checkpoint(
 
 pub(crate) async fn get_stream_graph(dag_manager: Data<DagManager>) -> Result<HttpResponse, Error> {
     let dag = &dag_manager.get_ref().stream_graph().dag;
-    let json_dag = JsonDag::dag_json(dag);
+    let json_dag = JsonDag::from(dag);
 
     let response = StdResponse::new(ResponseCode::OK, Some(json_dag));
     Ok(HttpResponse::Ok().json(response))
@@ -282,7 +282,7 @@ pub(crate) async fn get_stream_graph(dag_manager: Data<DagManager>) -> Result<Ht
 
 pub(crate) async fn get_job_graph(dag_manager: Data<DagManager>) -> Result<HttpResponse, Error> {
     let dag = &dag_manager.get_ref().job_graph().dag;
-    let json_dag = JsonDag::dag_json(dag);
+    let json_dag = JsonDag::from(dag);
 
     let response = StdResponse::new(ResponseCode::OK, Some(json_dag));
     Ok(HttpResponse::Ok().json(response))
@@ -292,7 +292,7 @@ pub(crate) async fn get_execution_graph(
     dag_manager: Data<DagManager>,
 ) -> Result<HttpResponse, Error> {
     let dag = &dag_manager.get_ref().execution_graph().dag;
-    let json_dag = JsonDag::dag_json(dag);
+    let json_dag = JsonDag::from(dag);
 
     let response = StdResponse::new(ResponseCode::OK, Some(json_dag));
     Ok(HttpResponse::Ok().json(response))
@@ -307,7 +307,7 @@ pub(crate) async fn get_physic_graph(dag_manager: Data<DagManager>) -> Result<Ht
 
 async fn get_stream_graph_page(dag_manager: Data<DagManager>) -> Result<HttpResponse, Error> {
     let dag = &dag_manager.get_ref().stream_graph().dag;
-    let json_dag = JsonDag::dag_json(dag);
+    let json_dag = JsonDag::from(dag);
 
     let json = serde_json::to_string(&json_dag).unwrap();
     let html = DAG_TEMPLATE.replace("DAG_PLACE_HOLDER", json.as_str());
@@ -317,7 +317,7 @@ async fn get_stream_graph_page(dag_manager: Data<DagManager>) -> Result<HttpResp
 
 async fn get_job_graph_page(dag_manager: Data<DagManager>) -> Result<HttpResponse, Error> {
     let dag = &dag_manager.get_ref().job_graph().dag;
-    let json_dag = JsonDag::dag_json(dag);
+    let json_dag = JsonDag::from(dag);
 
     let json = serde_json::to_string(&json_dag).unwrap();
     let html = DAG_TEMPLATE.replace("DAG_PLACE_HOLDER", json.as_str());
@@ -327,7 +327,7 @@ async fn get_job_graph_page(dag_manager: Data<DagManager>) -> Result<HttpRespons
 
 async fn get_execution_graph_page(dag_manager: Data<DagManager>) -> Result<HttpResponse, Error> {
     let dag = &dag_manager.get_ref().execution_graph().dag;
-    let json_dag = JsonDag::dag_json(dag);
+    let json_dag = JsonDag::from(dag);
 
     let json = serde_json::to_string(&json_dag).unwrap();
     let html = DAG_TEMPLATE.replace("DAG_PLACE_HOLDER", json.as_str());
