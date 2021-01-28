@@ -127,3 +127,16 @@ where
         serde_json::to_string(self).unwrap_or("".to_string())
     }
 }
+
+impl<N, E> JsonDag<N, E>
+where
+    N: Clone + Label + Serialize,
+    E: Clone + Label + Serialize,
+{
+    pub fn nodes(&self) -> &Vec<JsonNode<N>> {
+        &self.nodes
+    }
+    pub fn edges(&self) -> &Vec<JsonEdge<E>> {
+        &self.edges
+    }
+}

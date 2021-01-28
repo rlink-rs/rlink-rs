@@ -13,7 +13,7 @@ use crate::deployment::TResourceManager;
 use crate::runtime::context::Context;
 use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
 use crate::runtime::coordinator::server::web_launch;
-use crate::runtime::coordinator::task_distribution::build_job_descriptor;
+use crate::runtime::coordinator::task_distribution::build_application_descriptor;
 use crate::runtime::{ApplicationDescriptor, TaskManagerStatus};
 use crate::storage::metadata::{
     loop_delete_job_descriptor, loop_read_job_descriptor, loop_save_job_descriptor,
@@ -152,7 +152,7 @@ where
         dag_manager: &DagManager,
         job_properties: &Properties,
     ) -> ApplicationDescriptor {
-        let application_descriptor = build_job_descriptor(
+        let application_descriptor = build_application_descriptor(
             self.stream_env.application_name.as_str(),
             dag_manager,
             job_properties,

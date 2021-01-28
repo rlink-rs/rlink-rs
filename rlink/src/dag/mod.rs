@@ -2,6 +2,7 @@
 //! stream_graph -> job_graph -> execution_graph
 
 use std::borrow::BorrowMut;
+use std::convert::TryFrom;
 use std::fmt::Debug;
 
 use serde::Serialize;
@@ -17,11 +18,11 @@ use crate::dag::stream_graph::{StreamGraph, StreamNode};
 
 pub(crate) mod execution_graph;
 pub(crate) mod job_graph;
+pub(crate) mod metadata;
 pub(crate) mod physic_graph;
 pub(crate) mod stream_graph;
 pub(crate) mod utils;
 
-use std::convert::TryFrom;
 pub(crate) use stream_graph::RawStreamGraph;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
