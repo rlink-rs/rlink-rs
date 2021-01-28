@@ -155,6 +155,36 @@ where
         self.nodes.iter().find(|node| node.id.eq(id))
     }
 
+    pub(crate) fn parents(&self, parent_node_id: &str) -> Vec<(&JsonNode<N>, &JsonEdge<E>)> {
+        self.gets(parent_node_id, true)
+    }
+
+    pub(crate) fn children(&self, child_node_id: &str) -> Vec<(&JsonNode<N>, &JsonEdge<E>)> {
+        self.gets(child_node_id, false)
+    }
+
+    fn gets(&self, node_id: &str, parent: bool) -> Vec<(&JsonNode<N>, &JsonEdge<E>)> {
+        self.edges()
+            .iter()
+            .filter_map(|edge| {
+                let node = if parent {
+                    if edge.target().eq(node_id) {
+                        Some(self.get_node(edge.source()).unwrap())
+                    } else {
+                        None
+                    }
+                } else {
+                    if edge.source().eq(node_id) {
+                        Some(self.get_node(edge.target()).unwrap())
+                    } else {
+                        None
+                    }
+                };
+                node.map(|node| (node, edge))
+            })
+            .collect()
+    }
+
     pub(crate) fn to_string(&self) -> String {
         serde_json::to_string(self).unwrap_or("".to_string())
     }

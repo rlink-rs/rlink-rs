@@ -61,31 +61,28 @@ impl DagMetadata {
     }
 
     pub fn get_job_parents(&self, child_job_id: JobId) -> Vec<(&JobNode, &JobEdge)> {
-        self.get_jobs(child_job_id, true)
-    }
-
-    pub fn get_job_children(&self, parent_job_id: JobId) -> Vec<(&JobNode, &JobEdge)> {
-        self.get_jobs(parent_job_id, false)
-    }
-
-    pub fn get_jobs(&self, job_id: JobId, parent: bool) -> Vec<(&JobNode, &JobEdge)> {
-        match self.get_job_node0(job_id) {
+        match self.get_job_node0(child_job_id) {
             Some(node) => {
                 let job_nodes: Vec<(&JobNode, &JobEdge)> = self
                     .job_graph
-                    .edges()
-                    .iter()
-                    .filter(|edge| {
-                        if parent {
-                            edge.target().eq(node.id())
-                        } else {
-                            edge.source().eq(node.id())
-                        }
-                    })
-                    .map(|edge| {
-                        let node = self.job_graph.get_node(edge.target()).unwrap();
-                        (node, edge)
-                    })
+                    .parents(node.id())
+                    .into_iter()
+                    .map(|(node, edge)| (node.detail(), edge.detail()))
+                    .collect();
+
+                job_nodes
+            }
+            None => vec![],
+        }
+    }
+
+    pub fn get_job_children(&self, parent_job_id: JobId) -> Vec<(&JobNode, &JobEdge)> {
+        match self.get_job_node0(parent_job_id) {
+            Some(node) => {
+                let job_nodes: Vec<(&JobNode, &JobEdge)> = self
+                    .job_graph
+                    .children(node.id())
+                    .into_iter()
                     .map(|(node, edge)| (node.detail(), edge.detail()))
                     .collect();
 
@@ -102,38 +99,31 @@ impl DagMetadata {
         &self,
         child_task_id: &TaskId,
     ) -> Vec<(&ExecutionNode, &ExecutionEdge)> {
-        self.get_executions(child_task_id, true)
+        match self.get_execution_node0(child_task_id) {
+            Some(node) => {
+                let job_nodes: Vec<(&ExecutionNode, &ExecutionEdge)> = self
+                    .execution_graph
+                    .parents(node.id())
+                    .into_iter()
+                    .map(|(node, edge)| (node.detail(), edge.detail()))
+                    .collect();
+
+                job_nodes
+            }
+            None => vec![],
+        }
     }
 
     pub fn get_execution_children(
         &self,
         parent_task_id: &TaskId,
     ) -> Vec<(&ExecutionNode, &ExecutionEdge)> {
-        self.get_executions(parent_task_id, false)
-    }
-
-    fn get_executions(
-        &self,
-        task_id: &TaskId,
-        parent: bool,
-    ) -> Vec<(&ExecutionNode, &ExecutionEdge)> {
-        match self.get_execution_node0(task_id) {
+        match self.get_execution_node0(parent_task_id) {
             Some(node) => {
                 let job_nodes: Vec<(&ExecutionNode, &ExecutionEdge)> = self
                     .execution_graph
-                    .edges()
-                    .iter()
-                    .filter(|edge| {
-                        if parent {
-                            edge.target().eq(node.id())
-                        } else {
-                            edge.source().eq(node.id())
-                        }
-                    })
-                    .map(|edge| {
-                        let node = self.execution_graph.get_node(edge.target()).unwrap();
-                        (node, edge)
-                    })
+                    .children(node.id())
+                    .into_iter()
                     .map(|(node, edge)| (node.detail(), edge.detail()))
                     .collect();
 
