@@ -3,10 +3,11 @@ use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
+use crate::api::checkpoint::FunctionSnapshotContext;
 use crate::api::element::Element;
 use crate::api::function::KeySelectorFunction;
 use crate::api::operator::DefaultStreamOperator;
-use crate::api::runtime::{CheckpointId, OperatorId};
+use crate::api::runtime::OperatorId;
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 use crate::utils;
@@ -124,5 +125,5 @@ impl Runnable for KeyByRunnable {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, _checkpoint_id: CheckpointId) {}
+    fn checkpoint(&mut self, _snapshot_context: FunctionSnapshotContext) {}
 }

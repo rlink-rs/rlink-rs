@@ -1,9 +1,10 @@
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::sync::Arc;
 
+use crate::api::checkpoint::FunctionSnapshotContext;
 use crate::api::element::Element;
 use crate::api::operator::DefaultStreamOperator;
-use crate::api::runtime::{CheckpointId, OperatorId};
+use crate::api::runtime::OperatorId;
 use crate::api::watermark::{Watermark, WatermarkAssigner, MAX_WATERMARK, MIN_WATERMARK};
 use crate::metrics::{register_counter, register_gauge, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
@@ -137,5 +138,5 @@ impl Runnable for WatermarkAssignerRunnable {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, _checkpoint_id: CheckpointId) {}
+    fn checkpoint(&mut self, _snapshot_context: FunctionSnapshotContext) {}
 }

@@ -2,11 +2,11 @@ use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-use crate::api::checkpoint::{Checkpoint, CheckpointHandle};
+use crate::api::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
 use crate::api::element::Element;
 use crate::api::function::OutputFormat;
 use crate::api::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
-use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
+use crate::api::runtime::{OperatorId, TaskId};
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
@@ -86,7 +86,11 @@ impl Runnable for SinkRunnable {
                             .write_element(Element::from(barrier));
                     }
                     FunctionCreator::User => {
-                        self.checkpoint(barrier.checkpoint_id);
+                        let snapshot_context = {
+                            let context = self.context.as_ref().unwrap();
+                            context.get_checkpoint_context(self.operator_id, barrier.checkpoint_id)
+                        };
+                        self.checkpoint(snapshot_context);
                     }
                 }
             }
@@ -128,30 +132,18 @@ impl Runnable for SinkRunnable {
         unimplemented!()
     }
 
-    fn checkpoint(&mut self, checkpoint_id: CheckpointId) {
-        let context = {
-            let context = self.context.as_ref().unwrap();
-            context.get_checkpoint_context(self.operator_id, checkpoint_id)
+    fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext) {
+        let handle = match self.stream_sink.operator_fn.get_checkpoint() {
+            Some(checkpoint) => checkpoint.snapshot_state(&snapshot_context),
+            None => CheckpointHandle::default(),
         };
 
-        let ck = match self.stream_sink.operator_fn.get_checkpoint() {
-            Some(checkpoint) => {
-                let ck_handle = checkpoint.snapshot_state(&context);
-                Checkpoint {
-                    operator_id: context.operator_id,
-                    task_id: self.task_id,
-                    checkpoint_id,
-                    handle: ck_handle,
-                }
-            }
-            None => Checkpoint {
-                operator_id: context.operator_id,
-                task_id: self.task_id,
-                checkpoint_id,
-                handle: CheckpointHandle::default(),
-            },
+        let ck = Checkpoint {
+            operator_id: snapshot_context.operator_id,
+            task_id: self.task_id,
+            checkpoint_id: snapshot_context.checkpoint_id,
+            handle,
         };
-
         submit_checkpoint(ck).map(|ck| {
             error!(
                 "{:?} report checkpoint error. maybe report channel is full, checkpoint: {:?}",

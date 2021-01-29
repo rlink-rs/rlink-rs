@@ -136,5 +136,5 @@ pub(crate) trait Runnable: Debug {
     fn run(&mut self, element: Element);
     fn close(&mut self) -> anyhow::Result<()>;
     fn set_next_runnable(&mut self, next_runnable: Option<Box<dyn Runnable>>);
-    fn checkpoint(&mut self, checkpoint_id: CheckpointId);
+    fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext);
 }

@@ -5,6 +5,7 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use crate::api::backend::KeyedStateBackend;
+use crate::api::checkpoint::FunctionSnapshotContext;
 use crate::api::element::{Barrier, Element, Record, Watermark};
 use crate::api::function::{KeySelectorFunction, ReduceFunction};
 use crate::api::operator::DefaultStreamOperator;
@@ -19,6 +20,7 @@ use crate::utils::date_time::timestamp_str;
 #[derive(Debug)]
 pub(crate) struct ReduceRunnable {
     operator_id: OperatorId,
+    context: Option<RunnableContext>,
     task_number: u16,
     dependency_parallelism: u16,
 
@@ -49,6 +51,7 @@ impl ReduceRunnable {
     ) -> Self {
         ReduceRunnable {
             operator_id,
+            context: None,
             task_number: 0,
             dependency_parallelism: 0,
             stream_key_by,
@@ -69,6 +72,8 @@ impl ReduceRunnable {
 impl Runnable for ReduceRunnable {
     fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
         self.next_runnable.as_mut().unwrap().open(context)?;
+
+        self.context = Some(context.clone());
 
         let fun_context = context.to_fun_context(self.operator_id);
         self.stream_reduce.operator_fn.open(&fun_context)?;
@@ -239,7 +244,12 @@ impl Runnable for ReduceRunnable {
                 if self.current_checkpoint_id == barrier.checkpoint_id {
                     self.reached_barriers.push(barrier);
                     if self.reached_barriers.len() == self.dependency_parallelism as usize {
-                        self.checkpoint(self.current_checkpoint_id);
+                        let checkpoint_id = self.current_checkpoint_id;
+                        let snapshot_context = {
+                            let context = self.context.as_ref().unwrap();
+                            context.get_checkpoint_context(self.operator_id, checkpoint_id)
+                        };
+                        self.checkpoint(snapshot_context);
                     }
 
                     self.current_checkpoint_id = CheckpointId::default();
@@ -276,7 +286,7 @@ impl Runnable for ReduceRunnable {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, _checkpoint_id: CheckpointId) {
+    fn checkpoint(&mut self, _snapshot_context: FunctionSnapshotContext) {
         // foreach self.reached_barriers
     }
 }

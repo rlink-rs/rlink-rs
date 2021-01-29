@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 
+use crate::api::checkpoint::FunctionSnapshotContext;
 use crate::api::element::Element;
 use crate::api::function::CoProcessFunction;
 use crate::api::operator::DefaultStreamOperator;
-use crate::api::runtime::{CheckpointId, JobId, OperatorId};
+use crate::api::runtime::{JobId, OperatorId};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
 #[derive(Debug)]
@@ -105,5 +106,5 @@ impl Runnable for CoProcessRunnable {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, _checkpoint_id: CheckpointId) {}
+    fn checkpoint(&mut self, _snapshot_context: FunctionSnapshotContext) {}
 }

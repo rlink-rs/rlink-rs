@@ -3,7 +3,7 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::api::checkpoint::{Checkpoint, CheckpointHandle};
+use crate::api::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
 use crate::api::element::Element;
 use crate::api::function::{InputFormat, InputSplit};
 use crate::api::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
@@ -194,7 +194,11 @@ impl Runnable for SourceRunnable {
         while let Ok(element) = receiver.recv() {
             if element.is_barrier() {
                 let checkpoint_id = element.as_barrier().checkpoint_id;
-                self.checkpoint(checkpoint_id);
+                let snapshot_context = {
+                    let context = self.context.as_ref().unwrap();
+                    context.get_checkpoint_context(self.operator_id, checkpoint_id)
+                };
+                self.checkpoint(snapshot_context);
             }
 
             self.next_runnable.as_mut().unwrap().run(element);
@@ -213,33 +217,21 @@ impl Runnable for SourceRunnable {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, checkpoint_id: CheckpointId) {
-        let context = {
-            let context = self.context.as_ref().unwrap();
-            context.get_checkpoint_context(self.operator_id, checkpoint_id)
+    fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext) {
+        let handle = match self.stream_source.operator_fn.get_checkpoint() {
+            Some(checkpoint) => checkpoint.snapshot_state(&snapshot_context),
+            None => CheckpointHandle::default(),
         };
 
-        let ck = match self.stream_source.operator_fn.get_checkpoint() {
-            Some(checkpoint) => {
-                let ck_handle = checkpoint.snapshot_state(&context);
-                Checkpoint {
-                    operator_id: context.operator_id,
-                    task_id: self.task_id,
-                    checkpoint_id,
-                    handle: ck_handle,
-                }
-            }
-            None => Checkpoint {
-                operator_id: context.operator_id,
-                task_id: self.task_id,
-                checkpoint_id,
-                handle: CheckpointHandle::default(),
-            },
+        let ck = Checkpoint {
+            operator_id: snapshot_context.operator_id,
+            task_id: self.task_id,
+            checkpoint_id: snapshot_context.checkpoint_id,
+            handle,
         };
-
         submit_checkpoint(ck).map(|ck| {
             error!(
-                "{:?} submit checkpoint error. maybe report channel is full, checkpoint: {:?}",
+                "{:?} report checkpoint error. maybe report channel is full, checkpoint: {:?}",
                 self.operator_id, ck
             )
         });
