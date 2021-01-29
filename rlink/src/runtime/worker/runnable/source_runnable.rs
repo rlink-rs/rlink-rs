@@ -219,9 +219,6 @@ impl Runnable for SourceRunnable {
             context.get_checkpoint_context(self.operator_id, checkpoint_id)
         };
 
-        let fn_name = self.stream_source.operator_fn.get_name().to_string();
-        debug!("begin checkpoint : {}", fn_name);
-
         let ck = match self.stream_source.operator_fn.get_checkpoint() {
             Some(checkpoint) => {
                 let ck_handle = checkpoint.snapshot_state(&context);
@@ -242,8 +239,8 @@ impl Runnable for SourceRunnable {
 
         submit_checkpoint(ck).map(|ck| {
             error!(
-                "{} report checkpoint error. maybe report channel is full, checkpoint: {:?}",
-                fn_name, ck
+                "{:?} submit checkpoint error. maybe report channel is full, checkpoint: {:?}",
+                self.operator_id, ck
             )
         });
     }
