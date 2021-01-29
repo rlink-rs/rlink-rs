@@ -427,7 +427,7 @@ let width = document.getElementById("tree").offsetWidth;
 let height = document.getElementById("tree").offsetHeight;
 // Create a new directed graph
 let g = new dagreD3.graphlib.Graph().setGraph({
-    rankdir: 'TB',
+    rankdir: 'LR',
     edgesep: 100,
     ranksep: 80
 });
@@ -526,9 +526,9 @@ function tooltipOver(d) {
         chartTooltip.select('.chartTooltip-label').text('label：' + d)
     }
     if (g.node(d).name) {
-        chartTooltip.select('.chartTooltip-name').text('名字2：' + g.node(d).name)
+        chartTooltip.select('.chartTooltip-name').text('name2：' + g.node(d).name)
     } else {
-        chartTooltip.select('.chartTooltip-name').text('名字2：' + g.node(d).name)
+        chartTooltip.select('.chartTooltip-name').text('name2：' + g.node(d).name)
     }
 }
 </script>

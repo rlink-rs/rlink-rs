@@ -209,7 +209,7 @@ impl JobGraph {
             }
         }
 
-        // parallelism ==0 check, and inherit to parent's parallelism
+        // parallelism == 0 check, and inherit to parent's parallelism
         loop {
             let no_parallelism_jobs: Vec<(JobId, u16)> = self
                 .job_node_indies
