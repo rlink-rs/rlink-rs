@@ -23,7 +23,7 @@ lazy_static! {
     static ref CK_CHANNEL: CheckpointChannel = CheckpointChannel::new();
 }
 
-pub(crate) fn report_checkpoint(ck: Checkpoint) -> Option<Checkpoint> {
+pub(crate) fn submit_checkpoint(ck: Checkpoint) -> Option<Checkpoint> {
     let ck_channel = &*CK_CHANNEL;
 
     debug!("report checkpoint: {:?}", &ck);

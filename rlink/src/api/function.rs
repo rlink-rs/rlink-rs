@@ -135,11 +135,15 @@ where
 
     fn close(&mut self) -> crate::api::Result<()>;
 
+    fn get_checkpoint(&mut self) -> Option<Box<&mut dyn CheckpointedFunction>> {
+        None
+    }
+
     // todo unsupported. `TwoPhaseCommitSinkFunction`
-    fn begin_transaction(&mut self) {}
-    fn prepare_commit(&mut self) {}
-    fn commit(&mut self) {}
-    fn abort(&mut self) {}
+    // fn begin_transaction(&mut self) {}
+    // fn prepare_commit(&mut self) {}
+    // fn commit(&mut self) {}
+    // fn abort(&mut self) {}
 }
 
 pub trait FlatMapFunction

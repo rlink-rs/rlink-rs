@@ -136,7 +136,7 @@ async fn serve(
                 .service(web::resource("/context").route(web::get().to(get_context)))
                 .service(web::resource("/metadata").route(web::get().to(get_metadata)))
                 .service(web::resource("/dag_metadata").route(web::get().to(get_dag_metadata)))
-                .service(web::resource("/checkpoint").route(web::post().to(register_checkpoint)))
+                .service(web::resource("/checkpoint").route(web::post().to(checkpoint)))
                 .service(web::resource("/checkpoints").route(web::get().to(get_checkpoint)))
                 .service(web::resource("/dag/stream_graph").route(web::get().to(get_stream_graph)))
                 .service(web::resource("/dag/job_graph").route(web::get().to(get_job_graph)))
@@ -244,18 +244,15 @@ pub(crate) async fn get_metadata(context: Data<WebContext>) -> Result<HttpRespon
     Ok(HttpResponse::Ok().json(response))
 }
 
-pub(crate) async fn register_checkpoint(
+pub(crate) async fn checkpoint(
     ck_model: web::Json<Checkpoint>,
     ck_manager: Data<CheckpointManager>,
 ) -> Result<HttpResponse, Error> {
-    debug!(
-        "<<<<<< register checkpoint to coordinator. {:?}",
-        &ck_model.0
-    );
-    let resp = match ck_manager.get_ref().add(ck_model.0) {
+    debug!("submit checkpoint to coordinator. {:?}", &ck_model.0);
+    let resp = match ck_manager.get_ref().apply(ck_model.0) {
         Ok(_) => "ok",
         Err(e) => {
-            error!("register checkpoint error. {}", e);
+            error!("submit checkpoint error. {}", e);
             "error"
         }
     };

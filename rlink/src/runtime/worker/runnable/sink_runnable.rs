@@ -2,18 +2,21 @@ use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
+use crate::api::checkpoint::{Checkpoint, CheckpointHandle};
 use crate::api::element::Element;
 use crate::api::function::OutputFormat;
 use crate::api::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
-use crate::api::runtime::{CheckpointId, OperatorId};
+use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::metrics::{register_counter, Tag};
+use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
 #[derive(Debug)]
 pub(crate) struct SinkRunnable {
     operator_id: OperatorId,
-    task_number: u16,
-    num_tasks: u16,
+    context: Option<RunnableContext>,
+
+    task_id: TaskId,
 
     stream_sink: DefaultStreamOperator<dyn OutputFormat>,
 
@@ -27,8 +30,8 @@ impl SinkRunnable {
     ) -> Self {
         SinkRunnable {
             operator_id,
-            task_number: 0,
-            num_tasks: 0,
+            context: None,
+            task_id: TaskId::default(),
             stream_sink,
             counter: Arc::new(AtomicU64::new(0)),
         }
@@ -37,12 +40,13 @@ impl SinkRunnable {
 
 impl Runnable for SinkRunnable {
     fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
-        self.task_number = context.task_descriptor.task_id.task_number;
-        self.num_tasks = context.task_descriptor.task_id.num_tasks;
+        self.context = Some(context.clone());
+
+        self.task_id = context.task_descriptor.task_id;
 
         info!(
-            "SinkRunnable Opened. task_number={}, num_tasks={}",
-            self.task_number, self.num_tasks
+            "SinkRunnable Opened. operator_id={:?}, task_id={:?}",
+            self.operator_id, self.task_id
         );
 
         let fun_context = context.to_fun_context(self.operator_id);
@@ -124,7 +128,38 @@ impl Runnable for SinkRunnable {
         unimplemented!()
     }
 
-    fn checkpoint(&mut self, _checkpoint_id: CheckpointId) {
-        self.stream_sink.operator_fn.prepare_commit();
+    fn checkpoint(&mut self, checkpoint_id: CheckpointId) {
+        let context = {
+            let context = self.context.as_ref().unwrap();
+            context.get_checkpoint_context(self.operator_id, checkpoint_id)
+        };
+
+        let fn_name = self.stream_sink.operator_fn.get_name().to_string();
+        debug!("begin checkpoint : {}", fn_name);
+
+        let ck = match self.stream_sink.operator_fn.get_checkpoint() {
+            Some(checkpoint) => {
+                let ck_handle = checkpoint.snapshot_state(&context);
+                Checkpoint {
+                    operator_id: context.operator_id,
+                    task_id: self.task_id,
+                    checkpoint_id,
+                    handle: ck_handle,
+                }
+            }
+            None => Checkpoint {
+                operator_id: context.operator_id,
+                task_id: self.task_id,
+                checkpoint_id,
+                handle: CheckpointHandle::default(),
+            },
+        };
+
+        submit_checkpoint(ck).map(|ck| {
+            error!(
+                "{} report checkpoint error. maybe report channel is full, checkpoint: {:?}",
+                fn_name, ck
+            )
+        });
     }
 }

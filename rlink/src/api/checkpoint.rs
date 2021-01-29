@@ -39,6 +39,14 @@ pub struct CheckpointHandle {
     pub handle: String,
 }
 
+impl Default for CheckpointHandle {
+    fn default() -> Self {
+        Self {
+            handle: "".to_string(),
+        }
+    }
+}
+
 /// descriptor a `Checkpoint`
 /// use for network communication between `Coordinator` and `Worker`
 #[derive(Debug, Clone, Serialize, Deserialize)]

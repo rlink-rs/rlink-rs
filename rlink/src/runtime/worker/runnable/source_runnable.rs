@@ -3,7 +3,7 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::api::checkpoint::Checkpoint;
+use crate::api::checkpoint::{Checkpoint, CheckpointHandle};
 use crate::api::element::Element;
 use crate::api::function::{InputFormat, InputSplit};
 use crate::api::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
@@ -12,7 +12,7 @@ use crate::channel::named_channel;
 use crate::channel::sender::ChannelSender;
 use crate::metrics::Tag;
 use crate::runtime::timer::TimerChannel;
-use crate::runtime::worker::checkpoint::report_checkpoint;
+use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
 #[derive(Debug)]
@@ -32,11 +32,10 @@ pub(crate) struct SourceRunnable {
 impl SourceRunnable {
     pub fn new(
         operator_id: OperatorId,
-        input_split: InputSplit,
+        _input_split: InputSplit, // todo remove?
         stream_source: DefaultStreamOperator<dyn InputFormat>,
         next_runnable: Option<Box<dyn Runnable>>,
     ) -> Self {
-        info!("Create SourceRunnable input_split={:?}", &input_split);
         SourceRunnable {
             operator_id,
             context: None,
@@ -162,7 +161,10 @@ impl Runnable for SourceRunnable {
             self.checkpoint_timer = Some(checkpoint_timer);
         }
 
-        info!("Operator(SourceOperator) open");
+        info!(
+            "SourceRunnable Opened, operator_id={:?}, task_id={:?}",
+            self.operator_id, self.task_id
+        );
         Ok(())
     }
 
@@ -217,22 +219,32 @@ impl Runnable for SourceRunnable {
             context.get_checkpoint_context(self.operator_id, checkpoint_id)
         };
 
-        let fn_name = self.stream_source.operator_fn.get_name();
+        let fn_name = self.stream_source.operator_fn.get_name().to_string();
         debug!("begin checkpoint : {}", fn_name);
 
-        match self.stream_source.operator_fn.get_checkpoint() {
+        let ck = match self.stream_source.operator_fn.get_checkpoint() {
             Some(checkpoint) => {
                 let ck_handle = checkpoint.snapshot_state(&context);
-                let ck = Checkpoint {
+                Checkpoint {
                     operator_id: context.operator_id,
                     task_id: self.task_id,
                     checkpoint_id,
                     handle: ck_handle,
-                };
-
-                report_checkpoint(ck);
+                }
             }
-            None => {}
-        }
+            None => Checkpoint {
+                operator_id: context.operator_id,
+                task_id: self.task_id,
+                checkpoint_id,
+                handle: CheckpointHandle::default(),
+            },
+        };
+
+        submit_checkpoint(ck).map(|ck| {
+            error!(
+                "{} report checkpoint error. maybe report channel is full, checkpoint: {:?}",
+                fn_name, ck
+            )
+        });
     }
 }

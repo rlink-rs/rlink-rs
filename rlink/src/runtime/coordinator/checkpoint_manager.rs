@@ -52,18 +52,12 @@ impl OperatorCheckpoint {
         }
     }
 
-    pub fn add(&mut self, ck: Checkpoint) -> anyhow::Result<()> {
+    pub fn apply(&mut self, ck: Checkpoint) -> anyhow::Result<()> {
         if ck.checkpoint_id.0 == self.current_ck_id.0 {
             if self.is_align() {
-                Err(anyhow::Error::msg(format!(
-                    "the Checkpoint has align. {:?}",
-                    &ck
-                )))
+                Err(anyhow!("the Checkpoint has align. {:?}", &ck))
             } else if self.current_cks.contains_key(&ck.task_id.task_number) {
-                Err(anyhow::Error::msg(format!(
-                    "the Checkpoint has existed. {:?}",
-                    &ck
-                )))
+                Err(anyhow!("the Checkpoint has existed. {:?}", &ck))
             } else {
                 self.current_ck_id = ck.checkpoint_id;
                 self.current_cks.insert(ck.task_id.task_number, ck);
@@ -86,10 +80,13 @@ impl OperatorCheckpoint {
 
             Ok(())
         } else {
-            Err(anyhow::Error::msg(format!(
-                "checkpoint_id={:?} late. current checkpoint_id={:?}",
-                ck.checkpoint_id, self.current_ck_id
-            )))
+            Err(anyhow!(
+                "checkpoint_id={:?} late. current checkpoint_id={:?}, operator={}, job_id={}",
+                ck.checkpoint_id,
+                self.current_ck_id,
+                self.operator_name,
+                self.job_id.0
+            ))
         }
     }
 
@@ -214,16 +211,13 @@ impl CheckpointManager {
         }
     }
 
-    pub fn add(&self, ck: Checkpoint) -> anyhow::Result<()> {
+    pub fn apply(&self, ck: Checkpoint) -> anyhow::Result<()> {
         match self.operator_cks.get_mut(&ck.operator_id) {
             Some(mut d) => {
                 let mut operator_checkpoint = d.value_mut().write().unwrap();
-                operator_checkpoint.add(ck)
+                operator_checkpoint.apply(ck)
             }
-            None => Err(anyhow::Error::msg(format!(
-                "checkpoint_id={:?} not found",
-                ck
-            ))),
+            None => Err(anyhow!("checkpoint_id={:?} not found", ck)),
         }
     }
 
