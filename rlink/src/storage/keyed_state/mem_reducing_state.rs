@@ -13,11 +13,8 @@ pub struct MemoryReducingState {
 }
 
 impl MemoryReducingState {
-    pub fn new(state_key: &StateKey, suggest_capacity: usize) -> Self {
-        debug!(
-            "create memory state {:?}, suggest capacity {}",
-            state_key, suggest_capacity
-        );
+    pub fn new(state_key: &StateKey) -> Self {
+        debug!("create memory state {:?}", state_key);
         MemoryReducingState {
             state_key: state_key.clone(),
             kv: BTreeMap::new(),
