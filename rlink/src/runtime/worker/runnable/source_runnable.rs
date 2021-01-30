@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -253,7 +252,9 @@ impl Runnable for SourceRunnable {
 #[derive(Debug)]
 struct BarrierAlign {
     expected_size: usize,
-    barriers: BTreeMap<u64, usize>,
+
+    checkpoint_id: u64,
+    reached_size: usize,
 }
 
 impl BarrierAlign {
@@ -270,7 +271,8 @@ impl BarrierAlign {
             .sum();
         BarrierAlign {
             expected_size,
-            barriers: BTreeMap::new(),
+            checkpoint_id: 0,
+            reached_size: 0,
         }
     }
 
@@ -280,29 +282,25 @@ impl BarrierAlign {
         }
 
         let checkpoint_id = barrier.checkpoint_id.0;
-        let reached_size = {
-            let reached_size = self.barriers.get(&checkpoint_id).unwrap_or(&0);
-            *reached_size + 1
-        };
+        if self.checkpoint_id == checkpoint_id {
+            self.reached_size += 1;
 
-        if reached_size == self.expected_size {
-            self.barriers.remove(&checkpoint_id);
-            true
+            if self.reached_size > self.expected_size {
+                unreachable!()
+            }
+
+            self.reached_size == self.expected_size
+        } else if self.checkpoint_id < checkpoint_id {
+            self.checkpoint_id = checkpoint_id;
+            self.reached_size = 1;
+
+            self.reached_size == self.expected_size
         } else {
-            self.barriers.insert(checkpoint_id, reached_size);
-            self.remove_history();
-
+            error!(
+                "barrier delay, current {}, reached {}",
+                self.checkpoint_id, checkpoint_id
+            );
             false
-        }
-    }
-
-    fn remove_history(&mut self) {
-        if self.barriers.len() > 5 {
-            let checkpoint_id = {
-                let (checkpoint_id, _) = self.barriers.iter().next().unwrap();
-                *checkpoint_id
-            };
-            self.barriers.remove(&checkpoint_id);
         }
     }
 }
