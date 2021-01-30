@@ -1,10 +1,11 @@
+use std::ops::Deref;
+use std::sync::Arc;
+
 use crate::api::cluster::TaskResourceInfo;
 use crate::api::env::{StreamApp, StreamExecutionEnvironment};
 use crate::deployment::{Resource, TResourceManager};
 use crate::runtime::context::Context;
 use crate::runtime::{cluster, ApplicationDescriptor, ManagerType};
-use std::ops::Deref;
-use std::sync::Arc;
 
 #[derive(Clone, Debug)]
 pub(crate) struct LocalResourceManager {

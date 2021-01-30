@@ -1,5 +1,6 @@
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::thread::JoinHandle;
 
 use crate::api::element::{Element, Record};
@@ -17,7 +18,6 @@ use crate::runtime::worker::runnable::{
     SinkRunnable, SourceRunnable, WatermarkAssignerRunnable, WindowAssignerRunnable,
 };
 use crate::runtime::{ApplicationDescriptor, TaskDescriptor};
-use std::sync::Arc;
 
 pub mod checkpoint;
 pub mod heart_beat;

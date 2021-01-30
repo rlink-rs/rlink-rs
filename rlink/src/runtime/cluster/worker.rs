@@ -1,5 +1,7 @@
 use std::borrow::{Borrow, BorrowMut};
 use std::net::SocketAddr;
+use std::ops::Deref;
+use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
@@ -13,8 +15,6 @@ use crate::runtime::worker::heart_beat::{start_heart_beat_timer, status_heartbea
 use crate::runtime::{worker, ApplicationDescriptor, TaskManagerStatus, WorkerManagerDescriptor};
 use crate::storage::metadata::MetadataLoader;
 use crate::utils;
-use std::ops::Deref;
-use std::sync::Arc;
 
 pub(crate) fn run<S>(
     context: Arc<Context>,

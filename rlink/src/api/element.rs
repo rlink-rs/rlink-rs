@@ -1,13 +1,13 @@
 #![allow(dead_code)]
 
 use std::borrow::BorrowMut;
+use std::cmp::Ordering;
 use std::fmt::Debug;
 
 use bytes::{Buf, BufMut, BytesMut};
 
 use crate::api::runtime::{ChannelKey, CheckpointId};
 use crate::api::window::Window;
-use std::cmp::Ordering;
 
 lazy_static! {
     static ref EMPTY_VEC: Vec<Window> = Vec::with_capacity(0);

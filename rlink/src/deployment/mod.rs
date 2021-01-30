@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+use std::sync::Arc;
 
 use crate::api::cluster::TaskResourceInfo;
 use crate::api::env::{StreamApp, StreamExecutionEnvironment};
@@ -7,7 +8,6 @@ use crate::deployment::standalone::StandaloneResourceManager;
 use crate::deployment::yarn::YarnResourceManager;
 use crate::runtime::context::Context;
 use crate::runtime::{ApplicationDescriptor, ClusterMode};
-use std::sync::Arc;
 
 pub mod local;
 pub mod standalone;
