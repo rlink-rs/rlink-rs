@@ -57,7 +57,7 @@ pub struct Checkpoint {
     pub handle: CheckpointHandle,
 }
 
-pub trait CheckpointedFunction
+pub trait CheckpointFunction
 where
     Self: Debug,
 {

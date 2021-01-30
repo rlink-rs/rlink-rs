@@ -4,7 +4,7 @@ use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::{ClientConfig, Offset};
 use rlink::api;
 use rlink::api::backend::OperatorStateBackend;
-use rlink::api::checkpoint::CheckpointedFunction;
+use rlink::api::checkpoint::CheckpointFunction;
 use rlink::api::element::Record;
 use rlink::api::function::{Context, InputFormat, InputSplit, InputSplitSource};
 use rlink::api::properties::{Properties, SystemProperties};
@@ -118,7 +118,7 @@ impl InputFormat for KafkaInputFormat {
         Ok(())
     }
 
-    fn get_checkpoint(&mut self) -> Option<Box<&mut dyn CheckpointedFunction>> {
+    fn checkpoint_function(&mut self) -> Option<Box<&mut dyn CheckpointFunction>> {
         match self.checkpoint.as_mut() {
             Some(checkpoint) => Some(Box::new(checkpoint)),
             None => None,

@@ -1,4 +1,4 @@
-use rlink::api::checkpoint::{CheckpointHandle, CheckpointedFunction, FunctionSnapshotContext};
+use rlink::api::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
 use rlink::api::runtime::JobId;
 
 use crate::state::{KafkaSourceStateCache, OffsetMetadata};
@@ -27,7 +27,7 @@ impl KafkaCheckpointed {
     }
 }
 
-impl CheckpointedFunction for KafkaCheckpointed {
+impl CheckpointFunction for KafkaCheckpointed {
     fn initialize_state(
         &mut self,
         context: &FunctionSnapshotContext,

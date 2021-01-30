@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use crate::api::checkpoint::{CheckpointHandle, CheckpointedFunction, FunctionSnapshotContext};
+use crate::api::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
 use crate::api::element::{Element, Record};
 use crate::api::properties::Properties;
 use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
@@ -110,7 +110,7 @@ where
     }
     fn close(&mut self) -> crate::api::Result<()>;
 
-    fn get_checkpoint(&mut self) -> Option<Box<&mut dyn CheckpointedFunction>> {
+    fn checkpoint_function(&mut self) -> Option<Box<&mut dyn CheckpointFunction>> {
         None
     }
 }
@@ -135,7 +135,7 @@ where
 
     fn close(&mut self) -> crate::api::Result<()>;
 
-    fn get_checkpoint(&mut self) -> Option<Box<&mut dyn CheckpointedFunction>> {
+    fn get_checkpoint(&mut self) -> Option<Box<&mut dyn CheckpointFunction>> {
         None
     }
 

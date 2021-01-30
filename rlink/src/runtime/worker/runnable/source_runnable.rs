@@ -218,21 +218,21 @@ impl Runnable for SourceRunnable {
     }
 
     fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext) {
-        let handle = match self.stream_source.operator_fn.get_checkpoint() {
+        let handle = match self.stream_source.operator_fn.checkpoint_function() {
             Some(checkpoint) => checkpoint.snapshot_state(&snapshot_context),
             None => CheckpointHandle::default(),
         };
 
         let ck = Checkpoint {
             operator_id: snapshot_context.operator_id,
-            task_id: self.task_id,
+            task_id: snapshot_context.task_id,
             checkpoint_id: snapshot_context.checkpoint_id,
             handle,
         };
         submit_checkpoint(ck).map(|ck| {
             error!(
-                "{:?} report checkpoint error. maybe report channel is full, checkpoint: {:?}",
-                self.operator_id, ck
+                "{:?} submit checkpoint error. maybe report channel is full, checkpoint: {:?}",
+                snapshot_context.operator_id, ck
             )
         });
     }
