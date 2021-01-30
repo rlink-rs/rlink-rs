@@ -11,7 +11,7 @@ use rlink::api::properties::{Properties, SystemProperties};
 use rlink::channel::handover::Handover;
 use rlink::metrics::Tag;
 
-use crate::source::checkpoint::KafkaCheckpointed;
+use crate::source::checkpoint::KafkaCheckpointFunction;
 use crate::source::consumer::{create_kafka_consumer, get_kafka_consumer_handover};
 use crate::source::iterator::KafkaRecordIterator;
 
@@ -24,7 +24,7 @@ pub struct KafkaInputFormat {
     handover: Option<Handover>,
 
     state_mode: Option<OperatorStateBackend>,
-    checkpoint: Option<KafkaCheckpointed>,
+    checkpoint: Option<KafkaCheckpointFunction>,
 }
 
 impl KafkaInputFormat {
@@ -54,11 +54,8 @@ impl InputFormat for KafkaInputFormat {
                 .unwrap_or(OperatorStateBackend::None);
             self.state_mode = Some(state_backend);
 
-            let mut kafka_checkpoint = KafkaCheckpointed::new(
-                context.application_id.clone(),
-                context.task_id.job_id(),
-                context.task_id.task_number(),
-            );
+            let mut kafka_checkpoint =
+                KafkaCheckpointFunction::new(context.application_id.clone(), context.task_id);
             // todo provide the data from coordinator
             kafka_checkpoint.initialize_state(
                 &context.get_checkpoint_context(),

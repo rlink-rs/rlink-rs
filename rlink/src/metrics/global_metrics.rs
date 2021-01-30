@@ -9,9 +9,13 @@ use metrics::gauge;
 #[derive(Clone, Debug)]
 pub struct Tag(pub String, pub String);
 
-impl Tag {
-    pub fn new(field0: String, field1: String) -> Self {
-        Tag(field0, field1)
+impl<F, C> From<(F, C)> for Tag
+where
+    F: ToString,
+    C: ToString,
+{
+    fn from((field, context): (F, C)) -> Self {
+        Tag(field.to_string(), context.to_string())
     }
 }
 

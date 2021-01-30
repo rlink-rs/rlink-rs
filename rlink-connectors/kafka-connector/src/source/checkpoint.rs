@@ -1,24 +1,21 @@
 use rlink::api::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
-use rlink::api::runtime::JobId;
+use rlink::api::runtime::TaskId;
 
 use crate::state::{KafkaSourceStateCache, OffsetMetadata};
 
 #[derive(Debug, Clone)]
-pub struct KafkaCheckpointed {
+pub struct KafkaCheckpointFunction {
     pub(crate) state_cache: Option<KafkaSourceStateCache>,
     pub(crate) application_id: String,
-    pub(crate) job_id: JobId,
-    pub(crate) task_number: u16,
-    // pub(crate) state_mode: OperatorStateBackend,
+    pub(crate) task_id: TaskId,
 }
 
-impl KafkaCheckpointed {
-    pub fn new(application_id: String, job_id: JobId, task_number: u16) -> Self {
-        KafkaCheckpointed {
+impl KafkaCheckpointFunction {
+    pub fn new(application_id: String, task_id: TaskId) -> Self {
+        KafkaCheckpointFunction {
             state_cache: None,
             application_id,
-            job_id,
-            task_number,
+            task_id,
         }
     }
 
@@ -27,7 +24,7 @@ impl KafkaCheckpointed {
     }
 }
 
-impl CheckpointFunction for KafkaCheckpointed {
+impl CheckpointFunction for KafkaCheckpointFunction {
     fn initialize_state(
         &mut self,
         context: &FunctionSnapshotContext,

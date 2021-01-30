@@ -172,11 +172,8 @@ impl Runnable for SourceRunnable {
         info!("{} running...", self.stream_source.operator_fn.get_name());
 
         let tags = vec![
-            Tag("job_id".to_string(), self.task_id.job_id.0.to_string()),
-            Tag(
-                "task_number".to_string(),
-                self.task_id.task_number.to_string(),
-            ),
+            Tag::from(("job_id", self.task_id.job_id.0)),
+            Tag::from(("task_number", self.task_id.task_number)),
         ];
         let metric_name = format!(
             "Source_{}",

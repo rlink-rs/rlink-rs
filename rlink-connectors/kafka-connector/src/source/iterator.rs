@@ -3,18 +3,18 @@ use std::borrow::BorrowMut;
 use rlink::api::element::Record;
 use rlink::channel::handover::Handover;
 
-use crate::source::checkpoint::KafkaCheckpointed;
+use crate::source::checkpoint::KafkaCheckpointFunction;
 use crate::KafkaRecord;
 
 pub struct KafkaRecordIterator {
     handover: Handover,
     counter: u64,
 
-    checkpoint: KafkaCheckpointed,
+    checkpoint: KafkaCheckpointFunction,
 }
 
 impl KafkaRecordIterator {
-    pub fn new(handover: Handover, checkpoint: KafkaCheckpointed) -> Self {
+    pub fn new(handover: Handover, checkpoint: KafkaCheckpointFunction) -> Self {
         KafkaRecordIterator {
             handover,
             counter: 0,

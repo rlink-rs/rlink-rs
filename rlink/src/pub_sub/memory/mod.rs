@@ -47,14 +47,8 @@ pub(crate) fn get(target_task_id: TaskId, channel_size: usize) -> (ElementSender
         named_channel(
             "Memory_PubSub",
             vec![
-                Tag::new(
-                    "target_job_id".to_string(),
-                    target_task_id.job_id.0.to_string(),
-                ),
-                Tag::new(
-                    "target_task_number".to_string(),
-                    target_task_id.task_number.to_string(),
-                ),
+                Tag::from(("target_job_id", target_task_id.job_id.0)),
+                Tag::from(("target_task_number", target_task_id.task_number)),
             ],
             channel_size,
         )

@@ -7,7 +7,7 @@ use crate::api::checkpoint::FunctionSnapshotContext;
 use crate::api::element::Element;
 use crate::api::function::KeySelectorFunction;
 use crate::api::operator::DefaultStreamOperator;
-use crate::api::runtime::OperatorId;
+use crate::api::runtime::{OperatorId, TaskId};
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 use crate::utils;
@@ -15,6 +15,8 @@ use crate::utils;
 #[derive(Debug)]
 pub(crate) struct KeyByRunnable {
     operator_id: OperatorId,
+    task_id: TaskId,
+
     stream_key_by: DefaultStreamOperator<dyn KeySelectorFunction>,
     next_runnable: Option<Box<dyn Runnable>>,
     partition_size: u16,
@@ -30,6 +32,7 @@ impl KeyByRunnable {
     ) -> Self {
         KeyByRunnable {
             operator_id,
+            task_id: TaskId::default(),
             stream_key_by,
             next_runnable,
             partition_size: 0,
@@ -42,6 +45,8 @@ impl Runnable for KeyByRunnable {
     fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
         self.next_runnable.as_mut().unwrap().open(context)?;
 
+        self.task_id = context.task_descriptor.task_id;
+
         let fun_context = context.to_fun_context(self.operator_id);
         self.stream_key_by.operator_fn.open(&fun_context)?;
 
@@ -49,14 +54,8 @@ impl Runnable for KeyByRunnable {
         self.partition_size = context.get_child_parallelism() as u16;
 
         let tags = vec![
-            Tag(
-                "job_id".to_string(),
-                context.task_descriptor.task_id.job_id.0.to_string(),
-            ),
-            Tag(
-                "task_number".to_string(),
-                context.task_descriptor.task_id.task_number.to_string(),
-            ),
+            Tag::from(("job_id", self.task_id.job_id.0)),
+            Tag::from(("task_number", self.task_id.task_number)),
         ];
         let metric_name = format!(
             "KeyBy_{}",

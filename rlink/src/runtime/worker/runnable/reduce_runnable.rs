@@ -10,7 +10,7 @@ use crate::api::element::{Barrier, Element, Record, Watermark};
 use crate::api::function::{KeySelectorFunction, ReduceFunction};
 use crate::api::operator::DefaultStreamOperator;
 use crate::api::properties::SystemProperties;
-use crate::api::runtime::{CheckpointId, OperatorId};
+use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::api::window::{TWindow, Window};
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
@@ -20,9 +20,11 @@ use crate::utils::date_time::timestamp_str;
 #[derive(Debug)]
 pub(crate) struct ReduceRunnable {
     operator_id: OperatorId,
+    task_id: TaskId,
+
     context: Option<RunnableContext>,
-    task_number: u16,
-    dependency_parallelism: u16,
+
+    parent_parallelism: u16,
 
     stream_key_by: Option<DefaultStreamOperator<dyn KeySelectorFunction>>,
     stream_reduce: DefaultStreamOperator<dyn ReduceFunction>,
@@ -51,9 +53,9 @@ impl ReduceRunnable {
     ) -> Self {
         ReduceRunnable {
             operator_id,
+            task_id: TaskId::default(),
             context: None,
-            task_number: 0,
-            dependency_parallelism: 0,
+            parent_parallelism: 0,
             stream_key_by,
             stream_reduce,
             next_runnable,
@@ -73,6 +75,8 @@ impl Runnable for ReduceRunnable {
     fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
         self.next_runnable.as_mut().unwrap().open(context)?;
 
+        self.task_id = context.task_descriptor.task_id;
+
         self.context = Some(context.clone());
 
         let fun_context = context.to_fun_context(self.operator_id);
@@ -81,15 +85,11 @@ impl Runnable for ReduceRunnable {
             .as_mut()
             .map(|s| s.operator_fn.open(&fun_context));
 
-        self.task_number = context.task_descriptor.task_id.task_number;
-        self.dependency_parallelism = context.get_parent_parallelism();
+        self.parent_parallelism = context.get_parent_parallelism();
 
         self.watermark_align = Some(WatermarkAlign::new());
 
-        info!(
-            "ReduceRunnable Opened. task_number={}, num_tasks={}",
-            self.task_number, context.task_descriptor.task_id.num_tasks
-        );
+        info!("ReduceRunnable Opened. task_id={:?}", self.task_id);
 
         let state_mode = context
             .application_descriptor
@@ -110,14 +110,8 @@ impl Runnable for ReduceRunnable {
         ));
 
         let tags = vec![
-            Tag(
-                "job_id".to_string(),
-                context.task_descriptor.task_id.job_id.0.to_string(),
-            ),
-            Tag(
-                "task_number".to_string(),
-                context.task_descriptor.task_id.task_number.to_string(),
-            ),
+            Tag::from(("job_id", self.task_id.job_id.0)),
+            Tag::from(("task_number", self.task_id.task_number)),
         ];
         let fn_name = self.stream_reduce.operator_fn.as_ref().get_name();
 
@@ -243,7 +237,7 @@ impl Runnable for ReduceRunnable {
 
                 if self.current_checkpoint_id == barrier.checkpoint_id {
                     self.reached_barriers.push(barrier);
-                    if self.reached_barriers.len() == self.dependency_parallelism as usize {
+                    if self.reached_barriers.len() == self.parent_parallelism as usize {
                         let checkpoint_id = self.current_checkpoint_id;
                         let snapshot_context = {
                             let context = self.context.as_ref().unwrap();

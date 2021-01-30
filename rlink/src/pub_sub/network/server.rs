@@ -40,18 +40,9 @@ pub(crate) fn publish(
         let (sender, receiver) = named_channel(
             "NetworkPublish",
             vec![
-                Tag::new(
-                    "source_job_id".to_string(),
-                    source_task_id.job_id.0.to_string(),
-                ),
-                Tag::new(
-                    "target_job_id".to_string(),
-                    target_task_id.job_id.0.to_string(),
-                ),
-                Tag::new(
-                    "target_task_number".to_string(),
-                    target_task_id.task_number.to_string(),
-                ),
+                Tag::from(("source_job_id", source_task_id.job_id.0)),
+                Tag::from(("target_job_id", target_task_id.job_id.0)),
+                Tag::from(("target_task_number", target_task_id.task_number)),
             ],
             channel_size,
         );

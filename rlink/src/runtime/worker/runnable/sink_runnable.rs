@@ -14,9 +14,9 @@ use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 #[derive(Debug)]
 pub(crate) struct SinkRunnable {
     operator_id: OperatorId,
-    context: Option<RunnableContext>,
-
     task_id: TaskId,
+
+    context: Option<RunnableContext>,
 
     stream_sink: DefaultStreamOperator<dyn OutputFormat>,
 
@@ -30,8 +30,8 @@ impl SinkRunnable {
     ) -> Self {
         SinkRunnable {
             operator_id,
-            context: None,
             task_id: TaskId::default(),
+            context: None,
             stream_sink,
             counter: Arc::new(AtomicU64::new(0)),
         }
@@ -53,14 +53,8 @@ impl Runnable for SinkRunnable {
         self.stream_sink.operator_fn.open(&fun_context)?;
 
         let tags = vec![
-            Tag(
-                "job_id".to_string(),
-                context.task_descriptor.task_id.job_id.0.to_string(),
-            ),
-            Tag(
-                "task_number".to_string(),
-                context.task_descriptor.task_id.task_number.to_string(),
-            ),
+            Tag::from(("job_id", self.task_id.job_id.0)),
+            Tag::from(("task_number", self.task_id.task_number)),
         ];
         let metric_name = format!("Sink_{}", self.stream_sink.operator_fn.as_ref().get_name());
         register_counter(metric_name.as_str(), tags, self.counter.clone());

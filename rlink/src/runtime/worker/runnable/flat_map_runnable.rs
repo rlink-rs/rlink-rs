@@ -6,13 +6,15 @@ use crate::api::checkpoint::FunctionSnapshotContext;
 use crate::api::element::Element;
 use crate::api::function::FlatMapFunction;
 use crate::api::operator::DefaultStreamOperator;
-use crate::api::runtime::OperatorId;
+use crate::api::runtime::{OperatorId, TaskId};
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
 #[derive(Debug)]
 pub(crate) struct FlatMapRunnable {
     operator_id: OperatorId,
+    task_id: TaskId,
+
     stream_map: DefaultStreamOperator<dyn FlatMapFunction>,
     next_runnable: Option<Box<dyn Runnable>>,
 
@@ -29,6 +31,7 @@ impl FlatMapRunnable {
 
         FlatMapRunnable {
             operator_id,
+            task_id: TaskId::default(),
             stream_map,
             next_runnable,
             counter: Arc::new(AtomicU64::new(0)),
@@ -39,18 +42,14 @@ impl Runnable for FlatMapRunnable {
     fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
         self.next_runnable.as_mut().unwrap().open(context)?;
 
+        self.task_id = context.task_descriptor.task_id;
+
         let fun_context = context.to_fun_context(self.operator_id);
         self.stream_map.operator_fn.open(&fun_context)?;
 
         let tags = vec![
-            Tag(
-                "job_id".to_string(),
-                context.task_descriptor.task_id.job_id.0.to_string(),
-            ),
-            Tag(
-                "task_number".to_string(),
-                context.task_descriptor.task_id.task_number.to_string(),
-            ),
+            Tag::from(("job_id", self.task_id.job_id.0)),
+            Tag::from(("task_number", self.task_id.task_number)),
         ];
         let metric_name = format!(
             "FlatMap_{}",
