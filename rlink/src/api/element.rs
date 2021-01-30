@@ -7,6 +7,7 @@ use bytes::{Buf, BufMut, BytesMut};
 
 use crate::api::runtime::{ChannelKey, CheckpointId};
 use crate::api::window::Window;
+use std::cmp::Ordering;
 
 lazy_static! {
     static ref EMPTY_VEC: Vec<Window> = Vec::with_capacity(0);
@@ -49,6 +50,26 @@ pub struct Record {
     pub(crate) trigger_window: Option<Window>,
 
     pub(crate) values: Buffer,
+}
+
+impl Ord for Record {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.values.as_slice().cmp(other.values.as_slice())
+    }
+}
+
+impl PartialOrd for Record {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.values.as_slice().partial_cmp(other.values.as_slice())
+    }
+}
+
+impl Eq for Record {}
+
+impl PartialEq for Record {
+    fn eq(&self, other: &Self) -> bool {
+        self.values.as_slice().eq(other.values.as_slice())
+    }
 }
 
 impl Record {
@@ -175,14 +196,6 @@ impl Serde for Record {
             trigger_window: None,
             values: Buffer::from(values),
         }
-    }
-}
-
-impl Eq for Record {}
-
-impl PartialEq for Record {
-    fn eq(&self, other: &Self) -> bool {
-        self.values.eq(&other.values)
     }
 }
 

@@ -1,4 +1,4 @@
-use std::collections::hash_map::IntoIter;
+use std::collections::btree_map::IntoIter;
 use std::fmt::Debug;
 
 use crate::api::backend::KeyedStateBackend;
@@ -30,7 +30,7 @@ impl StateKey {
 }
 
 pub enum StateIterator {
-    HashMap(Window, IntoIter<Record, Record>),
+    BTreeMap(Window, IntoIter<Record, Record>),
 }
 
 impl Iterator for StateIterator {
@@ -38,7 +38,7 @@ impl Iterator for StateIterator {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            StateIterator::HashMap(window, iter) => iter.next().map(|(key, val)| {
+            StateIterator::BTreeMap(window, iter) => iter.next().map(|(key, val)| {
                 let mut key = key.clone();
                 key.extend(val.clone()).expect("key value merge error");
                 key.trigger_window = Some(window.clone());
