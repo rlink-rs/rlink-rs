@@ -1,15 +1,17 @@
+use std::collections::BTreeMap;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
 use crate::api::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
-use crate::api::element::Element;
+use crate::api::element::{Barrier, Element};
 use crate::api::function::{InputFormat, InputSplit};
 use crate::api::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
 use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::channel::named_channel;
 use crate::channel::sender::ChannelSender;
+use crate::dag::job_graph::JobEdge;
 use crate::metrics::Tag;
 use crate::runtime::timer::TimerChannel;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
@@ -27,6 +29,8 @@ pub(crate) struct SourceRunnable {
 
     stream_status_timer: Option<TimerChannel>,
     checkpoint_timer: Option<TimerChannel>,
+
+    barrier_align: Option<BarrierAlign>,
 }
 
 impl SourceRunnable {
@@ -46,6 +50,8 @@ impl SourceRunnable {
 
             stream_status_timer: None,
             checkpoint_timer: None,
+
+            barrier_align: None,
         }
     }
 
@@ -161,9 +167,11 @@ impl Runnable for SourceRunnable {
             self.checkpoint_timer = Some(checkpoint_timer);
         }
 
+        self.barrier_align = Some(BarrierAlign::new(context));
+
         info!(
-            "SourceRunnable Opened, operator_id={:?}, task_id={:?}",
-            self.operator_id, self.task_id
+            "SourceRunnable Opened, operator_id={:?}, task_id={:?}, BarrierAlign expected_size={:?}",
+            self.operator_id, self.task_id, self.barrier_align.as_ref().unwrap(),
         );
         Ok(())
     }
@@ -187,15 +195,25 @@ impl Runnable for SourceRunnable {
 
         while let Ok(element) = receiver.recv() {
             if element.is_barrier() {
-                let checkpoint_id = element.as_barrier().checkpoint_id;
-                let snapshot_context = {
-                    let context = self.context.as_ref().unwrap();
-                    context.get_checkpoint_context(self.operator_id, checkpoint_id)
-                };
-                self.checkpoint(snapshot_context);
-            }
+                let is_barrier_align = self
+                    .barrier_align
+                    .as_mut()
+                    .unwrap()
+                    .apply(element.as_barrier());
+                if is_barrier_align {
+                    debug!("barrier align and checkpoint");
+                    let checkpoint_id = element.as_barrier().checkpoint_id;
+                    let snapshot_context = {
+                        let context = self.context.as_ref().unwrap();
+                        context.get_checkpoint_context(self.operator_id, checkpoint_id)
+                    };
+                    self.checkpoint(snapshot_context);
 
-            self.next_runnable.as_mut().unwrap().run(element);
+                    self.next_runnable.as_mut().unwrap().run(element);
+                }
+            } else {
+                self.next_runnable.as_mut().unwrap().run(element);
+            }
         }
     }
 
@@ -229,5 +247,62 @@ impl Runnable for SourceRunnable {
                 snapshot_context.operator_id, ck
             )
         });
+    }
+}
+
+#[derive(Debug)]
+struct BarrierAlign {
+    expected_size: usize,
+    barriers: BTreeMap<u64, usize>,
+}
+
+impl BarrierAlign {
+    pub fn new(context: &RunnableContext) -> Self {
+        let parents = context
+            .dag_metadata
+            .job_parents(context.task_descriptor.task_id.job_id);
+        let expected_size = parents
+            .into_iter()
+            .map(|(node, edge)| match edge {
+                JobEdge::Forward => 1 as usize,
+                JobEdge::ReBalance => node.parallelism as usize,
+            })
+            .sum();
+        BarrierAlign {
+            expected_size,
+            barriers: BTreeMap::new(),
+        }
+    }
+
+    pub fn apply(&mut self, barrier: &Barrier) -> bool {
+        if self.expected_size == 0 {
+            return true;
+        }
+
+        let checkpoint_id = barrier.checkpoint_id.0;
+        let reached_size = {
+            let reached_size = self.barriers.get(&checkpoint_id).unwrap_or(&0);
+            *reached_size + 1
+        };
+
+        if reached_size == self.expected_size {
+            self.barriers.remove(&checkpoint_id);
+            true
+        } else {
+            self.barriers.insert(checkpoint_id, reached_size);
+            self.remove_history();
+
+            false
+        }
+    }
+
+    fn remove_history(&mut self) {
+        if self.barriers.len() > 5 {
+            let checkpoint_id = {
+                let (checkpoint_id, _) = self.barriers.iter().next().unwrap();
+                *checkpoint_id
+            };
+            self.barriers.remove(&checkpoint_id);
+        }
     }
 }
