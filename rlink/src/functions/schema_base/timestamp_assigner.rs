@@ -25,7 +25,7 @@ impl TimestampAssigner for SchemaBaseTimestampAssigner {
 }
 
 impl Function for SchemaBaseTimestampAssigner {
-    fn get_name(&self) -> &str {
+    fn name(&self) -> &str {
         "SchemaBaseTimestampAssigner"
     }
 }

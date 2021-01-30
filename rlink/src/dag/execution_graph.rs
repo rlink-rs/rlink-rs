@@ -8,7 +8,6 @@ use crate::api::operator::StreamOperator;
 use crate::api::runtime::{JobId, OperatorId};
 use crate::dag::job_graph::{JobEdge, JobGraph};
 use crate::dag::stream_graph::StreamNode;
-use crate::dag::utils::JsonDag;
 use crate::dag::{DagError, Label, TaskId};
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -94,7 +93,7 @@ impl ExecutionGraph {
                 if input_splits.len() != job_node.parallelism as usize {
                     return Err(DagError::IllegalInputSplitSize(format!(
                         "{}'s parallelism = {}, but input_splits size = {}",
-                        op.operator_fn.get_name(),
+                        op.operator_fn.name(),
                         job_node.parallelism,
                         input_splits.len(),
                     )));
@@ -185,9 +184,5 @@ impl ExecutionGraph {
         }
 
         Ok(())
-    }
-
-    pub(crate) fn to_string(&self) -> String {
-        JsonDag::from(&self.dag).to_string()
     }
 }

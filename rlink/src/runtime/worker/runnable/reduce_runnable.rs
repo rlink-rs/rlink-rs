@@ -113,7 +113,7 @@ impl Runnable for ReduceRunnable {
             Tag::from(("job_id", self.task_id.job_id.0)),
             Tag::from(("task_number", self.task_id.task_number)),
         ];
-        let fn_name = self.stream_reduce.operator_fn.as_ref().get_name();
+        let fn_name = self.stream_reduce.operator_fn.as_ref().name();
 
         let metric_name = format!("Reduce_{}", fn_name);
         register_counter(metric_name.as_str(), tags.clone(), self.counter.clone());
@@ -236,7 +236,7 @@ impl Runnable for ReduceRunnable {
                 }
 
                 if self.current_checkpoint_id == barrier.checkpoint_id {
-                    self.reached_barriers.push(barrier);
+                    self.reached_barriers.push(barrier.clone());
                     if self.reached_barriers.len() == self.parent_parallelism as usize {
                         let checkpoint_id = self.current_checkpoint_id;
                         let snapshot_context = {
@@ -265,6 +265,11 @@ impl Runnable for ReduceRunnable {
                         self.reached_barriers.push(barrier.clone());
                     }
                 }
+
+                self.next_runnable
+                    .as_mut()
+                    .unwrap()
+                    .run(Element::Barrier(barrier));
             }
             _ => {}
         }

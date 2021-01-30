@@ -77,7 +77,7 @@ impl OutputFormat for PrintOutputFormat {
 }
 
 impl Function for PrintOutputFormat {
-    fn get_name(&self) -> &str {
+    fn name(&self) -> &str {
         "PrintOutputFormat"
     }
 }

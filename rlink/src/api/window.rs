@@ -143,7 +143,7 @@ impl WindowAssigner for SlidingEventTimeWindows {
 }
 
 impl Function for SlidingEventTimeWindows {
-    fn get_name(&self) -> &str {
+    fn name(&self) -> &str {
         "SlidingEventTimeWindows"
     }
 }

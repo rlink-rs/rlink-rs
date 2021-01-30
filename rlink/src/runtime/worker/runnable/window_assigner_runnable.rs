@@ -35,7 +35,7 @@ impl Runnable for WindowAssignerRunnable {
         self.next_runnable.as_mut().unwrap().open(context)?;
         info!(
             "WindowAssignerRunnable({}) opened",
-            self.stream_window.operator_fn.get_name()
+            self.stream_window.operator_fn.name()
         );
 
         Ok(())

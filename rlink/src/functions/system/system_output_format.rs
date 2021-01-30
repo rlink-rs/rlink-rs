@@ -190,7 +190,7 @@ impl OutputFormat for SystemOutputFormat {
 }
 
 impl Function for SystemOutputFormat {
-    fn get_name(&self) -> &str {
+    fn name(&self) -> &str {
         "SystemOutputFormat"
     }
 }

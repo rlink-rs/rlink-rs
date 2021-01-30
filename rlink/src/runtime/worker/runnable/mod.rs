@@ -45,13 +45,13 @@ impl RunnableContext {
         let coordinator_manager = &self.application_descriptor.coordinator_manager;
         let parents = self
             .dag_metadata
-            .get_execution_parents(&self.task_descriptor.task_id)
+            .execution_parents(&self.task_descriptor.task_id)
             .into_iter()
             .map(|(node, edge)| (node.clone(), edge.clone()))
             .collect();
         let children = self
             .dag_metadata
-            .get_execution_children(&self.task_descriptor.task_id)
+            .execution_children(&self.task_descriptor.task_id)
             .into_iter()
             .map(|(node, edge)| (node.clone(), edge.clone()))
             .collect();
@@ -92,7 +92,7 @@ impl RunnableContext {
 
     pub(crate) fn get_parents_parallelism(&self) -> Vec<u16> {
         self.dag_metadata
-            .get_job_parents(self.task_descriptor.task_id.job_id)
+            .job_parents(self.task_descriptor.task_id.job_id)
             .iter()
             .map(|(job_node, _)| job_node.parallelism)
             .collect()
@@ -105,7 +105,7 @@ impl RunnableContext {
 
     pub(crate) fn get_children_parallelism(&self) -> Vec<u16> {
         self.dag_metadata
-            .get_job_children(self.task_descriptor.task_id.job_id)
+            .job_children(self.task_descriptor.task_id.job_id)
             .into_iter()
             .map(|(job_node, _)| job_node.parallelism)
             .collect()
@@ -113,7 +113,7 @@ impl RunnableContext {
 
     pub(crate) fn get_parent_jobs(&self) -> Vec<(JobNode, JobEdge)> {
         self.dag_metadata
-            .get_job_parents(self.task_descriptor.task_id.job_id)
+            .job_parents(self.task_descriptor.task_id.job_id)
             .into_iter()
             .map(|(job_node, job_edge)| (job_node.clone(), job_edge.clone()))
             .collect()
@@ -121,12 +121,12 @@ impl RunnableContext {
 
     #[allow(dead_code)]
     pub(crate) fn get_stream_node(&self, operator_id: OperatorId) -> &StreamNode {
-        self.dag_metadata.get_stream_node(operator_id).unwrap()
+        self.dag_metadata.stream_node(operator_id).unwrap()
     }
 
     pub(crate) fn get_job_node(&self) -> &JobNode {
         self.dag_metadata
-            .get_job_node(self.task_descriptor.task_id.job_id)
+            .job_node(self.task_descriptor.task_id.job_id)
             .unwrap()
     }
 }

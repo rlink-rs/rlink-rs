@@ -8,7 +8,7 @@ use crate::dag::execution_graph::{ExecutionEdge, ExecutionNode};
 
 /// Base class of all operators in the Rust API.
 pub trait Function {
-    fn get_name(&self) -> &str;
+    fn name(&self) -> &str;
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

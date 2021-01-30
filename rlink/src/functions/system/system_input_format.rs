@@ -95,7 +95,7 @@ impl InputFormat for SystemInputFormat {
 impl InputSplitSource for SystemInputFormat {}
 
 impl Function for SystemInputFormat {
-    fn get_name(&self) -> &str {
+    fn name(&self) -> &str {
         "SystemInputFormat"
     }
 }

@@ -169,16 +169,13 @@ impl Runnable for SourceRunnable {
     }
 
     fn run(&mut self, mut _element: Element) {
-        info!("{} running...", self.stream_source.operator_fn.get_name());
+        info!("{} running...", self.stream_source.operator_fn.name());
 
         let tags = vec![
             Tag::from(("job_id", self.task_id.job_id.0)),
             Tag::from(("task_number", self.task_id.task_number)),
         ];
-        let metric_name = format!(
-            "Source_{}",
-            self.stream_source.operator_fn.as_ref().get_name()
-        );
+        let metric_name = format!("Source_{}", self.stream_source.operator_fn.as_ref().name());
         let (sender, receiver) = named_channel(metric_name.as_str(), tags, 10240);
         let running = Arc::new(AtomicBool::new(true));
 

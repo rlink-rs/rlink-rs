@@ -52,7 +52,7 @@ impl KeySelectorFunction for SchemaBaseKeySelector {
 }
 
 impl Function for SchemaBaseKeySelector {
-    fn get_name(&self) -> &str {
+    fn name(&self) -> &str {
         "SchemaBaseKeySelector"
     }
 }

@@ -17,7 +17,7 @@ pub fn derive_function(input: TokenStream) -> TokenStream {
     let (im, ty, wh) = input.generics.split_for_impl();
     let expanded = quote! {
         impl #im rlink::api::function::Function for #name #ty #wh {
-            fn get_name(&self) -> &str {
+            fn name(&self) -> &str {
                 stringify!(#name)
             }
         }

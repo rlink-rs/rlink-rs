@@ -129,7 +129,7 @@ impl<E> Function for BoundedOutOfOrdernessTimestampExtractor<E>
 where
     E: TimestampAssigner,
 {
-    fn get_name(&self) -> &str {
+    fn name(&self) -> &str {
         "BoundedOutOfOrdernessTimestampExtractor"
     }
 }

@@ -41,7 +41,7 @@ impl FlatMapFunction for BroadcastFlagMapFunction {
 }
 
 impl Function for BroadcastFlagMapFunction {
-    fn get_name(&self) -> &str {
+    fn name(&self) -> &str {
         "BroadcastFlagMapFunction"
     }
 }

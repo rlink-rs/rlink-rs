@@ -137,7 +137,7 @@ where
     ) -> Box<dyn Runnable> {
         let job_node = self
             .dag_metadata
-            .get_job_node(self.task_descriptor.task_id.job_id)
+            .job_node(self.task_descriptor.task_id.job_id)
             .expect(format!("Job={:?} is not found", &self.task_descriptor).as_str());
 
         let mut invoke_operators = Vec::new();
@@ -222,7 +222,7 @@ where
         operators: &mut HashMap<OperatorId, StreamOperator>,
         job_id: JobId,
     ) -> Option<DefaultStreamOperator<dyn KeySelectorFunction>> {
-        let job_parents = self.dag_metadata.get_job_parents(job_id);
+        let job_parents = self.dag_metadata.job_parents(job_id);
         if job_parents.len() == 0 {
             error!("key by not found");
             None

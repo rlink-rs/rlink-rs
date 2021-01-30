@@ -7,7 +7,6 @@ use daggy::{Dag, EdgeIndex, NodeIndex, Walker};
 use crate::api::operator::DEFAULT_PARALLELISM;
 use crate::api::runtime::{JobId, OperatorId};
 use crate::dag::stream_graph::{StreamGraph, StreamNode};
-use crate::dag::utils::JsonDag;
 use crate::dag::{DagError, Label, OperatorType};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -64,7 +63,7 @@ impl JobNode {
             .is_some()
     }
 
-    fn get_stream_node(&self, operator_id: OperatorId) -> Option<&StreamNode> {
+    fn stream_node(&self, operator_id: OperatorId) -> Option<&StreamNode> {
         self.stream_nodes.iter().find(|x| x.id == operator_id)
     }
 }
@@ -186,7 +185,7 @@ impl JobGraph {
                         let parent_node_index = self.job_node_indies.get(parent_job_id).unwrap();
                         self.dag.index(*parent_node_index)
                     })
-                    .find(|job_node| job_node.get_stream_node(left_parent_id).is_some())
+                    .find(|job_node| job_node.stream_node(left_parent_id).is_some())
                     .map(|job_node| job_node.parallelism);
                 match parent_parallelism {
                     Some(parallelism) => {
@@ -255,7 +254,7 @@ impl JobGraph {
         let mut node_index = source_node_index;
         let stream_dag = &stream_graph.dag;
         loop {
-            let stream_node = stream_graph.get_stream_node(node_index);
+            let stream_node = stream_graph.stream_node(node_index);
             let children: Vec<(EdgeIndex, NodeIndex)> =
                 stream_dag.children(node_index).iter(stream_dag).collect();
 
@@ -268,7 +267,7 @@ impl JobGraph {
             if stream_node.operator_type == OperatorType::Sink {
                 let f_job_ids: Vec<JobId> = children
                     .iter()
-                    .map(|(_edge_index, node_index)| stream_graph.get_stream_node(*node_index))
+                    .map(|(_edge_index, node_index)| stream_graph.stream_node(*node_index))
                     .map(|stream_node| JobId::from(stream_node.id))
                     .collect();
                 child_job_ids.extend_from_slice(f_job_ids.as_slice());
@@ -294,9 +293,5 @@ impl JobGraph {
             child_job_ids,
             parent_job_ids: vec![],
         })
-    }
-
-    pub(crate) fn to_string(&self) -> String {
-        JsonDag::from(&self.dag).to_string()
     }
 }

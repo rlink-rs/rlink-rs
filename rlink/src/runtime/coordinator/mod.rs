@@ -75,13 +75,10 @@ where
             let raw_stream_graph = self.stream_env.stream_manager.stream_graph.borrow();
             DagManager::try_from(raw_stream_graph.deref())?
         };
-        info!("StreamGraph: {}", dag_manager.stream_graph().to_string());
-        info!("JobGraph: {}", dag_manager.job_graph().to_string());
-        info!(
-            "ExecutionGraph: {}",
-            dag_manager.execution_graph().to_string()
-        );
+        info!("DagManager build success");
+
         let dag_metadata = DagMetadata::from(&dag_manager);
+        info!("DagMetadata: {}", dag_metadata.to_string());
 
         let mut application_descriptor = self.build_metadata(&dag_manager, &application_properties);
         info!(
@@ -157,12 +154,12 @@ where
     fn build_metadata(
         &mut self,
         dag_manager: &DagManager,
-        job_properties: &Properties,
+        application_properties: &Properties,
     ) -> ApplicationDescriptor {
         let application_descriptor = build_application_descriptor(
             self.stream_env.application_name.as_str(),
             dag_manager,
-            job_properties,
+            application_properties,
             &self.context,
         );
         // let mut metadata_storage = MetadataStorage::new(&self.metadata_storage_mode);

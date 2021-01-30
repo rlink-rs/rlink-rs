@@ -461,7 +461,7 @@ impl ReduceFunction for SchemaBaseReduceFunction {
 }
 
 impl Function for SchemaBaseReduceFunction {
-    fn get_name(&self) -> &str {
+    fn name(&self) -> &str {
         "SchemaBaseReduceFunction"
     }
 }

@@ -48,7 +48,7 @@ where
     T: ?Sized + Function,
 {
     fn get_operator_name(&self) -> &str {
-        self.operator_fn.get_name()
+        self.operator_fn.name()
     }
 
     fn get_parallelism(&self) -> u16 {
@@ -68,7 +68,7 @@ where
         f.debug_struct("StreamOperator")
             .field("parallelism", &self.parallelism)
             .field("fn_creator", &self.fn_creator)
-            .field("operator_fn", &self.operator_fn.get_name())
+            .field("operator_fn", &self.operator_fn.name())
             .finish()
     }
 }

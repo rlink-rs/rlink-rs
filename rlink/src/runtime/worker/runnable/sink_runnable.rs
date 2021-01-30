@@ -56,7 +56,7 @@ impl Runnable for SinkRunnable {
             Tag::from(("job_id", self.task_id.job_id.0)),
             Tag::from(("task_number", self.task_id.task_number)),
         ];
-        let metric_name = format!("Sink_{}", self.stream_sink.operator_fn.as_ref().get_name());
+        let metric_name = format!("Sink_{}", self.stream_sink.operator_fn.as_ref().name());
         register_counter(metric_name.as_str(), tags, self.counter.clone());
 
         Ok(())

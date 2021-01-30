@@ -38,7 +38,7 @@ impl FlatMapFunction for RoundRobinFlagMapFunction {
 }
 
 impl Function for RoundRobinFlagMapFunction {
-    fn get_name(&self) -> &str {
+    fn name(&self) -> &str {
         "RoundRobinFlagMapFunction"
     }
 }

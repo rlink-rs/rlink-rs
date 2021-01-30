@@ -53,7 +53,7 @@ impl Runnable for WatermarkAssignerRunnable {
             Tag::from(("job_id", self.task_id.job_id.0)),
             Tag::from(("task_number", self.task_id.task_number)),
         ];
-        let fn_name = self.stream_watermark.operator_fn.as_ref().get_name();
+        let fn_name = self.stream_watermark.operator_fn.as_ref().name();
 
         let metric_name = format!("Watermark_{}", fn_name);
         register_gauge(

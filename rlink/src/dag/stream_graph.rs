@@ -8,7 +8,6 @@ use crate::api::operator::{
     DefaultStreamOperator, FunctionCreator, StreamOperator, TStreamOperator, DEFAULT_PARALLELISM,
 };
 use crate::api::runtime::OperatorId;
-use crate::dag::utils::JsonDag;
 use crate::dag::{DagError, Label, OperatorType};
 use crate::functions::system::keyed_state_flat_map::KeyedStateFlatMapFunction;
 use crate::functions::system::system_input_format::SystemInputFormat;
@@ -56,12 +55,8 @@ impl StreamGraph {
         StreamGraph { sources, dag }
     }
 
-    pub fn get_stream_node(&self, node_index: NodeIndex) -> &StreamNode {
+    pub fn stream_node(&self, node_index: NodeIndex) -> &StreamNode {
         self.dag.index(node_index)
-    }
-
-    pub(crate) fn to_string(&self) -> String {
-        JsonDag::from(&self.dag).to_string()
     }
 }
 
@@ -110,7 +105,7 @@ impl RawStreamGraph {
         operators
     }
 
-    pub fn get_operators(&self) -> HashMap<OperatorId, &StreamOperator> {
+    pub fn operators(&self) -> HashMap<OperatorId, &StreamOperator> {
         let operator_ids: Vec<OperatorId> = self.operators.iter().map(|(x, _)| *x).collect();
 
         let mut operators = HashMap::new();

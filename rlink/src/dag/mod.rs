@@ -149,7 +149,7 @@ impl<'a> TryFrom<&'a RawStreamGraph> for DagManager {
         );
 
         let mut execution_graph = ExecutionGraph::new();
-        execution_graph.build(&job_graph, raw_stream_graph.get_operators().borrow_mut())?;
+        execution_graph.build(&job_graph, raw_stream_graph.operators().borrow_mut())?;
 
         let mut physic_graph = PhysicGraph::new();
         physic_graph.build(&execution_graph);
@@ -288,7 +288,7 @@ mod tests {
     impl InputSplitSource for MyInputFormat {}
 
     impl Function for MyInputFormat {
-        fn get_name(&self) -> &str {
+        fn name(&self) -> &str {
             "MyInputFormat"
         }
     }
@@ -331,7 +331,7 @@ mod tests {
     }
 
     impl Function for MyFlatMapFunction {
-        fn get_name(&self) -> &str {
+        fn name(&self) -> &str {
             "MyFlatMapFunction"
         }
     }
@@ -356,7 +356,7 @@ mod tests {
     }
 
     impl Function for MyTimestampAssigner {
-        fn get_name(&self) -> &str {
+        fn name(&self) -> &str {
             "MyTimestampAssigner"
         }
     }
@@ -386,7 +386,7 @@ mod tests {
     }
 
     impl Function for MyKeySelectorFunction {
-        fn get_name(&self) -> &str {
+        fn name(&self) -> &str {
             "MyKeySelectorFunction"
         }
     }
@@ -415,7 +415,7 @@ mod tests {
     }
 
     impl Function for MyReduceFunction {
-        fn get_name(&self) -> &str {
+        fn name(&self) -> &str {
             "MyReduceFunction"
         }
     }
@@ -444,7 +444,7 @@ mod tests {
     }
 
     impl Function for MyOutputFormat {
-        fn get_name(&self) -> &str {
+        fn name(&self) -> &str {
             "MyOutputFormat"
         }
     }
@@ -474,7 +474,7 @@ mod tests {
     }
 
     impl Function for MyCoProcessFunction {
-        fn get_name(&self) -> &str {
+        fn name(&self) -> &str {
             "MyCoProcessFunction"
         }
     }

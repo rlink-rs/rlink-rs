@@ -184,10 +184,6 @@ where
             })
             .collect()
     }
-
-    pub(crate) fn to_string(&self) -> String {
-        serde_json::to_string(self).unwrap_or("".to_string())
-    }
 }
 
 impl<N, E> JsonDag<N, E>
