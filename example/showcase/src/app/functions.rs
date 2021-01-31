@@ -218,7 +218,7 @@ impl InputSplitSource for ConfigInputFormat {}
 
 impl InputFormat for ConfigInputFormat {
     fn open(&mut self, input_split: InputSplit, _context: &Context) -> api::Result<()> {
-        let partition_num = input_split.get_split_number();
+        let partition_num = input_split.split_number();
         info!("open split number = {}", partition_num);
 
         Ok(())

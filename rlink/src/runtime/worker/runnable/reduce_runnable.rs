@@ -85,7 +85,7 @@ impl Runnable for ReduceRunnable {
             .as_mut()
             .map(|s| s.operator_fn.open(&fun_context));
 
-        self.parent_parallelism = context.get_parent_parallelism();
+        self.parent_parallelism = context.parent_parallelism();
 
         self.watermark_align = Some(WatermarkAlign::new());
 
@@ -134,7 +134,7 @@ impl Runnable for ReduceRunnable {
                     .as_ref()
                     .map(|limit_window| {
                         record
-                            .get_max_location_windows()
+                            .max_location_windows()
                             .map(|window| window.min_timestamp() >= limit_window.min_timestamp())
                             .unwrap_or(true)
                     })
@@ -144,7 +144,7 @@ impl Runnable for ReduceRunnable {
                     if n & 1048575 == 1 {
                         error!(
                             "expire data. record window={:?}, limit window={:?}",
-                            record.get_min_location_windows().unwrap(),
+                            record.min_location_windows().unwrap(),
                             self.limited_watermark_window.as_ref().unwrap()
                         );
                     }
@@ -176,8 +176,7 @@ impl Runnable for ReduceRunnable {
 
                 if align_watermarks.len() > 0 {
                     let align_watermark = align_watermarks[align_watermarks.len() - 1].clone();
-                    let minimum_watermark_window =
-                        align_watermark.get_min_location_windows().unwrap();
+                    let minimum_watermark_window = align_watermark.min_location_windows().unwrap();
                     self.limited_watermark_window = Some(minimum_watermark_window.clone());
 
                     // info!("minimum_watermark_window: {:?}", minimum_watermark_window);
@@ -241,7 +240,7 @@ impl Runnable for ReduceRunnable {
                         let checkpoint_id = self.current_checkpoint_id;
                         let snapshot_context = {
                             let context = self.context.as_ref().unwrap();
-                            context.get_checkpoint_context(self.operator_id, checkpoint_id)
+                            context.checkpoint_context(self.operator_id, checkpoint_id)
                         };
                         self.checkpoint(snapshot_context);
                     }
@@ -348,7 +347,7 @@ impl WatermarkAlign {
         if self.dependency_parallelism == 0 {
             self.dependency_parallelism = watermark.num_tasks;
             self.timeout_ms = {
-                let window = watermark.get_min_location_windows().unwrap();
+                let window = watermark.min_location_windows().unwrap();
                 (window.max_timestamp() - window.min_timestamp()) * 2
             }
         }
@@ -370,10 +369,7 @@ impl WatermarkAlign {
             .entry(watermark.status_timestamp)
             .or_insert(WatermarkAggregation::new());
 
-        let min_window_timestamp = watermark
-            .get_min_location_windows()
-            .unwrap()
-            .min_timestamp();
+        let min_window_timestamp = watermark.min_location_windows().unwrap().min_timestamp();
 
         if watermark_agg.min_watermark.is_none() {
             watermark_agg.min_watermark = Some(watermark);

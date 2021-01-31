@@ -19,7 +19,7 @@ impl SchemaBaseTimestampAssigner {
 
 impl TimestampAssigner for SchemaBaseTimestampAssigner {
     fn extract_timestamp(&mut self, row: &mut Record, _previous_element_timestamp: u64) -> u64 {
-        let mut reader = row.get_reader(self.field_types.as_slice());
+        let mut reader = row.as_reader(self.field_types.as_slice());
         reader.get_u64(self.column).unwrap()
     }
 }

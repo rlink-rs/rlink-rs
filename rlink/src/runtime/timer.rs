@@ -36,11 +36,11 @@ impl TimerChannel {
         self.receiver.recv()
     }
 
-    pub fn get_interval(&self) -> Duration {
+    pub fn interval(&self) -> Duration {
         self.interval
     }
 
-    pub fn get_name(&self) -> &str {
+    pub fn name(&self) -> &str {
         self.name.as_str()
     }
 }
@@ -87,8 +87,8 @@ pub fn start_window_timer() -> WindowTimer {
                         Ok(timer_channel) => {
                             info!(
                                 "register {}ms window timer [{}], start scheduling",
-                                &timer_channel.get_interval().as_millis(),
-                                timer_channel.get_name(),
+                                &timer_channel.interval().as_millis(),
+                                timer_channel.name(),
                             );
                             timer_channels.push(timer_channel)
                         }

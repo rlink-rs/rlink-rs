@@ -45,7 +45,7 @@ impl InputFormat for KafkaInputFormat {
         info!("kafka source open");
 
         let can_create_consumer = input_split
-            .get_properties()
+            .properties()
             .get_string("create_kafka_connection")?;
         if can_create_consumer.to_lowercase().eq("true") {
             let state_backend = context
@@ -57,14 +57,12 @@ impl InputFormat for KafkaInputFormat {
             let mut kafka_checkpoint =
                 KafkaCheckpointFunction::new(context.application_id.clone(), context.task_id);
             // todo provide the data from coordinator
-            kafka_checkpoint.initialize_state(
-                &context.get_checkpoint_context(),
-                &context.checkpoint_handle,
-            );
+            kafka_checkpoint
+                .initialize_state(&context.checkpoint_context(), &context.checkpoint_handle);
             self.checkpoint = Some(kafka_checkpoint);
 
-            let topic = input_split.get_properties().get_string("topic").unwrap();
-            let partition = input_split.get_properties().get_i32("partition").unwrap();
+            let topic = input_split.properties().get_string("topic").unwrap();
+            let partition = input_split.properties().get_i32("partition").unwrap();
 
             let tags = vec![
                 Tag("topic".to_string(), topic.to_string()),
@@ -172,8 +170,8 @@ impl InputSplitSource for KafkaInputFormat {
             let times = (min_num_splits as usize + input_splits.len() - 1) / input_splits.len();
             for _ in 1..times {
                 for input_split in &input_splits {
-                    let split_number = input_split.get_split_number();
-                    let mut properties = input_split.get_properties().clone();
+                    let split_number = input_split.split_number();
+                    let mut properties = input_split.properties().clone();
                     properties.set_str("create_kafka_connection", "false");
 
                     extend_input_splits.push(InputSplit::new(split_number, properties));

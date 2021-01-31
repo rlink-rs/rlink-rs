@@ -18,8 +18,8 @@ use crate::runtime::coordinator::server::web_launch;
 use crate::runtime::coordinator::task_distribution::build_application_descriptor;
 use crate::runtime::{ApplicationDescriptor, TaskManagerStatus};
 use crate::storage::metadata::{
-    loop_delete_job_descriptor, loop_read_job_descriptor, loop_save_job_descriptor,
-    loop_update_application_status, MetadataStorage,
+    loop_delete_application_descriptor, loop_read_application_descriptor,
+    loop_save_application_descriptor, loop_update_application_status, MetadataStorage,
 };
 use crate::utils::date_time::timestamp_str;
 
@@ -169,7 +169,7 @@ where
 
     fn save_metadata(&self, application_descriptor: ApplicationDescriptor) {
         let mut metadata_storage = MetadataStorage::new(&self.metadata_storage_mode);
-        loop_save_job_descriptor(
+        loop_save_application_descriptor(
             metadata_storage.borrow_mut(),
             application_descriptor.clone(),
         );
@@ -177,7 +177,7 @@ where
 
     fn clear_metadata(&self) {
         let mut metadata_storage = MetadataStorage::new(&self.metadata_storage_mode);
-        loop_delete_job_descriptor(metadata_storage.borrow_mut());
+        loop_delete_application_descriptor(metadata_storage.borrow_mut());
     }
 
     fn build_checkpoint_manager(
@@ -248,7 +248,7 @@ where
         loop {
             info!("waiting all workers status fine...");
 
-            let job_descriptor = loop_read_job_descriptor(&metadata_storage);
+            let job_descriptor = loop_read_application_descriptor(&metadata_storage);
 
             let unregister_worker = job_descriptor
                 .worker_managers

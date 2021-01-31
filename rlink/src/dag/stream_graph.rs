@@ -25,7 +25,7 @@ pub struct StreamNode {
 }
 
 impl Label for StreamNode {
-    fn get_label(&self) -> String {
+    fn label(&self) -> String {
         format!("{}({})", self.operator_name, self.id.0)
     }
 }
@@ -39,7 +39,7 @@ pub struct StreamEdge {
 }
 
 impl Label for StreamEdge {
-    fn get_label(&self) -> String {
+    fn label(&self) -> String {
         self.edge_id.clone()
     }
 }
@@ -157,9 +157,9 @@ impl RawStreamGraph {
             id: operator_id,
             parent_ids: parent_operator_ids.clone(),
             parallelism,
-            operator_name: operator.get_operator_name().to_string(),
+            operator_name: operator.operator_name().to_string(),
             operator_type: OperatorType::from(&operator),
-            fn_creator: operator.get_fn_creator(),
+            fn_creator: operator.fn_creator(),
         };
 
         let node_index = self.dag.add_node(stream_node.clone());
@@ -202,7 +202,7 @@ impl RawStreamGraph {
         operator: StreamOperator,
         parent_operator_ids: Vec<OperatorId>,
     ) -> Result<OperatorId, DagError> {
-        let parallelism = operator.get_parallelism();
+        let parallelism = operator.parallelism();
         let operator_type = OperatorType::from(&operator);
 
         return if parent_operator_ids.len() == 0 {

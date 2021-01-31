@@ -90,13 +90,13 @@ impl TMetadataStorage for MetadataStorage {
     }
 }
 
-pub(crate) fn loop_read_job_descriptor(
+pub(crate) fn loop_read_application_descriptor(
     metadata_storage: &MetadataStorage,
 ) -> ApplicationDescriptor {
     loop_fn!(metadata_storage.load(), std::time::Duration::from_secs(2))
 }
 
-pub(crate) fn loop_save_job_descriptor(
+pub(crate) fn loop_save_application_descriptor(
     metadata_storage: &mut MetadataStorage,
     application_descriptor: ApplicationDescriptor,
 ) {
@@ -106,7 +106,7 @@ pub(crate) fn loop_save_job_descriptor(
     );
 }
 
-pub(crate) fn loop_delete_job_descriptor(metadata_storage: &mut MetadataStorage) {
+pub(crate) fn loop_delete_application_descriptor(metadata_storage: &mut MetadataStorage) {
     loop_fn!(metadata_storage.delete(), std::time::Duration::from_secs(2));
 }
 

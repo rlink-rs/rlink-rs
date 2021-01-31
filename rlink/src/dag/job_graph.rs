@@ -18,7 +18,7 @@ pub enum JobEdge {
 }
 
 impl Label for JobEdge {
-    fn get_label(&self) -> String {
+    fn label(&self) -> String {
         format!("{:?}", self)
     }
 }
@@ -34,7 +34,7 @@ pub struct JobNode {
 }
 
 impl Label for JobNode {
-    fn get_label(&self) -> String {
+    fn label(&self) -> String {
         let op_names: Vec<&str> = self
             .stream_nodes
             .iter()

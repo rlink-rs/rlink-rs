@@ -72,7 +72,7 @@ impl Runnable for SinkRunnable {
                 self.counter.fetch_add(1, Ordering::Relaxed);
             }
             Element::Barrier(barrier) => {
-                match self.stream_sink.get_fn_creator() {
+                match self.stream_sink.fn_creator() {
                     FunctionCreator::System => {
                         // distribution to downstream
                         self.stream_sink
@@ -82,14 +82,14 @@ impl Runnable for SinkRunnable {
                     FunctionCreator::User => {
                         let snapshot_context = {
                             let context = self.context.as_ref().unwrap();
-                            context.get_checkpoint_context(self.operator_id, barrier.checkpoint_id)
+                            context.checkpoint_context(self.operator_id, barrier.checkpoint_id)
                         };
                         self.checkpoint(snapshot_context);
                     }
                 }
             }
             Element::Watermark(watermark) => {
-                match self.stream_sink.get_fn_creator() {
+                match self.stream_sink.fn_creator() {
                     FunctionCreator::System => {
                         // distribution to downstream
                         self.stream_sink
@@ -102,7 +102,7 @@ impl Runnable for SinkRunnable {
                 }
             }
             Element::StreamStatus(stream_status) => {
-                match self.stream_sink.get_fn_creator() {
+                match self.stream_sink.fn_creator() {
                     FunctionCreator::System => {
                         // distribution to downstream
                         self.stream_sink
@@ -127,7 +127,7 @@ impl Runnable for SinkRunnable {
     }
 
     fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext) {
-        let handle = match self.stream_sink.operator_fn.get_checkpoint() {
+        let handle = match self.stream_sink.operator_fn.checkpoint_function() {
             Some(checkpoint) => checkpoint.snapshot_state(&snapshot_context),
             None => CheckpointHandle::default(),
         };

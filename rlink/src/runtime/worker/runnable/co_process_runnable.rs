@@ -41,12 +41,12 @@ impl Runnable for CoProcessRunnable {
 
         // find the stream_node of `input_format`
         // the chain: input_format -> connect, so the `connect` is only one parent
-        let source_stream_node = &context.get_job_node().stream_nodes[0];
+        let source_stream_node = &context.job_node().stream_nodes[0];
 
         for index in 0..source_stream_node.parent_ids.len() {
             let parent_id = source_stream_node.parent_ids[index];
             let parent_job_id = context
-                .get_parent_jobs()
+                .parent_jobs()
                 .iter()
                 .find_map(|(node, _)| {
                     node.stream_nodes

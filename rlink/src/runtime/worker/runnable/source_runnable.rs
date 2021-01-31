@@ -151,14 +151,14 @@ impl Runnable for SourceRunnable {
         let source_func = self.stream_source.operator_fn.as_mut();
         source_func.open(input_split, &fun_context)?;
 
-        if let FunctionCreator::User = self.stream_source.get_fn_creator() {
+        if let FunctionCreator::User = self.stream_source.fn_creator() {
             let stream_status_timer = context
                 .window_timer
                 .register("StreamStatus Event Timer", Duration::from_secs(10))
                 .expect("register StreamStatus timer error");
             self.stream_status_timer = Some(stream_status_timer);
 
-            let checkpoint_period = context.get_checkpoint_internal(Duration::from_secs(30));
+            let checkpoint_period = context.checkpoint_internal(Duration::from_secs(30));
             let checkpoint_timer = context
                 .window_timer
                 .register("Checkpoint Event Timer", checkpoint_period)
@@ -187,7 +187,7 @@ impl Runnable for SourceRunnable {
         let running = Arc::new(AtomicBool::new(true));
 
         self.poll_input_element(sender.clone(), running.clone());
-        if let FunctionCreator::User = self.stream_source.get_fn_creator() {
+        if let FunctionCreator::User = self.stream_source.fn_creator() {
             self.poll_stream_status(sender.clone(), running.clone());
             self.poll_checkpoint(sender.clone(), running.clone());
         }
@@ -204,7 +204,7 @@ impl Runnable for SourceRunnable {
                     let checkpoint_id = element.as_barrier().checkpoint_id;
                     let snapshot_context = {
                         let context = self.context.as_ref().unwrap();
-                        context.get_checkpoint_context(self.operator_id, checkpoint_id)
+                        context.checkpoint_context(self.operator_id, checkpoint_id)
                     };
                     self.checkpoint(snapshot_context);
 

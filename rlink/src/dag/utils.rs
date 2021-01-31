@@ -6,16 +6,6 @@ use serde::Serialize;
 
 use crate::dag::Label;
 
-// pub(crate) fn get_nodes<N, E>(dag: &Dag<N, E>) -> Vec<N>
-// where
-//     N: Clone,
-// {
-//     dag.raw_nodes()
-//         .iter()
-//         .map(|node| node.weight.clone())
-//         .collect()
-// }
-
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub(crate) struct JsonNode<N>
 where
@@ -96,7 +86,7 @@ where
             let target_json_node = JsonDag::crate_json_node(dag, edge.target());
 
             let json_edge = {
-                let label = edge.weight.get_label();
+                let label = edge.weight.label();
                 JsonEdge {
                     source: source_json_node.id.clone(),
                     target: target_json_node.id.clone(),
@@ -138,7 +128,7 @@ where
 
     fn crate_json_node(dag: &Dag<N, E>, node_index: NodeIndex) -> JsonNode<N> {
         let n = dag.index(node_index);
-        let label = n.get_label();
+        let label = n.label();
         let id = node_index.index().to_string();
         let ty = JsonDag::get_node_type(dag, node_index);
 

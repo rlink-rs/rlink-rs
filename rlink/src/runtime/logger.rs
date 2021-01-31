@@ -12,7 +12,7 @@ use log4rs::config::{Appender, Config, Logger, Root};
 use log4rs::encode::pattern::PatternEncoder;
 
 use crate::runtime::ClusterMode;
-use crate::utils::process::get_work_space;
+use crate::utils::process::work_space;
 
 /// init log4r
 /// cluster_mode: for appender build
@@ -56,7 +56,7 @@ fn create_console_appender(encoder: PatternEncoder) -> Box<dyn Append> {
 }
 
 fn create_rolling_file_appender(encoder: PatternEncoder) -> Box<dyn Append> {
-    let cur_dir = get_work_space();
+    let cur_dir = work_space();
     let path = cur_dir.join("task-manager.log");
     let roll_path = path.to_str().unwrap().to_string() + ".{}";
 

@@ -14,7 +14,7 @@ pub(crate) struct ForwardTaskChain {
 }
 
 impl ForwardTaskChain {
-    pub fn get_task_id(&self) -> TaskId {
+    pub fn task_id(&self) -> TaskId {
         self.tasks
             .iter()
             .min_by_key(|x| x.task_id.job_id.0)
@@ -68,7 +68,7 @@ impl PhysicGraph {
     pub(crate) fn build(&mut self, execution_graph: &ExecutionGraph) {
         let chains = self.merge_forward_task(execution_graph);
         for chain in chains {
-            let task_id = chain.get_task_id();
+            let task_id = chain.task_id();
             let task_groups = self.task_groups.entry(task_id.job_id).or_insert(vec![]);
             task_groups.push(chain);
         }

@@ -39,8 +39,8 @@ where
     Self: TimestampAssigner + Function + Debug,
 {
     /// Return the current `Watermark` and row's timestamp
-    fn get_watermark(&mut self, element: &Element) -> Option<Watermark>;
-    fn get_current_watermark(&self) -> Option<Watermark>;
+    fn watermark(&mut self, element: &Element) -> Option<Watermark>;
+    fn current_watermark(&self) -> Option<Watermark>;
 }
 
 #[derive(Debug)]
@@ -75,7 +75,7 @@ impl<E> WatermarkAssigner for BoundedOutOfOrdernessTimestampExtractor<E>
 where
     E: TimestampAssigner,
 {
-    fn get_watermark(&mut self, element: &Element) -> Option<Watermark> {
+    fn watermark(&mut self, element: &Element) -> Option<Watermark> {
         if element.is_stream_status() {
             let potential_wm = self.current_max_timestamp - self.max_out_of_orderness;
             debug!(
@@ -101,7 +101,7 @@ where
         }
     }
 
-    fn get_current_watermark(&self) -> Option<Watermark> {
+    fn current_watermark(&self) -> Option<Watermark> {
         if self.last_emitted_watermark == 0 {
             None
         } else {

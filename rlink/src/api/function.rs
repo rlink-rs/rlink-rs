@@ -26,7 +26,7 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn get_checkpoint_context(&self) -> FunctionSnapshotContext {
+    pub fn checkpoint_context(&self) -> FunctionSnapshotContext {
         FunctionSnapshotContext::new(self.operator_id, self.task_id, self.checkpoint_id)
     }
 }
@@ -45,11 +45,11 @@ impl InputSplit {
         }
     }
 
-    pub fn get_split_number(&self) -> u16 {
+    pub fn split_number(&self) -> u16 {
         self.split_number
     }
 
-    pub fn get_properties(&self) -> &Properties {
+    pub fn properties(&self) -> &Properties {
         &self.properties
     }
 }
@@ -69,7 +69,7 @@ impl InputSplitAssigner {
         InputSplitAssigner { input_splits }
     }
 
-    pub fn get_next_input_split(&mut self, _host: String, _task_id: usize) -> Option<InputSplit> {
+    pub fn next_input_split(&mut self, _host: String, _task_id: usize) -> Option<InputSplit> {
         self.input_splits.pop()
     }
 }
@@ -91,7 +91,7 @@ pub trait InputSplitSource {
     /// Create InputSplitAssigner by InputSplits['input_splits']
     ///
     /// Returns a InputSplitAssigner
-    fn get_input_split_assigner(&self, input_splits: Vec<InputSplit>) -> InputSplitAssigner {
+    fn input_split_assigner(&self, input_splits: Vec<InputSplit>) -> InputSplitAssigner {
         InputSplitAssigner::new(input_splits)
     }
 }
@@ -135,7 +135,7 @@ where
 
     fn close(&mut self) -> crate::api::Result<()>;
 
-    fn get_checkpoint(&mut self) -> Option<Box<&mut dyn CheckpointFunction>> {
+    fn checkpoint_function(&mut self) -> Option<Box<&mut dyn CheckpointFunction>> {
         None
     }
 

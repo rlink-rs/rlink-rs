@@ -37,8 +37,8 @@ impl StreamApp for SimpleStreamApp {
 
         // the schema after reduce
         let output_schema_types = {
-            let mut key_types = key_selector.get_schema_types();
-            let reduce_types = reduce_function.get_schema_types();
+            let mut key_types = key_selector.schema_types();
+            let reduce_types = reduce_function.schema_types();
             key_types.extend_from_slice(reduce_types.as_slice());
             key_types
         };
@@ -77,8 +77,8 @@ impl StreamApp for ConnectStreamApp {
 
         // the schema after reduce
         let output_schema_types = {
-            let mut key_types = key_selector.get_schema_types();
-            let reduce_types = reduce_function.get_schema_types();
+            let mut key_types = key_selector.schema_types();
+            let reduce_types = reduce_function.schema_types();
             key_types.extend_from_slice(reduce_types.as_slice());
             key_types
         };
@@ -134,8 +134,8 @@ impl StreamApp for ConnectStreamApp1 {
 
         // the schema after reduce
         let output_schema_types = {
-            let mut key_types = key_selector.get_schema_types();
-            let reduce_types = reduce_function.get_schema_types();
+            let mut key_types = key_selector.schema_types();
+            let reduce_types = reduce_function.schema_types();
             key_types.extend_from_slice(reduce_types.as_slice());
             key_types
         };

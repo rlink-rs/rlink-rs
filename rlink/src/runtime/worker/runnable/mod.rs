@@ -69,7 +69,7 @@ impl RunnableContext {
         }
     }
 
-    pub(crate) fn get_checkpoint_context(
+    pub(crate) fn checkpoint_context(
         &self,
         operator_id: OperatorId,
         checkpoint_id: CheckpointId,
@@ -77,7 +77,7 @@ impl RunnableContext {
         FunctionSnapshotContext::new(operator_id, self.task_descriptor.task_id, checkpoint_id)
     }
 
-    pub(crate) fn get_checkpoint_internal(&self, default_value: Duration) -> Duration {
+    pub(crate) fn checkpoint_internal(&self, default_value: Duration) -> Duration {
         self.application_descriptor
             .coordinator_manager
             .application_properties
@@ -85,12 +85,12 @@ impl RunnableContext {
             .unwrap_or(default_value)
     }
 
-    pub(crate) fn get_parent_parallelism(&self) -> u16 {
-        let ps = self.get_parents_parallelism();
+    pub(crate) fn parent_parallelism(&self) -> u16 {
+        let ps = self.parents_parallelism();
         *ps.get(0).unwrap()
     }
 
-    pub(crate) fn get_parents_parallelism(&self) -> Vec<u16> {
+    pub(crate) fn parents_parallelism(&self) -> Vec<u16> {
         self.dag_metadata
             .job_parents(self.task_descriptor.task_id.job_id)
             .iter()
@@ -98,12 +98,12 @@ impl RunnableContext {
             .collect()
     }
 
-    pub(crate) fn get_child_parallelism(&self) -> u16 {
-        let ps = self.get_children_parallelism();
+    pub(crate) fn child_parallelism(&self) -> u16 {
+        let ps = self.children_parallelism();
         *ps.get(0).unwrap()
     }
 
-    pub(crate) fn get_children_parallelism(&self) -> Vec<u16> {
+    pub(crate) fn children_parallelism(&self) -> Vec<u16> {
         self.dag_metadata
             .job_children(self.task_descriptor.task_id.job_id)
             .into_iter()
@@ -111,7 +111,7 @@ impl RunnableContext {
             .collect()
     }
 
-    pub(crate) fn get_parent_jobs(&self) -> Vec<(JobNode, JobEdge)> {
+    pub(crate) fn parent_jobs(&self) -> Vec<(JobNode, JobEdge)> {
         self.dag_metadata
             .job_parents(self.task_descriptor.task_id.job_id)
             .into_iter()
@@ -120,11 +120,11 @@ impl RunnableContext {
     }
 
     #[allow(dead_code)]
-    pub(crate) fn get_stream_node(&self, operator_id: OperatorId) -> &StreamNode {
+    pub(crate) fn stream_node(&self, operator_id: OperatorId) -> &StreamNode {
         self.dag_metadata.stream_node(operator_id).unwrap()
     }
 
-    pub(crate) fn get_job_node(&self) -> &JobNode {
+    pub(crate) fn job_node(&self) -> &JobNode {
         self.dag_metadata
             .job_node(self.task_descriptor.task_id.job_id)
             .unwrap()

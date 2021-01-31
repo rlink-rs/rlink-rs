@@ -100,7 +100,7 @@ impl Runnable for WatermarkAssignerRunnable {
                         stream_status,
                     ));
             } else {
-                match watermark_assigner.get_watermark(&element) {
+                match watermark_assigner.watermark(&element) {
                     Some(watermark) => {
                         debug!("Emit watermark {:?}", timestamp_str(watermark.timestamp));
                         self.watermark = watermark;

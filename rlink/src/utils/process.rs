@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-pub fn get_work_space() -> PathBuf {
+pub fn work_space() -> PathBuf {
     std::env::current_dir().expect("Get current dir error")
 }
 

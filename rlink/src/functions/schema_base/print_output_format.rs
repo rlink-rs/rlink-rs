@@ -52,7 +52,7 @@ impl OutputFormat for PrintOutputFormat {
             field_str_vec.push(format!("{}:{}", i, field_str));
         }
 
-        let window_str = record.get_trigger_window().map(|window| {
+        let window_str = record.trigger_window().map(|window| {
             let min_timestamp = window.min_timestamp();
             let max_timestamp = window.max_timestamp();
             format!(

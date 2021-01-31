@@ -84,12 +84,12 @@ impl Server {
         }
     }
 
-    pub fn get_bind_addr_sync(&self) -> Option<SocketAddr> {
+    pub fn bind_addr_sync(&self) -> Option<SocketAddr> {
         let self_clone = self.clone();
-        get_runtime().block_on(self_clone.get_bind_addr())
+        get_runtime().block_on(self_clone.bind_addr())
     }
 
-    pub async fn get_bind_addr(&self) -> Option<SocketAddr> {
+    pub async fn bind_addr(&self) -> Option<SocketAddr> {
         let addr = self.bind_addr.read().await;
         let addr = *addr;
         addr.clone()

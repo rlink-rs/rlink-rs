@@ -19,7 +19,7 @@ pub(crate) enum ExecutionEdge {
 }
 
 impl Label for ExecutionEdge {
-    fn get_label(&self) -> String {
+    fn label(&self) -> String {
         format!("{:?}", self)
     }
 }
@@ -32,7 +32,7 @@ pub(crate) struct ExecutionNode {
 }
 
 impl Label for ExecutionNode {
-    fn get_label(&self) -> String {
+    fn label(&self) -> String {
         let op_names: Vec<&str> = self
             .stream_nodes
             .iter()

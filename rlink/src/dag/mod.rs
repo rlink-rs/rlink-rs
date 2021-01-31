@@ -121,7 +121,7 @@ pub enum DagError {
 }
 
 pub(crate) trait Label {
-    fn get_label(&self) -> String;
+    fn label(&self) -> String;
 }
 
 #[derive(Clone, Debug)]

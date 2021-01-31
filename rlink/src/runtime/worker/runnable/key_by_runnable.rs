@@ -51,7 +51,7 @@ impl Runnable for KeyByRunnable {
         self.stream_key_by.operator_fn.open(&fun_context)?;
 
         // todo set self.partition_size = Reduce.partition
-        self.partition_size = context.get_child_parallelism() as u16;
+        self.partition_size = context.child_parallelism() as u16;
 
         let tags = vec![
             Tag::from(("job_id", self.task_id.job_id.0)),

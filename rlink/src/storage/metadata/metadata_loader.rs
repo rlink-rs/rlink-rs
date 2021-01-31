@@ -19,14 +19,6 @@ impl MetadataLoader {
         }
     }
 
-    // pub fn get_application_descriptor_from_cache(&mut self) -> ApplicationDescriptor {
-    //     if let Some(a) = &self.application_descriptor_cache {
-    //         a.clone()
-    //     } else {
-    //         self.get_application_descriptor()
-    //     }
-    // }
-
     pub fn get_application_descriptor(&mut self) -> ApplicationDescriptor {
         let url = format!("{}/metadata", self.coordinator_address);
         loop {
@@ -53,14 +45,6 @@ impl MetadataLoader {
             }
         }
     }
-
-    // pub fn get_dag_metadata_from_cache(&mut self) -> DagMetadata {
-    //     if let Some(a) = &self.dag_metadata_cache {
-    //         a.clone()
-    //     } else {
-    //         self.get_dag_metadata()
-    //     }
-    // }
 
     pub fn get_dag_metadata(&mut self) -> DagMetadata {
         let url = format!("{}/dag_metadata", self.coordinator_address);

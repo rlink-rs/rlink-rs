@@ -64,7 +64,7 @@ impl TWindowState for MemoryWindowState {
     where
         F: Fn(Option<&mut Record>, &mut Record) -> Record,
     {
-        let windows = record.get_location_windows();
+        let windows = record.location_windows();
 
         if windows.len() == 1 {
             let window = &windows[0].clone();

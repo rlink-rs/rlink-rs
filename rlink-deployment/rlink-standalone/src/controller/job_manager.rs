@@ -212,8 +212,8 @@ pub async fn shutdown_tasks(
     let application_id = application_id.as_str();
 
     for task_res_info in &task_ids.into_inner() {
-        let task_id = task_res_info.get_task_id().unwrap(); //.ok_or(anyhow!("task_id not found"))?;
-        let task_manager_address = task_res_info.get_task_manager_address().unwrap();
+        let task_id = task_res_info.task_id().unwrap(); //.ok_or(anyhow!("task_id not found"))?;
+        let task_manager_address = task_res_info.task_manager_address().unwrap();
 
         let kill_result = kill_task(application_id, task_id, task_manager_address).await;
         match kill_result {

@@ -82,7 +82,7 @@ fn bootstrap_publish_serve(bind_ip: String) -> SocketAddr {
     let worker_service_clone = worker_service.clone();
     utils::thread::spawn("publish_serve", move || worker_service_clone.serve_sync());
     loop {
-        match worker_service.get_bind_addr_sync() {
+        match worker_service.bind_addr_sync() {
             Some(addr) => {
                 return addr;
             }
