@@ -93,7 +93,7 @@ impl Runnable for KeyByRunnable {
     }
 
     fn close(&mut self) -> anyhow::Result<()> {
-        // self.stream_key_by.operator_fn.close();
+        self.stream_key_by.operator_fn.close()?;
         self.next_runnable.as_mut().unwrap().close()
     }
 
