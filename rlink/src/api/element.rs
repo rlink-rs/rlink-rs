@@ -22,6 +22,7 @@ pub mod types {
 
 pub(crate) trait Partition {
     fn partition(&self) -> u16;
+    fn set_partition(&mut self, partition: u16);
 }
 
 const SER_DE_RECORD: u8 = 1;
@@ -42,7 +43,7 @@ pub(crate) trait Serde {
 
 #[derive(Clone, Debug, Hash)]
 pub struct Record {
-    pub(crate) partition_num: u16,
+    pub partition_num: u16,
     pub(crate) timestamp: u64,
 
     pub(crate) channel_key: ChannelKey,
@@ -160,6 +161,10 @@ impl Partition for Record {
     fn partition(&self) -> u16 {
         self.partition_num
     }
+
+    fn set_partition(&mut self, partition: u16) {
+        self.partition_num = partition;
+    }
 }
 
 impl Serde for Record {
@@ -202,7 +207,7 @@ impl Serde for Record {
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub struct Watermark {
     // for partition routing
-    pub(crate) partition_num: u16,
+    partition_num: u16,
 
     // for align
     pub(crate) task_number: u16,
@@ -253,6 +258,10 @@ impl Partition for Watermark {
     fn partition(&self) -> u16 {
         self.partition_num
     }
+
+    fn set_partition(&mut self, partition: u16) {
+        self.partition_num = partition;
+    }
 }
 
 impl Serde for Watermark {
@@ -294,7 +303,7 @@ impl Serde for Watermark {
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub struct StreamStatus {
-    pub(crate) partition_num: u16,
+    partition_num: u16,
     pub(crate) timestamp: u64,
 
     pub(crate) end: bool,
@@ -313,6 +322,10 @@ impl StreamStatus {
 impl Partition for StreamStatus {
     fn partition(&self) -> u16 {
         self.partition_num
+    }
+
+    fn set_partition(&mut self, partition: u16) {
+        self.partition_num = partition;
     }
 }
 
@@ -345,7 +358,7 @@ impl Serde for StreamStatus {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Barrier {
-    pub(crate) partition_num: u16,
+    partition_num: u16,
     pub(crate) checkpoint_id: CheckpointId,
 }
 
@@ -361,6 +374,10 @@ impl Barrier {
 impl Partition for Barrier {
     fn partition(&self) -> u16 {
         self.partition_num
+    }
+
+    fn set_partition(&mut self, partition: u16) {
+        self.partition_num = partition;
     }
 }
 
@@ -518,6 +535,15 @@ impl Partition for Element {
             Element::StreamStatus(stream_status) => stream_status.partition(),
             Element::Watermark(water_mark) => water_mark.partition(),
             Element::Barrier(barrier) => barrier.partition(),
+        }
+    }
+
+    fn set_partition(&mut self, partition: u16) {
+        match self {
+            Element::Record(record) => record.set_partition(partition),
+            Element::StreamStatus(stream_status) => stream_status.set_partition(partition),
+            Element::Watermark(water_mark) => water_mark.set_partition(partition),
+            Element::Barrier(barrier) => barrier.set_partition(partition),
         }
     }
 }

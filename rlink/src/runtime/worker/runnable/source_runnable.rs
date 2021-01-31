@@ -200,7 +200,7 @@ impl Runnable for SourceRunnable {
                     .unwrap()
                     .apply(element.as_barrier());
                 if is_barrier_align {
-                    info!("barrier align and checkpoint");
+                    debug!("barrier align and checkpoint");
                     let checkpoint_id = element.as_barrier().checkpoint_id;
                     let snapshot_context = {
                         let context = self.context.as_ref().unwrap();

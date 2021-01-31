@@ -3,7 +3,7 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use crate::api::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
-use crate::api::element::Element;
+use crate::api::element::{Element, Partition};
 use crate::api::function::OutputFormat;
 use crate::api::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
 use crate::api::runtime::{OperatorId, TaskId};
@@ -88,60 +88,33 @@ impl Runnable for SinkRunnable {
 
                 self.counter.fetch_add(1, Ordering::Relaxed);
             }
-            Element::Barrier(barrier) => {
+            _ => {
+                if element.is_barrier() {
+                    let snapshot_context = {
+                        let checkpoint_id = element.as_barrier().checkpoint_id;
+                        let context = self.context.as_ref().unwrap();
+                        context.checkpoint_context(self.operator_id, checkpoint_id)
+                    };
+                    self.checkpoint(snapshot_context);
+                }
+
                 match self.stream_sink.fn_creator() {
                     FunctionCreator::System => {
                         // distribution to downstream
                         if self.child_parallelism > 0 {
                             for index in 0..self.child_parallelism {
-                                let mut row_barrier = barrier.clone();
-                                row_barrier.partition_num = index;
+                                let mut ele = element.clone();
+                                ele.set_partition(index);
                                 debug!("downstream barrier: {}", index);
 
-                                self.stream_sink
-                                    .operator_fn
-                                    .write_element(Element::Barrier(row_barrier));
+                                self.stream_sink.operator_fn.write_element(ele);
                             }
                         } else {
                             debug!("downstream barrier");
-                            self.stream_sink
-                                .operator_fn
-                                .write_element(Element::from(barrier));
+                            self.stream_sink.operator_fn.write_element(element);
                         }
                     }
-                    FunctionCreator::User => {
-                        let snapshot_context = {
-                            let context = self.context.as_ref().unwrap();
-                            context.checkpoint_context(self.operator_id, barrier.checkpoint_id)
-                        };
-                        self.checkpoint(snapshot_context);
-                    }
-                }
-            }
-            Element::Watermark(watermark) => {
-                match self.stream_sink.fn_creator() {
-                    FunctionCreator::System => {
-                        // distribution to downstream
-                        self.stream_sink
-                            .operator_fn
-                            .write_element(Element::from(watermark));
-                    }
-                    FunctionCreator::User => {
-                        // nothing to do
-                    }
-                }
-            }
-            Element::StreamStatus(stream_status) => {
-                match self.stream_sink.fn_creator() {
-                    FunctionCreator::System => {
-                        // distribution to downstream
-                        self.stream_sink
-                            .operator_fn
-                            .write_element(Element::from(stream_status));
-                    }
-                    FunctionCreator::User => {
-                        // nothing to do
-                    }
+                    FunctionCreator::User => {}
                 }
             }
         }

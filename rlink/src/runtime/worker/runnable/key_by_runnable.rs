@@ -4,7 +4,7 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use crate::api::checkpoint::FunctionSnapshotContext;
-use crate::api::element::Element;
+use crate::api::element::{Element, Partition};
 use crate::api::function::KeySelectorFunction;
 use crate::api::operator::DefaultStreamOperator;
 use crate::api::runtime::{OperatorId, TaskId};
@@ -80,35 +80,15 @@ impl Runnable for KeyByRunnable {
                 //     hash_code,
                 //     self.partition_size,
                 // );
-                record.partition_num = partition_num as u16;
+                record.set_partition(partition_num as u16);
 
                 self.next_runnable.as_mut().unwrap().run(element);
 
                 self.counter.fetch_add(1, Ordering::Relaxed);
             }
-            Element::Watermark(watermark) => {
-                for index in 0..self.partition_size {
-                    let mut row_watermark = watermark.clone();
-                    row_watermark.partition_num = index as u16;
-
-                    self.next_runnable
-                        .as_mut()
-                        .unwrap()
-                        .run(Element::Watermark(row_watermark));
-                }
+            _ => {
+                self.next_runnable.as_mut().unwrap().run(element);
             }
-            Element::Barrier(barrier) => {
-                // for index in 0..self.partition_size {
-                //     let mut row_barrier = barrier.clone();
-                //     row_barrier.partition_num = index as u16;
-
-                self.next_runnable
-                    .as_mut()
-                    .unwrap()
-                    .run(Element::Barrier(barrier.clone()));
-                // }
-            }
-            _ => {}
         }
     }
 
