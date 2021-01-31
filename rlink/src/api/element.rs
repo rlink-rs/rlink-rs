@@ -343,7 +343,7 @@ impl Serde for StreamStatus {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Barrier {
     pub(crate) partition_num: u16,
     pub(crate) checkpoint_id: CheckpointId,

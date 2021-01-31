@@ -170,7 +170,7 @@ impl Runnable for SourceRunnable {
 
         info!(
             "SourceRunnable Opened, operator_id={:?}, task_id={:?}, BarrierAlign expected_size={:?}",
-            self.operator_id, self.task_id, self.barrier_align.as_ref().unwrap(),
+            self.operator_id, self.task_id, self.barrier_align.as_ref().unwrap().expected_size,
         );
         Ok(())
     }
@@ -200,7 +200,7 @@ impl Runnable for SourceRunnable {
                     .unwrap()
                     .apply(element.as_barrier());
                 if is_barrier_align {
-                    debug!("barrier align and checkpoint");
+                    info!("barrier align and checkpoint");
                     let checkpoint_id = element.as_barrier().checkpoint_id;
                     let snapshot_context = {
                         let context = self.context.as_ref().unwrap();

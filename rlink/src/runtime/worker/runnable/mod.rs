@@ -119,6 +119,14 @@ impl RunnableContext {
             .collect()
     }
 
+    pub(crate) fn child_jobs(&self) -> Vec<(JobNode, JobEdge)> {
+        self.dag_metadata
+            .job_children(self.task_descriptor.task_id.job_id)
+            .into_iter()
+            .map(|(job_node, job_edge)| (job_node.clone(), job_edge.clone()))
+            .collect()
+    }
+
     #[allow(dead_code)]
     pub(crate) fn stream_node(&self, operator_id: OperatorId) -> &StreamNode {
         self.dag_metadata.stream_node(operator_id).unwrap()

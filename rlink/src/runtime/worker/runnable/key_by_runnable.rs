@@ -98,15 +98,15 @@ impl Runnable for KeyByRunnable {
                 }
             }
             Element::Barrier(barrier) => {
-                for index in 0..self.partition_size {
-                    let mut row_barrier = barrier.clone();
-                    row_barrier.partition_num = index as u16;
+                // for index in 0..self.partition_size {
+                //     let mut row_barrier = barrier.clone();
+                //     row_barrier.partition_num = index as u16;
 
-                    self.next_runnable
-                        .as_mut()
-                        .unwrap()
-                        .run(Element::Barrier(row_barrier));
-                }
+                self.next_runnable
+                    .as_mut()
+                    .unwrap()
+                    .run(Element::Barrier(barrier.clone()));
+                // }
             }
             _ => {}
         }

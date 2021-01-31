@@ -202,22 +202,16 @@ impl Client {
                 .new_read(r);
 
         let tags = vec![
-            Tag(
-                "source_job_id".to_string(),
-                self.channel_key.source_task_id.job_id.0.to_string(),
-            ),
-            Tag(
-                "source_task_number".to_string(),
-                self.channel_key.source_task_id.task_number.to_string(),
-            ),
-            Tag(
-                "target_job_id".to_string(),
-                self.channel_key.target_task_id.job_id.0.to_string(),
-            ),
-            Tag(
-                "target_task_number".to_string(),
-                self.channel_key.target_task_id.task_number.to_string(),
-            ),
+            Tag::from(("source_job_id", self.channel_key.source_task_id.job_id.0)),
+            Tag::from((
+                "source_task_number",
+                self.channel_key.source_task_id.task_number,
+            )),
+            Tag::from(("target_job_id", self.channel_key.target_task_id.job_id.0)),
+            Tag::from((
+                "target_task_number",
+                self.channel_key.target_task_id.task_number,
+            )),
         ];
         let counter = Arc::new(AtomicU64::new(0));
         register_counter("NetWorkClient", tags, counter.clone());

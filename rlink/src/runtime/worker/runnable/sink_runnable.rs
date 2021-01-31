@@ -7,6 +7,7 @@ use crate::api::element::Element;
 use crate::api::function::OutputFormat;
 use crate::api::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
 use crate::api::runtime::{OperatorId, TaskId};
+use crate::dag::job_graph::JobEdge;
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
@@ -15,6 +16,8 @@ use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 pub(crate) struct SinkRunnable {
     operator_id: OperatorId,
     task_id: TaskId,
+    child_target_id: TaskId,
+    child_parallelism: u16,
 
     context: Option<RunnableContext>,
 
@@ -31,6 +34,8 @@ impl SinkRunnable {
         SinkRunnable {
             operator_id,
             task_id: TaskId::default(),
+            child_target_id: TaskId::default(),
+            child_parallelism: 0,
             context: None,
             stream_sink,
             counter: Arc::new(AtomicU64::new(0)),
@@ -43,10 +48,22 @@ impl Runnable for SinkRunnable {
         self.context = Some(context.clone());
 
         self.task_id = context.task_descriptor.task_id;
+        let child_jobs = context.child_jobs();
+        self.child_parallelism = if child_jobs.len() > 1 {
+            unimplemented!()
+        } else if child_jobs.len() == 1 {
+            let (child_job_node, child_job_edge) = &child_jobs[0];
+            match child_job_edge {
+                JobEdge::Forward => 0,
+                JobEdge::ReBalance => child_job_node.parallelism,
+            }
+        } else {
+            0
+        };
 
         info!(
-            "SinkRunnable Opened. operator_id={:?}, task_id={:?}",
-            self.operator_id, self.task_id
+            "SinkRunnable Opened. operator_id={:?}, task_id={:?}, child_parallelism={}",
+            self.operator_id, self.task_id, self.child_parallelism
         );
 
         let fun_context = context.to_fun_context(self.operator_id);
@@ -75,9 +92,22 @@ impl Runnable for SinkRunnable {
                 match self.stream_sink.fn_creator() {
                     FunctionCreator::System => {
                         // distribution to downstream
-                        self.stream_sink
-                            .operator_fn
-                            .write_element(Element::from(barrier));
+                        if self.child_parallelism > 0 {
+                            for index in 0..self.child_parallelism {
+                                let mut row_barrier = barrier.clone();
+                                row_barrier.partition_num = index;
+                                debug!("downstream barrier: {}", index);
+
+                                self.stream_sink
+                                    .operator_fn
+                                    .write_element(Element::Barrier(row_barrier));
+                            }
+                        } else {
+                            debug!("downstream barrier");
+                            self.stream_sink
+                                .operator_fn
+                                .write_element(Element::from(barrier));
+                        }
                     }
                     FunctionCreator::User => {
                         let snapshot_context = {

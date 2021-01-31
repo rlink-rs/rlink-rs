@@ -118,6 +118,8 @@ impl Runnable for WatermarkAssignerRunnable {
                     None => {}
                 }
             }
+        } else {
+            self.next_runnable.as_mut().unwrap().run(element);
         }
     }
 
