@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 use std::str::FromStr;
 use std::time::Duration;
 
-use crate::api::backend::{CheckpointBackend, KeyedStateBackend, OperatorStateBackend};
+use crate::api::backend::{CheckpointBackend, KeyedStateBackend};
 use crate::api::cluster::MetadataStorageType;
 
 pub type ClusterMode = crate::runtime::ClusterMode;
@@ -14,9 +14,6 @@ pub trait SystemProperties {
 
     fn set_keyed_state_backend(&mut self, state_backend: KeyedStateBackend);
     fn get_keyed_state_backend(&self) -> anyhow::Result<KeyedStateBackend>;
-
-    fn set_operator_state_backend(&mut self, state_backend: OperatorStateBackend);
-    fn get_operator_state_backend(&self) -> anyhow::Result<OperatorStateBackend>;
 
     fn set_checkpoint_internal(&mut self, internal: Duration);
     fn get_checkpoint_internal(&self) -> anyhow::Result<Duration>;
@@ -108,7 +105,6 @@ impl Properties {
 
 pub(crate) const SYSTEM_METADATA_STORAGE_MODE: &str = "SYSTEM_METADATA_STORAGE_MODE";
 pub(crate) const SYSTEM_KEYED_STATE_BACKEND: &str = "SYSTEM_KEYED_STATE_BACKEND";
-pub(crate) const SYSTEM_OPERATOR_STATE_BACKEND: &str = "SYSTEM_OPERATOR_STATE_BACKEND";
 pub(crate) const SYSTEM_CHECKPOINT: &str = "SYSTEM_CHECKPOINT";
 pub(crate) const SYSTEM_CHECKPOINT_INTERNAL: &str = "SYSTEM_CHECKPOINT_INTERNAL";
 pub(crate) const SYSTEM_CLUSTER_MODE: &str = "SYSTEM_CLUSTER_MODE";
@@ -132,16 +128,6 @@ impl SystemProperties for Properties {
 
     fn get_keyed_state_backend(&self) -> anyhow::Result<KeyedStateBackend> {
         let value = self.get_string(SYSTEM_KEYED_STATE_BACKEND)?;
-        serde_json::from_str(value.as_str()).map_err(|e| anyhow!(e))
-    }
-
-    fn set_operator_state_backend(&mut self, state_backend: OperatorStateBackend) {
-        let value = serde_json::to_string(&state_backend).unwrap();
-        self.set_string(SYSTEM_OPERATOR_STATE_BACKEND.to_string(), value)
-    }
-
-    fn get_operator_state_backend(&self) -> anyhow::Result<OperatorStateBackend> {
-        let value = self.get_string(SYSTEM_OPERATOR_STATE_BACKEND)?;
         serde_json::from_str(value.as_str()).map_err(|e| anyhow!(e))
     }
 

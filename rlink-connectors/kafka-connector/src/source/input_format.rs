@@ -3,11 +3,10 @@ use std::time::Duration;
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::{ClientConfig, Offset};
 use rlink::api;
-use rlink::api::backend::OperatorStateBackend;
 use rlink::api::checkpoint::CheckpointFunction;
 use rlink::api::element::Record;
 use rlink::api::function::{Context, InputFormat, InputSplit, InputSplitSource};
-use rlink::api::properties::{Properties, SystemProperties};
+use rlink::api::properties::Properties;
 use rlink::channel::handover::Handover;
 use rlink::metrics::Tag;
 
@@ -23,7 +22,6 @@ pub struct KafkaInputFormat {
     buffer_size: usize,
     handover: Option<Handover>,
 
-    state_mode: Option<OperatorStateBackend>,
     checkpoint: Option<KafkaCheckpointFunction>,
 }
 
@@ -34,7 +32,6 @@ impl KafkaInputFormat {
             topics,
             buffer_size,
             handover: None,
-            state_mode: None,
             checkpoint: None,
         }
     }
@@ -48,12 +45,6 @@ impl InputFormat for KafkaInputFormat {
             .properties()
             .get_string("create_kafka_connection")?;
         if can_create_consumer.to_lowercase().eq("true") {
-            let state_backend = context
-                .application_properties
-                .get_operator_state_backend()
-                .unwrap_or(OperatorStateBackend::None);
-            self.state_mode = Some(state_backend);
-
             let mut kafka_checkpoint =
                 KafkaCheckpointFunction::new(context.application_id.clone(), context.task_id);
             // todo provide the data from coordinator
