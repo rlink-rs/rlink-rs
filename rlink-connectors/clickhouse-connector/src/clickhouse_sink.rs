@@ -57,13 +57,10 @@ impl ClickhouseSink {
 impl OutputFormat for ClickhouseSink {
     fn open(&mut self, context: &Context) -> api::Result<()> {
         let tags = vec![
-            Tag("job_id".to_string(), context.task_id.job_id().0.to_string()),
-            Tag(
-                "task_number".to_string(),
-                context.task_id.task_number().to_string(),
-            ),
+            Tag::from(("job_id", context.task_id.job_id().0)),
+            Tag::from(("task_number", context.task_id.task_number())),
         ];
-        self.handover = Some(Handover::new(self.get_name(), tags, 10000));
+        self.handover = Some(Handover::new(self.name(), tags, 10000));
 
         let urls: Vec<&str> = self.url.split(",").collect();
         let url = if urls.len() > 1 {
