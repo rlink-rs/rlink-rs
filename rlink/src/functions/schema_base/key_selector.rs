@@ -21,7 +21,7 @@ impl SchemaBaseKeySelector {
 }
 
 impl FunctionSchema for SchemaBaseKeySelector {
-    fn get_schema_types(&self) -> Vec<u8> {
+    fn schema_types(&self) -> Vec<u8> {
         self.key_field_types.clone()
     }
 }
@@ -33,9 +33,9 @@ impl KeySelectorFunction for SchemaBaseKeySelector {
 
     fn get_key(&self, record: &mut Record) -> Record {
         let mut record_key = Record::with_capacity(record.len());
-        let mut writer = record_key.get_writer(self.key_field_types.as_slice());
+        let mut writer = record_key.as_writer(self.key_field_types.as_slice());
 
-        let mut reader = record.get_reader(self.field_types.as_slice());
+        let mut reader = record.as_reader(self.field_types.as_slice());
 
         for index in 0..self.columns.len() {
             writer
@@ -52,7 +52,7 @@ impl KeySelectorFunction for SchemaBaseKeySelector {
 }
 
 impl Function for SchemaBaseKeySelector {
-    fn get_name(&self) -> &str {
+    fn name(&self) -> &str {
         "SchemaBaseKeySelector"
     }
 }

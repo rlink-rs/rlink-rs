@@ -23,7 +23,7 @@ lazy_static! {
     static ref CK_CHANNEL: CheckpointChannel = CheckpointChannel::new();
 }
 
-pub(crate) fn report_checkpoint(ck: Checkpoint) -> Option<Checkpoint> {
+pub(crate) fn submit_checkpoint(ck: Checkpoint) -> Option<Checkpoint> {
     let ck_channel = &*CK_CHANNEL;
 
     debug!("report checkpoint: {:?}", &ck);
@@ -58,7 +58,7 @@ pub(crate) fn start_report_checkpoint(coordinator_address: &str) {
 }
 
 pub(crate) async fn report_checkpoint0(coordinator_address: &str, ck: Checkpoint) {
-    let url = format!("{}/checkpoint", coordinator_address);
+    let url = format!("{}/api/checkpoint", coordinator_address);
 
     let body = serde_json::to_string(&ck).unwrap();
 

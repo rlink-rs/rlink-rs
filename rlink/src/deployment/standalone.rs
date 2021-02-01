@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::api::cluster::{BatchExecuteRequest, ResponseCode, StdResponse, TaskResourceInfo};
 use crate::api::env::{StreamApp, StreamExecutionEnvironment};
@@ -9,12 +10,12 @@ use crate::utils::http_client;
 
 #[derive(Clone, Debug)]
 pub(crate) struct StandaloneResourceManager {
-    context: Context,
+    context: Arc<Context>,
     job_descriptor: Option<ApplicationDescriptor>,
 }
 
 impl StandaloneResourceManager {
-    pub fn new(context: Context) -> Self {
+    pub fn new(context: Arc<Context>) -> Self {
         StandaloneResourceManager {
             context,
             job_descriptor: None,

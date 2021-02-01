@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 
+use crate::api::checkpoint::FunctionSnapshotContext;
 use crate::api::element::Element;
 use crate::api::function::CoProcessFunction;
 use crate::api::operator::DefaultStreamOperator;
-use crate::api::runtime::{CheckpointId, JobId, OperatorId};
+use crate::api::runtime::{JobId, OperatorId};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
 #[derive(Debug)]
@@ -38,14 +39,14 @@ impl Runnable for CoProcessRunnable {
     fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
         self.next_runnable.as_mut().unwrap().open(context)?;
 
-        let source_stream_node = {
-            let stream_node = context.get_stream(self.operator_id);
-            context.get_stream(stream_node.parent_ids[0])
-        };
+        // find the stream_node of `input_format`
+        // the chain: input_format -> connect, so the `connect` is only one parent
+        let source_stream_node = &context.job_node().stream_nodes[0];
+
         for index in 0..source_stream_node.parent_ids.len() {
             let parent_id = source_stream_node.parent_ids[index];
             let parent_job_id = context
-                .get_parent_jobs()
+                .parent_jobs()
                 .iter()
                 .find_map(|(node, _)| {
                     node.stream_nodes
@@ -53,7 +54,7 @@ impl Runnable for CoProcessRunnable {
                         .find(|x| x.id == parent_id)
                         .map(|_x| node.job_id)
                 })
-                .unwrap();
+                .ok_or(anyhow!("co_process_function parent not found"))?;
             self.parent_jobs.insert(parent_job_id, index);
         }
 
@@ -105,5 +106,5 @@ impl Runnable for CoProcessRunnable {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, _checkpoint_id: CheckpointId) {}
+    fn checkpoint(&mut self, _snapshot_context: FunctionSnapshotContext) {}
 }

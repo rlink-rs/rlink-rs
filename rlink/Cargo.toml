@@ -1,6 +1,6 @@
 [package]
 name = "rlink"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["yorkart <wangyue11.4@163.com>>"]
 edition = "2018"
 description = "High performance Stream Processing Framework"
@@ -57,6 +57,7 @@ hyper = "0.13"
 # web
 actix-rt = "1.1"
 actix-web = "3.1"
+actix-files = "0.5"
 awc = "2.0"
 
 # storage

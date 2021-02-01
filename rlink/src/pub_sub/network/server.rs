@@ -40,18 +40,9 @@ pub(crate) fn publish(
         let (sender, receiver) = named_channel(
             "NetworkPublish",
             vec![
-                Tag::new(
-                    "source_job_id".to_string(),
-                    source_task_id.job_id.0.to_string(),
-                ),
-                Tag::new(
-                    "target_job_id".to_string(),
-                    target_task_id.job_id.0.to_string(),
-                ),
-                Tag::new(
-                    "target_task_number".to_string(),
-                    target_task_id.task_number.to_string(),
-                ),
+                Tag::from(("source_job_id", source_task_id.job_id.0)),
+                Tag::from(("target_job_id", target_task_id.job_id.0)),
+                Tag::from(("target_task_number", target_task_id.task_number)),
             ],
             channel_size,
         );
@@ -93,12 +84,12 @@ impl Server {
         }
     }
 
-    pub fn get_bind_addr_sync(&self) -> Option<SocketAddr> {
+    pub fn bind_addr_sync(&self) -> Option<SocketAddr> {
         let self_clone = self.clone();
-        get_runtime().block_on(self_clone.get_bind_addr())
+        get_runtime().block_on(self_clone.bind_addr())
     }
 
-    pub async fn get_bind_addr(&self) -> Option<SocketAddr> {
+    pub async fn bind_addr(&self) -> Option<SocketAddr> {
         let addr = self.bind_addr.read().await;
         let addr = *addr;
         addr.clone()

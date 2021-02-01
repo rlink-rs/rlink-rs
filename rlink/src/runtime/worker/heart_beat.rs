@@ -31,7 +31,7 @@ pub(crate) async fn status_heartbeat_async(
     task_manager_address: &str,
     metrics_address: &str,
 ) {
-    let url = format!("{}/heartbeat", coordinator_address);
+    let url = format!("{}/api/heartbeat", coordinator_address);
 
     let status = if panic::is_panic() {
         "panic".to_string()

@@ -2,18 +2,24 @@ use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-use crate::api::element::Element;
+use crate::api::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
+use crate::api::element::{Element, Partition};
 use crate::api::function::OutputFormat;
 use crate::api::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
-use crate::api::runtime::{CheckpointId, OperatorId};
+use crate::api::runtime::{OperatorId, TaskId};
+use crate::dag::job_graph::JobEdge;
 use crate::metrics::{register_counter, Tag};
+use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
 #[derive(Debug)]
 pub(crate) struct SinkRunnable {
     operator_id: OperatorId,
-    task_number: u16,
-    num_tasks: u16,
+    task_id: TaskId,
+    child_target_id: TaskId,
+    child_parallelism: u16,
+
+    context: Option<RunnableContext>,
 
     stream_sink: DefaultStreamOperator<dyn OutputFormat>,
 
@@ -27,8 +33,10 @@ impl SinkRunnable {
     ) -> Self {
         SinkRunnable {
             operator_id,
-            task_number: 0,
-            num_tasks: 0,
+            task_id: TaskId::default(),
+            child_target_id: TaskId::default(),
+            child_parallelism: 0,
+            context: None,
             stream_sink,
             counter: Arc::new(AtomicU64::new(0)),
         }
@@ -37,28 +45,35 @@ impl SinkRunnable {
 
 impl Runnable for SinkRunnable {
     fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
-        self.task_number = context.task_descriptor.task_id.task_number;
-        self.num_tasks = context.task_descriptor.task_id.num_tasks;
+        self.context = Some(context.clone());
+
+        self.task_id = context.task_descriptor.task_id;
+        let child_jobs = context.child_jobs();
+        self.child_parallelism = if child_jobs.len() > 1 {
+            unimplemented!()
+        } else if child_jobs.len() == 1 {
+            let (child_job_node, child_job_edge) = &child_jobs[0];
+            match child_job_edge {
+                JobEdge::Forward => 0,
+                JobEdge::ReBalance => child_job_node.parallelism,
+            }
+        } else {
+            0
+        };
 
         info!(
-            "SinkRunnable Opened. task_number={}, num_tasks={}",
-            self.task_number, self.num_tasks
+            "SinkRunnable Opened. operator_id={:?}, task_id={:?}, child_parallelism={}",
+            self.operator_id, self.task_id, self.child_parallelism
         );
 
         let fun_context = context.to_fun_context(self.operator_id);
         self.stream_sink.operator_fn.open(&fun_context)?;
 
         let tags = vec![
-            Tag(
-                "job_id".to_string(),
-                context.task_descriptor.task_id.job_id.0.to_string(),
-            ),
-            Tag(
-                "task_number".to_string(),
-                context.task_descriptor.task_id.task_number.to_string(),
-            ),
+            Tag::from(("job_id", self.task_id.job_id.0)),
+            Tag::from(("task_number", self.task_id.task_number)),
         ];
-        let metric_name = format!("Sink_{}", self.stream_sink.operator_fn.as_ref().get_name());
+        let metric_name = format!("Sink_{}", self.stream_sink.operator_fn.as_ref().name());
         register_counter(metric_name.as_str(), tags, self.counter.clone());
 
         Ok(())
@@ -73,43 +88,33 @@ impl Runnable for SinkRunnable {
 
                 self.counter.fetch_add(1, Ordering::Relaxed);
             }
-            Element::Barrier(barrier) => {
-                match self.stream_sink.get_fn_creator() {
-                    FunctionCreator::System => {
-                        // distribution to downstream
-                        self.stream_sink
-                            .operator_fn
-                            .write_element(Element::from(barrier));
-                    }
-                    FunctionCreator::User => {
-                        self.checkpoint(barrier.checkpoint_id);
-                    }
+            _ => {
+                if element.is_barrier() {
+                    let snapshot_context = {
+                        let checkpoint_id = element.as_barrier().checkpoint_id;
+                        let context = self.context.as_ref().unwrap();
+                        context.checkpoint_context(self.operator_id, checkpoint_id)
+                    };
+                    self.checkpoint(snapshot_context);
                 }
-            }
-            Element::Watermark(watermark) => {
-                match self.stream_sink.get_fn_creator() {
+
+                match self.stream_sink.fn_creator() {
                     FunctionCreator::System => {
                         // distribution to downstream
-                        self.stream_sink
-                            .operator_fn
-                            .write_element(Element::from(watermark));
+                        if self.child_parallelism > 0 {
+                            for index in 0..self.child_parallelism {
+                                let mut ele = element.clone();
+                                ele.set_partition(index);
+                                debug!("downstream barrier: {}", index);
+
+                                self.stream_sink.operator_fn.write_element(ele);
+                            }
+                        } else {
+                            debug!("downstream barrier");
+                            self.stream_sink.operator_fn.write_element(element);
+                        }
                     }
-                    FunctionCreator::User => {
-                        // nothing to do
-                    }
-                }
-            }
-            Element::StreamStatus(stream_status) => {
-                match self.stream_sink.get_fn_creator() {
-                    FunctionCreator::System => {
-                        // distribution to downstream
-                        self.stream_sink
-                            .operator_fn
-                            .write_element(Element::from(stream_status));
-                    }
-                    FunctionCreator::User => {
-                        // nothing to do
-                    }
+                    FunctionCreator::User => {}
                 }
             }
         }
@@ -124,7 +129,23 @@ impl Runnable for SinkRunnable {
         unimplemented!()
     }
 
-    fn checkpoint(&mut self, _checkpoint_id: CheckpointId) {
-        self.stream_sink.operator_fn.prepare_commit();
+    fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext) {
+        let handle = match self.stream_sink.operator_fn.checkpoint_function() {
+            Some(checkpoint) => checkpoint.snapshot_state(&snapshot_context),
+            None => CheckpointHandle::default(),
+        };
+
+        let ck = Checkpoint {
+            operator_id: snapshot_context.operator_id,
+            task_id: snapshot_context.task_id,
+            checkpoint_id: snapshot_context.checkpoint_id,
+            handle,
+        };
+        submit_checkpoint(ck).map(|ck| {
+            error!(
+                "{:?} submit checkpoint error. maybe report channel is full, checkpoint: {:?}",
+                snapshot_context.operator_id, ck
+            )
+        });
     }
 }

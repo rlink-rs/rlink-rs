@@ -1,9 +1,10 @@
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::sync::Arc;
 
+use crate::api::checkpoint::FunctionSnapshotContext;
 use crate::api::element::Element;
 use crate::api::operator::DefaultStreamOperator;
-use crate::api::runtime::{CheckpointId, OperatorId};
+use crate::api::runtime::{OperatorId, TaskId};
 use crate::api::watermark::{Watermark, WatermarkAssigner, MAX_WATERMARK, MIN_WATERMARK};
 use crate::metrics::{register_counter, register_gauge, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
@@ -12,8 +13,7 @@ use crate::utils::date_time::timestamp_str;
 #[derive(Debug)]
 pub(crate) struct WatermarkAssignerRunnable {
     operator_id: OperatorId,
-    task_number: u16,
-    num_tasks: u16,
+    task_id: TaskId,
 
     stream_watermark: DefaultStreamOperator<dyn WatermarkAssigner>,
     next_runnable: Option<Box<dyn Runnable>>,
@@ -33,8 +33,7 @@ impl WatermarkAssignerRunnable {
 
         WatermarkAssignerRunnable {
             operator_id,
-            task_number: 0,
-            num_tasks: 0,
+            task_id: TaskId::default(),
             stream_watermark,
             next_runnable,
             watermark: MIN_WATERMARK,
@@ -48,20 +47,13 @@ impl Runnable for WatermarkAssignerRunnable {
     fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
         self.next_runnable.as_mut().unwrap().open(context)?;
 
-        self.task_number = context.task_descriptor.task_id.task_number;
-        self.num_tasks = context.task_descriptor.task_id.num_tasks;
+        self.task_id = context.task_descriptor.task_id;
 
         let tags = vec![
-            Tag(
-                "job_id".to_string(),
-                context.task_descriptor.task_id.job_id.0.to_string(),
-            ),
-            Tag(
-                "task_number".to_string(),
-                context.task_descriptor.task_id.task_number.to_string(),
-            ),
+            Tag::from(("job_id", self.task_id.job_id.0)),
+            Tag::from(("task_number", self.task_id.task_number)),
         ];
-        let fn_name = self.stream_watermark.operator_fn.as_ref().get_name();
+        let fn_name = self.stream_watermark.operator_fn.as_ref().name();
 
         let metric_name = format!("Watermark_{}", fn_name);
         register_gauge(
@@ -102,21 +94,21 @@ impl Runnable for WatermarkAssignerRunnable {
                     .as_mut()
                     .unwrap()
                     .run(Element::new_watermark(
-                        self.task_number,
-                        self.num_tasks,
+                        self.task_id.task_number,
+                        self.task_id.num_tasks,
                         MAX_WATERMARK.timestamp,
                         stream_status,
                     ));
             } else {
-                match watermark_assigner.get_watermark(&element) {
+                match watermark_assigner.watermark(&element) {
                     Some(watermark) => {
                         debug!("Emit watermark {:?}", timestamp_str(watermark.timestamp));
                         self.watermark = watermark;
                         self.watermark_gauge
                             .store(self.watermark.timestamp as i64, Ordering::Relaxed);
                         let watermark_ele = Element::new_watermark(
-                            self.task_number,
-                            self.num_tasks,
+                            self.task_id.task_number,
+                            self.task_id.num_tasks,
                             self.watermark.timestamp,
                             stream_status,
                         );
@@ -126,6 +118,8 @@ impl Runnable for WatermarkAssignerRunnable {
                     None => {}
                 }
             }
+        } else {
+            self.next_runnable.as_mut().unwrap().run(element);
         }
     }
 
@@ -137,5 +131,5 @@ impl Runnable for WatermarkAssignerRunnable {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, _checkpoint_id: CheckpointId) {}
+    fn checkpoint(&mut self, _snapshot_context: FunctionSnapshotContext) {}
 }

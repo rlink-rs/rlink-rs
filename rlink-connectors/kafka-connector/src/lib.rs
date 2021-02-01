@@ -6,6 +6,8 @@ extern crate log;
 extern crate lazy_static;
 #[macro_use]
 extern crate rlink_derive;
+#[macro_use]
+extern crate anyhow;
 
 pub mod sink;
 pub mod source;
@@ -56,7 +58,7 @@ pub fn build_kafka_record(
     //      4(place_holder)
     let capacity = payload.len() + topic.len() + key.len() + 36;
     let mut record = Record::with_capacity(capacity);
-    let mut writer = record.get_writer(&KAFKA_DATA_TYPES);
+    let mut writer = record.as_writer(&KAFKA_DATA_TYPES);
     writer.set_i64(timestamp)?;
     writer.set_bytes(key)?;
     writer.set_bytes(payload)?;
@@ -73,7 +75,7 @@ pub struct KafkaRecord<'a, 'b> {
 
 impl<'a, 'b> KafkaRecord<'a, 'b> {
     pub fn new(record: &'a mut Record) -> Self {
-        let reader = record.get_reader(&KAFKA_DATA_TYPES);
+        let reader = record.as_reader(&KAFKA_DATA_TYPES);
         KafkaRecord { reader }
     }
 

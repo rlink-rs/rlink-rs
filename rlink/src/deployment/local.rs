@@ -1,3 +1,6 @@
+use std::ops::Deref;
+use std::sync::Arc;
+
 use crate::api::cluster::TaskResourceInfo;
 use crate::api::env::{StreamApp, StreamExecutionEnvironment};
 use crate::deployment::{Resource, TResourceManager};
@@ -6,12 +9,12 @@ use crate::runtime::{cluster, ApplicationDescriptor, ManagerType};
 
 #[derive(Clone, Debug)]
 pub(crate) struct LocalResourceManager {
-    context: Context,
+    context: Arc<Context>,
     application_descriptor: Option<ApplicationDescriptor>,
 }
 
 impl LocalResourceManager {
-    pub fn new(context: Context) -> Self {
+    pub fn new(context: Arc<Context>) -> Self {
         LocalResourceManager {
             context,
             application_descriptor: None,
@@ -43,7 +46,7 @@ impl TResourceManager for LocalResourceManager {
                 task_manager_descriptor.task_manager_id, resource.cpu_cores, resource.memory
             );
 
-            let mut context_clone = self.context.clone();
+            let mut context_clone = self.context.deref().clone();
             context_clone.manager_type = ManagerType::Worker;
             context_clone.task_manager_id = task_manager_descriptor.task_manager_id.clone();
             context_clone.coordinator_address = application_descriptor
@@ -60,7 +63,12 @@ impl TResourceManager for LocalResourceManager {
                 ))
                 .spawn(move || {
                     let stream_env = StreamExecutionEnvironment::new(application_name);
-                    cluster::run_task(context_clone, stream_env, stream_app_clone);
+                    match cluster::run_task(Arc::new(context_clone), stream_env, stream_app_clone) {
+                        Ok(_) => {}
+                        Err(e) => {
+                            panic!(format!("TaskManager error. {}", e))
+                        }
+                    }
                 })
                 .unwrap();
         }

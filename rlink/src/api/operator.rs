@@ -16,9 +16,9 @@ pub enum FunctionCreator {
 }
 
 pub trait TStreamOperator: Debug {
-    fn get_operator_name(&self) -> &str;
-    fn get_parallelism(&self) -> u16;
-    fn get_fn_creator(&self) -> FunctionCreator;
+    fn operator_name(&self) -> &str;
+    fn parallelism(&self) -> u16;
+    fn fn_creator(&self) -> FunctionCreator;
 }
 
 pub struct DefaultStreamOperator<T>
@@ -47,15 +47,15 @@ impl<T> TStreamOperator for DefaultStreamOperator<T>
 where
     T: ?Sized + Function,
 {
-    fn get_operator_name(&self) -> &str {
-        self.operator_fn.get_name()
+    fn operator_name(&self) -> &str {
+        self.operator_fn.name()
     }
 
-    fn get_parallelism(&self) -> u16 {
+    fn parallelism(&self) -> u16 {
         self.parallelism
     }
 
-    fn get_fn_creator(&self) -> FunctionCreator {
+    fn fn_creator(&self) -> FunctionCreator {
         self.fn_creator.clone()
     }
 }
@@ -68,7 +68,7 @@ where
         f.debug_struct("StreamOperator")
             .field("parallelism", &self.parallelism)
             .field("fn_creator", &self.fn_creator)
-            .field("operator_fn", &self.operator_fn.get_name())
+            .field("operator_fn", &self.operator_fn.name())
             .finish()
     }
 }
@@ -203,45 +203,45 @@ impl StreamOperator {
 }
 
 impl TStreamOperator for StreamOperator {
-    fn get_operator_name(&self) -> &str {
+    fn operator_name(&self) -> &str {
         match self {
-            StreamOperator::StreamSource(op) => op.get_operator_name(),
-            StreamOperator::StreamFlatMap(op) => op.get_operator_name(),
-            StreamOperator::StreamFilter(op) => op.get_operator_name(),
-            StreamOperator::StreamCoProcess(op) => op.get_operator_name(),
-            StreamOperator::StreamKeyBy(op) => op.get_operator_name(),
-            StreamOperator::StreamReduce(op) => op.get_operator_name(),
-            StreamOperator::StreamWatermarkAssigner(op) => op.get_operator_name(),
-            StreamOperator::StreamWindowAssigner(op) => op.get_operator_name(),
-            StreamOperator::StreamSink(op) => op.get_operator_name(),
+            StreamOperator::StreamSource(op) => op.operator_name(),
+            StreamOperator::StreamFlatMap(op) => op.operator_name(),
+            StreamOperator::StreamFilter(op) => op.operator_name(),
+            StreamOperator::StreamCoProcess(op) => op.operator_name(),
+            StreamOperator::StreamKeyBy(op) => op.operator_name(),
+            StreamOperator::StreamReduce(op) => op.operator_name(),
+            StreamOperator::StreamWatermarkAssigner(op) => op.operator_name(),
+            StreamOperator::StreamWindowAssigner(op) => op.operator_name(),
+            StreamOperator::StreamSink(op) => op.operator_name(),
         }
     }
 
-    fn get_parallelism(&self) -> u16 {
+    fn parallelism(&self) -> u16 {
         match self {
-            StreamOperator::StreamSource(op) => op.get_parallelism(),
-            StreamOperator::StreamFlatMap(op) => op.get_parallelism(),
-            StreamOperator::StreamFilter(op) => op.get_parallelism(),
-            StreamOperator::StreamCoProcess(op) => op.get_parallelism(),
-            StreamOperator::StreamKeyBy(op) => op.get_parallelism(),
-            StreamOperator::StreamReduce(op) => op.get_parallelism(),
-            StreamOperator::StreamWatermarkAssigner(op) => op.get_parallelism(),
-            StreamOperator::StreamWindowAssigner(op) => op.get_parallelism(),
-            StreamOperator::StreamSink(op) => op.get_parallelism(),
+            StreamOperator::StreamSource(op) => op.parallelism(),
+            StreamOperator::StreamFlatMap(op) => op.parallelism(),
+            StreamOperator::StreamFilter(op) => op.parallelism(),
+            StreamOperator::StreamCoProcess(op) => op.parallelism(),
+            StreamOperator::StreamKeyBy(op) => op.parallelism(),
+            StreamOperator::StreamReduce(op) => op.parallelism(),
+            StreamOperator::StreamWatermarkAssigner(op) => op.parallelism(),
+            StreamOperator::StreamWindowAssigner(op) => op.parallelism(),
+            StreamOperator::StreamSink(op) => op.parallelism(),
         }
     }
 
-    fn get_fn_creator(&self) -> FunctionCreator {
+    fn fn_creator(&self) -> FunctionCreator {
         match self {
-            StreamOperator::StreamSource(op) => op.get_fn_creator(),
-            StreamOperator::StreamFlatMap(op) => op.get_fn_creator(),
-            StreamOperator::StreamFilter(op) => op.get_fn_creator(),
-            StreamOperator::StreamCoProcess(op) => op.get_fn_creator(),
-            StreamOperator::StreamKeyBy(op) => op.get_fn_creator(),
-            StreamOperator::StreamReduce(op) => op.get_fn_creator(),
-            StreamOperator::StreamWatermarkAssigner(op) => op.get_fn_creator(),
-            StreamOperator::StreamWindowAssigner(op) => op.get_fn_creator(),
-            StreamOperator::StreamSink(op) => op.get_fn_creator(),
+            StreamOperator::StreamSource(op) => op.fn_creator(),
+            StreamOperator::StreamFlatMap(op) => op.fn_creator(),
+            StreamOperator::StreamFilter(op) => op.fn_creator(),
+            StreamOperator::StreamCoProcess(op) => op.fn_creator(),
+            StreamOperator::StreamKeyBy(op) => op.fn_creator(),
+            StreamOperator::StreamReduce(op) => op.fn_creator(),
+            StreamOperator::StreamWatermarkAssigner(op) => op.fn_creator(),
+            StreamOperator::StreamWindowAssigner(op) => op.fn_creator(),
+            StreamOperator::StreamSink(op) => op.fn_creator(),
         }
     }
 }

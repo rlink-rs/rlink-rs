@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use crate::api::checkpoint::{CheckpointHandle, CheckpointedFunction, FunctionSnapshotContext};
+use crate::api::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
 use crate::api::element::{Element, Record};
 use crate::api::properties::Properties;
 use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
@@ -8,7 +8,7 @@ use crate::dag::execution_graph::{ExecutionEdge, ExecutionNode};
 
 /// Base class of all operators in the Rust API.
 pub trait Function {
-    fn get_name(&self) -> &str;
+    fn name(&self) -> &str;
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -26,7 +26,7 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn get_checkpoint_context(&self) -> FunctionSnapshotContext {
+    pub fn checkpoint_context(&self) -> FunctionSnapshotContext {
         FunctionSnapshotContext::new(self.operator_id, self.task_id, self.checkpoint_id)
     }
 }
@@ -45,11 +45,11 @@ impl InputSplit {
         }
     }
 
-    pub fn get_split_number(&self) -> u16 {
+    pub fn split_number(&self) -> u16 {
         self.split_number
     }
 
-    pub fn get_properties(&self) -> &Properties {
+    pub fn properties(&self) -> &Properties {
         &self.properties
     }
 }
@@ -69,7 +69,7 @@ impl InputSplitAssigner {
         InputSplitAssigner { input_splits }
     }
 
-    pub fn get_next_input_split(&mut self, _host: String, _task_id: usize) -> Option<InputSplit> {
+    pub fn next_input_split(&mut self, _host: String, _task_id: usize) -> Option<InputSplit> {
         self.input_splits.pop()
     }
 }
@@ -80,18 +80,18 @@ pub trait InputSplitSource {
     /// Create InputSplits by system parallelism[`min_num_splits`]
     ///
     /// Returns a InputSplit vec
-    fn create_input_splits(&self, min_num_splits: u16) -> Vec<InputSplit> {
+    fn create_input_splits(&self, min_num_splits: u16) -> crate::api::Result<Vec<InputSplit>> {
         let mut input_splits = Vec::with_capacity(min_num_splits as usize);
         for task_number in 0..min_num_splits {
             input_splits.push(InputSplit::new(task_number, Properties::new()));
         }
-        input_splits
+        Ok(input_splits)
     }
 
     /// Create InputSplitAssigner by InputSplits['input_splits']
     ///
     /// Returns a InputSplitAssigner
-    fn get_input_split_assigner(&self, input_splits: Vec<InputSplit>) -> InputSplitAssigner {
+    fn input_split_assigner(&self, input_splits: Vec<InputSplit>) -> InputSplitAssigner {
         InputSplitAssigner::new(input_splits)
     }
 }
@@ -110,7 +110,7 @@ where
     }
     fn close(&mut self) -> crate::api::Result<()>;
 
-    fn get_checkpoint(&mut self) -> Option<Box<&mut dyn CheckpointedFunction>> {
+    fn checkpoint_function(&mut self) -> Option<Box<&mut dyn CheckpointFunction>> {
         None
     }
 }
@@ -135,11 +135,15 @@ where
 
     fn close(&mut self) -> crate::api::Result<()>;
 
+    fn checkpoint_function(&mut self) -> Option<Box<&mut dyn CheckpointFunction>> {
+        None
+    }
+
     // todo unsupported. `TwoPhaseCommitSinkFunction`
-    fn begin_transaction(&mut self) {}
-    fn prepare_commit(&mut self) {}
-    fn commit(&mut self) {}
-    fn abort(&mut self) {}
+    // fn begin_transaction(&mut self) {}
+    // fn prepare_commit(&mut self) {}
+    // fn commit(&mut self) {}
+    // fn abort(&mut self) {}
 }
 
 pub trait FlatMapFunction

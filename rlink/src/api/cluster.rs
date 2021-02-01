@@ -77,11 +77,11 @@ impl TaskResourceInfo {
         }
     }
 
-    pub fn get_task_id(&self) -> Option<&String> {
+    pub fn task_id(&self) -> Option<&String> {
         self.resource_info.get("task_id")
     }
 
-    pub fn get_task_manager_address(&self) -> Option<&String> {
+    pub fn task_manager_address(&self) -> Option<&String> {
         self.resource_info.get("task_manager_address")
     }
 }

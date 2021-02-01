@@ -4,5 +4,5 @@ pub mod reduce;
 pub mod timestamp_assigner;
 
 pub trait FunctionSchema {
-    fn get_schema_types(&self) -> Vec<u8>;
+    fn schema_types(&self) -> Vec<u8>;
 }

@@ -3,10 +3,11 @@ use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-use crate::api::element::Element;
+use crate::api::checkpoint::FunctionSnapshotContext;
+use crate::api::element::{Element, Partition};
 use crate::api::function::KeySelectorFunction;
 use crate::api::operator::DefaultStreamOperator;
-use crate::api::runtime::{CheckpointId, OperatorId};
+use crate::api::runtime::{OperatorId, TaskId};
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 use crate::utils;
@@ -14,6 +15,8 @@ use crate::utils;
 #[derive(Debug)]
 pub(crate) struct KeyByRunnable {
     operator_id: OperatorId,
+    task_id: TaskId,
+
     stream_key_by: DefaultStreamOperator<dyn KeySelectorFunction>,
     next_runnable: Option<Box<dyn Runnable>>,
     partition_size: u16,
@@ -29,6 +32,7 @@ impl KeyByRunnable {
     ) -> Self {
         KeyByRunnable {
             operator_id,
+            task_id: TaskId::default(),
             stream_key_by,
             next_runnable,
             partition_size: 0,
@@ -41,26 +45,19 @@ impl Runnable for KeyByRunnable {
     fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
         self.next_runnable.as_mut().unwrap().open(context)?;
 
+        self.task_id = context.task_descriptor.task_id;
+
         let fun_context = context.to_fun_context(self.operator_id);
         self.stream_key_by.operator_fn.open(&fun_context)?;
 
         // todo set self.partition_size = Reduce.partition
-        self.partition_size = context.get_child_parallelism() as u16;
+        self.partition_size = context.child_parallelism() as u16;
 
         let tags = vec![
-            Tag(
-                "job_id".to_string(),
-                context.task_descriptor.task_id.job_id.0.to_string(),
-            ),
-            Tag(
-                "task_number".to_string(),
-                context.task_descriptor.task_id.task_number.to_string(),
-            ),
+            Tag::from(("job_id", self.task_id.job_id.0)),
+            Tag::from(("task_number", self.task_id.task_number)),
         ];
-        let metric_name = format!(
-            "KeyBy_{}",
-            self.stream_key_by.operator_fn.as_ref().get_name()
-        );
+        let metric_name = format!("KeyBy_{}", self.stream_key_by.operator_fn.as_ref().name());
         register_counter(metric_name.as_str(), tags, self.counter.clone());
 
         Ok(())
@@ -83,40 +80,20 @@ impl Runnable for KeyByRunnable {
                 //     hash_code,
                 //     self.partition_size,
                 // );
-                record.partition_num = partition_num as u16;
+                record.set_partition(partition_num as u16);
 
                 self.next_runnable.as_mut().unwrap().run(element);
 
                 self.counter.fetch_add(1, Ordering::Relaxed);
             }
-            Element::Watermark(watermark) => {
-                for index in 0..self.partition_size {
-                    let mut row_watermark = watermark.clone();
-                    row_watermark.partition_num = index as u16;
-
-                    self.next_runnable
-                        .as_mut()
-                        .unwrap()
-                        .run(Element::Watermark(row_watermark));
-                }
+            _ => {
+                self.next_runnable.as_mut().unwrap().run(element);
             }
-            Element::Barrier(barrier) => {
-                for index in 0..self.partition_size {
-                    let mut row_barrier = barrier.clone();
-                    row_barrier.partition_num = index as u16;
-
-                    self.next_runnable
-                        .as_mut()
-                        .unwrap()
-                        .run(Element::Barrier(row_barrier));
-                }
-            }
-            _ => {}
         }
     }
 
     fn close(&mut self) -> anyhow::Result<()> {
-        // self.stream_key_by.operator_fn.close();
+        self.stream_key_by.operator_fn.close()?;
         self.next_runnable.as_mut().unwrap().close()
     }
 
@@ -124,5 +101,5 @@ impl Runnable for KeyByRunnable {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, _checkpoint_id: CheckpointId) {}
+    fn checkpoint(&mut self, _snapshot_context: FunctionSnapshotContext) {}
 }

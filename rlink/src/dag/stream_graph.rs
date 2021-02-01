@@ -8,7 +8,6 @@ use crate::api::operator::{
     DefaultStreamOperator, FunctionCreator, StreamOperator, TStreamOperator, DEFAULT_PARALLELISM,
 };
 use crate::api::runtime::OperatorId;
-use crate::dag::utils::JsonDag;
 use crate::dag::{DagError, Label, OperatorType};
 use crate::functions::system::keyed_state_flat_map::KeyedStateFlatMapFunction;
 use crate::functions::system::system_input_format::SystemInputFormat;
@@ -26,7 +25,7 @@ pub struct StreamNode {
 }
 
 impl Label for StreamNode {
-    fn get_label(&self) -> String {
+    fn label(&self) -> String {
         format!("{}({})", self.operator_name, self.id.0)
     }
 }
@@ -40,7 +39,7 @@ pub struct StreamEdge {
 }
 
 impl Label for StreamEdge {
-    fn get_label(&self) -> String {
+    fn label(&self) -> String {
         self.edge_id.clone()
     }
 }
@@ -56,20 +55,8 @@ impl StreamGraph {
         StreamGraph { sources, dag }
     }
 
-    pub fn get_stream_node(&self, node_index: NodeIndex) -> &StreamNode {
+    pub fn stream_node(&self, node_index: NodeIndex) -> &StreamNode {
         self.dag.index(node_index)
-    }
-
-    pub fn get_stream_node_by_operator_id(&self, operator_id: OperatorId) -> Option<&StreamNode> {
-        self.dag
-            .raw_nodes()
-            .iter()
-            .find(|x| x.weight.id == operator_id)
-            .map(|x| &x.weight)
-    }
-
-    pub(crate) fn to_string(&self) -> String {
-        JsonDag::dag_json(&self.dag).to_string()
     }
 }
 
@@ -118,7 +105,7 @@ impl RawStreamGraph {
         operators
     }
 
-    pub fn get_operators(&self) -> HashMap<OperatorId, &StreamOperator> {
+    pub fn operators(&self) -> HashMap<OperatorId, &StreamOperator> {
         let operator_ids: Vec<OperatorId> = self.operators.iter().map(|(x, _)| *x).collect();
 
         let mut operators = HashMap::new();
@@ -170,9 +157,9 @@ impl RawStreamGraph {
             id: operator_id,
             parent_ids: parent_operator_ids.clone(),
             parallelism,
-            operator_name: operator.get_operator_name().to_string(),
+            operator_name: operator.operator_name().to_string(),
             operator_type: OperatorType::from(&operator),
-            fn_creator: operator.get_fn_creator(),
+            fn_creator: operator.fn_creator(),
         };
 
         let node_index = self.dag.add_node(stream_node.clone());
@@ -186,7 +173,7 @@ impl RawStreamGraph {
             let p_stream_node: &StreamNode = self.dag.index(*p_node_index);
 
             let stream_edge = StreamEdge {
-                edge_id: format!("{:?}->{:?}", p_stream_node.id, stream_node.id),
+                edge_id: format!("{:?}->{:?}", p_stream_node.id.0, stream_node.id.0),
                 source_id: p_stream_node.id,
                 target_id: stream_node.id,
             };
@@ -215,7 +202,7 @@ impl RawStreamGraph {
         operator: StreamOperator,
         parent_operator_ids: Vec<OperatorId>,
     ) -> Result<OperatorId, DagError> {
-        let parallelism = operator.get_parallelism();
+        let parallelism = operator.parallelism();
         let operator_type = OperatorType::from(&operator);
 
         return if parent_operator_ids.len() == 0 {
@@ -264,23 +251,75 @@ impl RawStreamGraph {
             }
 
             let mut new_p_operator_ids = Vec::new();
+            let mut p_reduce_operator_id = None;
+            let mut left_parent_parallelism = 0;
             for p_operator_id in parent_operator_ids {
                 let (p_node_index, _) = self.operators.get(&p_operator_id).unwrap();
                 let p_stream_node = self.dag.index(*p_node_index);
+
+                let parent_is_reduce = p_stream_node.operator_type == OperatorType::Reduce;
 
                 let p_parallelism = p_stream_node.parallelism;
                 let vir_sink = self.create_virtual_sink(0);
                 let vir_operator_id =
                     self.add_operator0(vir_sink, vec![p_operator_id], p_parallelism)?;
 
-                new_p_operator_ids.push(vir_operator_id);
+                if parent_is_reduce {
+                    p_reduce_operator_id = Some(vir_operator_id)
+                } else {
+                    new_p_operator_ids.push(vir_operator_id);
+                }
+
+                // latest parent is the left parent
+                left_parent_parallelism = p_parallelism;
             }
 
-            let vir_source = self.create_virtual_source(0);
-            let vir_operator_id =
-                self.add_operator0(vir_source, new_p_operator_ids, parallelism)?;
+            match p_reduce_operator_id {
+                Some(p_reduce_operator_id) => {
+                    // left:input_format -> flat_map -> output_format -> input_format -> connect
+                    // right:                                                         -> connect
 
-            self.add_operator0(operator, vec![vir_operator_id], parallelism)
+                    let vir_source = self.create_virtual_source(left_parent_parallelism);
+                    let vir_operator_id = self.add_operator0(
+                        vir_source,
+                        vec![p_reduce_operator_id],
+                        left_parent_parallelism,
+                    )?;
+
+                    let vir_map = self.create_virtual_flat_map(left_parent_parallelism);
+                    let vir_operator_id = self.add_operator0(
+                        vir_map,
+                        vec![vir_operator_id],
+                        left_parent_parallelism,
+                    )?;
+
+                    let vir_sink = self.create_virtual_sink(left_parent_parallelism);
+                    let vir_operator_id = self.add_operator0(
+                        vir_sink,
+                        vec![vir_operator_id],
+                        left_parent_parallelism,
+                    )?;
+
+                    // left operator must be the latest index
+                    new_p_operator_ids.push(vir_operator_id);
+
+                    let vir_source = self.create_virtual_source(left_parent_parallelism);
+                    let vir_operator_id = self.add_operator0(
+                        vir_source,
+                        new_p_operator_ids,
+                        left_parent_parallelism,
+                    )?;
+
+                    self.add_operator0(operator, vec![vir_operator_id], left_parent_parallelism)
+                }
+                None => {
+                    let vir_source = self.create_virtual_source(0);
+                    let vir_operator_id =
+                        self.add_operator0(vir_source, new_p_operator_ids, parallelism)?;
+
+                    self.add_operator0(operator, vec![vir_operator_id], parallelism)
+                }
+            }
         };
     }
 

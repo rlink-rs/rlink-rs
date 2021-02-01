@@ -21,11 +21,11 @@ impl TimeWindow {
         TimeWindow { start, end }
     }
 
-    pub fn get_start(&self) -> u64 {
+    pub fn start(&self) -> u64 {
         self.start
     }
 
-    pub fn get_end(&self) -> u64 {
+    pub fn end(&self) -> u64 {
         self.end
     }
 
@@ -81,7 +81,7 @@ impl TWindow for Window {
 pub struct WindowAssignerContext {}
 
 impl WindowAssignerContext {
-    pub fn get_current_processing_time(&self) -> u64 {
+    pub fn current_processing_time(&self) -> u64 {
         utils::date_time::current_timestamp().as_millis() as u64
     }
 }
@@ -143,7 +143,7 @@ impl WindowAssigner for SlidingEventTimeWindows {
 }
 
 impl Function for SlidingEventTimeWindows {
-    fn get_name(&self) -> &str {
+    fn name(&self) -> &str {
         "SlidingEventTimeWindows"
     }
 }

@@ -1,5 +1,7 @@
 use std::borrow::BorrowMut;
+use std::convert::TryFrom;
 use std::ops::Deref;
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::api::checkpoint::CheckpointHandle;
@@ -7,16 +9,17 @@ use crate::api::cluster::MetadataStorageType;
 use crate::api::cluster::TaskResourceInfo;
 use crate::api::env::{StreamApp, StreamExecutionEnvironment};
 use crate::api::properties::{Properties, SYSTEM_CLUSTER_MODE};
+use crate::dag::metadata::DagMetadata;
 use crate::dag::DagManager;
 use crate::deployment::TResourceManager;
 use crate::runtime::context::Context;
 use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
 use crate::runtime::coordinator::server::web_launch;
-use crate::runtime::coordinator::task_distribution::build_job_descriptor;
+use crate::runtime::coordinator::task_distribution::build_application_descriptor;
 use crate::runtime::{ApplicationDescriptor, TaskManagerStatus};
 use crate::storage::metadata::{
-    loop_delete_job_descriptor, loop_read_job_descriptor, loop_save_job_descriptor,
-    loop_update_job_status, MetadataStorage,
+    loop_delete_application_descriptor, loop_read_application_descriptor,
+    loop_save_application_descriptor, loop_update_application_status, MetadataStorage,
 };
 use crate::utils::date_time::timestamp_str;
 
@@ -31,7 +34,7 @@ where
     S: StreamApp + 'static,
     R: TResourceManager + 'static,
 {
-    context: Context,
+    context: Arc<Context>,
     stream_app: S,
     metadata_storage_mode: MetadataStorageType,
     resource_manager: R,
@@ -44,7 +47,7 @@ where
     R: TResourceManager + 'static,
 {
     pub fn new(
-        context: Context,
+        context: Arc<Context>,
         stream_app: S,
         resource_manager: R,
         stream_env: StreamExecutionEnvironment,
@@ -60,7 +63,7 @@ where
         }
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&mut self) -> anyhow::Result<()> {
         info!("coordinator start with mode {}", self.context.manager_type);
 
         let application_properties = self.prepare_properties();
@@ -70,14 +73,12 @@ where
 
         let dag_manager = {
             let raw_stream_graph = self.stream_env.stream_manager.stream_graph.borrow();
-            DagManager::new(raw_stream_graph.deref())
+            DagManager::try_from(raw_stream_graph.deref())?
         };
-        info!("StreamGraph: {}", dag_manager.stream_graph().to_string());
-        info!("JobGraph: {}", dag_manager.job_graph().to_string());
-        info!(
-            "ExecutionGraph: {}",
-            dag_manager.execution_graph().to_string()
-        );
+        info!("DagManager build success");
+
+        let dag_metadata = DagMetadata::from(&dag_manager);
+        info!("DagMetadata: {}", dag_metadata.to_string());
 
         let mut application_descriptor = self.build_metadata(&dag_manager, &application_properties);
         info!(
@@ -86,10 +87,14 @@ where
         );
 
         let ck_manager =
-            self.build_checkpoint_manager(&dag_manager, application_descriptor.borrow_mut());
+            self.build_checkpoint_manager(&dag_metadata, application_descriptor.borrow_mut());
         info!("CheckpointManager create");
 
-        self.web_serve(application_descriptor.borrow_mut(), ck_manager, dag_manager);
+        self.web_serve(
+            application_descriptor.borrow_mut(),
+            ck_manager,
+            dag_metadata,
+        );
         info!(
             "serve coordinator web ui {}",
             &application_descriptor
@@ -149,12 +154,12 @@ where
     fn build_metadata(
         &mut self,
         dag_manager: &DagManager,
-        job_properties: &Properties,
+        application_properties: &Properties,
     ) -> ApplicationDescriptor {
-        let application_descriptor = build_job_descriptor(
+        let application_descriptor = build_application_descriptor(
             self.stream_env.application_name.as_str(),
             dag_manager,
-            job_properties,
+            application_properties,
             &self.context,
         );
         // let mut metadata_storage = MetadataStorage::new(&self.metadata_storage_mode);
@@ -164,7 +169,7 @@ where
 
     fn save_metadata(&self, application_descriptor: ApplicationDescriptor) {
         let mut metadata_storage = MetadataStorage::new(&self.metadata_storage_mode);
-        loop_save_job_descriptor(
+        loop_save_application_descriptor(
             metadata_storage.borrow_mut(),
             application_descriptor.clone(),
         );
@@ -172,12 +177,12 @@ where
 
     fn clear_metadata(&self) {
         let mut metadata_storage = MetadataStorage::new(&self.metadata_storage_mode);
-        loop_delete_job_descriptor(metadata_storage.borrow_mut());
+        loop_delete_application_descriptor(metadata_storage.borrow_mut());
     }
 
     fn build_checkpoint_manager(
         &self,
-        dag_manager: &DagManager,
+        dag_manager: &DagMetadata,
         application_descriptor: &mut ApplicationDescriptor,
     ) -> CheckpointManager {
         let mut ck_manager =
@@ -216,7 +221,7 @@ where
         &self,
         application_descriptor: &mut ApplicationDescriptor,
         checkpoint_manager: CheckpointManager,
-        dag_manager: DagManager,
+        dag_metadata: DagMetadata,
     ) {
         let context = self.context.clone();
         let metadata_storage_mode = self.metadata_storage_mode.clone();
@@ -225,7 +230,7 @@ where
             context,
             metadata_storage_mode,
             checkpoint_manager,
-            dag_manager,
+            dag_metadata,
         );
         application_descriptor
             .coordinator_manager
@@ -243,7 +248,7 @@ where
         loop {
             info!("waiting all workers status fine...");
 
-            let job_descriptor = loop_read_job_descriptor(&metadata_storage);
+            let job_descriptor = loop_read_application_descriptor(&metadata_storage);
 
             let unregister_worker = job_descriptor
                 .worker_managers
@@ -251,7 +256,7 @@ where
                 .find(|x| x.task_status.ne(&TaskManagerStatus::Registered));
 
             if unregister_worker.is_none() {
-                loop_update_job_status(
+                loop_update_application_status(
                     metadata_storage.borrow_mut(),
                     TaskManagerStatus::Registered,
                 );

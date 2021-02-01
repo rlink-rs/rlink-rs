@@ -43,18 +43,9 @@ pub(crate) fn subscribe(
     let (sender, receiver) = named_channel(
         "NetworkSubscribe",
         vec![
-            Tag::new(
-                "source_job_id".to_string(),
-                source_task_ids[0].job_id.0.to_string(),
-            ),
-            Tag::new(
-                "target_job_id".to_string(),
-                target_task_id.job_id.0.to_string(),
-            ),
-            Tag::new(
-                "target_task_number".to_string(),
-                target_task_id.task_number.to_string(),
-            ),
+            Tag::from(("source_job_id", source_task_ids[0].job_id.0)),
+            Tag::from(("target_job_id", target_task_id.job_id.0)),
+            Tag::from(("target_task_number", target_task_id.task_number)),
         ],
         channel_size,
     );
@@ -79,11 +70,11 @@ fn subscribe_post(channel_key: ChannelKey, sender: ElementSender) {
     c.0.send((channel_key, sender)).unwrap()
 }
 
-pub(crate) fn run_subscribe(application_descriptor: ApplicationDescriptor) {
+pub(crate) fn run_subscribe(application_descriptor: Arc<ApplicationDescriptor>) {
     get_runtime().block_on(subscribe_listen(application_descriptor));
 }
 
-async fn subscribe_listen(application_descriptor: ApplicationDescriptor) {
+async fn subscribe_listen(application_descriptor: Arc<ApplicationDescriptor>) {
     let c: &(
         Sender<(ChannelKey, ElementSender)>,
         Receiver<(ChannelKey, ElementSender)>,
@@ -101,12 +92,8 @@ async fn subscribe_listen(application_descriptor: ApplicationDescriptor) {
                 let addr = SocketAddr::from_str(&worker_manager_descriptor.task_manager_address)
                     .expect("parse address error");
 
-                let join_handle = tokio::spawn(async move {
-                    let mut client = Client::new(channel_key, sender, addr, BATCH_PULL_SIZE)
-                        .await
-                        .unwrap();
-                    client.send().await.unwrap();
-                });
+                let join_handle =
+                    tokio::spawn(loop_client_task(channel_key, sender, addr, BATCH_PULL_SIZE));
                 join_handles.push(join_handle);
 
                 idle_counter = 0;
@@ -130,6 +117,45 @@ async fn subscribe_listen(application_descriptor: ApplicationDescriptor) {
             Ok(_) => {}
             Err(e) => error!("Client task error. {}", e),
         }
+    }
+}
+
+async fn client_task(
+    channel_key: ChannelKey,
+    sender: ElementSender,
+    addr: SocketAddr,
+    batch_pull_size: u16,
+) -> anyhow::Result<()> {
+    let mut client = Client::new(channel_key, sender.clone(), addr, batch_pull_size).await?;
+    match client.send().await {
+        Ok(()) => {
+            client.close_rough();
+            Ok(())
+        }
+        Err(e) => {
+            client.close_rough();
+            Err(e)
+        }
+    }
+}
+
+async fn loop_client_task(
+    channel_key: ChannelKey,
+    sender: ElementSender,
+    addr: SocketAddr,
+    batch_pull_size: u16,
+) {
+    loop {
+        match client_task(channel_key, sender.clone(), addr, batch_pull_size).await {
+            Ok(_) => {
+                error!("client({}) unreached code", addr)
+            }
+            Err(e) => {
+                error!("client({}) task error. {}", addr, e)
+            }
+        }
+
+        tokio::time::delay_for(Duration::from_secs(3)).await;
     }
 }
 
@@ -157,7 +183,7 @@ impl Client {
                 batch_pull_size,
                 stream,
             }),
-            Err(e) => Err(anyhow::Error::new(e)),
+            Err(e) => Err(anyhow!(e)),
         }
     }
 
@@ -176,22 +202,16 @@ impl Client {
                 .new_read(r);
 
         let tags = vec![
-            Tag(
-                "source_job_id".to_string(),
-                self.channel_key.source_task_id.job_id.0.to_string(),
-            ),
-            Tag(
-                "source_task_number".to_string(),
-                self.channel_key.source_task_id.task_number.to_string(),
-            ),
-            Tag(
-                "target_job_id".to_string(),
-                self.channel_key.target_task_id.job_id.0.to_string(),
-            ),
-            Tag(
-                "target_task_number".to_string(),
-                self.channel_key.target_task_id.task_number.to_string(),
-            ),
+            Tag::from(("source_job_id", self.channel_key.source_task_id.job_id.0)),
+            Tag::from((
+                "source_task_number",
+                self.channel_key.source_task_id.task_number,
+            )),
+            Tag::from(("target_job_id", self.channel_key.target_task_id.job_id.0)),
+            Tag::from((
+                "target_task_number",
+                self.channel_key.target_task_id.task_number,
+            )),
         ];
         let counter = Arc::new(AtomicU64::new(0));
         register_counter("NetWorkClient", tags, counter.clone());

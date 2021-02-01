@@ -10,6 +10,7 @@ use rlink::api::cluster::{ExecuteRequest, ResponseCode, StdResponse};
 
 use crate::config::Context;
 use crate::utils::{current_timestamp_millis, read_file_as_lines};
+use rlink::utils::process::work_space;
 
 lazy_static! {
     static ref TASK_MANAGER_START_TIME: u64 = current_timestamp_millis();
@@ -39,6 +40,9 @@ pub async fn execute_task(
         task_counter.fetch_add(1 as u64, Ordering::SeqCst)
     );
 
+    let asset_path = work_space().join("rlink-deployment");
+    let asset_path = asset_path.to_str().unwrap();
+
     let script_path = context.script_path.clone().to_str().unwrap().to_string();
     let worker_path = PathBuf::from(context.config.task_manager_work_dir.as_str());
     let task_work_space = worker_path
@@ -61,6 +65,7 @@ pub async fn execute_task(
     envs.insert("BIND_IP".to_string(), bind_ip);
     envs.insert("FILE_NAME".to_string(), executable_file);
     envs.insert("CLUSTER_CONFIG".to_string(), cluster_config);
+    envs.insert("ASSET_PATH".to_string(), asset_path.to_string());
 
     let execute_args: Vec<String> = execute_model
         .args

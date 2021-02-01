@@ -41,7 +41,7 @@ impl OutputFormat for KafkaOutputFormat {
                 format!("{}", context.task_id.task_number()),
             ),
         ];
-        self.handover = Some(Handover::new(self.get_name(), tags, self.buffer_size));
+        self.handover = Some(Handover::new(self.name(), tags, self.buffer_size));
 
         let topic = self.topic.clone();
         let client_config = self.client_config.clone();

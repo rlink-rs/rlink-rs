@@ -218,7 +218,7 @@ impl InputSplitSource for ConfigInputFormat {}
 
 impl InputFormat for ConfigInputFormat {
     fn open(&mut self, input_split: InputSplit, _context: &Context) -> api::Result<()> {
-        let partition_num = input_split.get_split_number();
+        let partition_num = input_split.split_number();
         info!("open split number = {}", partition_num);
 
         Ok(())
@@ -275,13 +275,12 @@ impl CoProcessFunction for MyCoProcessFunction {
         stream_seq: usize,
         mut record: Record,
     ) -> Box<dyn Iterator<Item = Record>> {
-        if stream_seq == 0 {
-            let conf = config::Entity::parse(record.as_buffer()).unwrap();
-            info!("Broadcast config field:{}, val:{}", conf.field, conf.value);
-        } else if stream_seq == 1 {
-            let conf = config::Entity::parse(record.as_buffer()).unwrap();
-            info!("RoundRobin config field:{}, val:{}", conf.field, conf.value);
-        }
+        let conf = config::Entity::parse(record.as_buffer()).unwrap();
+        info!(
+            "Right Stream: {}, config [field:{}, val:{}]",
+            stream_seq, conf.field, conf.value
+        );
+
         Box::new(vec![].into_iter())
     }
 

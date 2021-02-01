@@ -5,11 +5,12 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use crate::api::backend::KeyedStateBackend;
+use crate::api::checkpoint::FunctionSnapshotContext;
 use crate::api::element::{Barrier, Element, Record, Watermark};
 use crate::api::function::{KeySelectorFunction, ReduceFunction};
 use crate::api::operator::DefaultStreamOperator;
 use crate::api::properties::SystemProperties;
-use crate::api::runtime::{CheckpointId, OperatorId};
+use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::api::window::{TWindow, Window};
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
@@ -19,8 +20,11 @@ use crate::utils::date_time::timestamp_str;
 #[derive(Debug)]
 pub(crate) struct ReduceRunnable {
     operator_id: OperatorId,
-    task_number: u16,
-    dependency_parallelism: u16,
+    task_id: TaskId,
+
+    context: Option<RunnableContext>,
+
+    parent_parallelism: u16,
 
     stream_key_by: Option<DefaultStreamOperator<dyn KeySelectorFunction>>,
     stream_reduce: DefaultStreamOperator<dyn ReduceFunction>,
@@ -49,8 +53,9 @@ impl ReduceRunnable {
     ) -> Self {
         ReduceRunnable {
             operator_id,
-            task_number: 0,
-            dependency_parallelism: 0,
+            task_id: TaskId::default(),
+            context: None,
+            parent_parallelism: 0,
             stream_key_by,
             stream_reduce,
             next_runnable,
@@ -70,21 +75,21 @@ impl Runnable for ReduceRunnable {
     fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
         self.next_runnable.as_mut().unwrap().open(context)?;
 
+        self.task_id = context.task_descriptor.task_id;
+
+        self.context = Some(context.clone());
+
         let fun_context = context.to_fun_context(self.operator_id);
         self.stream_reduce.operator_fn.open(&fun_context)?;
         self.stream_key_by
             .as_mut()
             .map(|s| s.operator_fn.open(&fun_context));
 
-        self.task_number = context.task_descriptor.task_id.task_number;
-        self.dependency_parallelism = context.get_parent_parallelism();
+        self.parent_parallelism = context.parent_parallelism();
 
         self.watermark_align = Some(WatermarkAlign::new());
 
-        info!(
-            "ReduceRunnable Opened. task_number={}, num_tasks={}",
-            self.task_number, context.task_descriptor.task_id.num_tasks
-        );
+        info!("ReduceRunnable Opened. task_id={:?}", self.task_id);
 
         let state_mode = context
             .application_descriptor
@@ -105,16 +110,10 @@ impl Runnable for ReduceRunnable {
         ));
 
         let tags = vec![
-            Tag(
-                "job_id".to_string(),
-                context.task_descriptor.task_id.job_id.0.to_string(),
-            ),
-            Tag(
-                "task_number".to_string(),
-                context.task_descriptor.task_id.task_number.to_string(),
-            ),
+            Tag::from(("job_id", self.task_id.job_id.0)),
+            Tag::from(("task_number", self.task_id.task_number)),
         ];
-        let fn_name = self.stream_reduce.operator_fn.as_ref().get_name();
+        let fn_name = self.stream_reduce.operator_fn.as_ref().name();
 
         let metric_name = format!("Reduce_{}", fn_name);
         register_counter(metric_name.as_str(), tags.clone(), self.counter.clone());
@@ -135,7 +134,7 @@ impl Runnable for ReduceRunnable {
                     .as_ref()
                     .map(|limit_window| {
                         record
-                            .get_max_location_windows()
+                            .max_location_windows()
                             .map(|window| window.min_timestamp() >= limit_window.min_timestamp())
                             .unwrap_or(true)
                     })
@@ -145,7 +144,7 @@ impl Runnable for ReduceRunnable {
                     if n & 1048575 == 1 {
                         error!(
                             "expire data. record window={:?}, limit window={:?}",
-                            record.get_min_location_windows().unwrap(),
+                            record.min_location_windows().unwrap(),
                             self.limited_watermark_window.as_ref().unwrap()
                         );
                     }
@@ -177,8 +176,7 @@ impl Runnable for ReduceRunnable {
 
                 if align_watermarks.len() > 0 {
                     let align_watermark = align_watermarks[align_watermarks.len() - 1].clone();
-                    let minimum_watermark_window =
-                        align_watermark.get_min_location_windows().unwrap();
+                    let minimum_watermark_window = align_watermark.min_location_windows().unwrap();
                     self.limited_watermark_window = Some(minimum_watermark_window.clone());
 
                     // info!("minimum_watermark_window: {:?}", minimum_watermark_window);
@@ -237,9 +235,14 @@ impl Runnable for ReduceRunnable {
                 }
 
                 if self.current_checkpoint_id == barrier.checkpoint_id {
-                    self.reached_barriers.push(barrier);
-                    if self.reached_barriers.len() == self.dependency_parallelism as usize {
-                        self.checkpoint(self.current_checkpoint_id);
+                    self.reached_barriers.push(barrier.clone());
+                    if self.reached_barriers.len() == self.parent_parallelism as usize {
+                        let checkpoint_id = self.current_checkpoint_id;
+                        let snapshot_context = {
+                            let context = self.context.as_ref().unwrap();
+                            context.checkpoint_context(self.operator_id, checkpoint_id)
+                        };
+                        self.checkpoint(snapshot_context);
                     }
 
                     self.current_checkpoint_id = CheckpointId::default();
@@ -261,6 +264,11 @@ impl Runnable for ReduceRunnable {
                         self.reached_barriers.push(barrier.clone());
                     }
                 }
+
+                self.next_runnable
+                    .as_mut()
+                    .unwrap()
+                    .run(Element::Barrier(barrier));
             }
             _ => {}
         }
@@ -276,7 +284,7 @@ impl Runnable for ReduceRunnable {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, _checkpoint_id: CheckpointId) {
+    fn checkpoint(&mut self, _snapshot_context: FunctionSnapshotContext) {
         // foreach self.reached_barriers
     }
 }
@@ -339,7 +347,7 @@ impl WatermarkAlign {
         if self.dependency_parallelism == 0 {
             self.dependency_parallelism = watermark.num_tasks;
             self.timeout_ms = {
-                let window = watermark.get_min_location_windows().unwrap();
+                let window = watermark.min_location_windows().unwrap();
                 (window.max_timestamp() - window.min_timestamp()) * 2
             }
         }
@@ -361,10 +369,7 @@ impl WatermarkAlign {
             .entry(watermark.status_timestamp)
             .or_insert(WatermarkAggregation::new());
 
-        let min_window_timestamp = watermark
-            .get_min_location_windows()
-            .unwrap()
-            .min_timestamp();
+        let min_window_timestamp = watermark.min_location_windows().unwrap().min_timestamp();
 
         if watermark_agg.min_watermark.is_none() {
             watermark_agg.min_watermark = Some(watermark);

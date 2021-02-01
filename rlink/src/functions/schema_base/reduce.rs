@@ -412,7 +412,7 @@ impl SchemaBaseReduceFunction {
 }
 
 impl FunctionSchema for SchemaBaseReduceFunction {
-    fn get_schema_types(&self) -> Vec<u8> {
+    fn schema_types(&self) -> Vec<u8> {
         self.val_field_types.clone()
     }
 }
@@ -424,13 +424,13 @@ impl ReduceFunction for SchemaBaseReduceFunction {
 
     fn reduce(&self, value: Option<&mut Record>, record: &mut Record) -> Record {
         let mut record_rt = Record::with_capacity(self.val_len);
-        let mut writer = record_rt.get_writer(self.val_field_types.as_slice());
+        let mut writer = record_rt.as_writer(self.val_field_types.as_slice());
 
-        let mut record_reader = record.get_reader(self.field_types.as_slice());
+        let mut record_reader = record.as_reader(self.field_types.as_slice());
 
         match value {
             Some(state_value) => {
-                let mut stat_reader = state_value.get_reader(self.val_field_types.as_slice());
+                let mut stat_reader = state_value.as_reader(self.val_field_types.as_slice());
 
                 for index in 0..self.agg_operators.len() {
                     self.agg_operators[index].reduce(
@@ -461,7 +461,7 @@ impl ReduceFunction for SchemaBaseReduceFunction {
 }
 
 impl Function for SchemaBaseReduceFunction {
-    fn get_name(&self) -> &str {
+    fn name(&self) -> &str {
         "SchemaBaseReduceFunction"
     }
 }

@@ -46,6 +46,10 @@ pub trait TConnectedStreams {
     fn key_by<F>(self, key_selector: F) -> KeyedStream
     where
         F: KeySelectorFunction + 'static;
+
+    fn add_sink<O>(self, output_format: O)
+    where
+        O: OutputFormat + 'static;
 }
 
 pub trait TKeyedStream {
@@ -169,6 +173,13 @@ impl TConnectedStreams for ConnectedStreams {
         F: KeySelectorFunction + 'static,
     {
         self.co_stream.key_by(key_selector)
+    }
+
+    fn add_sink<O>(self, output_format: O)
+    where
+        O: OutputFormat + 'static,
+    {
+        TDataStream::add_sink(self.co_stream, output_format);
     }
 }
 

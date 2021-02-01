@@ -4,23 +4,28 @@ use serbuffer::types;
 
 use crate::api::element::Record;
 use crate::api::function::{Context, Function, OutputFormat};
+use crate::api::runtime::TaskId;
 use crate::api::window::TWindow;
-use crate::utils::date_time::{fmt_date_time, FMT_DATE_TIME};
+use crate::utils::date_time::fmt_date_time;
 
 pub struct PrintOutputFormat {
+    task_id: TaskId,
     field_types: Vec<u8>,
 }
 
 impl PrintOutputFormat {
     pub fn new(field_types: &[u8]) -> Self {
         PrintOutputFormat {
+            task_id: TaskId::default(),
             field_types: field_types.to_vec(),
         }
     }
 }
 
 impl OutputFormat for PrintOutputFormat {
-    fn open(&mut self, _context: &Context) -> crate::api::Result<()> {
+    fn open(&mut self, context: &Context) -> crate::api::Result<()> {
+        self.task_id = context.task_id;
+
         Ok(())
     }
 
@@ -52,20 +57,22 @@ impl OutputFormat for PrintOutputFormat {
             field_str_vec.push(format!("{}:{}", i, field_str));
         }
 
-        let window_str = record.get_trigger_window().map(|window| {
-            let min_timestamp = window.min_timestamp();
-            let max_timestamp = window.max_timestamp();
-            format!(
-                "start:{}({}), end:{}({})",
-                min_timestamp,
-                fmt_date_time(Duration::from_millis(min_timestamp), FMT_DATE_TIME),
-                max_timestamp,
-                fmt_date_time(Duration::from_millis(max_timestamp), FMT_DATE_TIME)
-            )
-        });
+        let window_str = record
+            .trigger_window()
+            .map(|window| {
+                let min_timestamp = window.min_timestamp();
+                let max_timestamp = window.max_timestamp();
+                format!(
+                    "[{}, {}]",
+                    fmt_date_time(Duration::from_millis(min_timestamp), "%T"),
+                    fmt_date_time(Duration::from_millis(max_timestamp), "%T")
+                )
+            })
+            .unwrap_or_default();
 
         println!(
-            "row: [{}], window: {:?}",
+            "task: {}, row: [{}], window: {}",
+            self.task_id.task_number,
             field_str_vec.join(","),
             window_str
         );
@@ -77,7 +84,7 @@ impl OutputFormat for PrintOutputFormat {
 }
 
 impl Function for PrintOutputFormat {
-    fn get_name(&self) -> &str {
+    fn name(&self) -> &str {
         "PrintOutputFormat"
     }
 }

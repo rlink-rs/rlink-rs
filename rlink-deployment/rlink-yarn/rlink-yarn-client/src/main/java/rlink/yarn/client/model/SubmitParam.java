@@ -10,6 +10,7 @@ public class SubmitParam implements Serializable {
     private String applicationName;
     private Path rustStreamingPath;
     private Path javaManagerPath;
+    private Path assetPath;
     private int memoryMb;
     private int vCores;
     private int masterMemoryMb;
@@ -39,6 +40,14 @@ public class SubmitParam implements Serializable {
 
     public void setJavaManagerPath(Path javaManagerPath) {
         this.javaManagerPath = javaManagerPath;
+    }
+
+    public Path getAssetPath() {
+        return assetPath;
+    }
+
+    public void setAssetPath(Path assetPath) {
+        this.assetPath = assetPath;
     }
 
     public int getMemoryMb() {

@@ -1,6 +1,6 @@
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
-use std::ops::Deref;
+use std::sync::Arc;
 use std::thread::JoinHandle;
 
 use crate::api::element::{Element, Record};
@@ -8,7 +8,8 @@ use crate::api::env::{StreamApp, StreamExecutionEnvironment};
 use crate::api::function::KeySelectorFunction;
 use crate::api::operator::{DefaultStreamOperator, StreamOperator};
 use crate::api::runtime::{JobId, OperatorId};
-use crate::dag::{DagManager, OperatorType};
+use crate::dag::metadata::DagMetadata;
+use crate::dag::OperatorType;
 use crate::runtime::context::Context;
 use crate::runtime::timer::WindowTimer;
 use crate::runtime::worker::runnable::co_process_runnable::CoProcessRunnable;
@@ -17,7 +18,6 @@ use crate::runtime::worker::runnable::{
     SinkRunnable, SourceRunnable, WatermarkAssignerRunnable, WindowAssignerRunnable,
 };
 use crate::runtime::{ApplicationDescriptor, TaskDescriptor};
-use crate::storage::metadata::MetadataLoader;
 
 pub mod checkpoint;
 pub mod heart_beat;
@@ -26,8 +26,9 @@ pub mod runnable;
 pub(crate) type FunctionContext = crate::api::function::Context;
 
 pub(crate) fn run<S>(
-    context: Context,
-    metadata_loader: MetadataLoader,
+    context: Arc<Context>,
+    dag_metadata: Arc<DagMetadata>,
+    application_descriptor: Arc<ApplicationDescriptor>,
     task_descriptor: TaskDescriptor,
     stream_app: S,
     stream_env: &StreamExecutionEnvironment,
@@ -46,8 +47,9 @@ where
             let stream_env = StreamExecutionEnvironment::new(application_name);
             let worker_task = WorkerTask::new(
                 context,
+                dag_metadata,
+                application_descriptor,
                 task_descriptor,
-                metadata_loader,
                 stream_app,
                 stream_env,
                 window_timer,
@@ -63,10 +65,10 @@ pub struct WorkerTask<S>
 where
     S: StreamApp + 'static,
 {
-    context: Context,
+    context: Arc<Context>,
+    dag_metadata: Arc<DagMetadata>,
+    application_descriptor: Arc<ApplicationDescriptor>,
     task_descriptor: TaskDescriptor,
-    application_descriptor: ApplicationDescriptor,
-    metadata_loader: MetadataLoader,
     stream_app: S,
     stream_env: StreamExecutionEnvironment,
     window_timer: WindowTimer,
@@ -77,18 +79,19 @@ where
     S: StreamApp + 'static,
 {
     pub(crate) fn new(
-        context: Context,
+        context: Arc<Context>,
+        dag_metadata: Arc<DagMetadata>,
+        application_descriptor: Arc<ApplicationDescriptor>,
         task_descriptor: TaskDescriptor,
-        mut metadata_loader: MetadataLoader,
         stream_app: S,
         stream_env: StreamExecutionEnvironment,
         window_timer: WindowTimer,
     ) -> Self {
         WorkerTask {
             context,
+            dag_metadata,
+            application_descriptor,
             task_descriptor,
-            application_descriptor: metadata_loader.get_job_descriptor_from_cache(),
-            metadata_loader,
             stream_app,
             stream_env,
             window_timer,
@@ -104,14 +107,13 @@ where
             .build_stream(application_properties, self.stream_env.borrow_mut());
 
         let mut raw_stream_graph = self.stream_env.stream_manager.stream_graph.borrow_mut();
-        let dag_manager = DagManager::new(raw_stream_graph.deref());
         let operators = raw_stream_graph.pop_operators();
 
-        let mut operator_invoke_chain = self.build_invoke_chain(&dag_manager, operators);
+        let mut operator_invoke_chain = self.build_invoke_chain(operators);
         debug!("Invoke: {:?}", operator_invoke_chain);
 
         let runnable_context = RunnableContext {
-            dag_manager,
+            dag_metadata: self.dag_metadata.clone(),
             application_descriptor: self.application_descriptor.clone(),
             task_descriptor: self.task_descriptor.clone(),
             window_timer: self.window_timer.clone(),
@@ -131,11 +133,11 @@ where
 
     fn build_invoke_chain(
         &self,
-        dag_manager: &DagManager,
         mut operators: HashMap<OperatorId, StreamOperator>,
     ) -> Box<dyn Runnable> {
-        let job_node = dag_manager
-            .get_job_node(&self.task_descriptor.task_id)
+        let job_node = self
+            .dag_metadata
+            .job_node(self.task_descriptor.task_id.job_id)
             .expect(format!("Job={:?} is not found", &self.task_descriptor).as_str());
 
         let mut invoke_operators = Vec::new();
@@ -174,11 +176,8 @@ where
                     op
                 }
                 StreamOperator::StreamReduce(stream_operator) => {
-                    let stream_key_by = self.get_dependency_key_by(
-                        &dag_manager,
-                        operators.borrow_mut(),
-                        job_node.job_id,
-                    );
+                    let stream_key_by =
+                        self.get_dependency_key_by(operators.borrow_mut(), job_node.job_id);
                     let op = ReduceRunnable::new(operator_id, stream_key_by, stream_operator, None);
                     let op: Box<dyn Runnable> = Box::new(op);
                     op
@@ -220,11 +219,10 @@ where
 
     fn get_dependency_key_by(
         &self,
-        dag_manager: &DagManager,
         operators: &mut HashMap<OperatorId, StreamOperator>,
         job_id: JobId,
     ) -> Option<DefaultStreamOperator<dyn KeySelectorFunction>> {
-        let job_parents = dag_manager.get_job_parents(job_id);
+        let job_parents = self.dag_metadata.job_parents(job_id);
         if job_parents.len() == 0 {
             error!("key by not found");
             None
@@ -232,7 +230,7 @@ where
             error!("multi key by parents");
             None
         } else {
-            let (job_node, _) = &job_parents[0];
+            let (job_node, _) = job_parents[0];
             let stream_node = job_node
                 .stream_nodes
                 .iter()

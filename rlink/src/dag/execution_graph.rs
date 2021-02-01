@@ -8,7 +8,6 @@ use crate::api::operator::StreamOperator;
 use crate::api::runtime::{JobId, OperatorId};
 use crate::dag::job_graph::{JobEdge, JobGraph};
 use crate::dag::stream_graph::StreamNode;
-use crate::dag::utils::JsonDag;
 use crate::dag::{DagError, Label, TaskId};
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -20,7 +19,7 @@ pub(crate) enum ExecutionEdge {
 }
 
 impl Label for ExecutionEdge {
-    fn get_label(&self) -> String {
+    fn label(&self) -> String {
         format!("{:?}", self)
     }
 }
@@ -33,7 +32,7 @@ pub(crate) struct ExecutionNode {
 }
 
 impl Label for ExecutionNode {
-    fn get_label(&self) -> String {
+    fn label(&self) -> String {
         let op_names: Vec<&str> = self
             .stream_nodes
             .iter()
@@ -61,46 +60,6 @@ impl ExecutionGraph {
         }
     }
 
-    pub(crate) fn get_parents(
-        &self,
-        task_id: &TaskId,
-    ) -> Option<Vec<(ExecutionNode, ExecutionEdge)>> {
-        self.node_indies.get(task_id).map(|node_index| {
-            let job_nodes: Vec<(ExecutionNode, ExecutionEdge)> = self
-                .dag
-                .parents(*node_index)
-                .iter(&self.dag)
-                .map(|(edge_index, node_index)| {
-                    (
-                        self.dag.index(node_index).clone(),
-                        self.dag.index(edge_index).clone(),
-                    )
-                })
-                .collect();
-            job_nodes
-        })
-    }
-
-    pub(crate) fn get_children(
-        &self,
-        task_id: &TaskId,
-    ) -> Option<Vec<(ExecutionNode, ExecutionEdge)>> {
-        self.node_indies.get(&task_id).map(|node_index| {
-            let job_nodes: Vec<(ExecutionNode, ExecutionEdge)> = self
-                .dag
-                .children(*node_index)
-                .iter(&self.dag)
-                .map(|(edge_index, node_index)| {
-                    (
-                        self.dag.index(node_index).clone(),
-                        self.dag.index(edge_index).clone(),
-                    )
-                })
-                .collect();
-            job_nodes
-        })
-    }
-
     pub fn build(
         &mut self,
         job_graph: &JobGraph,
@@ -123,23 +82,32 @@ impl ExecutionGraph {
             let job_node = job_dag.index(*node_index);
             let source_stream_node = &job_node.stream_nodes[0];
 
-            let operator = operators.get_mut(&source_stream_node.id).unwrap();
+            let operator = operators
+                .get_mut(&source_stream_node.id)
+                .ok_or(DagError::OperatorNotFound(source_stream_node.id))?;
             if let StreamOperator::StreamSource(op) = operator {
-                let input_splits = op.operator_fn.create_input_splits(job_node.parallelism);
+                let input_splits = op
+                    .operator_fn
+                    .create_input_splits(job_node.parallelism)
+                    .map_err(|e| DagError::OtherApiError(e))?;
                 if input_splits.len() != job_node.parallelism as usize {
                     return Err(DagError::IllegalInputSplitSize(format!(
                         "{}'s parallelism = {}, but input_splits size = {}",
-                        op.operator_fn.get_name(),
+                        op.operator_fn.name(),
                         job_node.parallelism,
                         input_splits.len(),
                     )));
                 }
 
+                if job_node.parallelism == 0 {
+                    return Err(DagError::JobParallelismNotFound);
+                }
+
                 for task_number in 0..job_node.parallelism {
                     let task_id = TaskId {
                         job_id: job_node.job_id,
-                        task_number: task_number as u16,
-                        num_tasks: job_node.parallelism as u16,
+                        task_number,
+                        num_tasks: job_node.parallelism,
                     };
                     let execution_node = ExecutionNode {
                         task_id: task_id.clone(),
@@ -155,6 +123,8 @@ impl ExecutionGraph {
                         .or_insert(Vec::new())
                         .push(node_index);
                 }
+            } else {
+                return Err(DagError::SourceNotFound);
             }
         }
 
@@ -169,7 +139,10 @@ impl ExecutionGraph {
         let job_dag = &job_graph.dag;
 
         for (job_id, execution_node_indies) in &execution_node_index_map {
-            let job_node_index = job_graph.job_node_indies.get(job_id).unwrap();
+            let job_node_index = job_graph
+                .job_node_indies
+                .get(job_id)
+                .ok_or(DagError::JobNotFound(*job_id))?;
 
             let children: Vec<(EdgeIndex, NodeIndex)> =
                 job_dag.children(*job_node_index).iter(job_dag).collect();
@@ -178,7 +151,7 @@ impl ExecutionGraph {
                 let child_job_node = job_dag.index(child_node_index);
                 let child_execution_node_indies = execution_node_index_map
                     .get(&child_job_node.job_id)
-                    .unwrap();
+                    .ok_or(DagError::JobNotFound(child_job_node.job_id))?;
 
                 let job_edge = job_dag.index(edge_index);
                 match job_edge {
@@ -189,7 +162,7 @@ impl ExecutionGraph {
                             let child_node_index = child_execution_node_indies[number];
                             self.dag
                                 .add_edge(node_index, child_node_index, ExecutionEdge::Memory)
-                                .unwrap();
+                                .map_err(|_e| DagError::WouldCycle)?;
                         }
                     }
                     JobEdge::ReBalance => {
@@ -202,7 +175,7 @@ impl ExecutionGraph {
                                         *child_node_index,
                                         ExecutionEdge::Network,
                                     )
-                                    .unwrap();
+                                    .map_err(|_e| DagError::WouldCycle)?;
                             }
                         }
                     }
@@ -211,9 +184,5 @@ impl ExecutionGraph {
         }
 
         Ok(())
-    }
-
-    pub(crate) fn to_string(&self) -> String {
-        JsonDag::dag_json(&self.dag).to_string()
     }
 }

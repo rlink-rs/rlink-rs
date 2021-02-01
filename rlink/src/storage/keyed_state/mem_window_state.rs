@@ -15,7 +15,6 @@ pub struct MemoryWindowState {
     task_number: u16,
 
     windows: HashMap<Window, MemoryReducingState>,
-    suggest_state_capacity: usize,
 }
 
 impl MemoryWindowState {
@@ -25,7 +24,6 @@ impl MemoryWindowState {
             job_id,
             task_number,
             windows: HashMap::new(),
-            suggest_state_capacity: 512,
         }
     }
 
@@ -41,7 +39,7 @@ impl MemoryWindowState {
             }
             None => {
                 let state_key = StateKey::new(window.clone(), self.job_id, self.task_number);
-                let mut state = MemoryReducingState::new(&state_key, self.suggest_state_capacity);
+                let mut state = MemoryReducingState::new(&state_key);
 
                 let new_val = reduce_fun(None, record);
                 state.insert(key, new_val);
@@ -66,7 +64,7 @@ impl TWindowState for MemoryWindowState {
     where
         F: Fn(Option<&mut Record>, &mut Record) -> Record,
     {
-        let windows = record.get_location_windows();
+        let windows = record.location_windows();
 
         if windows.len() == 1 {
             let window = &windows[0].clone();
@@ -83,9 +81,6 @@ impl TWindowState for MemoryWindowState {
     fn drop_window(&mut self, window: &Window) {
         match self.windows.remove(&window) {
             Some(state) => {
-                let len = state.len() as f32;
-                self.suggest_state_capacity = (len * 1.1f32) as usize;
-
                 let state_key = StorageKey::new(self.job_id, self.task_number);
                 append_drop_window(state_key, window.clone(), state);
             }

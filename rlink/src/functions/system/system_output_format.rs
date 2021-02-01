@@ -171,12 +171,12 @@ impl OutputFormat for SystemOutputFormat {
                 if self.job_senders.len() == 1 {
                     let (_job_id, task_senders) = &self.job_senders[0];
                     let (_task_id, sender) =
-                        task_senders.get(element.get_partition() as usize).unwrap();
+                        task_senders.get(element.partition() as usize).unwrap();
                     sender.send(element).unwrap();
                 } else {
                     for (_job, task_senders) in &self.job_senders {
                         let (_task_id, sender) =
-                            task_senders.get(element.get_partition() as usize).unwrap();
+                            task_senders.get(element.partition() as usize).unwrap();
                         sender.send(element.clone()).unwrap()
                     }
                 }
@@ -190,7 +190,7 @@ impl OutputFormat for SystemOutputFormat {
 }
 
 impl Function for SystemOutputFormat {
-    fn get_name(&self) -> &str {
+    fn name(&self) -> &str {
         "SystemOutputFormat"
     }
 }

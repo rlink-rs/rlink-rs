@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use std::borrow::BorrowMut;
+use std::cmp::Ordering;
 use std::fmt::Debug;
 
 use bytes::{Buf, BufMut, BytesMut};
@@ -20,7 +21,8 @@ pub mod types {
 }
 
 pub(crate) trait Partition {
-    fn get_partition(&self) -> u16;
+    fn partition(&self) -> u16;
+    fn set_partition(&mut self, partition: u16);
 }
 
 const SER_DE_RECORD: u8 = 1;
@@ -41,7 +43,7 @@ pub(crate) trait Serde {
 
 #[derive(Clone, Debug, Hash)]
 pub struct Record {
-    pub(crate) partition_num: u16,
+    pub partition_num: u16,
     pub(crate) timestamp: u64,
 
     pub(crate) channel_key: ChannelKey,
@@ -49,6 +51,26 @@ pub struct Record {
     pub(crate) trigger_window: Option<Window>,
 
     pub(crate) values: Buffer,
+}
+
+impl Ord for Record {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.values.as_slice().cmp(other.values.as_slice())
+    }
+}
+
+impl PartialOrd for Record {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.values.as_slice().partial_cmp(other.values.as_slice())
+    }
+}
+
+impl Eq for Record {}
+
+impl PartialEq for Record {
+    fn eq(&self, other: &Self) -> bool {
+        self.values.as_slice().eq(other.values.as_slice())
+    }
 }
 
 impl Record {
@@ -74,7 +96,7 @@ impl Record {
         }
     }
 
-    pub fn get_arity(&self) -> usize {
+    pub fn arity(&self) -> usize {
         self.values.len()
     }
 
@@ -86,18 +108,18 @@ impl Record {
         self.location_windows = Some(windows);
     }
 
-    pub(crate) fn get_location_windows(&self) -> &Vec<Window> {
+    pub(crate) fn location_windows(&self) -> &Vec<Window> {
         self.location_windows.as_ref().unwrap_or(&EMPTY_VEC)
     }
 
-    pub(crate) fn get_min_location_windows(&self) -> Option<&Window> {
+    pub(crate) fn min_location_windows(&self) -> Option<&Window> {
         match &self.location_windows {
             Some(windows) => windows.get(0),
             None => None,
         }
     }
 
-    pub(crate) fn get_max_location_windows(&self) -> Option<&Window> {
+    pub(crate) fn max_location_windows(&self) -> Option<&Window> {
         match &self.location_windows {
             Some(windows) => {
                 if windows.len() > 0 {
@@ -114,7 +136,7 @@ impl Record {
         self.trigger_window = Some(window);
     }
 
-    pub fn get_trigger_window(&self) -> Option<Window> {
+    pub fn trigger_window(&self) -> Option<Window> {
         self.trigger_window.clone()
     }
 
@@ -122,11 +144,11 @@ impl Record {
         self.values.borrow_mut()
     }
 
-    pub fn get_reader<'a, 'b>(&'a mut self, data_types: &'b [u8]) -> BufferReader<'a, 'b> {
+    pub fn as_reader<'a, 'b>(&'a mut self, data_types: &'b [u8]) -> BufferReader<'a, 'b> {
         self.values.as_reader(data_types)
     }
 
-    pub fn get_writer<'a, 'b>(&'a mut self, data_types: &'b [u8]) -> BufferWriter<'a, 'b> {
+    pub fn as_writer<'a, 'b>(&'a mut self, data_types: &'b [u8]) -> BufferWriter<'a, 'b> {
         self.values.as_writer(data_types)
     }
 
@@ -136,8 +158,12 @@ impl Record {
 }
 
 impl Partition for Record {
-    fn get_partition(&self) -> u16 {
+    fn partition(&self) -> u16 {
         self.partition_num
+    }
+
+    fn set_partition(&mut self, partition: u16) {
+        self.partition_num = partition;
     }
 }
 
@@ -178,18 +204,10 @@ impl Serde for Record {
     }
 }
 
-impl Eq for Record {}
-
-impl PartialEq for Record {
-    fn eq(&self, other: &Self) -> bool {
-        self.values.eq(&other.values)
-    }
-}
-
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub struct Watermark {
     // for partition routing
-    pub(crate) partition_num: u16,
+    partition_num: u16,
 
     // for align
     pub(crate) task_number: u16,
@@ -228,7 +246,7 @@ impl Watermark {
         self.location_windows = Some(windows);
     }
 
-    pub(crate) fn get_min_location_windows(&self) -> Option<&Window> {
+    pub(crate) fn min_location_windows(&self) -> Option<&Window> {
         match &self.location_windows {
             Some(windows) => windows.get(0),
             None => None,
@@ -237,8 +255,12 @@ impl Watermark {
 }
 
 impl Partition for Watermark {
-    fn get_partition(&self) -> u16 {
+    fn partition(&self) -> u16 {
         self.partition_num
+    }
+
+    fn set_partition(&mut self, partition: u16) {
+        self.partition_num = partition;
     }
 }
 
@@ -281,7 +303,7 @@ impl Serde for Watermark {
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub struct StreamStatus {
-    pub(crate) partition_num: u16,
+    partition_num: u16,
     pub(crate) timestamp: u64,
 
     pub(crate) end: bool,
@@ -298,8 +320,12 @@ impl StreamStatus {
 }
 
 impl Partition for StreamStatus {
-    fn get_partition(&self) -> u16 {
+    fn partition(&self) -> u16 {
         self.partition_num
+    }
+
+    fn set_partition(&mut self, partition: u16) {
+        self.partition_num = partition;
     }
 }
 
@@ -330,9 +356,9 @@ impl Serde for StreamStatus {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Barrier {
-    pub(crate) partition_num: u16,
+    partition_num: u16,
     pub(crate) checkpoint_id: CheckpointId,
 }
 
@@ -346,8 +372,12 @@ impl Barrier {
 }
 
 impl Partition for Barrier {
-    fn get_partition(&self) -> u16 {
+    fn partition(&self) -> u16 {
         self.partition_num
+    }
+
+    fn set_partition(&mut self, partition: u16) {
+        self.partition_num = partition;
     }
 }
 
@@ -499,12 +529,21 @@ impl Element {
 }
 
 impl Partition for Element {
-    fn get_partition(&self) -> u16 {
+    fn partition(&self) -> u16 {
         match self {
-            Element::Record(record) => record.get_partition(),
-            Element::StreamStatus(stream_status) => stream_status.get_partition(),
-            Element::Watermark(water_mark) => water_mark.get_partition(),
-            Element::Barrier(barrier) => barrier.get_partition(),
+            Element::Record(record) => record.partition(),
+            Element::StreamStatus(stream_status) => stream_status.partition(),
+            Element::Watermark(water_mark) => water_mark.partition(),
+            Element::Barrier(barrier) => barrier.partition(),
+        }
+    }
+
+    fn set_partition(&mut self, partition: u16) {
+        match self {
+            Element::Record(record) => record.set_partition(partition),
+            Element::StreamStatus(stream_status) => stream_status.set_partition(partition),
+            Element::Watermark(water_mark) => water_mark.set_partition(partition),
+            Element::Barrier(barrier) => barrier.set_partition(partition),
         }
     }
 }
@@ -590,7 +629,7 @@ mod tests {
         record.timestamp = 3;
 
         let data_types = vec![types::U32, types::U64, types::I32, types::I64, types::BYTES];
-        let mut writer = record.get_writer(&data_types);
+        let mut writer = record.as_writer(&data_types);
 
         writer.set_u32(10).unwrap();
         writer.set_u64(20).unwrap();
@@ -599,13 +638,13 @@ mod tests {
         writer.set_bytes("abc".as_bytes()).unwrap();
 
         let record_clone = record.clone();
-        let mut reader = record.get_reader(&data_types);
+        let mut reader = record.as_reader(&data_types);
 
         let element_record = Element::Record(record_clone);
         let mut data = element_record.to_bytes();
         let mut element_record_de = Element::deserialize(data.borrow_mut());
 
-        let mut de_reader = element_record_de.as_record_mut().get_reader(&data_types);
+        let mut de_reader = element_record_de.as_record_mut().as_reader(&data_types);
         assert_eq!(reader.get_u32(0).unwrap(), de_reader.get_u32(0).unwrap());
         assert_eq!(reader.get_u64(1).unwrap(), de_reader.get_u64(1).unwrap());
         assert_eq!(reader.get_i32(2).unwrap(), de_reader.get_i32(2).unwrap());

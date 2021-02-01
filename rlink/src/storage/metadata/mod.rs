@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::fmt::Debug;
 
 use crate::api::cluster::MetadataStorageType;
@@ -8,26 +7,23 @@ use crate::storage::metadata::mem_metadata_storage::MemoryMetadataStorage;
 pub mod mem_metadata_storage;
 
 pub mod metadata_loader;
-pub use metadata_loader::MetadataLoader;
+pub(crate) use metadata_loader::MetadataLoader;
 
 pub trait TMetadataStorage: Debug {
-    fn save_job_descriptor(
-        &mut self,
-        metadata: ApplicationDescriptor,
-    ) -> Result<(), Box<dyn Error + Send + Sync>>;
-    fn delete_job_descriptor(&mut self) -> Result<(), Box<dyn Error + Send + Sync>>;
-    fn read_job_descriptor(&self) -> Result<ApplicationDescriptor, Box<dyn Error + Send + Sync>>;
-    fn update_job_status(
+    fn save(&mut self, metadata: ApplicationDescriptor) -> anyhow::Result<()>;
+    fn delete(&mut self) -> anyhow::Result<()>;
+    fn load(&self) -> anyhow::Result<ApplicationDescriptor>;
+    fn update_application_status(
         &self,
         job_manager_status: TaskManagerStatus,
-    ) -> Result<(), Box<dyn Error + Send + Sync>>;
-    fn update_task_status(
+    ) -> anyhow::Result<()>;
+    fn update_task_manager_status(
         &self,
         task_manager_id: &str,
         task_manager_address: &str,
         task_manager_status: TaskManagerStatus,
         metrics_address: &str,
-    ) -> Result<(), Box<dyn Error + Send + Sync>>;
+    ) -> anyhow::Result<()>;
 }
 
 #[derive(Debug)]
@@ -47,49 +43,44 @@ impl MetadataStorage {
 }
 
 impl TMetadataStorage for MetadataStorage {
-    fn save_job_descriptor(
-        &mut self,
-        metadata: ApplicationDescriptor,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
+    fn save(&mut self, metadata: ApplicationDescriptor) -> anyhow::Result<()> {
         match self {
-            MetadataStorage::MemoryMetadataStorage(storage) => {
-                storage.save_job_descriptor(metadata)
-            }
+            MetadataStorage::MemoryMetadataStorage(storage) => storage.save(metadata),
         }
     }
 
-    fn delete_job_descriptor(&mut self) -> Result<(), Box<dyn Error + Send + Sync>> {
+    fn delete(&mut self) -> anyhow::Result<()> {
         match self {
-            MetadataStorage::MemoryMetadataStorage(storage) => storage.delete_job_descriptor(),
+            MetadataStorage::MemoryMetadataStorage(storage) => storage.delete(),
         }
     }
 
-    fn read_job_descriptor(&self) -> Result<ApplicationDescriptor, Box<dyn Error + Send + Sync>> {
+    fn load(&self) -> anyhow::Result<ApplicationDescriptor> {
         match self {
-            MetadataStorage::MemoryMetadataStorage(storage) => storage.read_job_descriptor(),
+            MetadataStorage::MemoryMetadataStorage(storage) => storage.load(),
         }
     }
 
-    fn update_job_status(
+    fn update_application_status(
         &self,
         job_manager_status: TaskManagerStatus,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
+    ) -> anyhow::Result<()> {
         match self {
             MetadataStorage::MemoryMetadataStorage(storage) => {
-                storage.update_job_status(job_manager_status)
+                storage.update_application_status(job_manager_status)
             }
         }
     }
 
-    fn update_task_status(
+    fn update_task_manager_status(
         &self,
         task_manager_id: &str,
         task_manager_address: &str,
         task_manager_status: TaskManagerStatus,
         metrics_address: &str,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
+    ) -> anyhow::Result<()> {
         match self {
-            MetadataStorage::MemoryMetadataStorage(storage) => storage.update_task_status(
+            MetadataStorage::MemoryMetadataStorage(storage) => storage.update_task_manager_status(
                 task_manager_id,
                 task_manager_address,
                 task_manager_status,
@@ -99,38 +90,32 @@ impl TMetadataStorage for MetadataStorage {
     }
 }
 
-pub(crate) fn loop_read_job_descriptor(
+pub(crate) fn loop_read_application_descriptor(
     metadata_storage: &MetadataStorage,
 ) -> ApplicationDescriptor {
-    loop_fn!(
-        metadata_storage.read_job_descriptor(),
-        std::time::Duration::from_secs(2)
-    )
+    loop_fn!(metadata_storage.load(), std::time::Duration::from_secs(2))
 }
 
-pub(crate) fn loop_save_job_descriptor(
+pub(crate) fn loop_save_application_descriptor(
     metadata_storage: &mut MetadataStorage,
     application_descriptor: ApplicationDescriptor,
 ) {
     loop_fn!(
-        metadata_storage.save_job_descriptor(application_descriptor.clone()),
+        metadata_storage.save(application_descriptor.clone()),
         std::time::Duration::from_secs(2)
     );
 }
 
-pub(crate) fn loop_delete_job_descriptor(metadata_storage: &mut MetadataStorage) {
-    loop_fn!(
-        metadata_storage.delete_job_descriptor(),
-        std::time::Duration::from_secs(2)
-    );
+pub(crate) fn loop_delete_application_descriptor(metadata_storage: &mut MetadataStorage) {
+    loop_fn!(metadata_storage.delete(), std::time::Duration::from_secs(2));
 }
 
-pub(crate) fn loop_update_job_status(
+pub(crate) fn loop_update_application_status(
     metadata_storage: &mut MetadataStorage,
     job_manager_status: TaskManagerStatus,
 ) {
     loop_fn!(
-        metadata_storage.update_job_status(job_manager_status.clone()),
+        metadata_storage.update_application_status(job_manager_status.clone()),
         std::time::Duration::from_secs(2)
     );
 }

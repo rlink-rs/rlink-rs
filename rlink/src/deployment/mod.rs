@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+use std::sync::Arc;
 
 use crate::api::cluster::TaskResourceInfo;
 use crate::api::env::{StreamApp, StreamExecutionEnvironment};
@@ -50,7 +51,7 @@ pub(crate) enum ResourceManager {
 }
 
 impl ResourceManager {
-    pub fn new(context: &Context) -> Self {
+    pub fn new(context: Arc<Context>) -> Self {
         match context.cluster_mode {
             ClusterMode::Local => {
                 ResourceManager::LocalResourceManager(LocalResourceManager::new(context.clone()))

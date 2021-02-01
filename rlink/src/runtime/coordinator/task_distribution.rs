@@ -7,7 +7,7 @@ use crate::runtime::{
     WorkerManagerDescriptor,
 };
 
-pub(crate) fn build_job_descriptor(
+pub(crate) fn build_application_descriptor(
     job_name: &str,
     dag_manager: &DagManager,
     application_properties: &Properties,

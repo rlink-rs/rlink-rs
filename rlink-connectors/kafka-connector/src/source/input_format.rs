@@ -4,14 +4,14 @@ use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::{ClientConfig, Offset};
 use rlink::api;
 use rlink::api::backend::OperatorStateBackend;
-use rlink::api::checkpoint::CheckpointedFunction;
+use rlink::api::checkpoint::CheckpointFunction;
 use rlink::api::element::Record;
 use rlink::api::function::{Context, InputFormat, InputSplit, InputSplitSource};
 use rlink::api::properties::{Properties, SystemProperties};
 use rlink::channel::handover::Handover;
 use rlink::metrics::Tag;
 
-use crate::source::checkpoint::KafkaCheckpointed;
+use crate::source::checkpoint::KafkaCheckpointFunction;
 use crate::source::consumer::{create_kafka_consumer, get_kafka_consumer_handover};
 use crate::source::iterator::KafkaRecordIterator;
 
@@ -24,7 +24,7 @@ pub struct KafkaInputFormat {
     handover: Option<Handover>,
 
     state_mode: Option<OperatorStateBackend>,
-    checkpoint: Option<KafkaCheckpointed>,
+    checkpoint: Option<KafkaCheckpointFunction>,
 }
 
 impl KafkaInputFormat {
@@ -45,7 +45,7 @@ impl InputFormat for KafkaInputFormat {
         info!("kafka source open");
 
         let can_create_consumer = input_split
-            .get_properties()
+            .properties()
             .get_string("create_kafka_connection")?;
         if can_create_consumer.to_lowercase().eq("true") {
             let state_backend = context
@@ -54,20 +54,15 @@ impl InputFormat for KafkaInputFormat {
                 .unwrap_or(OperatorStateBackend::None);
             self.state_mode = Some(state_backend);
 
-            let mut kafka_checkpoint = KafkaCheckpointed::new(
-                context.application_id.clone(),
-                context.task_id.job_id(),
-                context.task_id.task_number(),
-            );
+            let mut kafka_checkpoint =
+                KafkaCheckpointFunction::new(context.application_id.clone(), context.task_id);
             // todo provide the data from coordinator
-            kafka_checkpoint.initialize_state(
-                &context.get_checkpoint_context(),
-                &context.checkpoint_handle,
-            );
+            kafka_checkpoint
+                .initialize_state(&context.checkpoint_context(), &context.checkpoint_handle);
             self.checkpoint = Some(kafka_checkpoint);
 
-            let topic = input_split.get_properties().get_string("topic").unwrap();
-            let partition = input_split.get_properties().get_i32("partition").unwrap();
+            let topic = input_split.properties().get_string("topic").unwrap();
+            let partition = input_split.properties().get_i32("partition").unwrap();
 
             let tags = vec![
                 Tag("topic".to_string(), topic.to_string()),
@@ -118,7 +113,7 @@ impl InputFormat for KafkaInputFormat {
         Ok(())
     }
 
-    fn get_checkpoint(&mut self) -> Option<Box<&mut dyn CheckpointedFunction>> {
+    fn checkpoint_function(&mut self) -> Option<Box<&mut dyn CheckpointFunction>> {
         match self.checkpoint.as_mut() {
             Some(checkpoint) => Some(Box::new(checkpoint)),
             None => None,
@@ -127,7 +122,7 @@ impl InputFormat for KafkaInputFormat {
 }
 
 impl InputSplitSource for KafkaInputFormat {
-    fn create_input_splits(&self, min_num_splits: u16) -> Vec<InputSplit> {
+    fn create_input_splits(&self, min_num_splits: u16) -> api::Result<Vec<InputSplit>> {
         let timeout = Duration::from_secs(3);
 
         info!("kafka config {:?}", self.client_config);
@@ -135,18 +130,18 @@ impl InputSplitSource for KafkaInputFormat {
         let consumer: BaseConsumer = self
             .client_config
             .create()
-            .expect("Consumer creation failed");
+            .map_err(|e| anyhow!("Consumer creation failed. {}", e))?;
 
         let mut input_splits = Vec::new();
         let mut index = 0;
         for topic in &self.topics {
             let metadata = consumer
                 .fetch_metadata(Some(topic.as_str()), timeout)
-                .expect("Failed to fetch metadata");
+                .map_err(|e| anyhow!("Failed to fetch metadata. {}", e))?;
             let metadata_topic = metadata
                 .topics()
                 .get(0)
-                .expect(format!("Topic({}) not found", topic).as_str());
+                .ok_or(anyhow!("Topic({}) not found", topic))?;
 
             for partition in metadata_topic.partitions() {
                 let mut properties = Properties::new();
@@ -165,7 +160,9 @@ impl InputSplitSource for KafkaInputFormat {
         }
 
         if input_splits.len() > min_num_splits as usize {
-            panic!("kafka `input_splits.len()` != `min_num_splits`")
+            return Err(rlink::api::Error::from(
+                "kafka `input_splits.len()` != `min_num_splits`",
+            ));
         }
 
         if input_splits.len() < min_num_splits as usize {
@@ -173,8 +170,8 @@ impl InputSplitSource for KafkaInputFormat {
             let times = (min_num_splits as usize + input_splits.len() - 1) / input_splits.len();
             for _ in 1..times {
                 for input_split in &input_splits {
-                    let split_number = input_split.get_split_number();
-                    let mut properties = input_split.get_properties().clone();
+                    let split_number = input_split.split_number();
+                    let mut properties = input_split.properties().clone();
                     properties.set_str("create_kafka_connection", "false");
 
                     extend_input_splits.push(InputSplit::new(split_number, properties));
@@ -183,6 +180,6 @@ impl InputSplitSource for KafkaInputFormat {
             input_splits.extend_from_slice(extend_input_splits.as_slice());
         }
 
-        input_splits
+        Ok(input_splits)
     }
 }

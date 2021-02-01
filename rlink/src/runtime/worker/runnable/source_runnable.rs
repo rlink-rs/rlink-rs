@@ -3,16 +3,17 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::api::checkpoint::Checkpoint;
-use crate::api::element::Element;
+use crate::api::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
+use crate::api::element::{Barrier, Element};
 use crate::api::function::{InputFormat, InputSplit};
 use crate::api::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
 use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::channel::named_channel;
 use crate::channel::sender::ChannelSender;
+use crate::dag::job_graph::JobEdge;
 use crate::metrics::Tag;
 use crate::runtime::timer::TimerChannel;
-use crate::runtime::worker::checkpoint::report_checkpoint;
+use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
 #[derive(Debug)]
@@ -27,16 +28,17 @@ pub(crate) struct SourceRunnable {
 
     stream_status_timer: Option<TimerChannel>,
     checkpoint_timer: Option<TimerChannel>,
+
+    barrier_align: Option<BarrierAlign>,
 }
 
 impl SourceRunnable {
     pub fn new(
         operator_id: OperatorId,
-        input_split: InputSplit,
+        _input_split: InputSplit, // todo remove?
         stream_source: DefaultStreamOperator<dyn InputFormat>,
         next_runnable: Option<Box<dyn Runnable>>,
     ) -> Self {
-        info!("Create SourceRunnable input_split={:?}", &input_split);
         SourceRunnable {
             operator_id,
             context: None,
@@ -47,6 +49,8 @@ impl SourceRunnable {
 
             stream_status_timer: None,
             checkpoint_timer: None,
+
+            barrier_align: None,
         }
     }
 
@@ -147,14 +151,14 @@ impl Runnable for SourceRunnable {
         let source_func = self.stream_source.operator_fn.as_mut();
         source_func.open(input_split, &fun_context)?;
 
-        if let FunctionCreator::User = self.stream_source.get_fn_creator() {
+        if let FunctionCreator::User = self.stream_source.fn_creator() {
             let stream_status_timer = context
                 .window_timer
                 .register("StreamStatus Event Timer", Duration::from_secs(10))
                 .expect("register StreamStatus timer error");
             self.stream_status_timer = Some(stream_status_timer);
 
-            let checkpoint_period = context.get_checkpoint_internal(Duration::from_secs(30));
+            let checkpoint_period = context.checkpoint_internal(Duration::from_secs(30));
             let checkpoint_timer = context
                 .window_timer
                 .register("Checkpoint Event Timer", checkpoint_period)
@@ -162,40 +166,53 @@ impl Runnable for SourceRunnable {
             self.checkpoint_timer = Some(checkpoint_timer);
         }
 
-        info!("Operator(SourceOperator) open");
+        self.barrier_align = Some(BarrierAlign::new(context));
+
+        info!(
+            "SourceRunnable Opened, operator_id={:?}, task_id={:?}, BarrierAlign expected_size={:?}",
+            self.operator_id, self.task_id, self.barrier_align.as_ref().unwrap().expected_size,
+        );
         Ok(())
     }
 
     fn run(&mut self, mut _element: Element) {
-        info!("{} running...", self.stream_source.operator_fn.get_name());
+        info!("{} running...", self.stream_source.operator_fn.name());
 
         let tags = vec![
-            Tag("job_id".to_string(), self.task_id.job_id.0.to_string()),
-            Tag(
-                "task_number".to_string(),
-                self.task_id.task_number.to_string(),
-            ),
+            Tag::from(("job_id", self.task_id.job_id.0)),
+            Tag::from(("task_number", self.task_id.task_number)),
         ];
-        let metric_name = format!(
-            "Source_{}",
-            self.stream_source.operator_fn.as_ref().get_name()
-        );
+        let metric_name = format!("Source_{}", self.stream_source.operator_fn.as_ref().name());
         let (sender, receiver) = named_channel(metric_name.as_str(), tags, 10240);
         let running = Arc::new(AtomicBool::new(true));
 
         self.poll_input_element(sender.clone(), running.clone());
-        if let FunctionCreator::User = self.stream_source.get_fn_creator() {
+        if let FunctionCreator::User = self.stream_source.fn_creator() {
             self.poll_stream_status(sender.clone(), running.clone());
             self.poll_checkpoint(sender.clone(), running.clone());
         }
 
         while let Ok(element) = receiver.recv() {
             if element.is_barrier() {
-                let checkpoint_id = element.as_barrier().checkpoint_id;
-                self.checkpoint(checkpoint_id);
-            }
+                let is_barrier_align = self
+                    .barrier_align
+                    .as_mut()
+                    .unwrap()
+                    .apply(element.as_barrier());
+                if is_barrier_align {
+                    debug!("barrier align and checkpoint");
+                    let checkpoint_id = element.as_barrier().checkpoint_id;
+                    let snapshot_context = {
+                        let context = self.context.as_ref().unwrap();
+                        context.checkpoint_context(self.operator_id, checkpoint_id)
+                    };
+                    self.checkpoint(snapshot_context);
 
-            self.next_runnable.as_mut().unwrap().run(element);
+                    self.next_runnable.as_mut().unwrap().run(element);
+                }
+            } else {
+                self.next_runnable.as_mut().unwrap().run(element);
+            }
         }
     }
 
@@ -211,28 +228,79 @@ impl Runnable for SourceRunnable {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, checkpoint_id: CheckpointId) {
-        let context = {
-            let context = self.context.as_ref().unwrap();
-            context.get_checkpoint_context(self.operator_id, checkpoint_id)
+    fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext) {
+        let handle = match self.stream_source.operator_fn.checkpoint_function() {
+            Some(checkpoint) => checkpoint.snapshot_state(&snapshot_context),
+            None => CheckpointHandle::default(),
         };
 
-        let fn_name = self.stream_source.operator_fn.get_name();
-        debug!("begin checkpoint : {}", fn_name);
+        let ck = Checkpoint {
+            operator_id: snapshot_context.operator_id,
+            task_id: snapshot_context.task_id,
+            checkpoint_id: snapshot_context.checkpoint_id,
+            handle,
+        };
+        submit_checkpoint(ck).map(|ck| {
+            error!(
+                "{:?} submit checkpoint error. maybe report channel is full, checkpoint: {:?}",
+                snapshot_context.operator_id, ck
+            )
+        });
+    }
+}
 
-        match self.stream_source.operator_fn.get_checkpoint() {
-            Some(checkpoint) => {
-                let ck_handle = checkpoint.snapshot_state(&context);
-                let ck = Checkpoint {
-                    operator_id: context.operator_id,
-                    task_id: self.task_id,
-                    checkpoint_id,
-                    handle: ck_handle,
-                };
+#[derive(Debug)]
+struct BarrierAlign {
+    expected_size: usize,
 
-                report_checkpoint(ck);
+    checkpoint_id: u64,
+    reached_size: usize,
+}
+
+impl BarrierAlign {
+    pub fn new(context: &RunnableContext) -> Self {
+        let parents = context
+            .dag_metadata
+            .job_parents(context.task_descriptor.task_id.job_id);
+        let expected_size = parents
+            .into_iter()
+            .map(|(node, edge)| match edge {
+                JobEdge::Forward => 1 as usize,
+                JobEdge::ReBalance => node.parallelism as usize,
+            })
+            .sum();
+        BarrierAlign {
+            expected_size,
+            checkpoint_id: 0,
+            reached_size: 0,
+        }
+    }
+
+    pub fn apply(&mut self, barrier: &Barrier) -> bool {
+        if self.expected_size == 0 {
+            return true;
+        }
+
+        let checkpoint_id = barrier.checkpoint_id.0;
+        if self.checkpoint_id == checkpoint_id {
+            self.reached_size += 1;
+
+            if self.reached_size > self.expected_size {
+                unreachable!()
             }
-            None => {}
+
+            self.reached_size == self.expected_size
+        } else if self.checkpoint_id < checkpoint_id {
+            self.checkpoint_id = checkpoint_id;
+            self.reached_size = 1;
+
+            self.reached_size == self.expected_size
+        } else {
+            error!(
+                "barrier delay, current {}, reached {}",
+                self.checkpoint_id, checkpoint_id
+            );
+            false
         }
     }
 }

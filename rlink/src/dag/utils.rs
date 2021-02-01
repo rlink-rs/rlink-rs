@@ -1,4 +1,3 @@
-use std::cmp::max;
 use std::collections::HashMap;
 use std::ops::Index;
 
@@ -6,16 +5,6 @@ use daggy::{Dag, NodeIndex, Walker};
 use serde::Serialize;
 
 use crate::dag::Label;
-
-pub(crate) fn get_nodes<N, E>(dag: &Dag<N, E>) -> Vec<N>
-where
-    N: Clone,
-{
-    dag.raw_nodes()
-        .iter()
-        .map(|node| node.weight.clone())
-        .collect()
-}
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub(crate) struct JsonNode<N>
@@ -26,8 +15,21 @@ where
     label: String,
     #[serde(rename = "type")]
     ty: String,
-    detail: Option<N>,
+    detail: N,
     dept: isize,
+}
+
+impl<N> JsonNode<N>
+where
+    N: Serialize,
+{
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    pub fn detail(&self) -> &N {
+        &self.detail
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -40,8 +42,24 @@ where
     /// target JsonNode id
     target: String,
     label: String,
-    detail: Option<E>,
-    dept: isize,
+    detail: E,
+}
+
+impl<E> JsonEdge<E>
+where
+    E: Serialize,
+{
+    pub fn source(&self) -> &str {
+        &self.source
+    }
+
+    pub fn target(&self) -> &str {
+        &self.target
+    }
+
+    pub fn detail(&self) -> &E {
+        &self.detail
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -52,6 +70,41 @@ where
 {
     nodes: Vec<JsonNode<N>>,
     edges: Vec<JsonEdge<E>>,
+}
+
+impl<'a, N, E> From<&'a Dag<N, E>> for JsonDag<N, E>
+where
+    N: Clone + Label + Serialize,
+    E: Clone + Label + Serialize,
+{
+    fn from(dag: &'a Dag<N, E, u32>) -> Self {
+        let mut node_map = HashMap::new();
+        let mut edges = Vec::new();
+
+        for edge in dag.raw_edges() {
+            let source_json_node = JsonDag::crate_json_node(dag, edge.source());
+            let target_json_node = JsonDag::crate_json_node(dag, edge.target());
+
+            let json_edge = {
+                let label = edge.weight.label();
+                JsonEdge {
+                    source: source_json_node.id.clone(),
+                    target: target_json_node.id.clone(),
+                    label,
+                    detail: edge.weight.clone(),
+                }
+            };
+
+            node_map.insert(source_json_node.id.clone(), source_json_node);
+            node_map.insert(target_json_node.id.clone(), target_json_node);
+
+            edges.push(json_edge);
+        }
+
+        let nodes = node_map.into_iter().map(|(_, node)| node).collect();
+
+        JsonDag { nodes, edges }
+    }
 }
 
 impl<N, E> JsonDag<N, E>
@@ -75,7 +128,7 @@ where
 
     fn crate_json_node(dag: &Dag<N, E>, node_index: NodeIndex) -> JsonNode<N> {
         let n = dag.index(node_index);
-        let label = n.get_label();
+        let label = n.label();
         let id = node_index.index().to_string();
         let ty = JsonDag::get_node_type(dag, node_index);
 
@@ -83,124 +136,56 @@ where
             id,
             label,
             ty: ty.to_string(),
-            detail: Some(n.clone()),
+            detail: n.clone(),
             dept: -1,
         }
     }
 
-    pub(crate) fn dag_json(dag: &Dag<N, E>) -> Self {
-        let mut node_map = HashMap::new();
-        let mut edges = Vec::new();
-
-        for edge in dag.raw_edges() {
-            let source_json_node = JsonDag::crate_json_node(dag, edge.source());
-            let target_json_node = JsonDag::crate_json_node(dag, edge.target());
-
-            let json_edge = {
-                let label = edge.weight.get_label();
-                JsonEdge {
-                    source: source_json_node.id.clone(),
-                    target: target_json_node.id.clone(),
-                    label,
-                    detail: Some(edge.weight.clone()),
-                    dept: -1,
-                }
-            };
-
-            node_map.insert(source_json_node.id.clone(), source_json_node);
-            node_map.insert(target_json_node.id.clone(), target_json_node);
-
-            edges.push(json_edge);
-        }
-
-        let nodes = node_map.into_iter().map(|(_, node)| node).collect();
-
-        let mut json_dag = JsonDag { nodes, edges };
-        json_dag.sort_nodes();
-        json_dag.sort_edge();
-
-        json_dag
+    pub(crate) fn get_node(&self, id: &str) -> Option<&JsonNode<N>> {
+        self.nodes.iter().find(|node| node.id.eq(id))
     }
 
-    fn sort_nodes(&mut self) {
-        let mut node_indies = HashMap::new();
-        for i in 0..self.nodes.len() {
-            let node = self.nodes.get(i).unwrap();
-            node_indies.insert(node.id.clone(), i);
-        }
+    pub(crate) fn parents(&self, parent_node_id: &str) -> Vec<(&JsonNode<N>, &JsonEdge<E>)> {
+        self.gets(parent_node_id, true)
+    }
 
-        let root_source_ids: Vec<String> = self
-            .nodes
+    pub(crate) fn children(&self, child_node_id: &str) -> Vec<(&JsonNode<N>, &JsonEdge<E>)> {
+        self.gets(child_node_id, false)
+    }
+
+    fn gets(&self, node_id: &str, parent: bool) -> Vec<(&JsonNode<N>, &JsonEdge<E>)> {
+        self.edges()
             .iter()
-            .filter(|node| {
-                self.edges
-                    .iter()
-                    .find(|edge| edge.target.eq(&node.id))
-                    .is_none()
-            })
-            .map(|node| node.id.clone())
-            .collect();
-
-        root_source_ids.into_iter().for_each(|node_id| {
-            let index = node_indies.get(&node_id).unwrap();
-            self.nodes.get_mut(*index).unwrap().dept = 0;
-        });
-
-        self.dept_build(0, &node_indies);
-
-        self.nodes.sort_by_key(|node| node.dept);
-    }
-
-    fn dept_build(&mut self, parent_dept: isize, node_indies: &HashMap<String, usize>) {
-        for i in 0..self.edges.len() {
-            let (source_index, target_index) = {
-                let edge = self.edges.get(i).unwrap();
-                let source_index = node_indies.get(&edge.source).unwrap();
-                let target_index = node_indies.get(&edge.target).unwrap();
-                (*source_index, *target_index)
-            };
-
-            let source_dept = self.nodes.get(source_index).unwrap().dept;
-            if source_dept == parent_dept {
-                let target = self.nodes.get_mut(target_index).unwrap();
-
-                let next_dept = parent_dept + 1;
-                target.dept = if target.dept == -1 {
-                    next_dept
+            .filter_map(|edge| {
+                let node = if parent {
+                    if edge.target().eq(node_id) {
+                        Some(self.get_node(edge.source()).unwrap())
+                    } else {
+                        None
+                    }
                 } else {
-                    max(target.dept, next_dept)
+                    if edge.source().eq(node_id) {
+                        Some(self.get_node(edge.target()).unwrap())
+                    } else {
+                        None
+                    }
                 };
+                node.map(|node| (node, edge))
+            })
+            .collect()
+    }
+}
 
-                self.dept_build(next_dept, node_indies);
-            }
-        }
+impl<N, E> JsonDag<N, E>
+where
+    N: Clone + Label + Serialize,
+    E: Clone + Label + Serialize,
+{
+    pub fn nodes(&self) -> &Vec<JsonNode<N>> {
+        &self.nodes
     }
 
-    fn sort_edge(&mut self) {
-        let mut edge_index_map = HashMap::new();
-        for i in 0..self.edges.len() {
-            let edge = self.edges.get(i).unwrap();
-            let indies = edge_index_map.entry(edge.source.clone()).or_insert(vec![]);
-            indies.push(i);
-        }
-
-        for i in 0..self.nodes.len() {
-            let (edge_index, source_dept) = {
-                let node = self.nodes.get(i).unwrap();
-                let edge_index = edge_index_map.get(&node.id).map(|x| x.clone());
-                (edge_index, node.dept)
-            };
-            edge_index.map(|edge_indies| {
-                edge_indies.into_iter().for_each(|edge_index| {
-                    self.edges.get_mut(edge_index).unwrap().dept = source_dept;
-                });
-            });
-        }
-
-        self.edges.sort_by_key(|edge| edge.dept);
-    }
-
-    pub(crate) fn to_string(&self) -> String {
-        serde_json::to_string(self).unwrap_or("".to_string())
+    pub fn edges(&self) -> &Vec<JsonEdge<E>> {
+        &self.edges
     }
 }

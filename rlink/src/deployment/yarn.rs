@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::io::{BufRead, Write};
 use std::process::Stdio;
+use std::sync::Arc;
 
 use serde::Deserialize;
 use serde::Serialize;
@@ -15,14 +16,14 @@ use crate::utils;
 
 #[derive(Debug)]
 pub(crate) struct YarnResourceManager {
-    context: Context,
+    context: Arc<Context>,
     job_descriptor: Option<ApplicationDescriptor>,
 
     yarn_command: Option<YarnCliCommand>,
 }
 
 impl YarnResourceManager {
-    pub fn new(context: Context) -> Self {
+    pub fn new(context: Arc<Context>) -> Self {
         YarnResourceManager {
             context,
             job_descriptor: None,
@@ -109,7 +110,8 @@ impl YarnCliCommand {
     pub fn new(context: &Context, job_descriptor: &ApplicationDescriptor) -> Self {
         let child = std::process::Command::new("java")
             .arg("-Xmx256M")
-            .arg("rlink.yarn.manager.ResourceManagerCli")
+            // .arg("rlink.yarn.manager.ResourceManagerCli")
+            .arg(context.yarn_manager_main_class.as_str())
             .arg("--coordinator_address")
             .arg(
                 job_descriptor
@@ -146,7 +148,9 @@ impl YarnCliCommand {
                                     Err(e) => error!("stdin write error. {}", e),
                                 }
                             }
-                            Err(e) => error!("stdin recv error. {}", e),
+                            Err(e) => {
+                                panic!(format!("stdin recv error. {}", e));
+                            }
                         }
                     }
                 });

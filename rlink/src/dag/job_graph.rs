@@ -7,8 +7,7 @@ use daggy::{Dag, EdgeIndex, NodeIndex, Walker};
 use crate::api::operator::DEFAULT_PARALLELISM;
 use crate::api::runtime::{JobId, OperatorId};
 use crate::dag::stream_graph::{StreamGraph, StreamNode};
-use crate::dag::utils::JsonDag;
-use crate::dag::{utils, DagError, Label, OperatorType};
+use crate::dag::{DagError, Label, OperatorType};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum JobEdge {
@@ -19,7 +18,7 @@ pub enum JobEdge {
 }
 
 impl Label for JobEdge {
-    fn get_label(&self) -> String {
+    fn label(&self) -> String {
         format!("{:?}", self)
     }
 }
@@ -35,7 +34,7 @@ pub struct JobNode {
 }
 
 impl Label for JobNode {
-    fn get_label(&self) -> String {
+    fn label(&self) -> String {
         let op_names: Vec<&str> = self
             .stream_nodes
             .iter()
@@ -64,7 +63,7 @@ impl JobNode {
             .is_some()
     }
 
-    fn get_stream_node(&self, operator_id: OperatorId) -> Option<&StreamNode> {
+    fn stream_node(&self, operator_id: OperatorId) -> Option<&StreamNode> {
         self.stream_nodes.iter().find(|x| x.id == operator_id)
     }
 }
@@ -83,51 +82,6 @@ impl JobGraph {
         }
     }
 
-    pub(crate) fn get_nodes(&self) -> Vec<JobNode> {
-        utils::get_nodes(&self.dag)
-    }
-
-    pub(crate) fn get_job_node(&self, job_id: JobId) -> Option<JobNode> {
-        self.job_node_indies.get(&job_id).map(|node_index| {
-            let job_node = self.dag.index(*node_index);
-            job_node.clone()
-        })
-    }
-
-    pub(crate) fn get_parents(&self, job_id: JobId) -> Option<Vec<(JobNode, JobEdge)>> {
-        self.job_node_indies.get(&job_id).map(|node_index| {
-            let job_nodes: Vec<(JobNode, JobEdge)> = self
-                .dag
-                .parents(*node_index)
-                .iter(&self.dag)
-                .map(|(edge_index, node_index)| {
-                    (
-                        self.dag.index(node_index).clone(),
-                        self.dag.index(edge_index).clone(),
-                    )
-                })
-                .collect();
-            job_nodes
-        })
-    }
-
-    pub(crate) fn get_children(&self, job_id: JobId) -> Option<Vec<(JobNode, JobEdge)>> {
-        self.job_node_indies.get(&job_id).map(|node_index| {
-            let job_nodes: Vec<(JobNode, JobEdge)> = self
-                .dag
-                .children(*node_index)
-                .iter(&self.dag)
-                .map(|(edge_index, node_index)| {
-                    (
-                        self.dag.index(node_index).clone(),
-                        self.dag.index(edge_index).clone(),
-                    )
-                })
-                .collect();
-            job_nodes
-        })
-    }
-
     pub fn build(&mut self, stream_graph: &StreamGraph) -> Result<(), DagError> {
         self.build_job_nodes(stream_graph)?;
         debug!("{:?}", self.dag);
@@ -136,28 +90,31 @@ impl JobGraph {
 
     pub fn build_job_edges(&mut self) -> Result<(), DagError> {
         let node_indies: Vec<NodeIndex> = self.job_node_indies.values().map(|x| *x).collect();
-        node_indies.into_iter().for_each(|job_node_index| {
-            self.build_job_edge(job_node_index);
-        });
+        for job_node_index in node_indies {
+            self.build_job_edge(job_node_index)?;
+        }
 
         Ok(())
     }
 
-    fn build_job_edge(&mut self, job_node_index: NodeIndex) {
+    fn build_job_edge(&mut self, job_node_index: NodeIndex) -> Result<(), DagError> {
         let job_node = self.dag.index(job_node_index).clone();
         if job_node.child_job_ids.len() == 0 {
-            return;
+            return Ok(());
         }
 
         for child_job_id in &job_node.child_job_ids {
-            let child_node_index = self.job_node_indies.get(child_job_id).unwrap();
+            let child_node_index = self
+                .job_node_indies
+                .get(child_job_id)
+                .ok_or(DagError::JobNotFound(*child_job_id))?;
             let child_job_node = self.dag.index(*child_node_index);
 
             let job_edge = if child_job_node.is_reduce_job() {
                 JobEdge::ReBalance
             } else if job_node.is_reduce_job() {
                 if job_node.parallelism != child_job_node.parallelism {
-                    unimplemented!("unsupported")
+                    return Err(DagError::ReduceOutputParallelismConflict);
                 }
 
                 JobEdge::Forward
@@ -171,8 +128,10 @@ impl JobGraph {
 
             self.dag
                 .add_edge(job_node_index, *child_node_index, job_edge)
-                .unwrap();
+                .map_err(|_e| DagError::WouldCycle)?;
         }
+
+        Ok(())
     }
 
     pub fn build_job_nodes(&mut self, stream_graph: &StreamGraph) -> Result<(), DagError> {
@@ -196,7 +155,10 @@ impl JobGraph {
         }
 
         for (child_job_id, parent_job_ids) in job_id_map {
-            let node_index = self.job_node_indies.get(&child_job_id).unwrap();
+            let node_index = self
+                .job_node_indies
+                .get(&child_job_id)
+                .ok_or(DagError::JobNotFound(child_job_id))?;
 
             // update `parent_job_ids`
             {
@@ -210,7 +172,9 @@ impl JobGraph {
                 // the latest OperatorId is the left OperatorId
                 let left_parent_id = {
                     let source_parent_ids = &job_node.stream_nodes[0].parent_ids;
-                    *source_parent_ids.get(source_parent_ids.len() - 1).unwrap()
+                    *source_parent_ids
+                        .get(source_parent_ids.len() - 1)
+                        .ok_or(DagError::ConnectParentNotFound)?
                 };
 
                 // update the parallelism with parent left operator's parallelism
@@ -221,7 +185,7 @@ impl JobGraph {
                         let parent_node_index = self.job_node_indies.get(parent_job_id).unwrap();
                         self.dag.index(*parent_node_index)
                     })
-                    .find(|job_node| job_node.get_stream_node(left_parent_id).is_some())
+                    .find(|job_node| job_node.stream_node(left_parent_id).is_some())
                     .map(|job_node| job_node.parallelism);
                 match parent_parallelism {
                     Some(parallelism) => {
@@ -233,11 +197,44 @@ impl JobGraph {
                     }
                 }
             } else if job_node.is_reduce_job() {
-                job_node.child_job_ids.iter().for_each(|child_job_id| {
-                    let child_node_index = self.job_node_indies.get(child_job_id).unwrap();
+                for child_job_id in &job_node.child_job_ids {
+                    let child_node_index = self
+                        .job_node_indies
+                        .get(child_job_id)
+                        .ok_or(DagError::JobNotFound(*child_job_id))?;
                     let child_node_stream = self.dag.index_mut(*child_node_index);
                     child_node_stream.parallelism = job_node.parallelism;
+                }
+            }
+        }
+
+        // parallelism == 0 check, and inherit to parent's parallelism
+        loop {
+            let no_parallelism_jobs: Vec<(JobId, u16)> = self
+                .job_node_indies
+                .iter()
+                .map(|(_job_id, node_index)| self.dag.index(*node_index))
+                .filter(|job_node| job_node.parallelism == 0)
+                .map(|job_node| {
+                    if job_node.parent_job_ids.len() != 1 {
+                        unimplemented!()
+                    }
+                    let parent_job_id = job_node.parent_job_ids.get(0).unwrap();
+
+                    let parent_job_index = self.job_node_indies.get(parent_job_id).unwrap();
+                    let parent_parallelism = self.dag.index(*parent_job_index).parallelism;
+                    (job_node.job_id, parent_parallelism)
                 })
+                .collect();
+
+            if no_parallelism_jobs.len() == 0 {
+                break;
+            }
+
+            for (job_id, parent_parallelism) in no_parallelism_jobs {
+                let node_index = self.job_node_indies.get(&job_id).unwrap();
+                let job_node = self.dag.index_mut(*node_index);
+                job_node.parallelism = parent_parallelism
             }
         }
 
@@ -257,7 +254,7 @@ impl JobGraph {
         let mut node_index = source_node_index;
         let stream_dag = &stream_graph.dag;
         loop {
-            let stream_node = stream_graph.get_stream_node(node_index);
+            let stream_node = stream_graph.stream_node(node_index);
             let children: Vec<(EdgeIndex, NodeIndex)> =
                 stream_dag.children(node_index).iter(stream_dag).collect();
 
@@ -270,7 +267,7 @@ impl JobGraph {
             if stream_node.operator_type == OperatorType::Sink {
                 let f_job_ids: Vec<JobId> = children
                     .iter()
-                    .map(|(_edge_index, node_index)| stream_graph.get_stream_node(*node_index))
+                    .map(|(_edge_index, node_index)| stream_graph.stream_node(*node_index))
                     .map(|stream_node| JobId::from(stream_node.id))
                     .collect();
                 child_job_ids.extend_from_slice(f_job_ids.as_slice());
@@ -296,9 +293,5 @@ impl JobGraph {
             child_job_ids,
             parent_job_ids: vec![],
         })
-    }
-
-    pub(crate) fn to_string(&self) -> String {
-        JsonDag::dag_json(&self.dag).to_string()
     }
 }

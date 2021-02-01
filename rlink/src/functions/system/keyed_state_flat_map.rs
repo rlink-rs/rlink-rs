@@ -1,9 +1,8 @@
 use crate::api::backend::KeyedStateBackend;
-use crate::api::element::{Barrier, Element, Record};
+use crate::api::element::{Element, Record};
 use crate::api::function::{Context, FlatMapFunction, Function};
 use crate::api::properties::SystemProperties;
-use crate::api::runtime::{CheckpointId, JobId};
-use crate::api::window::{TWindow, Window};
+use crate::api::runtime::JobId;
 use crate::storage::keyed_state::{ReducingState, StateKey, TReducingState};
 
 pub(crate) struct KeyedStateFlatMapFunction {
@@ -59,8 +58,8 @@ impl FlatMapFunction for KeyedStateFlatMapFunction {
         match reducing_state {
             Some(reducing_state) => {
                 let state_iter = reducing_state.iter();
-
-                Box::new(BatchIterator::new(state_iter, window))
+                Box::new(state_iter.map(|record| Element::Record(record)))
+                // Box::new(BatchIterator::new(state_iter, window))
             }
             None => Box::new(vec![].into_iter()),
         }
@@ -72,52 +71,52 @@ impl FlatMapFunction for KeyedStateFlatMapFunction {
 }
 
 impl Function for KeyedStateFlatMapFunction {
-    fn get_name(&self) -> &str {
+    fn name(&self) -> &str {
         "KeyedStateFlatMapFunction"
     }
 }
 
-pub(crate) struct BatchIterator<T>
-where
-    T: Iterator<Item = Record>,
-{
-    end: bool,
-    iterator: T,
-    window: Window,
-}
-
-impl<T> BatchIterator<T>
-where
-    T: Iterator<Item = Record>,
-{
-    pub fn new(iterator: T, window: Window) -> Self {
-        BatchIterator {
-            end: false,
-            iterator,
-            window,
-        }
-    }
-}
-
-impl<T> Iterator for BatchIterator<T>
-where
-    T: Iterator<Item = Record>,
-{
-    type Item = Element;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.end {
-            return None;
-        }
-
-        match self.iterator.next() {
-            Some(n) => Some(Element::Record(n)),
-            None => {
-                self.end = true;
-
-                let window_finish_barrier = Barrier::new(CheckpointId(self.window.min_timestamp()));
-                Some(Element::Barrier(window_finish_barrier))
-            }
-        }
-    }
-}
+// pub(crate) struct BatchIterator<T>
+// where
+//     T: Iterator<Item = Record>,
+// {
+//     end: bool,
+//     iterator: T,
+//     window: Window,
+// }
+//
+// impl<T> BatchIterator<T>
+// where
+//     T: Iterator<Item = Record>,
+// {
+//     pub fn new(iterator: T, window: Window) -> Self {
+//         BatchIterator {
+//             end: false,
+//             iterator,
+//             window,
+//         }
+//     }
+// }
+//
+// impl<T> Iterator for BatchIterator<T>
+// where
+//     T: Iterator<Item = Record>,
+// {
+//     type Item = Element;
+//
+//     fn next(&mut self) -> Option<Self::Item> {
+//         if self.end {
+//             return None;
+//         }
+//
+//         match self.iterator.next() {
+//             Some(n) => Some(Element::Record(n)),
+//             None => {
+//                 self.end = true;
+//
+//                 let window_finish_barrier = Barrier::new(CheckpointId(self.window.min_timestamp()));
+//                 Some(Element::Barrier(window_finish_barrier))
+//             }
+//         }
+//     }
+// }

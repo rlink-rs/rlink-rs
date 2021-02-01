@@ -1,4 +1,5 @@
 use std::convert::TryFrom;
+use std::sync::Arc;
 
 use crate::api::checkpoint::CheckpointHandle;
 use crate::api::env::{StreamApp, StreamExecutionEnvironment};
@@ -50,8 +51,6 @@ impl std::fmt::Display for ClusterMode {
 pub enum ManagerType {
     /// Job Manager activity
     Coordinator = 1,
-    /// Job Manager standby
-    Standby = 2,
     /// Task Manager
     Worker = 3,
 }
@@ -63,7 +62,6 @@ impl<'a> TryFrom<&'a str> for ManagerType {
         let mode_str = mode_str.to_ascii_lowercase();
         match mode_str.as_str() {
             "coordinator" => Ok(ManagerType::Coordinator),
-            "standby" => Ok(ManagerType::Standby),
             "worker" => Ok(ManagerType::Worker),
             _ => Err(anyhow!("Unsupported mode {}", mode_str)),
         }
@@ -74,7 +72,6 @@ impl std::fmt::Display for ManagerType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ManagerType::Coordinator => write!(f, "Coordinator"),
-            ManagerType::Standby => write!(f, "Standby"),
             ManagerType::Worker => write!(f, "Worker"),
         }
     }
@@ -155,7 +152,5 @@ where
     let context = context::Context::parse_node_arg(stream_env.application_name.as_str())?;
     info!("Context: {:?}", context);
 
-    cluster::run_task(context, stream_env, stream_app);
-
-    Ok(())
+    cluster::run_task(Arc::new(context), stream_env, stream_app)
 }

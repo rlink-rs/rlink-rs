@@ -1,8 +1,9 @@
 use std::borrow::BorrowMut;
 
+use crate::api::checkpoint::FunctionSnapshotContext;
 use crate::api::element::Element;
 use crate::api::operator::DefaultStreamOperator;
-use crate::api::runtime::{CheckpointId, OperatorId};
+use crate::api::runtime::OperatorId;
 use crate::api::window::{WindowAssigner, WindowAssignerContext};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
@@ -34,7 +35,7 @@ impl Runnable for WindowAssignerRunnable {
         self.next_runnable.as_mut().unwrap().open(context)?;
         info!(
             "WindowAssignerRunnable({}) opened",
-            self.stream_window.operator_fn.get_name()
+            self.stream_window.operator_fn.name()
         );
 
         Ok(())
@@ -92,5 +93,5 @@ impl Runnable for WindowAssignerRunnable {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, _checkpoint_id: CheckpointId) {}
+    fn checkpoint(&mut self, _snapshot_context: FunctionSnapshotContext) {}
 }

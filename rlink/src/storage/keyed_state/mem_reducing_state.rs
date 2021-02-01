@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use crate::api::element::Record;
 use crate::storage::keyed_state::mem_storage::remove_drop_window;
@@ -9,18 +9,15 @@ use crate::storage::keyed_state::{StateIterator, StateKey, TReducingState};
 #[derive(Clone, Debug)]
 pub struct MemoryReducingState {
     state_key: StateKey,
-    kv: HashMap<Record, Record>,
+    kv: BTreeMap<Record, Record>,
 }
 
 impl MemoryReducingState {
-    pub fn new(state_key: &StateKey, suggest_capacity: usize) -> Self {
-        debug!(
-            "create memory state {:?}, suggest capacity {}",
-            state_key, suggest_capacity
-        );
+    pub fn new(state_key: &StateKey) -> Self {
+        debug!("create memory state {:?}", state_key);
         MemoryReducingState {
             state_key: state_key.clone(),
-            kv: HashMap::with_capacity(suggest_capacity),
+            kv: BTreeMap::new(),
         }
     }
 
@@ -58,7 +55,7 @@ impl TReducingState for MemoryReducingState {
     fn destroy(self) {}
 
     fn iter(self) -> StateIterator {
-        StateIterator::HashMap(self.state_key.window, self.kv.into_iter())
+        StateIterator::BTreeMap(self.state_key.window, self.kv.into_iter())
     }
 
     fn len(&self) -> usize {

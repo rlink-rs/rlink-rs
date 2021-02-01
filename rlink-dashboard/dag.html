@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>rlink-rs DAG</title>
+
+<!--    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>-->
+<!--    <script src="https://d3js.org/d3.v3.min.js" charset="utf-8"></script>-->
+<!--    <script src="https://cdn.bootcss.com/dagre-d3/0.6.4/dagre-d3.js"></script>-->
+    <!--<script src="https://dagrejs.github.io/project/dagre-d3/v0.6.4/dagre-d3.min.js"></script>-->
+
+    <script src="js/d3.v3.min.js" charset="utf-8"></script>
+    <script src="js/dagre-d3.min.js" charset="utf-8"></script>
+    <script src="js/jquery-3.5.1.min.js" charset="utf-8"></script>
+
+    <style>
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            margin: 0;
+            padding: 0;
+            background: #3e3e3e;
+        }
+        #tree {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            position: relative;
+        }
+        #tree svg {
+            width: 100%;
+            height: 100%;
+        }
+        text {
+            font-size: 14px;
+            fill: #fff;
+        }
+        .edgePath path {
+            stroke: #d9822b;
+            fill: #d9822b;
+            stroke-width: 1.5px;
+        }
+        .node circle {
+            fill: #000000;
+        }
+        /* tree svg */
+
+        .chartTooltip {
+            position: absolute;
+            height: auto;
+            padding: 10px;
+            box-sizing: border-box;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.4);
+            opacity: 0;
+        }
+        .chartTooltip p {
+            margin: 0;
+            font-size: 14px;
+            line-height: 20px;
+            word-wrap: break-word;
+        }
+        .chartTooltip p span {
+            display: flex;
+        }
+        .chartTooltip p a {
+            display: flex;
+        }
+    </style>
+</head>
+
+<div id="tree">
+    <div class="chartTooltip">
+        <p id="chartTooltipText">
+            <span class="chartTooltip-label"></span>
+            <span class="chartTooltip-name"></span>
+        </p>
+    </div>
+</div>
+
+<script type="text/javascript">
+let req = GetRequest();
+let url = "api/dag/" + req["type"];
+$.get(url, function(data,status) {
+    let width = document.getElementById("tree").offsetWidth;
+    let height = document.getElementById("tree").offsetHeight;
+    // Create a new directed graph
+    let g = new dagreD3.graphlib.Graph().setGraph({
+        rankdir: 'LR',
+        edgesep: 100,
+        ranksep: 80
+    });
+
+    let dag = data.data;
+
+    dag.nodes.forEach(function(node){
+        let node_id = node.id;
+        let value = {
+            shape: "rect",
+            name: node.name,
+            label : node.label,
+            rx: 5,
+            ry: 5,
+        }
+
+        g.setNode(node_id, value);
+    });
+
+    dag.edges.forEach(function(edge) {
+        let source_node_id = edge.source;
+        let target_node_id = edge.target;
+        let label = edge.label;
+
+        g.setEdge(source_node_id, target_node_id, {
+            label: label,
+            lineInterpolate: 'basis',
+            style: "fill: none; stroke: #d9822b"
+        });
+    });
+
+    let render = new dagreD3.render();
+
+    // Set up an SVG group so that we can translate the final graph.
+    let svg = d3.select("#tree").append('svg');
+    let inner = svg.append("g");
+    render(inner, g);
+
+    // Set up zoom support
+    let zoom = d3.behavior.zoom().scaleExtent([0.1, 100])
+        .on('zoomstart', () => {
+            svg.style('cursor', 'move')
+        })
+        .on("zoom", function() {
+            inner.attr('transform',
+                "translate(" + d3.event.translate + ")" +
+                "scale(" + d3.event.scale + ")"
+            )
+        }).on('zoomend', () => {
+            svg.style('cursor', 'default')
+        });
+    svg.call(zoom);
+
+    let timer;
+    const nodeEnter = inner.selectAll('g.node');
+
+    nodeEnter
+        .on('mouseover', function(d) {
+            tooltipOver(d)
+            console.log(d)
+        })
+        .on('mouseout', () => {
+            timer = setTimeout(function() {
+                d3.select('.chartTooltip').transition().duration(300).style('opacity', 0).style('display', 'none')
+            }, 200)
+        });
+
+    function tooltipOver(d) {
+        if (timer) clearTimeout(timer);
+        d3.select('.chartTooltip').transition().duration(300).style('opacity', 1).style('display', 'block');
+        const yPosition = d3.event.layerY + 20;
+        const xPosition = d3.event.layerX + 20;
+        const chartTooltip = d3.select('.chartTooltip')
+            .style('left', xPosition + 'px')
+            .style('top', yPosition + 'px');
+
+        d3.select('.chartTooltip').on('mouseover', () => {
+            if (timer) clearTimeout(timer);
+            d3.select('.chartTooltip').transition().duration(300).style('opacity', 1).style('display', 'block')
+        }).on('mouseout', () => {
+            timer = setTimeout(function() {
+                d3.select('.chartTooltip').transition().duration(300).style('opacity', 0).style('display', 'none')
+            }, 200)
+        });
+
+        if (d) {
+            chartTooltip.select('.chartTooltip-label').text('label：' + d)
+        } else {
+            chartTooltip.select('.chartTooltip-label').text('label：' + d)
+        }
+        if (g.node(d).name) {
+            chartTooltip.select('.chartTooltip-name').text('name2：' + g.node(d).name)
+        } else {
+            chartTooltip.select('.chartTooltip-name').text('name2：' + g.node(d).name)
+        }
+    }
+});
+
+function GetRequest() {
+    var url = location.search; //获取url中"?"符后的字串
+    var theRequest = new Object();
+    if (url.indexOf("?") != -1) {
+        var str = url.substr(1);
+        strs = str.split("&");
+        for(var i = 0; i < strs.length; i ++) {
+            theRequest[strs[i].split("=")[0]] = unescape(strs[i].split("=")[1]);
+        }
+    }
+    return theRequest;
+}
+</script>
+</html>

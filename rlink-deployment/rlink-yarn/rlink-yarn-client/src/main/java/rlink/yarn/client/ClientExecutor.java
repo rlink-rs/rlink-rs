@@ -93,9 +93,11 @@ public class ClientExecutor {
         int vCores = submitParam.getvCores();
         Path rustStreamingPath = submitParam.getRustStreamingPath();
         Path javaManagerPath = submitParam.getJavaManagerPath();
+        Path assetPath = submitParam.getAssetPath();
         List<Path> pathList = new ArrayList<>();
         pathList.add(rustStreamingPath);
         pathList.add(javaManagerPath);
+        pathList.add(assetPath);
         Map<String, String> paramMap = submitParam.getParamMap();
         paramMap.put(MEMORY_MB_KEY, String.valueOf(memoryMb));
         paramMap.put(VIRTUAL_CORES_KEY, String.valueOf(vCores));
