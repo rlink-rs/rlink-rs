@@ -13,7 +13,7 @@ Framework tested on Linux/MacOS/Windows, requires stable Rust.
 ## Streaming Example
 
 ```yaml
-rlink = "0.2.0"
+rlink = "0.2"
 ```
 
 ```rust
@@ -112,6 +112,12 @@ upload `rlink-yarn-manager-0.2.0-alpha.5-jar-with-dependencies.jar` to hdfs
 
 eg: upload to `hdfs://nn/path/to/rlink-yarn-manager-0.2.0-alpha.5-jar-with-dependencies.jar`
 
+### update asset to hdfs
+upload `rlink-deployment.zip` to hdfs
+
+eg: upload to `hdfs://nn/path/to/rlink-deployment.zip`
+
+
 ### update application to hdfs
 upload your application executable file to hdfs.
 
@@ -125,6 +131,7 @@ hadoop jar rlink-yarn-client-0.2.0-alpha.5.jar rlink.yarn.client.Client \
   --worker_process_path hdfs://nn/path/to/rlink-showcase \
   --java_manager_path hdfs://nn/path/to/rlink-yarn-manager-0.2.0-alpha.5-jar-with-dependencies.jar \
   --yarn_manager_main_class rlink.yarn.manager.ResourceManagerCli \
+  --asset_path hdfs://nn/path/to/rlink-deployment.zip \
   --master_memory_mb 256 \
   --master_v_cores 1 \
   --memory_mb 256 \
