@@ -40,7 +40,8 @@ pub async fn execute_task(
         task_counter.fetch_add(1 as u64, Ordering::SeqCst)
     );
 
-    let asset_path = work_space().join("rlink-deployment").to_str().unwrap();
+    let asset_path = work_space().join("rlink-deployment");
+    let asset_path = asset_path.to_str().unwrap();
 
     let script_path = context.script_path.clone().to_str().unwrap().to_string();
     let worker_path = PathBuf::from(context.config.task_manager_work_dir.as_str());
