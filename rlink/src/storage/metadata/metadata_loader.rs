@@ -20,7 +20,7 @@ impl MetadataLoader {
     }
 
     pub fn get_application_descriptor(&mut self) -> ApplicationDescriptor {
-        let url = format!("{}/metadata", self.coordinator_address);
+        let url = format!("{}/api/metadata", self.coordinator_address);
         loop {
             match get_sync(url.as_str()) {
                 Ok(resp) => {
@@ -47,7 +47,7 @@ impl MetadataLoader {
     }
 
     pub fn get_dag_metadata(&mut self) -> DagMetadata {
-        let url = format!("{}/dag_metadata", self.coordinator_address);
+        let url = format!("{}/api/dag_metadata", self.coordinator_address);
         loop {
             match get_sync(url.as_str()) {
                 Ok(resp) => {

@@ -58,6 +58,7 @@ pub(crate) struct Context {
     pub metric_addr: String,
     /// effective only in `Worker` mode
     pub coordinator_address: String,
+    pub assert_path: String,
 
     /// on yarn arg
     pub yarn_manager_main_class: String,
@@ -78,6 +79,7 @@ impl Context {
         cluster_config: ClusterConfig,
         metric_addr: String,
         coordinator_address: String,
+        assert_path: String,
         yarn_manager_main_class: String,
         worker_process_path: String,
         memory_mb: usize,
@@ -94,6 +96,7 @@ impl Context {
             cluster_config,
             metric_addr,
             coordinator_address,
+            assert_path,
             yarn_manager_main_class,
             worker_process_path,
             memory_mb,
@@ -195,6 +198,8 @@ impl Context {
             _ => parse_arg("coordinator_address")?,
         };
 
+        let assert_path = parse_arg("assert_path").unwrap_or_default();
+
         Ok(Context::new(
             application_name.to_string(),
             application_id,
@@ -206,6 +211,7 @@ impl Context {
             cluster_config,
             metric_addr,
             coordinator_address,
+            assert_path,
             yarn_manager_main_class,
             worker_process_path,
             memory_mb,

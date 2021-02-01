@@ -81,7 +81,9 @@
 </div>
 
 <script type="text/javascript">
-$.get("dag/job_graph", function(data,status) {
+let req = GetRequest();
+let url = "api/dag/" + req["type"];
+$.get(url, function(data,status) {
     let width = document.getElementById("tree").offsetWidth;
     let height = document.getElementById("tree").offsetHeight;
     // Create a new directed graph
@@ -91,7 +93,7 @@ $.get("dag/job_graph", function(data,status) {
         ranksep: 80
     });
 
-    let dag = data;
+    let dag = data.data;
 
     dag.nodes.forEach(function(node){
         let node_id = node.id;
@@ -184,5 +186,18 @@ $.get("dag/job_graph", function(data,status) {
         }
     }
 });
+
+function GetRequest() {
+    var url = location.search; //获取url中"?"符后的字串
+    var theRequest = new Object();
+    if (url.indexOf("?") != -1) {
+        var str = url.substr(1);
+        strs = str.split("&");
+        for(var i = 0; i < strs.length; i ++) {
+            theRequest[strs[i].split("=")[0]] = unescape(strs[i].split("=")[1]);
+        }
+    }
+    return theRequest;
+}
 </script>
 </html>
