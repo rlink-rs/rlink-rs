@@ -90,7 +90,7 @@ async fn serve(
         let port = rng.gen_range(10000, 30000);
         let address = format!("{}:{}", ip.as_str(), port);
 
-        let assert_path = context.app_context.assert_path.clone();
+        let asset_path = context.app_context.asset_path.clone();
 
         let data = Data::new(context.clone());
         let data_ck_manager = Data::new(checkpoint_manager.clone());
@@ -117,7 +117,7 @@ async fn serve(
                         .route(web::get().to(get_execution_graph)),
                 )
                 .service(
-                    Files::new("/", assert_path.clone())
+                    Files::new("/", asset_path.clone())
                         .prefer_utf8(true)
                         .index_file("index.html"),
                 )
