@@ -7,7 +7,7 @@ use metrics::counter;
 use metrics::gauge;
 
 #[derive(Clone, Debug)]
-pub struct Tag(pub String, pub String);
+pub struct Tag(String, String);
 
 impl<F, C> From<(F, C)> for Tag
 where

@@ -56,8 +56,8 @@ impl InputFormat for KafkaInputFormat {
             let partition = input_split.properties().get_i32("partition").unwrap();
 
             let tags = vec![
-                Tag("topic".to_string(), topic.to_string()),
-                Tag("partition".to_string(), format!("{}", partition)),
+                Tag::from(("topic", topic.as_str())),
+                Tag::from(("partition", partition)),
             ];
             self.handover = Some(Handover::new(
                 "KafkaSource_Handover",
