@@ -40,8 +40,8 @@ pub async fn execute_task(
         task_counter.fetch_add(1 as u64, Ordering::SeqCst)
     );
 
-    let asset_path = work_space().join("rlink-deployment");
-    let asset_path = asset_path.to_str().unwrap();
+    let dashboard_path = work_space().join("rlink-dashboard");
+    let dashboard_path = dashboard_path.to_str().unwrap();
 
     let script_path = context.script_path.clone().to_str().unwrap().to_string();
     let worker_path = PathBuf::from(context.config.task_manager_work_dir.as_str());
@@ -65,7 +65,7 @@ pub async fn execute_task(
     envs.insert("BIND_IP".to_string(), bind_ip);
     envs.insert("FILE_NAME".to_string(), executable_file);
     envs.insert("CLUSTER_CONFIG".to_string(), cluster_config);
-    envs.insert("ASSET_PATH".to_string(), asset_path.to_string());
+    envs.insert("DASHBOARD_PATH".to_string(), dashboard_path.to_string());
 
     let execute_args: Vec<String> = execute_model
         .args

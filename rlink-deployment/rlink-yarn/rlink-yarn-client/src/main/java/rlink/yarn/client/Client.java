@@ -16,7 +16,7 @@ public class Client {
     public static final String APPLICATION_NAME_KEY = "applicationName";
     public static final String RUST_STREAMING_PATH_KEY = "worker_process_path";
     public static final String JAVA_MANAGER_PATH_KEY = "java_manager_path";
-    public static final String ASSET_PATH_KEY = "asset_path";
+    public static final String DASHBOARD_PATH_KEY = "dashboard_path";
     public static final String MEMORY_MB_KEY = "memory_mb";
     public static final String VIRTUAL_CORES_KEY = "v_cores";
     public static final String MASTER_MEMORY_MB_KEY = "master_memory_mb";
@@ -61,12 +61,12 @@ public class Client {
         parameterMap.remove(JAVA_MANAGER_PATH_KEY);
         submitParam.setJavaManagerPath(new Path(javaManagerPath));
 
-        String assertPath = parameterMap.get(ASSET_PATH_KEY);
-        if (StringUtils.isBlank(assertPath)) {
-            throw new RuntimeException(ASSET_PATH_KEY + " is blank.");
+        String dashboardPath = parameterMap.get(DASHBOARD_PATH_KEY);
+        if (StringUtils.isBlank(dashboardPath)) {
+            throw new RuntimeException(DASHBOARD_PATH_KEY + " is blank.");
         }
-        parameterMap.remove(ASSET_PATH_KEY);
-        submitParam.setAssetPath(new Path(assertPath));
+        parameterMap.remove(DASHBOARD_PATH_KEY);
+        submitParam.setDashboardPath(new Path(dashboardPath));
 
         String memoryMb = parameterMap.get(MEMORY_MB_KEY);
         if (StringUtils.isBlank(memoryMb)) {
