@@ -166,13 +166,13 @@ fn index() -> HttpResponse {
         <body>
             <h1>rlink api</h1>
             <ul>
-                <li><a href="context">context</a></li>
-                <li><a href="metadata">metadata</a></li>
-                <li><a href="checkpoints">checkpoints</a></li>
-                <li><a href="dag/stream_graph">dag:stream_graph</a></li>
-                <li><a href="dag/job_graph">dag:job_graph</a></li>
-                <li><a href="dag/execution_graph">dag:execution_graph</a></li>
-                <li><a href="dag/physic_graph">dag:physic_graph</a></li>
+                <li><a href="api/context">context</a></li>
+                <li><a href="api/metadata">metadata</a></li>
+                <li><a href="api/checkpoints">checkpoints</a></li>
+                <li><a href="api/dag/stream_graph">dag:stream_graph</a></li>
+                <li><a href="api/dag/job_graph">dag:job_graph</a></li>
+                <li><a href="api/dag/execution_graph">dag:execution_graph</a></li>
+                <li><a href="api/dag/physic_graph">dag:physic_graph</a></li>
             </ul>
         </body>
     </html>"#;

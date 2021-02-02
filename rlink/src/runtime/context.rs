@@ -191,7 +191,9 @@ impl Context {
 
         let dashboard_path = match cluster_mode {
             ClusterMode::YARN => {
-                let p = work_space().join("rlink-dashboard");
+                let dashboard_path = work_space().join("rlink-dashboard.zip");
+                let link_path = dashboard_path.read_link();
+                let p = link_path.unwrap_or(dashboard_path);
                 p.to_str().unwrap().to_string()
             }
             _ => parse_arg("dashboard_path").unwrap_or_default(),
