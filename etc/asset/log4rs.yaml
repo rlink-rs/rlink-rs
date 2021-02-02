@@ -1,0 +1,17 @@
+refresh_rate: 30 seconds
+appenders:
+  stdout:
+    kind: console
+    encoder:
+      pattern: "{d(%Y-%m-%d %H:%M:%S%.3f)} {level} [{thread}] {target} - {m}{n}"
+
+root:
+  level: info
+  appenders:
+    - stdout
+
+loggers:
+  actix_web::middleware::logger:
+    level: warn
+  clickhouse_rs:
+    level: warn
