@@ -31,15 +31,9 @@ impl KafkaOutputFormat {
 impl OutputFormat for KafkaOutputFormat {
     fn open(&mut self, context: &Context) -> api::Result<()> {
         let tags = vec![
-            Tag("topic".to_string(), self.topic.to_string()),
-            Tag(
-                "job_id".to_string(),
-                format!("{}", context.task_id.job_id().0),
-            ),
-            Tag(
-                "task_number".to_string(),
-                format!("{}", context.task_id.task_number()),
-            ),
+            Tag::from(("topic", self.topic.as_str())),
+            Tag::from(("job_id", context.task_id.job_id().0)),
+            Tag::from(("task_number", context.task_id.task_number())),
         ];
         self.handover = Some(Handover::new(self.name(), tags, self.buffer_size));
 

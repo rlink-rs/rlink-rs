@@ -1,6 +1,5 @@
 package rlink.yarn.client;
 
-import rlink.yarn.client.model.SubmitParam;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -22,6 +21,7 @@ import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.Records;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import rlink.yarn.client.model.SubmitParam;
 
 import java.io.File;
 import java.io.IOException;
@@ -93,11 +93,11 @@ public class ClientExecutor {
         int vCores = submitParam.getvCores();
         Path rustStreamingPath = submitParam.getRustStreamingPath();
         Path javaManagerPath = submitParam.getJavaManagerPath();
-        Path assetPath = submitParam.getAssetPath();
+        Path dashboardPath = submitParam.getDashboardPath();
         List<Path> pathList = new ArrayList<>();
         pathList.add(rustStreamingPath);
         pathList.add(javaManagerPath);
-        pathList.add(assetPath);
+        pathList.add(dashboardPath);
         Map<String, String> paramMap = submitParam.getParamMap();
         paramMap.put(MEMORY_MB_KEY, String.valueOf(memoryMb));
         paramMap.put(VIRTUAL_CORES_KEY, String.valueOf(vCores));
@@ -126,12 +126,15 @@ public class ClientExecutor {
     private Map<String, LocalResource> setupAppMasterResource(List<Path> resourcePathList, YarnConfiguration yarnConfiguration) throws IOException {
         Map<String, LocalResource> resourceMap = new HashMap<>(resourcePathList.size());
         for (Path resourcePath : resourcePathList) {
+            LocalResourceType localResourceType = isCompressFile(resourcePath.getName()) ?
+                    LocalResourceType.ARCHIVE : LocalResourceType.FILE;
+
             FileStatus fileStatus = FileSystem.get(yarnConfiguration).getFileStatus(resourcePath);
             LocalResource localResource = Records.newRecord(LocalResource.class);
             localResource.setResource(ConverterUtils.getYarnUrlFromPath(resourcePath));
             localResource.setSize(fileStatus.getLen());
             localResource.setTimestamp(fileStatus.getModificationTime());
-            localResource.setType(LocalResourceType.FILE);
+            localResource.setType(localResourceType);
             localResource.setVisibility(LocalResourceVisibility.APPLICATION);
 
             resourceMap.put(resourcePath.getName(), localResource);
@@ -149,5 +152,11 @@ public class ClientExecutor {
                 ApplicationConstants.Environment.CLASSPATH.name(),
                 ApplicationConstants.Environment.PWD.$() + File.separator + "*", File.pathSeparator);
         return appMasterEnv;
+    }
+
+    private static boolean isCompressFile(String fileName) {
+        return fileName.endsWith(".zip")
+                || fileName.endsWith(".tar")
+                || fileName.endsWith(".tar.gz");
     }
 }

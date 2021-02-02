@@ -112,10 +112,10 @@ upload `rlink-yarn-manager-0.2.1-jar-with-dependencies.jar` to hdfs
 
 eg: upload to `hdfs://nn/path/to/rlink-yarn-manager-0.2.1-jar-with-dependencies.jar`
 
-### update asset to hdfs
-upload `rlink-deployment.zip` to hdfs
+### update dashboard to hdfs
+upload `rlink-dashboard.zip` to hdfs
 
-eg: upload to `hdfs://nn/path/to/rlink-deployment.zip`
+eg: upload to `hdfs://nn/path/to/rlink-dashboard.zip`
 
 
 ### update application to hdfs
@@ -131,7 +131,7 @@ hadoop jar rlink-yarn-client-0.2.1.jar rlink.yarn.client.Client \
   --worker_process_path hdfs://nn/path/to/rlink-showcase \
   --java_manager_path hdfs://nn/path/to/rlink-yarn-manager-0.2.1-jar-with-dependencies.jar \
   --yarn_manager_main_class rlink.yarn.manager.ResourceManagerCli \
-  --asset_path hdfs://nn/path/to/rlink-deployment.zip \
+  --dashboard_path hdfs://nn/path/to/rlink-dashboard.zip \
   --master_memory_mb 256 \
   --master_v_cores 1 \
   --memory_mb 256 \

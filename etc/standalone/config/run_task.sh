@@ -8,7 +8,7 @@ echo "env TASK_ID = $TASK_ID"
 echo "env BIND_IP = $BIND_IP"
 echo "env FILE_NAME = $FILE_NAME"
 echo "env CLUSTER_CONFIG = $CLUSTER_CONFIG"
-echo "env ASSET_PATH = $ASSET_PATH"
+echo "env DASHBOARD_PATH = $DASHBOARD_PATH"
 #echo "env ARG_KV_PAIRE = $ARG_KV_PAIRE"
 
 #EXECUTOR_WORKSPACE=$(cd $(dirname $0); pwd)
@@ -32,7 +32,7 @@ nohup $execute_file_path \
   application_id=${APPLICATION_ID} \
   task_id=${TASK_ID} \
   bind_ip=${BIND_IP} \
-  asset_path=${ASSET_PATH} \
+  dashboard_path=${DASHBOARD_PATH} \
   ${args} \
   1>${task_workspace_path}/stdout \
   2>${task_workspace_path}/stderr \

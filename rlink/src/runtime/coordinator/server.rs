@@ -1,4 +1,5 @@
 use std::ops::Deref;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use actix_files::Files;
@@ -15,6 +16,7 @@ use crate::runtime::TaskManagerStatus;
 use crate::storage::metadata::MetadataStorage;
 use crate::storage::metadata::TMetadataStorage;
 use crate::utils::VERSION;
+use actix_web::http::header;
 
 #[derive(Clone, Debug)]
 pub(crate) struct WebContext {
@@ -90,13 +92,13 @@ async fn serve(
         let port = rng.gen_range(10000, 30000);
         let address = format!("{}:{}", ip.as_str(), port);
 
-        let asset_path = context.app_context.asset_path.clone();
+        let dashboard_path = PathBuf::from(context.app_context.dashboard_path.as_str());
 
         let data = Data::new(context.clone());
         let data_ck_manager = Data::new(checkpoint_manager.clone());
         let dag_metadata = Data::new(dag_metadata.clone());
         let server = HttpServer::new(move || {
-            App::new()
+            let app = App::new()
                 .app_data(data.clone())
                 .app_data(data_ck_manager.clone())
                 .app_data(dag_metadata.clone())
@@ -115,13 +117,25 @@ async fn serve(
                 .service(
                     web::resource("/api/dag/execution_graph")
                         .route(web::get().to(get_execution_graph)),
-                )
-                .service(
-                    Files::new("/", asset_path.clone())
+                );
+
+            if dashboard_path.exists() {
+                app.service(
+                    Files::new("/", dashboard_path.clone())
                         .prefer_utf8(true)
                         .index_file("index.html"),
                 )
-            // .service(web::resource("/dag/physic_graph").route(web::get().to(get_physic_graph)))
+            } else {
+                warn!("dashboard path not exist. can set `dashboard_path` to enable WebUI");
+                app.service(
+                    web::resource("/")
+                        .wrap(
+                            middleware::DefaultHeaders::new()
+                                .header(header::CONTENT_TYPE, "text/html; charset=UTF-8"),
+                        )
+                        .route(web::get().to(index)),
+                )
+            }
         })
         .disable_signals()
         .workers(8)
@@ -144,6 +158,26 @@ async fn serve(
         std::io::ErrorKind::AddrInUse,
         "port inuse",
     ))
+}
+
+fn index() -> HttpResponse {
+    let html = r#"<html>
+        <head><title>rlink-rs Home</title></head>
+        <body>
+            <h1>rlink api</h1>
+            <ul>
+                <li><a href="context">context</a></li>
+                <li><a href="metadata">metadata</a></li>
+                <li><a href="checkpoints">checkpoints</a></li>
+                <li><a href="dag/stream_graph">dag:stream_graph</a></li>
+                <li><a href="dag/job_graph">dag:job_graph</a></li>
+                <li><a href="dag/execution_graph">dag:execution_graph</a></li>
+                <li><a href="dag/physic_graph">dag:physic_graph</a></li>
+            </ul>
+        </body>
+    </html>"#;
+
+    HttpResponse::Ok().body(html)
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
