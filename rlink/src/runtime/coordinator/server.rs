@@ -92,7 +92,7 @@ async fn serve(
         let port = rng.gen_range(10000, 30000);
         let address = format!("{}:{}", ip.as_str(), port);
 
-        let asset_path = PathBuf::from(context.app_context.asset_path.as_str());
+        let dashboard_path = PathBuf::from(context.app_context.dashboard_path.as_str());
 
         let data = Data::new(context.clone());
         let data_ck_manager = Data::new(checkpoint_manager.clone());
@@ -119,14 +119,14 @@ async fn serve(
                         .route(web::get().to(get_execution_graph)),
                 );
 
-            if asset_path.exists() {
+            if dashboard_path.exists() {
                 app.service(
-                    Files::new("/", asset_path.clone())
+                    Files::new("/", dashboard_path.clone())
                         .prefer_utf8(true)
                         .index_file("index.html"),
                 )
             } else {
-                warn!("asset path not exist. can set `asset_path` to enable WebUI");
+                warn!("dashboard path not exist. can set `dashboard_path` to enable WebUI");
                 app.service(
                     web::resource("/")
                         .wrap(

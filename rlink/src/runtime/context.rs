@@ -58,7 +58,7 @@ pub(crate) struct Context {
     pub metric_addr: String,
     /// effective only in `Worker` mode
     pub coordinator_address: String,
-    pub asset_path: String,
+    pub dashboard_path: String,
 
     /// on yarn arg
     pub yarn_manager_main_class: String,
@@ -79,7 +79,7 @@ impl Context {
         cluster_config: ClusterConfig,
         metric_addr: String,
         coordinator_address: String,
-        asset_path: String,
+        dashboard_path: String,
         yarn_manager_main_class: String,
         worker_process_path: String,
         memory_mb: usize,
@@ -96,7 +96,7 @@ impl Context {
             cluster_config,
             metric_addr,
             coordinator_address,
-            asset_path,
+            dashboard_path,
             yarn_manager_main_class,
             worker_process_path,
             memory_mb,
@@ -189,12 +189,12 @@ impl Context {
             _ => ("".to_string(), "".to_string(), 0, 0),
         };
 
-        let asset_path = match cluster_mode {
+        let dashboard_path = match cluster_mode {
             ClusterMode::YARN => {
                 let p = work_space().join("rlink-dashboard");
                 p.to_str().unwrap().to_string()
             }
-            _ => parse_arg("asset_path").unwrap_or_default(),
+            _ => parse_arg("dashboard_path").unwrap_or_default(),
         };
 
         let log_config_path = parse_arg("log_config_path")
@@ -220,7 +220,7 @@ impl Context {
             cluster_config,
             metric_addr,
             coordinator_address,
-            asset_path,
+            dashboard_path,
             yarn_manager_main_class,
             worker_process_path,
             memory_mb,
