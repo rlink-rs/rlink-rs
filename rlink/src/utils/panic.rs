@@ -10,8 +10,12 @@ pub fn panic_notify() {
     std::panic::set_hook(Box::new(|panic_info| {
         PANIC_CAPTURE.store(true, Ordering::SeqCst);
 
-        eprintln!("panic_info: {:?}", panic_info);
-        eprintln!("backtrace: \n{:?}", backtrace::Backtrace::new());
+        eprintln!(
+            "thread: {:?}\npanic_info: {:?}\nbacktrace: \n{:?}",
+            std::thread::current().name(),
+            panic_info,
+            backtrace::Backtrace::new()
+        );
         if let Some(s) = panic_info.payload().downcast_ref::<&str>() {
             eprintln!("panic occurred: {:?}", s);
         } else {
