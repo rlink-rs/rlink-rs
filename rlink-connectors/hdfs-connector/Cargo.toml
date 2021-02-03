@@ -1,0 +1,23 @@
+[package]
+name = "rlink-hdfs-connector"
+version = "0.2.2-alpha.1"
+authors = ["yorkart <wangyue11.4@163.com>>"]
+edition = "2018"
+description = "High performance Stream Processing Framework"
+keywords = ["stream", "window", "flink", "spark", "hdfs"]
+repository = "https://github.com/rlink-rs/rlink-rs.git"
+license = "MIT/Apache-2.0"
+
+[lib]
+name = "rlink_hdfs_connector"
+
+[dependencies]
+rlink = {path = "../../rlink", version = "0.2.2-alpha.1"}
+rlink-derive = {path = "../../rlink-derive", version = "0.2.2-alpha.1"}
+
+log = "0.4"
+lazy_static = "1.4.0"
+anyhow = "1.0"
+
+webhdfs="0.3.1"
+parquet="3.0.0"
