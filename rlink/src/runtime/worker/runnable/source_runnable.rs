@@ -361,30 +361,21 @@ impl WatermarkAlign {
         &mut self,
         stream_status: &StreamStatus,
     ) -> (bool, Option<Watermark>) {
-        // info!("apply stream_status {:?}", stream_status);
-        let align = self.apply(stream_status.timestamp);
-        if align {
-            (true, self.min_watermark())
-        } else {
-            (false, None)
-        }
+        self.apply(stream_status.timestamp, None)
     }
 
     pub fn apply_watermark(&mut self, watermark: Watermark) -> Option<Watermark> {
-        // info!("apply watermark {:?}", watermark);
-        let align = self.apply(watermark.status_timestamp);
-        self.watermarks.push(watermark);
-
-        if align {
-            self.min_watermark()
-        } else {
-            None
-        }
+        // ignore 0(`align`) field
+        self.apply(watermark.status_timestamp, Some(watermark)).1
     }
 
-    fn apply(&mut self, status_timestamp: u64) -> bool {
+    fn apply(
+        &mut self,
+        status_timestamp: u64,
+        watermark: Option<Watermark>,
+    ) -> (bool, Option<Watermark>) {
         if self.parent_execution_size == 0 {
-            return true;
+            return (true, watermark);
         }
 
         if self.statue_timestamp == status_timestamp {
@@ -394,19 +385,43 @@ impl WatermarkAlign {
                 unreachable!()
             }
 
-            self.reached_size == self.parent_execution_size
+            if self.reached_size == self.parent_execution_size {
+                (true, self.min_watermark())
+            } else {
+                (false, None)
+            }
         } else if self.statue_timestamp < status_timestamp {
+            let expire_watermark =
+                if self.statue_timestamp > 0 && self.reached_size != self.parent_execution_size {
+                    error!("watermark/stream_status is not align, and the new's event is reached");
+                    self.min_watermark()
+                } else {
+                    None
+                };
+
             self.statue_timestamp = status_timestamp;
             self.reached_size = 1;
             self.watermarks.clear();
+            if let Some(watermark) = watermark {
+                self.watermarks.push(watermark);
+            }
 
-            self.reached_size == self.parent_execution_size
+            if self.reached_size == self.parent_execution_size {
+                (true, self.min_watermark())
+            } else {
+                // returns if expired data exists
+                if expire_watermark.is_some() {
+                    (true, expire_watermark)
+                } else {
+                    (false, None)
+                }
+            }
         } else {
             error!(
                 "watermark/stream_status delay, current {}, reached {}",
                 self.statue_timestamp, status_timestamp
             );
-            false
+            (false, None)
         }
     }
 }
