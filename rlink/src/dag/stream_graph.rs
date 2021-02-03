@@ -8,7 +8,7 @@ use crate::api::operator::{
     DefaultStreamOperator, FunctionCreator, StreamOperator, TStreamOperator, DEFAULT_PARALLELISM,
 };
 use crate::api::runtime::OperatorId;
-use crate::dag::{DagError, Label, OperatorType};
+use crate::dag::{DagError, OperatorType};
 use crate::functions::system::keyed_state_flat_map::KeyedStateFlatMapFunction;
 use crate::functions::system::system_input_format::SystemInputFormat;
 use crate::functions::system::system_output_format::SystemOutputFormat;
@@ -24,24 +24,12 @@ pub struct StreamNode {
     pub(crate) fn_creator: FunctionCreator,
 }
 
-impl Label for StreamNode {
-    fn label(&self) -> String {
-        format!("{}({})", self.operator_name, self.id.0)
-    }
-}
-
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct StreamEdge {
     edge_id: String,
 
     source_id: OperatorId,
     target_id: OperatorId,
-}
-
-impl Label for StreamEdge {
-    fn label(&self) -> String {
-        self.edge_id.clone()
-    }
 }
 
 #[derive(Debug, Clone)]

@@ -4,15 +4,12 @@ use std::ops::Index;
 use daggy::{Dag, NodeIndex, Walker};
 use serde::Serialize;
 
-use crate::dag::Label;
-
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub(crate) struct JsonNode<N>
 where
     N: Serialize,
 {
     id: String,
-    label: String,
     #[serde(rename = "type")]
     ty: String,
     detail: N,
@@ -41,7 +38,6 @@ where
     source: String,
     /// target JsonNode id
     target: String,
-    label: String,
     detail: E,
 }
 
@@ -65,8 +61,8 @@ where
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub(crate) struct JsonDag<N, E>
 where
-    N: Clone + Label + Serialize,
-    E: Clone + Label + Serialize,
+    N: Clone + Serialize,
+    E: Clone + Serialize,
 {
     nodes: Vec<JsonNode<N>>,
     edges: Vec<JsonEdge<E>>,
@@ -74,8 +70,8 @@ where
 
 impl<'a, N, E> From<&'a Dag<N, E>> for JsonDag<N, E>
 where
-    N: Clone + Label + Serialize,
-    E: Clone + Label + Serialize,
+    N: Clone + Serialize,
+    E: Clone + Serialize,
 {
     fn from(dag: &'a Dag<N, E, u32>) -> Self {
         let mut node_map = HashMap::new();
@@ -86,11 +82,9 @@ where
             let target_json_node = JsonDag::crate_json_node(dag, edge.target());
 
             let json_edge = {
-                let label = edge.weight.label();
                 JsonEdge {
                     source: source_json_node.id.clone(),
                     target: target_json_node.id.clone(),
-                    label,
                     detail: edge.weight.clone(),
                 }
             };
@@ -109,8 +103,8 @@ where
 
 impl<N, E> JsonDag<N, E>
 where
-    N: Clone + Label + Serialize,
-    E: Clone + Label + Serialize,
+    N: Clone + Serialize,
+    E: Clone + Serialize,
 {
     fn get_node_type(dag: &Dag<N, E>, node_index: NodeIndex) -> &str {
         let parent_count = dag.parents(node_index).iter(dag).count();
@@ -128,13 +122,11 @@ where
 
     fn crate_json_node(dag: &Dag<N, E>, node_index: NodeIndex) -> JsonNode<N> {
         let n = dag.index(node_index);
-        let label = n.label();
         let id = node_index.index().to_string();
         let ty = JsonDag::get_node_type(dag, node_index);
 
         JsonNode {
             id,
-            label,
             ty: ty.to_string(),
             detail: n.clone(),
             dept: -1,
@@ -178,8 +170,8 @@ where
 
 impl<N, E> JsonDag<N, E>
 where
-    N: Clone + Label + Serialize,
-    E: Clone + Label + Serialize,
+    N: Clone + Serialize,
+    E: Clone + Serialize,
 {
     pub fn nodes(&self) -> &Vec<JsonNode<N>> {
         &self.nodes

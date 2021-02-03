@@ -7,7 +7,7 @@ use daggy::{Dag, EdgeIndex, NodeIndex, Walker};
 use crate::api::operator::DEFAULT_PARALLELISM;
 use crate::api::runtime::{JobId, OperatorId};
 use crate::dag::stream_graph::{StreamGraph, StreamNode};
-use crate::dag::{DagError, Label, OperatorType};
+use crate::dag::{DagError, OperatorType};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum JobEdge {
@@ -15,12 +15,6 @@ pub enum JobEdge {
     Forward = 1,
     /// Hash
     ReBalance = 2,
-}
-
-impl Label for JobEdge {
-    fn label(&self) -> String {
-        format!("{:?}", self)
-    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -31,21 +25,6 @@ pub struct JobNode {
     pub(crate) stream_nodes: Vec<StreamNode>,
     pub(crate) child_job_ids: Vec<JobId>,
     pub(crate) parent_job_ids: Vec<JobId>,
-}
-
-impl Label for JobNode {
-    fn label(&self) -> String {
-        let op_names: Vec<&str> = self
-            .stream_nodes
-            .iter()
-            .map(|x| x.operator_name.as_str())
-            .collect();
-        let names: String = op_names.join(",\n");
-        format!(
-            "{:?}(parallelism:{})\n{}",
-            self.job_id, self.parallelism, names
-        )
-    }
 }
 
 impl JobNode {

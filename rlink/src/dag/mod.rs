@@ -120,10 +120,6 @@ pub enum DagError {
     OtherApiError(#[from] api::Error),
 }
 
-pub(crate) trait Label {
-    fn label(&self) -> String;
-}
-
 #[derive(Clone, Debug)]
 pub(crate) struct DagManager {
     stream_graph: StreamGraph,

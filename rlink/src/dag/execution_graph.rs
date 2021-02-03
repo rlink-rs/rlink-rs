@@ -8,7 +8,7 @@ use crate::api::operator::StreamOperator;
 use crate::api::runtime::{JobId, OperatorId};
 use crate::dag::job_graph::{JobEdge, JobGraph};
 use crate::dag::stream_graph::StreamNode;
-use crate::dag::{DagError, Label, TaskId};
+use crate::dag::{DagError, TaskId};
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub(crate) enum ExecutionEdge {
@@ -18,32 +18,11 @@ pub(crate) enum ExecutionEdge {
     Network = 2,
 }
 
-impl Label for ExecutionEdge {
-    fn label(&self) -> String {
-        format!("{:?}", self)
-    }
-}
-
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub(crate) struct ExecutionNode {
     pub task_id: TaskId,
     pub stream_nodes: Vec<StreamNode>,
     pub input_split: InputSplit,
-}
-
-impl Label for ExecutionNode {
-    fn label(&self) -> String {
-        let op_names: Vec<&str> = self
-            .stream_nodes
-            .iter()
-            .map(|x| x.operator_name.as_str())
-            .collect();
-        let names: String = op_names.join(",\n");
-        format!(
-            "{:?}({}/{})\n{}",
-            self.task_id.job_id, self.task_id.task_number, self.task_id.num_tasks, names
-        )
-    }
 }
 
 #[derive(Clone, Debug)]
