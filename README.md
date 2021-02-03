@@ -142,8 +142,3 @@ hadoop jar rlink-yarn-client-{version}.jar rlink.yarn.client.Client \
   --num_task_managers 80 \
   --application_process_arg xxx
 ```
-
-## TODO
-* Stream multiplexing output
-* Reduce operator checkpoint
-* Flink Sql support
