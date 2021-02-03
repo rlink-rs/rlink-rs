@@ -3,9 +3,9 @@
 <head>
     <title>rlink-rs DAG</title>
 
-<!--    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>-->
-<!--    <script src="https://d3js.org/d3.v3.min.js" charset="utf-8"></script>-->
-<!--    <script src="https://cdn.bootcss.com/dagre-d3/0.6.4/dagre-d3.js"></script>-->
+    <!--    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>-->
+    <!--    <script src="https://d3js.org/d3.v3.min.js" charset="utf-8"></script>-->
+    <!--    <script src="https://cdn.bootcss.com/dagre-d3/0.6.4/dagre-d3.js"></script>-->
     <!--<script src="https://dagrejs.github.io/project/dagre-d3/v0.6.4/dagre-d3.min.js"></script>-->
 
     <script src="js/d3.v3.min.js" charset="utf-8"></script>
@@ -23,28 +23,34 @@
             background: #333;
             font-family: "Helvetica Neue", Helvetica, Arial, sans-serf;
         }
+
         #tree {
             width: 100%;
             height: 100%;
             display: flex;
             position: relative;
         }
+
         #tree svg {
             width: 100%;
             height: 100%;
         }
+
         text {
             font-size: 14px;
             fill: #fff;
         }
+
         .edgePath path {
             stroke: #d9822b;
             fill: #d9822b;
             stroke-width: 1.5px;
         }
+
         .node circle {
             fill: #000000;
         }
+
         /* tree svg */
 
         .chartTooltip {
@@ -57,15 +63,18 @@
             box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.4);
             opacity: 0;
         }
+
         .chartTooltip p {
             margin: 0;
             font-size: 14px;
             line-height: 20px;
             word-wrap: break-word;
         }
+
         .chartTooltip p span {
             display: flex;
         }
+
         .chartTooltip p a {
             display: flex;
         }
@@ -73,6 +82,7 @@
         .label {
             color: #fff;
         }
+
         .label span {
             display: block;
         }
@@ -89,153 +99,163 @@
 </div>
 
 <script type="text/javascript">
-let req = GetRequest();
-let dag_type = req["type"];
-let url = "api/dag/" + dag_type;
-$.get(url, function(data,status) {
-    // let width = document.getElementById("tree").offsetWidth;
-    // let height = document.getElementById("tree").offsetHeight;
-    // Create a new directed graph
-    let g = new dagreD3.graphlib.Graph().setGraph({
-        rankdir: 'LR',
-        edgesep: 100,
-        ranksep: 80
-    });
-
-    let dag = data.data;
-
-    dag.nodes.forEach(function(node){
-        let node_id = node.id;
-        let label_html = node_label(node, dag_type);
-        let value = {
-            shape: "rect",
-            name: node.name,
-            labelType: "html",
-            label : label_html,
-            rx: 5,
-            ry: 5,
-        }
-
-        g.setNode(node_id, value);
-    });
-
-    dag.edges.forEach(function(edge) {
-        let source_node_id = edge.source;
-        let target_node_id = edge.target;
-        let label = edge.label;
-
-        g.setEdge(source_node_id, target_node_id, {
-            label: label,
-            lineInterpolate: 'basis',
-            style: "fill: none; stroke: #d9822b"
-        });
-    });
-
-    let render = new dagreD3.render();
-
-    // Set up an SVG group so that we can translate the final graph.
-    let svg = d3.select("#tree").append('svg');
-    let inner = svg.append("g");
-    render(inner, g);
-
-    // Set up zoom support
-    let zoom = d3.behavior.zoom().scaleExtent([0.1, 100])
-        .on('zoomstart', () => {
-            svg.style('cursor', 'move')
-        })
-        .on("zoom", function() {
-            inner.attr('transform',
-                "translate(" + d3.event.translate + ")" +
-                "scale(" + d3.event.scale + ")"
-            )
-        }).on('zoomend', () => {
-            svg.style('cursor', 'default')
-        });
-    svg.call(zoom);
-
-    let timer;
-    const nodeEnter = inner.selectAll('g.node');
-
-    nodeEnter
-        .on('mouseover', function(d) {
-            tooltipOver(d)
-            console.log(d)
-        })
-        .on('mouseout', () => {
-            timer = setTimeout(function() {
-                d3.select('.chartTooltip').transition().duration(300).style('opacity', 0).style('display', 'none')
-            }, 200)
+    let req = GetRequest();
+    let dag_type = req["type"];
+    let url = "api/dag/" + dag_type;
+    $.get(url, function (data, status) {
+        // let width = document.getElementById("tree").offsetWidth;
+        // let height = document.getElementById("tree").offsetHeight;
+        // Create a new directed graph
+        let g = new dagreD3.graphlib.Graph().setGraph({
+            rankdir: 'LR',
+            edgesep: 100,
+            ranksep: 80
         });
 
-    function tooltipOver(d) {
-        if (timer) clearTimeout(timer);
-        d3.select('.chartTooltip').transition().duration(300).style('opacity', 1).style('display', 'block');
-        const yPosition = d3.event.layerY + 20;
-        const xPosition = d3.event.layerX + 20;
-        const chartTooltip = d3.select('.chartTooltip')
-            .style('left', xPosition + 'px')
-            .style('top', yPosition + 'px');
+        let dag = data.data;
 
-        d3.select('.chartTooltip').on('mouseover', () => {
+        dag.nodes.forEach(function (node) {
+            let node_id = node.id;
+            let label_html = node_label(node, dag_type);
+            let value = {
+                shape: "rect",
+                name: node.name,
+                labelType: "html",
+                label: label_html,
+                rx: 5,
+                ry: 5,
+            }
+
+            g.setNode(node_id, value);
+        });
+
+        dag.edges.forEach(function (edge) {
+            let source_node_id = edge.source;
+            let target_node_id = edge.target;
+            let label = edge_label(edge, dag_type);
+
+            g.setEdge(source_node_id, target_node_id, {
+                label: label,
+                lineInterpolate: 'basis',
+                style: "fill: none; stroke: #d9822b"
+            });
+        });
+
+        let render = new dagreD3.render();
+
+        // Set up an SVG group so that we can translate the final graph.
+        let svg = d3.select("#tree").append('svg');
+        let inner = svg.append("g");
+        render(inner, g);
+
+        // Set up zoom support
+        let zoom = d3.behavior.zoom().scaleExtent([0.1, 100])
+            .on('zoomstart', () => {
+                svg.style('cursor', 'move')
+            })
+            .on("zoom", function () {
+                inner.attr('transform',
+                    "translate(" + d3.event.translate + ")" +
+                    "scale(" + d3.event.scale + ")"
+                )
+            }).on('zoomend', () => {
+                svg.style('cursor', 'default')
+            });
+        svg.call(zoom);
+
+        let timer;
+        const nodeEnter = inner.selectAll('g.node');
+
+        nodeEnter
+            .on('mouseover', function (d) {
+                tooltipOver(d)
+                console.log(d)
+            })
+            .on('mouseout', () => {
+                timer = setTimeout(function () {
+                    d3.select('.chartTooltip').transition().duration(300).style('opacity', 0).style('display', 'none')
+                }, 200)
+            });
+
+        function tooltipOver(d) {
             if (timer) clearTimeout(timer);
-            d3.select('.chartTooltip').transition().duration(300).style('opacity', 1).style('display', 'block')
-        }).on('mouseout', () => {
-            timer = setTimeout(function() {
-                d3.select('.chartTooltip').transition().duration(300).style('opacity', 0).style('display', 'none')
-            }, 200)
-        });
+            d3.select('.chartTooltip').transition().duration(300).style('opacity', 1).style('display', 'block');
+            const yPosition = d3.event.layerY + 20;
+            const xPosition = d3.event.layerX + 20;
+            const chartTooltip = d3.select('.chartTooltip')
+                .style('left', xPosition + 'px')
+                .style('top', yPosition + 'px');
 
-        if (d) {
-            chartTooltip.select('.chartTooltip-label').text('label：' + d)
-        } else {
-            chartTooltip.select('.chartTooltip-label').text('label：' + d)
+            d3.select('.chartTooltip').on('mouseover', () => {
+                if (timer) clearTimeout(timer);
+                d3.select('.chartTooltip').transition().duration(300).style('opacity', 1).style('display', 'block')
+            }).on('mouseout', () => {
+                timer = setTimeout(function () {
+                    d3.select('.chartTooltip').transition().duration(300).style('opacity', 0).style('display', 'none')
+                }, 200)
+            });
+
+            if (d) {
+                chartTooltip.select('.chartTooltip-label').text('label：' + d)
+            } else {
+                chartTooltip.select('.chartTooltip-label').text('label：' + d)
+            }
+            if (g.node(d).name) {
+                chartTooltip.select('.chartTooltip-name').text('name2：' + g.node(d).name)
+            } else {
+                chartTooltip.select('.chartTooltip-name').text('name2：' + g.node(d).name)
+            }
         }
-        if (g.node(d).name) {
-            chartTooltip.select('.chartTooltip-name').text('name2：' + g.node(d).name)
-        } else {
-            chartTooltip.select('.chartTooltip-name').text('name2：' + g.node(d).name)
+    });
+
+    function GetRequest() {
+        var url = location.search; //获取url中"?"符后的字串
+        var theRequest = new Object();
+        if (url.indexOf("?") != -1) {
+            var str = url.substr(1);
+            strs = str.split("&");
+            for (var i = 0; i < strs.length; i++) {
+                theRequest[strs[i].split("=")[0]] = unescape(strs[i].split("=")[1]);
+            }
+        }
+        return theRequest;
+    }
+
+    function node_label(node, dag_type) {
+        if (dag_type === "stream_graph") {
+            var html = "<div class='label'>";
+            html += "<span class='node_id'>OperatorId:" + node.detail.id + "</span>";
+            html += "<span class='parallelism'>Parallelism:" + node.detail.parallelism + "</span>";
+            html += "<span class='detail'>OperatorName:" + node.detail.operator_name + "</span>";
+            html += "</div>";
+            return html;
+        } else if (dag_type === "job_graph") {
+            var html = "<div class='label'>";
+            html += "<span class='node_id'>JobId:" + node.detail.job_id + "</span>";
+            html += "<span class='parallelism'>Parallelism:" + node.detail.parallelism + "</span>";
+            node.detail.stream_nodes.forEach(function (stream_node) {
+                html += "<span class='detail'> * " + stream_node.operator_name + "</span>";
+            });
+            html += "</div>";
+            return html;
+        } else if (dag_type === "execution_graph") {
+            var html = "<div class='label'>";
+            html += "<span class='node_id'>JobId:" + node.detail.task_id.job_id + "</span>";
+            html += "<span class='parallelism'>Task:" + node.detail.task_id.task_number
+                + "/" + node.detail.task_id.num_tasks + "</span>";
+            html += "</div>";
+            return html;
         }
     }
-});
 
-function GetRequest() {
-    var url = location.search; //获取url中"?"符后的字串
-    var theRequest = new Object();
-    if (url.indexOf("?") != -1) {
-        var str = url.substr(1);
-        strs = str.split("&");
-        for(var i = 0; i < strs.length; i ++) {
-            theRequest[strs[i].split("=")[0]] = unescape(strs[i].split("=")[1]);
+    function edge_label(edge, dag_type) {
+        if (dag_type === "stream_graph") {
+            return edge.detail.edge_id;
+        } else if (dag_type === "job_graph") {
+            return edge.detail;
+        } else if (dag_type === "execution_graph") {
+            return edge.detail;
         }
     }
-    return theRequest;
-}
-
-function node_label(node, dag_type) {
-    if (dag_type === "stream_graph") {
-        var html = "<div class='label'>";
-        html += "<span class='node_id'>OperatorId:"+node.detail.id+"</span>";
-        html += "<span class='parallelism'>Parallelism:"+node.detail.parallelism+"</span>";
-        html += "<span class='detail'>OperatorName:"+node.detail.operator_name+"</span>";
-        html += "</div>";
-        return html;
-    } else if (dag_type === "job_graph") {
-        var html = "<div class='label'>";
-        html += "<span class='node_id'>JobId:"+node.detail.job_id+"</span>";
-        html += "<span class='parallelism'>Parallelism:"+node.detail.parallelism+"</span>";
-        node.detail.stream_nodes.forEach(function(stream_node){
-            html += "<span class='detail'> * " + stream_node.operator_name + "</span>";
-        });
-        html += "</div>";
-        return html;
-    } else if (dag_type === "execution_graph") {
-        var html = "<div class='label'>";
-        html += "<span class='node_id'>JobId:"+node.detail.task_id.job_id+"</span>";
-        html += "<span class='parallelism'>Task:"+node.detail.task_id.task_number
-            +"/"+node.detail.task_id.num_tasks+"</span>";
-        html += "</div>";
-        return html;
-    }
-}
 </script>
 </html>
