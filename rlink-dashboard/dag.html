@@ -20,7 +20,8 @@
             position: relative;
             margin: 0;
             padding: 0;
-            background: #3e3e3e;
+            background: #333;
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serf;
         }
         #tree {
             width: 100%;
@@ -68,6 +69,13 @@
         .chartTooltip p a {
             display: flex;
         }
+
+        .label {
+            color: #fff;
+        }
+        .label span {
+            display: block;
+        }
     </style>
 </head>
 
@@ -82,10 +90,11 @@
 
 <script type="text/javascript">
 let req = GetRequest();
-let url = "api/dag/" + req["type"];
+let dag_type = req["type"];
+let url = "api/dag/" + dag_type;
 $.get(url, function(data,status) {
-    let width = document.getElementById("tree").offsetWidth;
-    let height = document.getElementById("tree").offsetHeight;
+    // let width = document.getElementById("tree").offsetWidth;
+    // let height = document.getElementById("tree").offsetHeight;
     // Create a new directed graph
     let g = new dagreD3.graphlib.Graph().setGraph({
         rankdir: 'LR',
@@ -97,10 +106,12 @@ $.get(url, function(data,status) {
 
     dag.nodes.forEach(function(node){
         let node_id = node.id;
+        let label_html = node_label(node, dag_type);
         let value = {
             shape: "rect",
             name: node.name,
-            label : node.label,
+            labelType: "html",
+            label : label_html,
             rx: 5,
             ry: 5,
         }
@@ -198,6 +209,33 @@ function GetRequest() {
         }
     }
     return theRequest;
+}
+
+function node_label(node, dag_type) {
+    if (dag_type === "stream_graph") {
+        var html = "<div class='label'>";
+        html += "<span class='node_id'>OperatorId:"+node.detail.id+"</span>";
+        html += "<span class='parallelism'>Parallelism:"+node.detail.parallelism+"</span>";
+        html += "<span class='detail'>OperatorName:"+node.detail.operator_name+"</span>";
+        html += "</div>";
+        return html;
+    } else if (dag_type === "job_graph") {
+        var html = "<div class='label'>";
+        html += "<span class='node_id'>JobId:"+node.detail.job_id+"</span>";
+        html += "<span class='parallelism'>Parallelism:"+node.detail.parallelism+"</span>";
+        node.detail.stream_nodes.forEach(function(stream_node){
+            html += "<span class='detail'> * " + stream_node.operator_name + "</span>";
+        });
+        html += "</div>";
+        return html;
+    } else if (dag_type === "execution_graph") {
+        var html = "<div class='label'>";
+        html += "<span class='node_id'>JobId:"+node.detail.task_id.job_id+"</span>";
+        html += "<span class='parallelism'>Task:"+node.detail.task_id.task_number
+            +"/"+node.detail.task_id.num_tasks+"</span>";
+        html += "</div>";
+        return html;
+    }
 }
 </script>
 </html>

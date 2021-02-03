@@ -1,16 +1,16 @@
+use std::collections::BTreeMap;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
 use crate::api::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
-use crate::api::element::{Barrier, Element};
+use crate::api::element::{Element, StreamStatus, Watermark};
 use crate::api::function::{InputFormat, InputSplit};
 use crate::api::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
 use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::channel::named_channel;
 use crate::channel::sender::ChannelSender;
-use crate::dag::job_graph::JobEdge;
 use crate::metrics::Tag;
 use crate::runtime::timer::TimerChannel;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
@@ -29,7 +29,8 @@ pub(crate) struct SourceRunnable {
     stream_status_timer: Option<TimerChannel>,
     checkpoint_timer: Option<TimerChannel>,
 
-    barrier_align: Option<BarrierAlign>,
+    barrier_align: BarrierAlignManager,
+    watermark_align: WatermarkAlignManager,
 }
 
 impl SourceRunnable {
@@ -50,7 +51,8 @@ impl SourceRunnable {
             stream_status_timer: None,
             checkpoint_timer: None,
 
-            barrier_align: None,
+            barrier_align: BarrierAlignManager::default(),
+            watermark_align: WatermarkAlignManager::default(),
         }
     }
 
@@ -166,11 +168,13 @@ impl Runnable for SourceRunnable {
             self.checkpoint_timer = Some(checkpoint_timer);
         }
 
-        self.barrier_align = Some(BarrierAlign::new(context));
+        let parent_execution_size = context.parent_executions(&self.task_id).len();
+        self.barrier_align = BarrierAlignManager::new(parent_execution_size);
+        self.watermark_align = WatermarkAlignManager::new(parent_execution_size, 120);
 
         info!(
-            "SourceRunnable Opened, operator_id={:?}, task_id={:?}, BarrierAlign expected_size={:?}",
-            self.operator_id, self.task_id, self.barrier_align.as_ref().unwrap().expected_size,
+            "SourceRunnable Opened, operator_id={:?}, task_id={:?}, ElementEventAlign parent_execution_size={:?}",
+            self.operator_id, self.task_id, parent_execution_size,
         );
         Ok(())
     }
@@ -193,25 +197,54 @@ impl Runnable for SourceRunnable {
         }
 
         while let Ok(element) = receiver.recv() {
-            if element.is_barrier() {
-                let is_barrier_align = self
-                    .barrier_align
-                    .as_mut()
-                    .unwrap()
-                    .apply(element.as_barrier());
-                if is_barrier_align {
-                    debug!("barrier align and checkpoint");
-                    let checkpoint_id = element.as_barrier().checkpoint_id;
-                    let snapshot_context = {
-                        let context = self.context.as_ref().unwrap();
-                        context.checkpoint_context(self.operator_id, checkpoint_id)
-                    };
-                    self.checkpoint(snapshot_context);
+            match element {
+                Element::Record(_) => self.next_runnable.as_mut().unwrap().run(element),
+                Element::Barrier(barrier) => {
+                    let is_barrier_align = self.barrier_align.apply(barrier.checkpoint_id.0);
+                    if is_barrier_align {
+                        debug!("barrier align and checkpoint");
+                        let checkpoint_id = barrier.checkpoint_id;
+                        let snapshot_context = {
+                            let context = self.context.as_ref().unwrap();
+                            context.checkpoint_context(self.operator_id, checkpoint_id)
+                        };
+                        self.checkpoint(snapshot_context);
 
-                    self.next_runnable.as_mut().unwrap().run(element);
+                        self.next_runnable
+                            .as_mut()
+                            .unwrap()
+                            .run(Element::Barrier(barrier));
+                    }
                 }
-            } else {
-                self.next_runnable.as_mut().unwrap().run(element);
+                Element::Watermark(watermark) => {
+                    let align_watermark = self.watermark_align.apply_watermark(watermark);
+                    match align_watermark {
+                        Some(w) => self
+                            .next_runnable
+                            .as_mut()
+                            .unwrap()
+                            .run(Element::Watermark(w)),
+                        None => {}
+                    }
+                }
+                Element::StreamStatus(stream_status) => {
+                    let (align, align_watermark) =
+                        self.watermark_align.apply_stream_status(&stream_status);
+                    if align {
+                        match align_watermark {
+                            Some(w) => self
+                                .next_runnable
+                                .as_mut()
+                                .unwrap()
+                                .run(Element::Watermark(w)),
+                            None => self
+                                .next_runnable
+                                .as_mut()
+                                .unwrap()
+                                .run(Element::StreamStatus(stream_status)),
+                        }
+                    }
+                }
             }
         }
     }
@@ -249,58 +282,243 @@ impl Runnable for SourceRunnable {
     }
 }
 
-#[derive(Debug)]
-struct BarrierAlign {
-    expected_size: usize,
+#[derive(Debug, Default)]
+struct BarrierAlignManager {
+    parent_execution_size: usize,
 
     checkpoint_id: u64,
     reached_size: usize,
 }
 
-impl BarrierAlign {
-    pub fn new(context: &RunnableContext) -> Self {
-        let parents = context
-            .dag_metadata
-            .job_parents(context.task_descriptor.task_id.job_id);
-        let expected_size = parents
-            .into_iter()
-            .map(|(node, edge)| match edge {
-                JobEdge::Forward => 1 as usize,
-                JobEdge::ReBalance => node.parallelism as usize,
-            })
-            .sum();
-        BarrierAlign {
-            expected_size,
+impl BarrierAlignManager {
+    pub fn new(parent_execution_size: usize) -> Self {
+        BarrierAlignManager {
+            parent_execution_size,
             checkpoint_id: 0,
             reached_size: 0,
         }
     }
 
-    pub fn apply(&mut self, barrier: &Barrier) -> bool {
-        if self.expected_size == 0 {
+    pub fn apply(&mut self, checkpoint_id: u64) -> bool {
+        if self.parent_execution_size == 0 {
             return true;
         }
 
-        let checkpoint_id = barrier.checkpoint_id.0;
         if self.checkpoint_id == checkpoint_id {
             self.reached_size += 1;
 
-            if self.reached_size > self.expected_size {
+            if self.reached_size > self.parent_execution_size {
                 unreachable!()
             }
 
-            self.reached_size == self.expected_size
+            self.reached_size == self.parent_execution_size
         } else if self.checkpoint_id < checkpoint_id {
             self.checkpoint_id = checkpoint_id;
             self.reached_size = 1;
 
-            self.reached_size == self.expected_size
+            self.reached_size == self.parent_execution_size
         } else {
             error!(
                 "barrier delay, current {}, reached {}",
                 self.checkpoint_id, checkpoint_id
             );
             false
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct WatermarkAlign {
+    parent_execution_size: usize,
+
+    statue_timestamp: u64,
+    reached_size: usize,
+
+    watermarks: Vec<Watermark>,
+}
+
+impl WatermarkAlign {
+    pub fn new(parent_execution_size: usize, statue_timestamp: u64) -> Self {
+        WatermarkAlign {
+            parent_execution_size,
+            statue_timestamp,
+            reached_size: 0,
+            watermarks: Vec::new(),
+        }
+    }
+
+    fn min_watermark(&self) -> Option<Watermark> {
+        if self.parent_execution_size == 0 {
+            self.watermarks.get(0).map(|w| w.clone())
+        } else {
+            self.watermarks
+                .iter()
+                .min_by_key(|w| w.timestamp)
+                .map(|w| w.clone())
+        }
+    }
+
+    pub fn apply_stream_status(
+        &mut self,
+        stream_status: &StreamStatus,
+    ) -> (bool, Option<Watermark>) {
+        self.apply(stream_status.timestamp, None)
+    }
+
+    pub fn apply_watermark(&mut self, watermark: Watermark) -> Option<Watermark> {
+        // ignore 0(`align`) field
+        self.apply(watermark.status_timestamp, Some(watermark)).1
+    }
+
+    fn apply(
+        &mut self,
+        status_timestamp: u64,
+        watermark: Option<Watermark>,
+    ) -> (bool, Option<Watermark>) {
+        if self.statue_timestamp != status_timestamp {
+            panic!("the `status_timestamp` confusion");
+        }
+
+        if self.parent_execution_size == 0 {
+            return (true, watermark);
+        }
+
+        self.reached_size += 1;
+        if let Some(watermark) = watermark {
+            self.watermarks.push(watermark);
+        }
+
+        if self.reached_size > self.parent_execution_size {
+            unreachable!()
+        }
+
+        if self.reached_size == self.parent_execution_size {
+            (true, self.min_watermark())
+        } else {
+            (false, None)
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct WatermarkAlignManager {
+    parent_execution_size: usize,
+    watermarks: BTreeMap<u64, WatermarkAlign>,
+    latest_align_status_timestamp: u64,
+    max_waiting_size: usize,
+}
+
+impl WatermarkAlignManager {
+    pub fn new(parent_execution_size: usize, max_waiting_size: usize) -> Self {
+        WatermarkAlignManager {
+            parent_execution_size,
+            watermarks: BTreeMap::new(),
+            latest_align_status_timestamp: 0,
+            max_waiting_size,
+        }
+    }
+
+    /// apply StreamStatus and align check
+    /// only align and return true
+    pub fn apply_stream_status(
+        &mut self,
+        stream_status: &StreamStatus,
+    ) -> (bool, Option<Watermark>) {
+        self.out_of_capacity_check();
+
+        let status_timestamp = stream_status.timestamp;
+        if status_timestamp <= self.latest_align_status_timestamp {
+            warn!("delay `StreamStatus` reached");
+            return (false, None);
+        }
+
+        let watermark_align =
+            self.watermarks
+                .entry(status_timestamp)
+                .or_insert(WatermarkAlign::new(
+                    self.parent_execution_size,
+                    status_timestamp,
+                ));
+
+        let (align, watermark) = watermark_align.apply_stream_status(stream_status);
+        if align {
+            self.latest_align_status_timestamp = watermark_align.statue_timestamp;
+            let statue_timestamp = watermark_align.statue_timestamp;
+            self.watermarks.remove(&statue_timestamp);
+        } else {
+            if self.watermarks.len() > self.max_waiting_size {
+                let status_timestamp = self
+                    .watermarks
+                    .iter()
+                    .next()
+                    .map(|(status_timestamp, _)| *status_timestamp)
+                    .unwrap();
+                let watermark_align = self.watermarks.remove(&status_timestamp).unwrap();
+
+                self.latest_align_status_timestamp = watermark_align.statue_timestamp;
+            }
+        }
+
+        (align, watermark)
+    }
+
+    /// apply Watermark and align check
+    /// align or expire return true
+    pub fn apply_watermark(&mut self, watermark: Watermark) -> Option<Watermark> {
+        self.out_of_capacity_check();
+
+        let status_timestamp = watermark.status_timestamp;
+        if status_timestamp <= self.latest_align_status_timestamp {
+            warn!("delay `StreamStatus` reached");
+            return None;
+        }
+
+        let watermark_align =
+            self.watermarks
+                .entry(status_timestamp)
+                .or_insert(WatermarkAlign::new(
+                    self.parent_execution_size,
+                    status_timestamp,
+                ));
+
+        let mut align_watermark = watermark_align.apply_watermark(watermark);
+
+        if align_watermark.is_none() && self.watermarks.len() > self.max_waiting_size {
+            let status_timestamp = self
+                .watermarks
+                .iter()
+                .next()
+                .map(|(status_timestamp, _)| *status_timestamp)
+                .unwrap();
+            let watermark_align = self.watermarks.remove(&status_timestamp).unwrap();
+            align_watermark = watermark_align.min_watermark()
+        }
+
+        match align_watermark {
+            Some(w) => {
+                self.latest_align_status_timestamp = w.status_timestamp;
+                self.watermarks.remove(&w.status_timestamp);
+                Some(w)
+            }
+            None => None,
+        }
+    }
+
+    fn out_of_capacity_check(&mut self) {
+        if self.watermarks.len() <= 1 {
+            return;
+        }
+
+        let expired: Vec<u64> = self
+            .watermarks
+            .iter()
+            .map(|(status_timestamp, _)| *status_timestamp)
+            .filter(|status_timestamp| *status_timestamp <= self.latest_align_status_timestamp)
+            .collect();
+
+        for status_timestamp in expired {
+            self.watermarks.remove(&status_timestamp);
+            warn!("remove expire status: {}", status_timestamp);
         }
     }
 }

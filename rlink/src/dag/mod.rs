@@ -120,10 +120,6 @@ pub enum DagError {
     OtherApiError(#[from] api::Error),
 }
 
-pub(crate) trait Label {
-    fn label(&self) -> String;
-}
-
 #[derive(Clone, Debug)]
 pub(crate) struct DagManager {
     stream_graph: StreamGraph,
@@ -143,10 +139,6 @@ impl<'a> TryFrom<&'a RawStreamGraph> for DagManager {
 
         let mut job_graph = JobGraph::new();
         job_graph.build(&stream_graph)?;
-        println!(
-            "{}",
-            serde_json::to_string(&crate::dag::utils::JsonDag::from(&job_graph.dag)).unwrap()
-        );
 
         let mut execution_graph = ExecutionGraph::new();
         execution_graph.build(&job_graph, raw_stream_graph.operators().borrow_mut())?;
