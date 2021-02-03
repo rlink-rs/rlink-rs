@@ -28,4 +28,4 @@ futures = "0.3"
 
 tokio = { version = "0.2", features = ["full"] }
 
-elasticsearch = "7.10.0-alpha.1"
+elasticsearch = "7.10.1-alpha.1"
