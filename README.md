@@ -108,9 +108,9 @@ curl http://x.x.x.x:8770/job/application/application-1591174445599/shutdown \
 ## On Yarn
 
 ### update manager jar to hdfs
-upload `rlink-yarn-manager-0.2.1-jar-with-dependencies.jar` to hdfs
+upload `rlink-yarn-manager-{version}-jar-with-dependencies.jar` to hdfs
 
-eg: upload to `hdfs://nn/path/to/rlink-yarn-manager-0.2.1-jar-with-dependencies.jar`
+eg: upload to `hdfs://nn/path/to/rlink-yarn-manager-{version}-jar-with-dependencies.jar`
 
 ### update dashboard to hdfs
 upload `rlink-dashboard.zip` to hdfs
@@ -124,12 +124,12 @@ upload your application executable file to hdfs.
 eg: upload `rlink-showcase` to `hdfs://nn/path/to/rlink-showcase`
 
 ### submit yarn job
-submit yarn job with `rlink-yarn-client-0.2.1.jar`
+submit yarn job with `rlink-yarn-client-{version}.jar`
 ```shell
-hadoop jar rlink-yarn-client-0.2.1.jar rlink.yarn.client.Client \
+hadoop jar rlink-yarn-client-{version}.jar rlink.yarn.client.Client \
   --applicationName rlink-showcase \
   --worker_process_path hdfs://nn/path/to/rlink-showcase \
-  --java_manager_path hdfs://nn/path/to/rlink-yarn-manager-0.2.1-jar-with-dependencies.jar \
+  --java_manager_path hdfs://nn/path/to/rlink-yarn-manager-{version}-jar-with-dependencies.jar \
   --yarn_manager_main_class rlink.yarn.manager.ResourceManagerCli \
   --dashboard_path hdfs://nn/path/to/rlink-dashboard.zip \
   --master_memory_mb 256 \
