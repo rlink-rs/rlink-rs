@@ -5,7 +5,7 @@ where
     T: Send + 'static,
 {
     std::thread::Builder::new()
-        .name(format!("S-{}", name))
+        .name(name.to_string())
         .spawn(f)
         .expect("failed to spawn thread")
 }
