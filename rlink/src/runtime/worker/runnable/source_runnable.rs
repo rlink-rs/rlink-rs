@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use crate::api::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
 use crate::api::element::{Element, StreamStatus, Watermark};
-use crate::api::function::{InputFormat, InputSplit};
+use crate::api::function::InputFormat;
 use crate::api::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
 use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::channel::named_channel;
@@ -36,7 +36,6 @@ pub(crate) struct SourceRunnable {
 impl SourceRunnable {
     pub fn new(
         operator_id: OperatorId,
-        _input_split: InputSplit, // todo remove?
         stream_source: DefaultStreamOperator<dyn InputFormat>,
         next_runnable: Option<Box<dyn Runnable>>,
     ) -> Self {
