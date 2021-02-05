@@ -4,7 +4,7 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use crate::api::backend::KeyedStateBackend;
-use crate::api::checkpoint::FunctionSnapshotContext;
+use crate::api::checkpoint::{FunctionSnapshotContext, Checkpoint, CheckpointHandle};
 use crate::api::element::{Element, Record, StreamStatus};
 use crate::api::function::{KeySelectorFunction, ReduceFunction};
 use crate::api::operator::DefaultStreamOperator;
@@ -15,6 +15,7 @@ use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 use crate::storage::keyed_state::{TWindowState, WindowState};
 use crate::utils::date_time::timestamp_str;
+use crate::runtime::worker::checkpoint::submit_checkpoint;
 
 #[derive(Debug)]
 pub(crate) struct ReduceRunnable {
@@ -228,7 +229,22 @@ impl Runnable for ReduceRunnable {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, _snapshot_context: FunctionSnapshotContext) {
-        // foreach self.reached_barriers
+    fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext) {
+        let windows  =self.state.as_ref().unwrap().windows();
+        let handle = serde_json::to_string(&windows).unwrap();
+
+        let ck = Checkpoint {
+            operator_id: snapshot_context.operator_id,
+            task_id: snapshot_context.task_id,
+            checkpoint_id: snapshot_context.checkpoint_id,
+            handle: CheckpointHandle{ handle },
+        };
+        submit_checkpoint(ck).map(|ck| {
+            error!(
+                "{:?} submit checkpoint error. maybe report channel is full, checkpoint: {:?}",
+                snapshot_context.operator_id, ck
+            )
+        });
+
     }
 }
