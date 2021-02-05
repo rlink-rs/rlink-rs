@@ -1,4 +1,5 @@
 use crate::api::backend::KeyedStateBackend;
+use crate::api::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
 use crate::api::element::Record;
 use crate::api::function::{BaseReduceFunction, Context, Function, ReduceFunction};
 use crate::api::properties::SystemProperties;
@@ -80,10 +81,30 @@ impl BaseReduceFunction for WindowBaseReduceFunction {
     fn close(&mut self) -> crate::api::Result<()> {
         Ok(())
     }
+
+    fn checkpoint_function(&mut self) -> Option<Box<&mut dyn CheckpointFunction>> {
+        Some(Box::new(self))
+    }
 }
 
 impl Function for WindowBaseReduceFunction {
     fn name(&self) -> &str {
-        "WindowBaseReduce"
+        "WindowBaseReduceFunction"
+    }
+}
+
+impl CheckpointFunction for WindowBaseReduceFunction {
+    fn initialize_state(
+        &mut self,
+        _context: &FunctionSnapshotContext,
+        _handle: &Option<CheckpointHandle>,
+    ) {
+    }
+
+    fn snapshot_state(&mut self, _context: &FunctionSnapshotContext) -> CheckpointHandle {
+        let windows = self.state.as_ref().unwrap().windows();
+        CheckpointHandle {
+            handle: serde_json::to_string(&windows).unwrap(),
+        }
     }
 }

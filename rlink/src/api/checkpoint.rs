@@ -46,10 +46,7 @@ pub struct Checkpoint {
     pub handle: CheckpointHandle,
 }
 
-pub trait CheckpointFunction
-where
-    Self: Debug,
-{
+pub trait CheckpointFunction {
     /// trigger the method when a `operator` initialization
     fn initialize_state(
         &mut self,
