@@ -1,8 +1,8 @@
 use std::fmt::Debug;
 
 use crate::api::function::{
-    CoProcessFunction, FilterFunction, FlatMapFunction, Function, InputFormat, KeySelectorFunction,
-    OutputFormat, ReduceFunction,
+    BaseReduceFunction, CoProcessFunction, FilterFunction, FlatMapFunction, Function, InputFormat,
+    KeySelectorFunction, OutputFormat,
 };
 use crate::api::watermark::WatermarkAssigner;
 use crate::api::window::WindowAssigner;
@@ -74,13 +74,13 @@ where
 }
 
 #[derive(Debug)]
-pub enum StreamOperator {
+pub(crate) enum StreamOperator {
     StreamSource(DefaultStreamOperator<dyn InputFormat>),
     StreamFlatMap(DefaultStreamOperator<dyn FlatMapFunction>),
     StreamFilter(DefaultStreamOperator<dyn FilterFunction>),
     StreamCoProcess(DefaultStreamOperator<dyn CoProcessFunction>),
     StreamKeyBy(DefaultStreamOperator<dyn KeySelectorFunction>),
-    StreamReduce(DefaultStreamOperator<dyn ReduceFunction>),
+    StreamReduce(DefaultStreamOperator<dyn BaseReduceFunction>),
     StreamWatermarkAssigner(DefaultStreamOperator<dyn WatermarkAssigner>),
     StreamWindowAssigner(DefaultStreamOperator<dyn WindowAssigner>),
     StreamSink(DefaultStreamOperator<dyn OutputFormat>),
@@ -120,7 +120,7 @@ impl StreamOperator {
         StreamOperator::StreamKeyBy(operator)
     }
 
-    pub fn new_reduce(parallelism: u16, reduce_fn: Box<dyn ReduceFunction>) -> Self {
+    pub fn new_reduce(parallelism: u16, reduce_fn: Box<dyn BaseReduceFunction>) -> Self {
         let operator = DefaultStreamOperator::new(parallelism, FunctionCreator::User, reduce_fn);
         StreamOperator::StreamReduce(operator)
     }
@@ -152,6 +152,7 @@ impl StreamOperator {
         false
     }
 
+    #[allow(dead_code)]
     pub fn is_window(&self) -> bool {
         if let StreamOperator::StreamWindowAssigner(_stream_window) = self {
             return true;
@@ -159,6 +160,7 @@ impl StreamOperator {
         false
     }
 
+    #[allow(dead_code)]
     pub fn is_key_by(&self) -> bool {
         if let StreamOperator::StreamKeyBy(_stream_key_by) = self {
             return true;
@@ -166,6 +168,7 @@ impl StreamOperator {
         false
     }
 
+    #[allow(dead_code)]
     pub fn is_reduce(&self) -> bool {
         if let StreamOperator::StreamReduce(_stream_reduce) = self {
             return true;
@@ -173,6 +176,7 @@ impl StreamOperator {
         false
     }
 
+    #[allow(dead_code)]
     pub fn is_sink(&self) -> bool {
         if let StreamOperator::StreamSink(_stream_sink) = self {
             return true;
@@ -180,6 +184,7 @@ impl StreamOperator {
         false
     }
 
+    #[allow(dead_code)]
     pub fn is_map(&self) -> bool {
         if let StreamOperator::StreamFlatMap(_stream_map) = self {
             return true;
@@ -187,6 +192,7 @@ impl StreamOperator {
         false
     }
 
+    #[allow(dead_code)]
     pub fn is_filter(&self) -> bool {
         if let StreamOperator::StreamFilter(_stream_filter) = self {
             return true;
@@ -194,8 +200,9 @@ impl StreamOperator {
         false
     }
 
+    #[allow(dead_code)]
     pub fn is_connect(&self) -> bool {
-        if let StreamOperator::StreamCoProcess(_stream_source) = self {
+        if let StreamOperator::StreamCoProcess(_stream_co_process) = self {
             return true;
         }
         false

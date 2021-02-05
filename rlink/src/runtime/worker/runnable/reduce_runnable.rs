@@ -3,19 +3,15 @@ use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-use crate::api::backend::KeyedStateBackend;
-use crate::api::checkpoint::{FunctionSnapshotContext, Checkpoint, CheckpointHandle};
+use crate::api::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
 use crate::api::element::{Element, Record, StreamStatus};
-use crate::api::function::{KeySelectorFunction, ReduceFunction};
+use crate::api::function::{BaseReduceFunction, KeySelectorFunction};
 use crate::api::operator::DefaultStreamOperator;
-use crate::api::properties::SystemProperties;
 use crate::api::runtime::{OperatorId, TaskId};
 use crate::api::window::{TWindow, Window};
 use crate::metrics::{register_counter, Tag};
-use crate::runtime::worker::runnable::{Runnable, RunnableContext};
-use crate::storage::keyed_state::{TWindowState, WindowState};
-use crate::utils::date_time::timestamp_str;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
+use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
 #[derive(Debug)]
 pub(crate) struct ReduceRunnable {
@@ -24,13 +20,9 @@ pub(crate) struct ReduceRunnable {
 
     context: Option<RunnableContext>,
 
-    parent_parallelism: u16,
-
     stream_key_by: Option<DefaultStreamOperator<dyn KeySelectorFunction>>,
-    stream_reduce: DefaultStreamOperator<dyn ReduceFunction>,
+    stream_reduce: DefaultStreamOperator<dyn BaseReduceFunction>,
     next_runnable: Option<Box<dyn Runnable>>,
-
-    state: Option<WindowState>, // HashMap<Vec<u8>, Record>, // HashMap<TimeWindow, HashMap<Record, Record>>,
 
     // the Record can be operate after this window(include this window's time)
     limited_watermark_window: Option<Window>,
@@ -43,18 +35,16 @@ impl ReduceRunnable {
     pub fn new(
         operator_id: OperatorId,
         stream_key_by: Option<DefaultStreamOperator<dyn KeySelectorFunction>>,
-        stream_reduce: DefaultStreamOperator<dyn ReduceFunction>,
+        stream_reduce: DefaultStreamOperator<dyn BaseReduceFunction>,
         next_runnable: Option<Box<dyn Runnable>>,
     ) -> Self {
         ReduceRunnable {
             operator_id,
             task_id: TaskId::default(),
             context: None,
-            parent_parallelism: 0,
             stream_key_by,
             stream_reduce,
             next_runnable,
-            state: None,
             limited_watermark_window: None,
             counter: Arc::new(AtomicU64::new(0)),
             expire_counter: Arc::new(AtomicU64::new(0)),
@@ -76,30 +66,6 @@ impl Runnable for ReduceRunnable {
             .as_mut()
             .map(|s| s.operator_fn.open(&fun_context));
 
-        self.parent_parallelism = context.parent_parallelism();
-
-        // self.watermark_align = Some(WatermarkAlign::new());
-
-        info!("ReduceRunnable Opened. task_id={:?}", self.task_id);
-
-        let state_mode = context
-            .application_descriptor
-            .coordinator_manager
-            .application_properties
-            .get_keyed_state_backend()
-            .unwrap_or(KeyedStateBackend::Memory);
-
-        self.state = Some(WindowState::new(
-            context
-                .application_descriptor
-                .coordinator_manager
-                .application_id
-                .clone(),
-            context.task_descriptor.task_id.job_id,
-            context.task_descriptor.task_id.task_number,
-            state_mode,
-        ));
-
         let tags = vec![
             Tag::from(("job_id", self.task_id.job_id.0)),
             Tag::from(("task_number", self.task_id.task_number)),
@@ -112,11 +78,11 @@ impl Runnable for ReduceRunnable {
         let metric_name = format!("Reduce_Expire_{}", fn_name);
         register_counter(metric_name.as_str(), tags, self.expire_counter.clone());
 
+        info!("ReduceRunnable Opened. task_id={:?}", self.task_id);
         Ok(())
     }
 
     fn run(&mut self, element: Element) {
-        let state = self.state.as_mut().unwrap();
         match element {
             Element::Record(mut record) => {
                 // Record expiration check
@@ -147,8 +113,7 @@ impl Runnable for ReduceRunnable {
                     None => Record::with_capacity(0),
                 };
 
-                let reduce_func = &self.stream_reduce.operator_fn;
-                state.merge(key, record, |val1, val2| reduce_func.reduce(val1, val2));
+                self.stream_reduce.operator_fn.as_mut().reduce(key, record);
 
                 self.counter.fetch_add(1, Ordering::Relaxed);
             }
@@ -157,37 +122,16 @@ impl Runnable for ReduceRunnable {
                     Some(min_watermark_window) => {
                         self.limited_watermark_window = Some(min_watermark_window.clone());
 
-                        let mut drop_windows = Vec::new();
-                        for window in state.windows() {
-                            if window.max_timestamp() <= min_watermark_window.min_timestamp() {
-                                drop_windows.push(window.clone());
-                                state.drop_window(&window);
-
-                                // info!(
-                                //     "drop window [{}/{}]",
-                                //     timestamp_str(window.min_timestamp()),
-                                //     timestamp_str(window.max_timestamp()),
-                                // );
-                            }
-                        }
-
-                        if drop_windows.len() > 0 {
-                            debug!(
-                                "check window for drop, trigger watermark={}, drop window size={}",
-                                timestamp_str(min_watermark_window.max_timestamp()),
-                                drop_windows.len()
-                            );
-
-                            drop_windows.sort_by_key(|w| w.max_timestamp());
-                            for drop_window in drop_windows {
-                                let mut drop_record = Record::new();
-                                drop_record.trigger_window = Some(drop_window);
-
-                                self.next_runnable
-                                    .as_mut()
-                                    .unwrap()
-                                    .run(Element::from(drop_record));
-                            }
+                        let drop_events = self
+                            .stream_reduce
+                            .operator_fn
+                            .as_mut()
+                            .drop_state(min_watermark_window.min_timestamp());
+                        for drop_event in drop_events {
+                            self.next_runnable
+                                .as_mut()
+                                .unwrap()
+                                .run(Element::from(drop_event));
                         }
                     }
                     None => {
@@ -230,14 +174,16 @@ impl Runnable for ReduceRunnable {
     }
 
     fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext) {
-        let windows  =self.state.as_ref().unwrap().windows();
-        let handle = serde_json::to_string(&windows).unwrap();
+        let handle = match self.stream_reduce.operator_fn.checkpoint_function() {
+            Some(checkpoint) => checkpoint.snapshot_state(&snapshot_context),
+            None => CheckpointHandle::default(),
+        };
 
         let ck = Checkpoint {
             operator_id: snapshot_context.operator_id,
             task_id: snapshot_context.task_id,
             checkpoint_id: snapshot_context.checkpoint_id,
-            handle: CheckpointHandle{ handle },
+            handle,
         };
         submit_checkpoint(ck).map(|ck| {
             error!(
@@ -245,6 +191,5 @@ impl Runnable for ReduceRunnable {
                 snapshot_context.operator_id, ck
             )
         });
-
     }
 }

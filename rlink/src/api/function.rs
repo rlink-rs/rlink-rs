@@ -187,6 +187,21 @@ where
     fn close(&mut self) -> crate::api::Result<()>;
 }
 
+pub(crate) trait BaseReduceFunction
+where
+    Self: Function,
+{
+    fn open(&mut self, context: &Context) -> crate::api::Result<()>;
+    ///
+    fn reduce(&mut self, key: Record, record: Record);
+    fn drop_state(&mut self, watermark_timestamp: u64) -> Vec<Record>;
+    fn close(&mut self) -> crate::api::Result<()>;
+
+    fn checkpoint_function(&mut self) -> Option<Box<&mut dyn CheckpointFunction>> {
+        None
+    }
+}
+
 pub trait CoProcessFunction
 where
     Self: Function,
