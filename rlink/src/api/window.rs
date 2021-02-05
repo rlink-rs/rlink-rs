@@ -10,7 +10,7 @@ pub trait TWindow: Debug + Clone {
     fn min_timestamp(&self) -> u64;
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
 pub struct TimeWindow {
     start: u64,
     end: u64,
@@ -74,6 +74,12 @@ impl TWindow for Window {
         match self {
             Window::TimeWindow(time_window) => time_window.min_timestamp(),
         }
+    }
+}
+
+impl Default for Window {
+    fn default() -> Self {
+        Window::TimeWindow(TimeWindow::default())
     }
 }
 

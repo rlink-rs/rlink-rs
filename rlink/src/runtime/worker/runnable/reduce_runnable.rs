@@ -25,7 +25,7 @@ pub(crate) struct ReduceRunnable {
     next_runnable: Option<Box<dyn Runnable>>,
 
     // the Record can be operate after this window(include this window's time)
-    limited_watermark_window: Option<Window>,
+    limited_watermark_window: Window,
 
     counter: Arc<AtomicU64>,
     expire_counter: Arc<AtomicU64>,
@@ -45,7 +45,7 @@ impl ReduceRunnable {
             stream_key_by,
             stream_reduce,
             next_runnable,
-            limited_watermark_window: None,
+            limited_watermark_window: Window::default(),
             counter: Arc::new(AtomicU64::new(0)),
             expire_counter: Arc::new(AtomicU64::new(0)),
         }
@@ -86,23 +86,18 @@ impl Runnable for ReduceRunnable {
         match element {
             Element::Record(mut record) => {
                 // Record expiration check
-                let acceptable = self
-                    .limited_watermark_window
-                    .as_ref()
-                    .map(|limit_window| {
-                        record
-                            .max_location_windows()
-                            .map(|window| window.min_timestamp() >= limit_window.min_timestamp())
-                            .unwrap_or(true)
-                    })
+                let min_window_timestamp = self.limited_watermark_window.min_timestamp();
+                let acceptable = record
+                    .max_location_window()
+                    .map(|window| window.min_timestamp() >= min_window_timestamp)
                     .unwrap_or(true);
                 if !acceptable {
                     let n = self.expire_counter.fetch_add(1, Ordering::Relaxed);
                     if n & 1048575 == 1 {
                         error!(
                             "expire data. record window={:?}, limit window={:?}",
-                            record.min_location_windows().unwrap(),
-                            self.limited_watermark_window.as_ref().unwrap()
+                            record.min_location_window().unwrap(),
+                            self.limited_watermark_window
                         );
                     }
                     return;
@@ -120,7 +115,7 @@ impl Runnable for ReduceRunnable {
             Element::Watermark(watermark) => {
                 match watermark.min_location_windows() {
                     Some(min_watermark_window) => {
-                        self.limited_watermark_window = Some(min_watermark_window.clone());
+                        self.limited_watermark_window = min_watermark_window.clone();
 
                         let drop_events = self
                             .stream_reduce
