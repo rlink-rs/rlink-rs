@@ -78,10 +78,11 @@ impl Runnable for FilterRunnable {
     }
 
     fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext) {
-        let handle = match self.stream_filter.operator_fn.checkpoint_function() {
-            Some(checkpoint) => checkpoint.snapshot_state(&snapshot_context),
-            None => CheckpointHandle::default(),
-        };
+        let handle = self
+            .stream_filter
+            .operator_fn
+            .snapshot_state(&snapshot_context)
+            .unwrap_or(CheckpointHandle::default());
 
         let ck = Checkpoint {
             operator_id: snapshot_context.operator_id,

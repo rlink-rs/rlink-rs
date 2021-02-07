@@ -1,3 +1,4 @@
+use crate::api::checkpoint::CheckpointFunction;
 use crate::api::element::Record;
 use crate::api::function::{Context, Function, KeySelectorFunction};
 use crate::functions::schema_base::FunctionSchema;
@@ -56,3 +57,5 @@ impl Function for SchemaBaseKeySelector {
         "SchemaBaseKeySelector"
     }
 }
+
+impl CheckpointFunction for SchemaBaseKeySelector {}

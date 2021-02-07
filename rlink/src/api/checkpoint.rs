@@ -58,10 +58,13 @@ pub trait CheckpointFunction {
     /// trigger the method when a `operator` initialization
     fn initialize_state(
         &mut self,
-        context: &FunctionSnapshotContext,
-        handle: &Option<CheckpointHandle>,
-    );
+        _context: &FunctionSnapshotContext,
+        _handle: &Option<CheckpointHandle>,
+    ) {
+    }
 
     /// trigger the method when the `operator` operate a `Barrier` event
-    fn snapshot_state(&mut self, context: &FunctionSnapshotContext) -> CheckpointHandle;
+    fn snapshot_state(&mut self, _context: &FunctionSnapshotContext) -> Option<CheckpointHandle> {
+        None
+    }
 }

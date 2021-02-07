@@ -7,6 +7,7 @@ use rlink::utils::thread::get_runtime;
 use rlink::{api, utils};
 
 use crate::sink::producer::KafkaProducerThread;
+use rlink::api::checkpoint::CheckpointFunction;
 
 #[derive(Function)]
 pub struct KafkaOutputFormat {
@@ -58,3 +59,5 @@ impl OutputFormat for KafkaOutputFormat {
         Ok(())
     }
 }
+
+impl CheckpointFunction for KafkaOutputFormat {}

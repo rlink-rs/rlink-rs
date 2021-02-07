@@ -30,13 +30,9 @@ impl PartialEq for Watermark {
 
 pub trait TimestampAssigner
 where
-    Self: Function + Debug,
+    Self: Function + CheckpointFunction + Debug,
 {
     fn extract_timestamp(&mut self, row: &mut Record, previous_element_timestamp: u64) -> u64;
-
-    fn checkpoint_function(&mut self) -> Option<Box<&mut dyn CheckpointFunction>> {
-        None
-    }
 }
 
 pub trait WatermarkAssigner
@@ -134,3 +130,5 @@ where
         "BoundedOutOfOrdernessTimestampExtractor"
     }
 }
+
+impl<E> CheckpointFunction for BoundedOutOfOrdernessTimestampExtractor<E> where E: TimestampAssigner {}

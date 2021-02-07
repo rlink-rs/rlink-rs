@@ -3,7 +3,7 @@ use std::time::Duration;
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::{ClientConfig, Offset};
 use rlink::api;
-use rlink::api::checkpoint::CheckpointFunction;
+use rlink::api::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
 use rlink::api::element::Record;
 use rlink::api::function::{Context, InputFormat, InputSplit, InputSplitSource};
 use rlink::api::properties::Properties;
@@ -47,7 +47,6 @@ impl InputFormat for KafkaInputFormat {
         if can_create_consumer.to_lowercase().eq("true") {
             let mut kafka_checkpoint =
                 KafkaCheckpointFunction::new(context.application_id.clone(), context.task_id);
-            // todo provide the data from coordinator
             kafka_checkpoint
                 .initialize_state(&context.checkpoint_context(), &context.checkpoint_handle);
             self.checkpoint = Some(kafka_checkpoint);
@@ -103,10 +102,20 @@ impl InputFormat for KafkaInputFormat {
     fn close(&mut self) -> api::Result<()> {
         Ok(())
     }
+}
 
-    fn checkpoint_function(&mut self) -> Option<Box<&mut dyn CheckpointFunction>> {
+impl CheckpointFunction for KafkaInputFormat {
+    fn initialize_state(
+        &mut self,
+        _context: &FunctionSnapshotContext,
+        _handle: &Option<CheckpointHandle>,
+    ) {
+    }
+
+    /// trigger the method when the `operator` operate a `Barrier` event
+    fn snapshot_state(&mut self, context: &FunctionSnapshotContext) -> Option<CheckpointHandle> {
         match self.checkpoint.as_mut() {
-            Some(checkpoint) => Some(Box::new(checkpoint)),
+            Some(checkpoint) => checkpoint.snapshot_state(context),
             None => None,
         }
     }

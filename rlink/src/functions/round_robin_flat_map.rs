@@ -1,3 +1,4 @@
+use crate::api::checkpoint::CheckpointFunction;
 use crate::api::element::Record;
 use crate::api::function::{Context, FlatMapFunction, Function};
 
@@ -42,3 +43,5 @@ impl Function for RoundRobinFlagMapFunction {
         "RoundRobinFlagMapFunction"
     }
 }
+
+impl CheckpointFunction for RoundRobinFlagMapFunction {}

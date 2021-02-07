@@ -1,4 +1,5 @@
 use crate::api::backend::KeyedStateBackend;
+use crate::api::checkpoint::CheckpointFunction;
 use crate::api::element::{Element, Record};
 use crate::api::function::{Context, FlatMapFunction, Function};
 use crate::api::properties::SystemProperties;
@@ -75,6 +76,8 @@ impl Function for KeyedStateFlatMapFunction {
         "KeyedStateFlatMapFunction"
     }
 }
+
+impl CheckpointFunction for KeyedStateFlatMapFunction {}
 
 // pub(crate) struct BatchIterator<T>
 // where

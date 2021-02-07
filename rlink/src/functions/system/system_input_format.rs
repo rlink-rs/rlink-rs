@@ -1,4 +1,5 @@
 use crate::api;
+use crate::api::checkpoint::CheckpointFunction;
 use crate::api::element::{Element, Record};
 use crate::api::function::{Context, Function, InputFormat, InputSplit, InputSplitSource};
 use crate::api::properties::SystemProperties;
@@ -99,6 +100,8 @@ impl Function for SystemInputFormat {
         "SystemInputFormat"
     }
 }
+
+impl CheckpointFunction for SystemInputFormat {}
 
 struct SubscribeIterator {
     receiver: ElementReceiver,

@@ -54,7 +54,7 @@ impl CheckpointFunction for KafkaCheckpointFunction {
         }
     }
 
-    fn snapshot_state(&mut self, context: &FunctionSnapshotContext) -> CheckpointHandle {
+    fn snapshot_state(&mut self, context: &FunctionSnapshotContext) -> Option<CheckpointHandle> {
         let offset_snapshot = self.state_cache.as_ref().unwrap().snapshot();
         debug!(
             "Checkpoint snapshot: {:?}, context: {:?}",
@@ -65,6 +65,6 @@ impl CheckpointFunction for KafkaCheckpointFunction {
 
         let json = serde_json::to_string(&snapshot_serial).unwrap();
 
-        CheckpointHandle { handle: json }
+        Some(CheckpointHandle { handle: json })
     }
 }

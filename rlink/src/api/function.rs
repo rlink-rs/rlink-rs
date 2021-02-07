@@ -100,7 +100,7 @@ pub trait InputSplitSource {
 ///
 pub trait InputFormat
 where
-    Self: InputSplitSource + Function,
+    Self: InputSplitSource + Function + CheckpointFunction,
 {
     // fn configure(&mut self, properties: HashMap<String, String>);
     fn open(&mut self, input_split: InputSplit, context: &Context) -> crate::api::Result<()>;
@@ -109,15 +109,11 @@ where
         Box::new(ElementIterator::new(self.record_iter()))
     }
     fn close(&mut self) -> crate::api::Result<()>;
-
-    fn checkpoint_function(&mut self) -> Option<Box<&mut dyn CheckpointFunction>> {
-        None
-    }
 }
 
 pub trait OutputFormat
 where
-    Self: Function,
+    Self: Function + CheckpointFunction,
 {
     /// Opens a parallel instance of the output format to store the result of its parallel instance.
     ///
@@ -135,10 +131,6 @@ where
 
     fn close(&mut self) -> crate::api::Result<()>;
 
-    fn checkpoint_function(&mut self) -> Option<Box<&mut dyn CheckpointFunction>> {
-        None
-    }
-
     // todo unsupported. `TwoPhaseCommitSinkFunction`
     // fn begin_transaction(&mut self) {}
     // fn prepare_commit(&mut self) {}
@@ -148,7 +140,7 @@ where
 
 pub trait FlatMapFunction
 where
-    Self: Function,
+    Self: Function + CheckpointFunction,
 {
     fn open(&mut self, context: &Context) -> crate::api::Result<()>;
     fn flat_map(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>>;
@@ -157,36 +149,24 @@ where
         Box::new(ElementIterator::new(iterator))
     }
     fn close(&mut self) -> crate::api::Result<()>;
-
-    fn checkpoint_function(&mut self) -> Option<Box<&mut dyn CheckpointFunction>> {
-        None
-    }
 }
 
 pub trait FilterFunction
 where
-    Self: Function,
+    Self: Function + CheckpointFunction,
 {
     fn open(&mut self, context: &Context) -> crate::api::Result<()>;
     fn filter(&self, record: &mut Record) -> bool;
     fn close(&mut self) -> crate::api::Result<()>;
-
-    fn checkpoint_function(&mut self) -> Option<Box<&mut dyn CheckpointFunction>> {
-        None
-    }
 }
 
 pub trait KeySelectorFunction
 where
-    Self: Function,
+    Self: Function + CheckpointFunction,
 {
     fn open(&mut self, context: &Context) -> crate::api::Result<()>;
     fn get_key(&self, record: &mut Record) -> Record;
     fn close(&mut self) -> crate::api::Result<()>;
-
-    fn checkpoint_function(&mut self) -> Option<Box<&mut dyn CheckpointFunction>> {
-        None
-    }
 }
 
 pub trait ReduceFunction
@@ -201,22 +181,18 @@ where
 
 pub(crate) trait BaseReduceFunction
 where
-    Self: Function,
+    Self: Function + CheckpointFunction,
 {
     fn open(&mut self, context: &Context) -> crate::api::Result<()>;
     ///
     fn reduce(&mut self, key: Record, record: Record);
     fn drop_state(&mut self, watermark_timestamp: u64) -> Vec<Record>;
     fn close(&mut self) -> crate::api::Result<()>;
-
-    fn checkpoint_function(&mut self) -> Option<Box<&mut dyn CheckpointFunction>> {
-        None
-    }
 }
 
 pub trait CoProcessFunction
 where
-    Self: Function,
+    Self: Function + CheckpointFunction,
 {
     fn open(&mut self, context: &Context) -> crate::api::Result<()>;
     /// This method is called for each element in the first of the connected streams.
@@ -225,10 +201,6 @@ where
     fn process_left(&self, record: Record) -> Box<dyn Iterator<Item = Record>>;
     fn process_right(&self, stream_seq: usize, record: Record) -> Box<dyn Iterator<Item = Record>>;
     fn close(&mut self) -> crate::api::Result<()>;
-
-    fn checkpoint_function(&mut self) -> Option<Box<&mut dyn CheckpointFunction>> {
-        None
-    }
 }
 
 pub(crate) struct ElementIterator<T>

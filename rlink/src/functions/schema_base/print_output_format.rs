@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use serbuffer::types;
 
+use crate::api::checkpoint::CheckpointFunction;
 use crate::api::element::Record;
 use crate::api::function::{Context, Function, OutputFormat};
 use crate::api::runtime::TaskId;
@@ -88,3 +89,5 @@ impl Function for PrintOutputFormat {
         "PrintOutputFormat"
     }
 }
+
+impl CheckpointFunction for PrintOutputFormat {}

@@ -1,3 +1,4 @@
+use crate::api::checkpoint::CheckpointFunction;
 use crate::api::element::Record;
 use crate::api::function::{Context, FlatMapFunction, Function};
 
@@ -45,3 +46,5 @@ impl Function for BroadcastFlagMapFunction {
         "BroadcastFlagMapFunction"
     }
 }
+
+impl CheckpointFunction for BroadcastFlagMapFunction {}

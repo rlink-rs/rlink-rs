@@ -95,13 +95,9 @@ impl WindowAssignerContext {
 
 pub trait WindowAssigner
 where
-    Self: Function + Debug,
+    Self: Function + CheckpointFunction + Debug,
 {
     fn assign_windows(&self, timestamp: u64, context: WindowAssignerContext) -> Vec<Window>;
-
-    fn checkpoint_function(&mut self) -> Option<Box<&mut dyn CheckpointFunction>> {
-        None
-    }
 }
 
 #[derive(Debug)]
@@ -158,3 +154,5 @@ impl Function for SlidingEventTimeWindows {
         "SlidingEventTimeWindows"
     }
 }
+
+impl CheckpointFunction for SlidingEventTimeWindows {}

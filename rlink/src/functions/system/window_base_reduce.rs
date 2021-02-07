@@ -81,10 +81,6 @@ impl BaseReduceFunction for WindowBaseReduceFunction {
     fn close(&mut self) -> crate::api::Result<()> {
         Ok(())
     }
-
-    fn checkpoint_function(&mut self) -> Option<Box<&mut dyn CheckpointFunction>> {
-        Some(Box::new(self))
-    }
 }
 
 impl Function for WindowBaseReduceFunction {
@@ -101,10 +97,10 @@ impl CheckpointFunction for WindowBaseReduceFunction {
     ) {
     }
 
-    fn snapshot_state(&mut self, _context: &FunctionSnapshotContext) -> CheckpointHandle {
+    fn snapshot_state(&mut self, _context: &FunctionSnapshotContext) -> Option<CheckpointHandle> {
         let windows = self.state.as_ref().unwrap().windows();
-        CheckpointHandle {
+        Some(CheckpointHandle {
             handle: serde_json::to_string(&windows).unwrap(),
-        }
+        })
     }
 }

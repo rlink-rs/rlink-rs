@@ -1,6 +1,7 @@
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
 
+use crate::api::checkpoint::CheckpointFunction;
 use crate::api::element::{Element, Partition, Record};
 use crate::api::function::{Context, Function, OutputFormat};
 use crate::api::properties::SystemProperties;
@@ -194,3 +195,5 @@ impl Function for SystemOutputFormat {
         "SystemOutputFormat"
     }
 }
+
+impl CheckpointFunction for SystemOutputFormat {}

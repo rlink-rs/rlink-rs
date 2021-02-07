@@ -1,3 +1,4 @@
+use crate::api::checkpoint::CheckpointFunction;
 use crate::api::element::Record;
 use crate::api::function::Function;
 use crate::api::watermark::TimestampAssigner;
@@ -29,3 +30,5 @@ impl Function for SchemaBaseTimestampAssigner {
         "SchemaBaseTimestampAssigner"
     }
 }
+
+impl CheckpointFunction for SchemaBaseTimestampAssigner {}

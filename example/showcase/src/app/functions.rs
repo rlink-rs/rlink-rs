@@ -12,6 +12,7 @@ use rlink::api::properties::Properties;
 use rlink::utils::date_time::current_timestamp_millis;
 
 use crate::buffer_gen::{config, model};
+use rlink::api::checkpoint::CheckpointFunction;
 
 #[derive(Debug, Function)]
 pub struct RandInputFormat {}
@@ -37,6 +38,8 @@ impl InputFormat for RandInputFormat {
         Ok(())
     }
 }
+
+impl CheckpointFunction for RandInputFormat {}
 
 struct RandIterator {}
 
@@ -154,6 +157,8 @@ impl TestInputFormat {
     }
 }
 
+impl CheckpointFunction for TestInputFormat {}
+
 impl InputSplitSource for TestInputFormat {}
 
 impl InputFormat for TestInputFormat {
@@ -213,6 +218,8 @@ impl ConfigInputFormat {
         record
     }
 }
+
+impl CheckpointFunction for ConfigInputFormat {}
 
 impl InputSplitSource for ConfigInputFormat {}
 
@@ -289,6 +296,8 @@ impl CoProcessFunction for MyCoProcessFunction {
     }
 }
 
+impl CheckpointFunction for MyCoProcessFunction {}
+
 #[derive(Debug, Function)]
 pub struct MyFlatMapFunction {}
 
@@ -312,6 +321,8 @@ impl FlatMapFunction for MyFlatMapFunction {
     }
 }
 
+impl CheckpointFunction for MyFlatMapFunction {}
+
 #[derive(Debug, Function)]
 pub struct MyFilterFunction {}
 
@@ -334,3 +345,5 @@ impl FilterFunction for MyFilterFunction {
         Ok(())
     }
 }
+
+impl CheckpointFunction for MyFilterFunction {}
