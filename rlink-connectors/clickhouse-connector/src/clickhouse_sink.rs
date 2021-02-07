@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use clickhouse_rs::{ClientHandle, Options, Pool};
+use rlink::api::checkpoint::CheckpointFunction;
 use rlink::api::element::Record;
 use rlink::api::function::{Context, Function, OutputFormat};
 use rlink::channel::handover::Handover;
@@ -98,6 +99,8 @@ impl OutputFormat for ClickhouseSink {
         Ok(())
     }
 }
+
+impl CheckpointFunction for ClickhouseSink {}
 
 #[derive(Clone)]
 pub struct ClickhouseSinkTask {

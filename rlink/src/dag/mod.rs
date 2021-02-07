@@ -180,6 +180,7 @@ mod tests {
     use std::time::Duration;
 
     use crate::api;
+    use crate::api::checkpoint::CheckpointFunction;
     use crate::api::data_stream::CoStream;
     use crate::api::data_stream::{TConnectedStreams, TKeyedStream};
     use crate::api::data_stream::{TDataStream, TWindowedStream};
@@ -279,6 +280,8 @@ mod tests {
 
     impl InputSplitSource for MyInputFormat {}
 
+    impl CheckpointFunction for MyInputFormat {}
+
     impl Function for MyInputFormat {
         fn name(&self) -> &str {
             "MyInputFormat"
@@ -328,6 +331,8 @@ mod tests {
         }
     }
 
+    impl CheckpointFunction for MyFlatMapFunction {}
+
     #[derive(Serialize, Deserialize, Debug, Clone)]
     pub struct MyTimestampAssigner {}
 
@@ -352,6 +357,8 @@ mod tests {
             "MyTimestampAssigner"
         }
     }
+
+    impl CheckpointFunction for MyTimestampAssigner {}
 
     #[derive(Serialize, Deserialize, Debug)]
     pub struct MyKeySelectorFunction {}
@@ -383,6 +390,8 @@ mod tests {
         }
     }
 
+    impl CheckpointFunction for MyKeySelectorFunction {}
+
     #[derive(Serialize, Deserialize, Debug)]
     pub struct MyReduceFunction {}
 
@@ -411,6 +420,8 @@ mod tests {
             "MyReduceFunction"
         }
     }
+
+    impl CheckpointFunction for MyReduceFunction {}
 
     #[derive(Debug)]
     pub struct MyOutputFormat {
@@ -441,6 +452,8 @@ mod tests {
         }
     }
 
+    impl CheckpointFunction for MyOutputFormat {}
+
     pub struct MyCoProcessFunction {}
 
     impl CoProcessFunction for MyCoProcessFunction {
@@ -470,4 +483,6 @@ mod tests {
             "MyCoProcessFunction"
         }
     }
+
+    impl CheckpointFunction for MyCoProcessFunction {}
 }

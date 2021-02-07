@@ -10,6 +10,7 @@ use elasticsearch::http::request::JsonBody;
 use elasticsearch::http::transport::{SingleNodeConnectionPool, TransportBuilder};
 use elasticsearch::http::Url;
 use elasticsearch::{BulkParts, Elasticsearch};
+use rlink::api::checkpoint::CheckpointFunction;
 use rlink::api::element::Record;
 use rlink::api::function::{Context, Function, OutputFormat};
 use rlink::channel::handover::Handover;
@@ -112,6 +113,8 @@ impl OutputFormat for ElasticsearchOutputFormat {
         Ok(())
     }
 }
+
+impl CheckpointFunction for ElasticsearchOutputFormat {}
 
 #[derive(Clone)]
 pub struct ElasticsearchWriteThread {
