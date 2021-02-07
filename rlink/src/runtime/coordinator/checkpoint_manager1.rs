@@ -151,7 +151,6 @@ impl CheckpointAlignManager {
 
         match self.operator_cks.get_mut(&ck.operator_id) {
             Some(operator_checkpoint) => {
-                info!("apply checkpoint: {:?}", ck);
                 operator_checkpoint.apply(ck);
             }
             None => {
