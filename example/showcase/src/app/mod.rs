@@ -2,7 +2,7 @@ pub mod functions;
 
 use std::time::Duration;
 
-use rlink::api::backend::KeyedStateBackend;
+use rlink::api::backend::{CheckpointBackend, KeyedStateBackend};
 use rlink::api::data_stream::{
     CoStream, TConnectedStreams, TDataStream, TKeyedStream, TWindowedStream,
 };
@@ -28,6 +28,8 @@ pub struct SimpleStreamApp {}
 impl StreamApp for SimpleStreamApp {
     fn prepare_properties(&self, properties: &mut Properties) {
         properties.set_keyed_state_backend(KeyedStateBackend::Memory);
+        properties.set_checkpoint_internal(Duration::from_secs(15));
+        properties.set_checkpoint(CheckpointBackend::Memory);
     }
 
     fn build_stream(&self, properties: &Properties, env: &mut StreamExecutionEnvironment) {

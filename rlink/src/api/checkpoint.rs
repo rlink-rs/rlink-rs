@@ -47,6 +47,14 @@ pub struct Checkpoint {
 }
 
 pub trait CheckpointFunction {
+    fn consult_version(
+        &mut self,
+        context: &FunctionSnapshotContext,
+        _handle: &Option<CheckpointHandle>,
+    ) -> CheckpointId {
+        context.checkpoint_id
+    }
+
     /// trigger the method when a `operator` initialization
     fn initialize_state(
         &mut self,

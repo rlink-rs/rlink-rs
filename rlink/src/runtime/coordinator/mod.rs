@@ -13,7 +13,7 @@ use crate::dag::metadata::DagMetadata;
 use crate::dag::DagManager;
 use crate::deployment::TResourceManager;
 use crate::runtime::context::Context;
-use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
+use crate::runtime::coordinator::checkpoint_manager1::CheckpointManager;
 use crate::runtime::coordinator::server::web_launch;
 use crate::runtime::coordinator::task_distribution::build_application_descriptor;
 use crate::runtime::{ApplicationDescriptor, TaskManagerStatus};
@@ -24,7 +24,8 @@ use crate::storage::metadata::{
 use crate::utils::date_time::timestamp_str;
 
 // pub mod checkpoint;
-pub mod checkpoint_manager;
+// pub mod checkpoint_manager;
+pub mod checkpoint_manager1;
 pub mod heart_beat;
 pub mod server;
 pub mod task_distribution;
@@ -88,7 +89,8 @@ where
 
         let ck_manager =
             self.build_checkpoint_manager(&dag_metadata, application_descriptor.borrow_mut());
-        info!("CheckpointManager create");
+        ck_manager.run_align_task();
+        info!("start CheckpointManager align task");
 
         self.web_serve(
             application_descriptor.borrow_mut(),
@@ -197,7 +199,7 @@ where
                 for operator_id in &task_descriptor.operator_ids {
                     let cks = operator_checkpoints.get(&operator_id).unwrap();
                     if cks.len() == 0 {
-                        info!("operator {:?} checkpoint not found", operator_id);
+                        debug!("operator {:?} checkpoint not found", operator_id);
                         continue;
                     }
 

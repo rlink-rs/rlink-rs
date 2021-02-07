@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 
-use crate::api::checkpoint::FunctionSnapshotContext;
+use crate::api::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
 use crate::api::element::Element;
 use crate::api::function::CoProcessFunction;
 use crate::api::operator::DefaultStreamOperator;
 use crate::api::runtime::{JobId, OperatorId};
+use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
 #[derive(Debug)]
@@ -12,6 +13,8 @@ pub(crate) struct CoProcessRunnable {
     operator_id: OperatorId,
     stream_co_process: DefaultStreamOperator<dyn CoProcessFunction>,
     next_runnable: Option<Box<dyn Runnable>>,
+
+    context: Option<RunnableContext>,
 
     /// key: JobId,
     /// value: DataStream index  
@@ -30,6 +33,7 @@ impl CoProcessRunnable {
             operator_id,
             stream_co_process,
             next_runnable,
+            context: None,
             parent_jobs: HashMap::new(),
         }
     }
@@ -38,6 +42,8 @@ impl CoProcessRunnable {
 impl Runnable for CoProcessRunnable {
     fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
         self.next_runnable.as_mut().unwrap().open(context)?;
+
+        self.context = Some(context.clone());
 
         // find the stream_node of `input_format`
         // the chain: input_format -> connect, so the `connect` is only one parent
@@ -91,6 +97,19 @@ impl Runnable for CoProcessRunnable {
                         .run(Element::Record(record));
                 }
             }
+            Element::Barrier(barrier) => {
+                let checkpoint_id = barrier.checkpoint_id;
+                let snapshot_context = {
+                    let context = self.context.as_ref().unwrap();
+                    context.checkpoint_context(self.operator_id, checkpoint_id)
+                };
+                self.checkpoint(snapshot_context);
+
+                self.next_runnable
+                    .as_mut()
+                    .unwrap()
+                    .run(Element::Barrier(barrier));
+            }
             _ => {
                 self.next_runnable.as_mut().unwrap().run(element);
             }
@@ -106,5 +125,23 @@ impl Runnable for CoProcessRunnable {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, _snapshot_context: FunctionSnapshotContext) {}
+    fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext) {
+        let handle = match self.stream_co_process.operator_fn.checkpoint_function() {
+            Some(checkpoint) => checkpoint.snapshot_state(&snapshot_context),
+            None => CheckpointHandle::default(),
+        };
+
+        let ck = Checkpoint {
+            operator_id: snapshot_context.operator_id,
+            task_id: snapshot_context.task_id,
+            checkpoint_id: snapshot_context.checkpoint_id,
+            handle,
+        };
+        submit_checkpoint(ck).map(|ck| {
+            error!(
+                "{:?} submit checkpoint error. maybe report channel is full, checkpoint: {:?}",
+                snapshot_context.operator_id, ck
+            )
+        });
+    }
 }

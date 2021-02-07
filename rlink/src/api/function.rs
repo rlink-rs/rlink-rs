@@ -157,6 +157,10 @@ where
         Box::new(ElementIterator::new(iterator))
     }
     fn close(&mut self) -> crate::api::Result<()>;
+
+    fn checkpoint_function(&mut self) -> Option<Box<&mut dyn CheckpointFunction>> {
+        None
+    }
 }
 
 pub trait FilterFunction
@@ -166,6 +170,10 @@ where
     fn open(&mut self, context: &Context) -> crate::api::Result<()>;
     fn filter(&self, record: &mut Record) -> bool;
     fn close(&mut self) -> crate::api::Result<()>;
+
+    fn checkpoint_function(&mut self) -> Option<Box<&mut dyn CheckpointFunction>> {
+        None
+    }
 }
 
 pub trait KeySelectorFunction
@@ -175,6 +183,10 @@ where
     fn open(&mut self, context: &Context) -> crate::api::Result<()>;
     fn get_key(&self, record: &mut Record) -> Record;
     fn close(&mut self) -> crate::api::Result<()>;
+
+    fn checkpoint_function(&mut self) -> Option<Box<&mut dyn CheckpointFunction>> {
+        None
+    }
 }
 
 pub trait ReduceFunction
@@ -213,6 +225,10 @@ where
     fn process_left(&self, record: Record) -> Box<dyn Iterator<Item = Record>>;
     fn process_right(&self, stream_seq: usize, record: Record) -> Box<dyn Iterator<Item = Record>>;
     fn close(&mut self) -> crate::api::Result<()>;
+
+    fn checkpoint_function(&mut self) -> Option<Box<&mut dyn CheckpointFunction>> {
+        None
+    }
 }
 
 pub(crate) struct ElementIterator<T>

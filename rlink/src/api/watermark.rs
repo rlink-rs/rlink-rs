@@ -1,7 +1,8 @@
 use std::fmt::Debug;
 use std::time::Duration;
 
-use crate::api::element::{Element, Record};
+use crate::api::checkpoint::CheckpointFunction;
+use crate::api::element::{Record, StreamStatus};
 use crate::api::function::Function;
 use crate::utils::date_time::timestamp_str;
 
@@ -32,6 +33,10 @@ where
     Self: Function + Debug,
 {
     fn extract_timestamp(&mut self, row: &mut Record, previous_element_timestamp: u64) -> u64;
+
+    fn checkpoint_function(&mut self) -> Option<Box<&mut dyn CheckpointFunction>> {
+        None
+    }
 }
 
 pub trait WatermarkAssigner
@@ -39,7 +44,7 @@ where
     Self: TimestampAssigner + Function + Debug,
 {
     /// Return the current `Watermark` and row's timestamp
-    fn watermark(&mut self, element: &Element) -> Option<Watermark>;
+    fn watermark(&mut self, stream_status: &StreamStatus) -> Option<Watermark>;
     fn current_watermark(&self) -> Option<Watermark>;
 }
 
@@ -75,27 +80,23 @@ impl<E> WatermarkAssigner for BoundedOutOfOrdernessTimestampExtractor<E>
 where
     E: TimestampAssigner,
 {
-    fn watermark(&mut self, element: &Element) -> Option<Watermark> {
-        if element.is_stream_status() {
-            let potential_wm = self.current_max_timestamp - self.max_out_of_orderness;
-            debug!(
-                "potential_wm={}, current_max_timestamp={}, max_out_of_orderness={}",
-                timestamp_str(potential_wm),
-                timestamp_str(self.current_max_timestamp),
-                self.max_out_of_orderness,
-            );
-            if potential_wm > self.last_emitted_watermark {
-                self.previous_emitted_watermark = self.last_emitted_watermark;
-                self.last_emitted_watermark = potential_wm;
+    fn watermark(&mut self, _stream_status: &StreamStatus) -> Option<Watermark> {
+        let potential_wm = self.current_max_timestamp - self.max_out_of_orderness;
+        debug!(
+            "potential_wm={}, current_max_timestamp={}, max_out_of_orderness={}",
+            timestamp_str(potential_wm),
+            timestamp_str(self.current_max_timestamp),
+            self.max_out_of_orderness,
+        );
+        if potential_wm > self.last_emitted_watermark {
+            self.previous_emitted_watermark = self.last_emitted_watermark;
+            self.last_emitted_watermark = potential_wm;
 
-                debug!(
-                    "Create Watermark: {}",
-                    timestamp_str(self.last_emitted_watermark)
-                );
-                Some(Watermark::new(self.last_emitted_watermark))
-            } else {
-                None
-            }
+            debug!(
+                "Create Watermark: {}",
+                timestamp_str(self.last_emitted_watermark)
+            );
+            Some(Watermark::new(self.last_emitted_watermark))
         } else {
             None
         }

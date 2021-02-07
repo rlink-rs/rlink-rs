@@ -6,6 +6,7 @@ use crate::api::checkpoint::FunctionSnapshotContext;
 use crate::api::element::Element;
 use crate::api::properties::SystemProperties;
 use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
+use crate::dag::execution_graph::{ExecutionEdge, ExecutionNode};
 use crate::dag::job_graph::{JobEdge, JobNode};
 use crate::dag::metadata::DagMetadata;
 use crate::dag::stream_graph::StreamNode;
@@ -23,7 +24,6 @@ pub mod source_runnable;
 pub mod watermark_assigner_runnable;
 pub mod window_assigner_runnable;
 
-use crate::dag::execution_graph::{ExecutionEdge, ExecutionNode};
 pub(crate) use filter_runnable::FilterRunnable;
 pub(crate) use flat_map_runnable::FlatMapRunnable;
 pub(crate) use key_by_runnable::KeyByRunnable;

@@ -2,6 +2,7 @@ use std::cmp::{max, min};
 use std::fmt::Debug;
 use std::time::Duration;
 
+use crate::api::checkpoint::CheckpointFunction;
 use crate::api::function::Function;
 use crate::utils;
 
@@ -97,6 +98,10 @@ where
     Self: Function + Debug,
 {
     fn assign_windows(&self, timestamp: u64, context: WindowAssignerContext) -> Vec<Window>;
+
+    fn checkpoint_function(&mut self) -> Option<Box<&mut dyn CheckpointFunction>> {
+        None
+    }
 }
 
 #[derive(Debug)]
