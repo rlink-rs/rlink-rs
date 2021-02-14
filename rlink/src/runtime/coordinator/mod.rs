@@ -13,7 +13,7 @@ use crate::dag::metadata::DagMetadata;
 use crate::dag::DagManager;
 use crate::deployment::TResourceManager;
 use crate::runtime::context::Context;
-use crate::runtime::coordinator::checkpoint_manager1::CheckpointManager;
+use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
 use crate::runtime::coordinator::server::web_launch;
 use crate::runtime::coordinator::task_distribution::build_application_descriptor;
 use crate::runtime::{ApplicationDescriptor, TaskManagerStatus};
@@ -23,10 +23,8 @@ use crate::storage::metadata::{
 };
 use crate::utils::date_time::timestamp_str;
 
-// pub mod checkpoint;
-// pub mod checkpoint_manager;
-pub mod checkpoint_manager1;
-pub mod heart_beat;
+pub mod checkpoint_manager;
+pub mod heart_beat_manager;
 pub mod server;
 pub mod task_distribution;
 
@@ -123,7 +121,7 @@ where
             info!("all worker status is fine");
 
             // heartbeat check. blocking util heartbeat timeout
-            heart_beat::start_heart_beat_timer(self.metadata_storage_mode.clone());
+            heart_beat_manager::start_heart_beat_timer(self.metadata_storage_mode.clone());
             info!("heartbeat has interrupted");
 
             // heartbeat timeout and stop all worker's tasks

@@ -11,7 +11,7 @@ use crate::api::checkpoint::Checkpoint;
 use crate::api::cluster::MetadataStorageType;
 use crate::api::cluster::{ResponseCode, StdResponse};
 use crate::dag::metadata::DagMetadata;
-use crate::runtime::coordinator::checkpoint_manager1::CheckpointManager;
+use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
 use crate::runtime::TaskManagerStatus;
 use crate::storage::metadata::MetadataStorage;
 use crate::storage::metadata::TMetadataStorage;
