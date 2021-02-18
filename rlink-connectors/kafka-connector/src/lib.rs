@@ -19,13 +19,14 @@ pub use source::input_format::KafkaInputFormat;
 
 use std::collections::HashMap;
 
+use rdkafka::ClientConfig;
+use rlink::api::element::BufferReader;
+use rlink::api::element::Record;
+
 use crate::source::deserializer::{
     DefaultKafkaRecordDeserializer, DefaultKafkaRecordDeserializerBuilder,
     KafkaRecordDeserializerBuilder,
 };
-use rdkafka::ClientConfig;
-use rlink::api::element::BufferReader;
-use rlink::api::element::Record;
 
 pub const BOOTSTRAP_SERVERS: &str = "bootstrap.servers";
 pub const TOPICS: &str = "topics";
