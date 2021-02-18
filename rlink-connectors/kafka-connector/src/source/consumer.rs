@@ -11,7 +11,7 @@ use rlink::utils;
 use rlink::utils::thread::get_runtime;
 
 use crate::source::deserializer::KafkaRecordDeserializer;
-use crate::state::{KafkaSourceStateCache, OffsetMetadata};
+use crate::state::{KafkaSourceStateCache, OffsetMetadata, PartitionMetadata};
 
 struct TaskHandover {
     task_number: u16,
@@ -38,7 +38,7 @@ pub(crate) fn create_kafka_consumer(
     job_id: JobId,
     task_number: u16,
     client_config: ClientConfig,
-    partition_offsets: Vec<OffsetMetadata>,
+    partition_offsets: Vec<(PartitionMetadata, OffsetMetadata)>,
     handover: Handover,
     deserializer: Box<dyn KafkaRecordDeserializer>,
     state_cache: Option<KafkaSourceStateCache>,
@@ -99,7 +99,7 @@ pub(crate) fn get_kafka_consumer_handover(job_id: JobId) -> Option<Handover> {
 
 pub struct KafkaConsumerThread {
     client_config: ClientConfig,
-    partition_offsets: Vec<OffsetMetadata>,
+    partition_offsets: Vec<(PartitionMetadata, OffsetMetadata)>,
 
     handover: Handover,
     deserializer: Box<dyn KafkaRecordDeserializer>,
@@ -109,7 +109,7 @@ pub struct KafkaConsumerThread {
 impl KafkaConsumerThread {
     pub fn new(
         client_config: ClientConfig,
-        partition_offsets: Vec<OffsetMetadata>,
+        partition_offsets: Vec<(PartitionMetadata, OffsetMetadata)>,
         handover: Handover,
         deserializer: Box<dyn KafkaRecordDeserializer>,
         state_cache: Option<KafkaSourceStateCache>,
@@ -125,11 +125,11 @@ impl KafkaConsumerThread {
 
     pub async fn run(&mut self) {
         let mut assignment = TopicPartitionList::new();
-        for po in &self.partition_offsets {
+        for (partition_metadata, offset_metadata) in &self.partition_offsets {
             assignment.add_partition_offset(
-                po.topic.as_str(),
-                po.partition,
-                Offset::from_raw(po.offset),
+                partition_metadata.topic.as_str(),
+                partition_metadata.partition,
+                Offset::from_raw(offset_metadata.offset),
             )
         }
 

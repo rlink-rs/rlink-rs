@@ -1,7 +1,7 @@
 use rlink::api::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
 use rlink::api::runtime::TaskId;
 
-use crate::state::{KafkaSourceStateCache, OffsetMetadata};
+use crate::state::{KafkaSourceStateCache, OffsetMetadata, PartitionMetadata};
 
 #[derive(Debug, Clone)]
 pub struct KafkaCheckpointFunction {
@@ -36,13 +36,12 @@ impl CheckpointFunction for KafkaCheckpointFunction {
         if context.checkpoint_id.0 > 0 && handle.is_some() {
             let data = handle.as_ref().unwrap();
 
-            let offsets: Vec<OffsetMetadata> = serde_json::from_str(data.handle.as_str()).unwrap();
-            for offset in offsets {
-                let OffsetMetadata {
-                    topic,
-                    partition,
-                    offset,
-                } = offset;
+            let offsets: Vec<PartitionOffset> = serde_json::from_str(data.handle.as_str()).unwrap();
+            for partition_offset in offsets {
+                let PartitionOffset { partition, offset } = partition_offset;
+                let PartitionMetadata { topic, partition } = partition;
+                let OffsetMetadata { offset } = offset;
+
                 let state_cache = self.state_cache.as_mut().unwrap();
                 state_cache.update(topic, partition, offset);
 
@@ -60,11 +59,22 @@ impl CheckpointFunction for KafkaCheckpointFunction {
             "Checkpoint snapshot: {:?}, context: {:?}",
             offset_snapshot, context
         );
-        let snapshot_serial: Vec<OffsetMetadata> =
-            offset_snapshot.into_iter().map(|kv_ref| kv_ref.1).collect();
+        let snapshot_serial: Vec<PartitionOffset> = offset_snapshot
+            .into_iter()
+            .map(|kv_ref| PartitionOffset {
+                partition: kv_ref.0,
+                offset: kv_ref.1,
+            })
+            .collect();
 
         let json = serde_json::to_string(&snapshot_serial).unwrap();
 
         Some(CheckpointHandle { handle: json })
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct PartitionOffset {
+    partition: PartitionMetadata,
+    offset: OffsetMetadata,
 }
