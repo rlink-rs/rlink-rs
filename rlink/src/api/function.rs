@@ -7,7 +7,7 @@ use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::dag::execution_graph::{ExecutionEdge, ExecutionNode};
 
 /// Base class of all operators in the Rust API.
-pub trait Function {
+pub trait NamedFunction {
     fn name(&self) -> &str;
 }
 
@@ -100,7 +100,7 @@ pub trait InputSplitSource {
 ///
 pub trait InputFormat
 where
-    Self: InputSplitSource + Function + CheckpointFunction,
+    Self: InputSplitSource + NamedFunction + CheckpointFunction,
 {
     // fn configure(&mut self, properties: HashMap<String, String>);
     fn open(&mut self, input_split: InputSplit, context: &Context) -> crate::api::Result<()>;
@@ -113,7 +113,7 @@ where
 
 pub trait OutputFormat
 where
-    Self: Function + CheckpointFunction,
+    Self: NamedFunction + CheckpointFunction,
 {
     /// Opens a parallel instance of the output format to store the result of its parallel instance.
     ///
@@ -140,7 +140,7 @@ where
 
 pub trait FlatMapFunction
 where
-    Self: Function + CheckpointFunction,
+    Self: NamedFunction + CheckpointFunction,
 {
     fn open(&mut self, context: &Context) -> crate::api::Result<()>;
     fn flat_map(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>>;
@@ -153,7 +153,7 @@ where
 
 pub trait FilterFunction
 where
-    Self: Function + CheckpointFunction,
+    Self: NamedFunction + CheckpointFunction,
 {
     fn open(&mut self, context: &Context) -> crate::api::Result<()>;
     fn filter(&self, record: &mut Record) -> bool;
@@ -162,7 +162,7 @@ where
 
 pub trait KeySelectorFunction
 where
-    Self: Function + CheckpointFunction,
+    Self: NamedFunction + CheckpointFunction,
 {
     fn open(&mut self, context: &Context) -> crate::api::Result<()>;
     fn get_key(&self, record: &mut Record) -> Record;
@@ -171,7 +171,7 @@ where
 
 pub trait ReduceFunction
 where
-    Self: Function,
+    Self: NamedFunction,
 {
     fn open(&mut self, context: &Context) -> crate::api::Result<()>;
     ///
@@ -181,7 +181,7 @@ where
 
 pub(crate) trait BaseReduceFunction
 where
-    Self: Function + CheckpointFunction,
+    Self: NamedFunction + CheckpointFunction,
 {
     fn open(&mut self, context: &Context) -> crate::api::Result<()>;
     ///
@@ -192,7 +192,7 @@ where
 
 pub trait CoProcessFunction
 where
-    Self: Function + CheckpointFunction,
+    Self: NamedFunction + CheckpointFunction,
 {
     fn open(&mut self, context: &Context) -> crate::api::Result<()>;
     /// This method is called for each element in the first of the connected streams.

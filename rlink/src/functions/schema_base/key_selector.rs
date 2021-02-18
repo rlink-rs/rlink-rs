@@ -1,6 +1,6 @@
 use crate::api::checkpoint::CheckpointFunction;
 use crate::api::element::Record;
-use crate::api::function::{Context, Function, KeySelectorFunction};
+use crate::api::function::{Context, KeySelectorFunction, NamedFunction};
 use crate::functions::schema_base::FunctionSchema;
 
 #[derive(Debug)]
@@ -52,7 +52,7 @@ impl KeySelectorFunction for SchemaBaseKeySelector {
     }
 }
 
-impl Function for SchemaBaseKeySelector {
+impl NamedFunction for SchemaBaseKeySelector {
     fn name(&self) -> &str {
         "SchemaBaseKeySelector"
     }

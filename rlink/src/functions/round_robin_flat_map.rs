@@ -1,6 +1,6 @@
 use crate::api::checkpoint::CheckpointFunction;
 use crate::api::element::Record;
-use crate::api::function::{Context, FlatMapFunction, Function};
+use crate::api::function::{Context, FlatMapFunction, NamedFunction};
 
 pub struct RoundRobinFlagMapFunction {
     child_job_parallelism: u16,
@@ -38,7 +38,7 @@ impl FlatMapFunction for RoundRobinFlagMapFunction {
     }
 }
 
-impl Function for RoundRobinFlagMapFunction {
+impl NamedFunction for RoundRobinFlagMapFunction {
     fn name(&self) -> &str {
         "RoundRobinFlagMapFunction"
     }

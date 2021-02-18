@@ -4,7 +4,7 @@ use serbuffer::types;
 
 use crate::api::checkpoint::CheckpointFunction;
 use crate::api::element::Record;
-use crate::api::function::{Context, Function, OutputFormat};
+use crate::api::function::{Context, NamedFunction, OutputFormat};
 use crate::api::runtime::TaskId;
 use crate::api::window::TWindow;
 use crate::utils::date_time::fmt_date_time;
@@ -84,7 +84,7 @@ impl OutputFormat for PrintOutputFormat {
     }
 }
 
-impl Function for PrintOutputFormat {
+impl NamedFunction for PrintOutputFormat {
     fn name(&self) -> &str {
         "PrintOutputFormat"
     }

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use crate::api::checkpoint::CheckpointFunction;
 use crate::api::element::{Element, Partition, Record};
-use crate::api::function::{Context, Function, OutputFormat};
+use crate::api::function::{Context, NamedFunction, OutputFormat};
 use crate::api::properties::SystemProperties;
 use crate::api::runtime::{ChannelKey, JobId, TaskId};
 use crate::channel::ElementSender;
@@ -190,7 +190,7 @@ impl OutputFormat for SystemOutputFormat {
     }
 }
 
-impl Function for SystemOutputFormat {
+impl NamedFunction for SystemOutputFormat {
     fn name(&self) -> &str {
         "SystemOutputFormat"
     }

@@ -1,6 +1,6 @@
 use crate::api::checkpoint::CheckpointFunction;
 use crate::api::element::Record;
-use crate::api::function::{Context, FlatMapFunction, Function};
+use crate::api::function::{Context, FlatMapFunction, NamedFunction};
 
 pub struct BroadcastFlagMapFunction {
     child_job_parallelism: u16,
@@ -41,7 +41,7 @@ impl FlatMapFunction for BroadcastFlagMapFunction {
     }
 }
 
-impl Function for BroadcastFlagMapFunction {
+impl NamedFunction for BroadcastFlagMapFunction {
     fn name(&self) -> &str {
         "BroadcastFlagMapFunction"
     }

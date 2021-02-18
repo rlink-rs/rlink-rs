@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use std::time::Duration;
 
 use crate::api::checkpoint::CheckpointFunction;
-use crate::api::function::Function;
+use crate::api::function::NamedFunction;
 use crate::utils;
 
 pub trait TWindow: Debug + Clone {
@@ -95,7 +95,7 @@ impl WindowAssignerContext {
 
 pub trait WindowAssigner
 where
-    Self: Function + CheckpointFunction + Debug,
+    Self: NamedFunction + CheckpointFunction + Debug,
 {
     fn assign_windows(&self, timestamp: u64, context: WindowAssignerContext) -> Vec<Window>;
 }
@@ -149,7 +149,7 @@ impl WindowAssigner for SlidingEventTimeWindows {
     }
 }
 
-impl Function for SlidingEventTimeWindows {
+impl NamedFunction for SlidingEventTimeWindows {
     fn name(&self) -> &str {
         "SlidingEventTimeWindows"
     }

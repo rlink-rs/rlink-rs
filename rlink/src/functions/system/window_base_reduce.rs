@@ -1,7 +1,7 @@
 use crate::api::backend::KeyedStateBackend;
 use crate::api::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
 use crate::api::element::Record;
-use crate::api::function::{BaseReduceFunction, Context, Function, ReduceFunction};
+use crate::api::function::{BaseReduceFunction, Context, NamedFunction, ReduceFunction};
 use crate::api::properties::SystemProperties;
 use crate::api::window::TWindow;
 use crate::storage::keyed_state::{TWindowState, WindowState};
@@ -83,7 +83,7 @@ impl BaseReduceFunction for WindowBaseReduceFunction {
     }
 }
 
-impl Function for WindowBaseReduceFunction {
+impl NamedFunction for WindowBaseReduceFunction {
     fn name(&self) -> &str {
         "WindowBaseReduceFunction"
     }

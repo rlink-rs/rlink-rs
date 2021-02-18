@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use crate::api::checkpoint::CheckpointFunction;
 use crate::api::element::{Record, StreamStatus};
-use crate::api::function::Function;
+use crate::api::function::NamedFunction;
 use crate::utils::date_time::timestamp_str;
 
 pub const MAX_WATERMARK: Watermark = Watermark {
@@ -30,14 +30,14 @@ impl PartialEq for Watermark {
 
 pub trait TimestampAssigner
 where
-    Self: Function + CheckpointFunction + Debug,
+    Self: NamedFunction + CheckpointFunction + Debug,
 {
     fn extract_timestamp(&mut self, row: &mut Record, previous_element_timestamp: u64) -> u64;
 }
 
 pub trait WatermarkAssigner
 where
-    Self: TimestampAssigner + Function + Debug,
+    Self: TimestampAssigner + NamedFunction + Debug,
 {
     /// Return the current `Watermark` and row's timestamp
     fn watermark(&mut self, stream_status: &StreamStatus) -> Option<Watermark>;
@@ -122,7 +122,7 @@ where
     }
 }
 
-impl<E> Function for BoundedOutOfOrdernessTimestampExtractor<E>
+impl<E> NamedFunction for BoundedOutOfOrdernessTimestampExtractor<E>
 where
     E: TimestampAssigner,
 {

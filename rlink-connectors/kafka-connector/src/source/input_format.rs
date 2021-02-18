@@ -14,7 +14,7 @@ use crate::source::checkpoint::KafkaCheckpointFunction;
 use crate::source::consumer::{create_kafka_consumer, get_kafka_consumer_handover};
 use crate::source::iterator::KafkaRecordIterator;
 
-#[derive(Function)]
+#[derive(NamedFunction)]
 pub struct KafkaInputFormat {
     client_config: ClientConfig,
     topics: Vec<String>,

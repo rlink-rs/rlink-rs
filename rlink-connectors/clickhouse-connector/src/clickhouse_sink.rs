@@ -6,7 +6,7 @@ use std::time::Duration;
 use clickhouse_rs::{ClientHandle, Options, Pool};
 use rlink::api::checkpoint::CheckpointFunction;
 use rlink::api::element::Record;
-use rlink::api::function::{Context, Function, OutputFormat};
+use rlink::api::function::{Context, NamedFunction, OutputFormat};
 use rlink::channel::handover::Handover;
 use rlink::metrics::Tag;
 use rlink::utils::thread::get_runtime;
@@ -23,7 +23,7 @@ pub trait ClickhouseBatch: Send + Sync {
     fn flush(&mut self) -> CkBlock;
 }
 
-#[derive(Function)]
+#[derive(NamedFunction)]
 pub struct ClickhouseSink {
     url: String,
     table: String,

@@ -1,6 +1,6 @@
 use crate::api::checkpoint::CheckpointFunction;
 use crate::api::element::Record;
-use crate::api::function::Function;
+use crate::api::function::NamedFunction;
 use crate::api::watermark::TimestampAssigner;
 
 #[derive(Debug)]
@@ -25,7 +25,7 @@ impl TimestampAssigner for SchemaBaseTimestampAssigner {
     }
 }
 
-impl Function for SchemaBaseTimestampAssigner {
+impl NamedFunction for SchemaBaseTimestampAssigner {
     fn name(&self) -> &str {
         "SchemaBaseTimestampAssigner"
     }

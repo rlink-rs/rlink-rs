@@ -1,7 +1,7 @@
 use crate::api;
 use crate::api::checkpoint::CheckpointFunction;
 use crate::api::element::{Element, Record};
-use crate::api::function::{Context, Function, InputFormat, InputSplit, InputSplitSource};
+use crate::api::function::{Context, InputFormat, InputSplit, InputSplitSource, NamedFunction};
 use crate::api::properties::SystemProperties;
 use crate::api::runtime::TaskId;
 use crate::channel::ElementReceiver;
@@ -95,7 +95,7 @@ impl InputFormat for SystemInputFormat {
 
 impl InputSplitSource for SystemInputFormat {}
 
-impl Function for SystemInputFormat {
+impl NamedFunction for SystemInputFormat {
     fn name(&self) -> &str {
         "SystemInputFormat"
     }

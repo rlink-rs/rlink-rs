@@ -12,7 +12,7 @@ use elasticsearch::http::Url;
 use elasticsearch::{BulkParts, Elasticsearch};
 use rlink::api::checkpoint::CheckpointFunction;
 use rlink::api::element::Record;
-use rlink::api::function::{Context, Function, OutputFormat};
+use rlink::api::function::{Context, NamedFunction, OutputFormat};
 use rlink::channel::handover::Handover;
 use rlink::metrics::Tag;
 use rlink::utils::thread::get_runtime;
@@ -55,7 +55,7 @@ pub trait ElasticsearchConverter: Debug + Send + Sync {
     fn to_json(&self, record: &mut Record) -> ElasticsearchModel;
 }
 
-#[derive(Debug, Function)]
+#[derive(Debug, NamedFunction)]
 pub struct ElasticsearchOutputFormat {
     address: String,
     headers: HashMap<String, String>,

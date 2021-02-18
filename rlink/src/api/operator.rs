@@ -1,8 +1,8 @@
 use std::fmt::Debug;
 
 use crate::api::function::{
-    BaseReduceFunction, CoProcessFunction, FilterFunction, FlatMapFunction, Function, InputFormat,
-    KeySelectorFunction, OutputFormat,
+    BaseReduceFunction, CoProcessFunction, FilterFunction, FlatMapFunction, InputFormat,
+    KeySelectorFunction, NamedFunction, OutputFormat,
 };
 use crate::api::watermark::WatermarkAssigner;
 use crate::api::window::WindowAssigner;
@@ -23,7 +23,7 @@ pub trait TStreamOperator: Debug {
 
 pub struct DefaultStreamOperator<T>
 where
-    T: ?Sized + Function,
+    T: ?Sized + NamedFunction,
 {
     parallelism: u16,
     fn_creator: FunctionCreator,
@@ -32,7 +32,7 @@ where
 
 impl<T> DefaultStreamOperator<T>
 where
-    T: ?Sized + Function,
+    T: ?Sized + NamedFunction,
 {
     pub fn new(parallelism: u16, fn_creator: FunctionCreator, operator_fn: Box<T>) -> Self {
         DefaultStreamOperator {
@@ -45,7 +45,7 @@ where
 
 impl<T> TStreamOperator for DefaultStreamOperator<T>
 where
-    T: ?Sized + Function,
+    T: ?Sized + NamedFunction,
 {
     fn operator_name(&self) -> &str {
         self.operator_fn.name()
@@ -62,7 +62,7 @@ where
 
 impl<T> Debug for DefaultStreamOperator<T>
 where
-    T: ?Sized + Function,
+    T: ?Sized + NamedFunction,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("StreamOperator")

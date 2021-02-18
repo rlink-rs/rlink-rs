@@ -187,8 +187,8 @@ mod tests {
     use crate::api::element::Record;
     use crate::api::env::StreamExecutionEnvironment;
     use crate::api::function::{
-        CoProcessFunction, Context, FlatMapFunction, Function, InputFormat, InputSplit,
-        InputSplitSource, KeySelectorFunction, OutputFormat, ReduceFunction,
+        CoProcessFunction, Context, FlatMapFunction, InputFormat, InputSplit, InputSplitSource,
+        KeySelectorFunction, NamedFunction, OutputFormat, ReduceFunction,
     };
     use crate::api::properties::Properties;
     use crate::api::watermark::{BoundedOutOfOrdernessTimestampExtractor, TimestampAssigner};
@@ -282,7 +282,7 @@ mod tests {
 
     impl CheckpointFunction for MyInputFormat {}
 
-    impl Function for MyInputFormat {
+    impl NamedFunction for MyInputFormat {
         fn name(&self) -> &str {
             "MyInputFormat"
         }
@@ -325,7 +325,7 @@ mod tests {
         }
     }
 
-    impl Function for MyFlatMapFunction {
+    impl NamedFunction for MyFlatMapFunction {
         fn name(&self) -> &str {
             "MyFlatMapFunction"
         }
@@ -352,7 +352,7 @@ mod tests {
         }
     }
 
-    impl Function for MyTimestampAssigner {
+    impl NamedFunction for MyTimestampAssigner {
         fn name(&self) -> &str {
             "MyTimestampAssigner"
         }
@@ -384,7 +384,7 @@ mod tests {
         }
     }
 
-    impl Function for MyKeySelectorFunction {
+    impl NamedFunction for MyKeySelectorFunction {
         fn name(&self) -> &str {
             "MyKeySelectorFunction"
         }
@@ -415,7 +415,7 @@ mod tests {
         }
     }
 
-    impl Function for MyReduceFunction {
+    impl NamedFunction for MyReduceFunction {
         fn name(&self) -> &str {
             "MyReduceFunction"
         }
@@ -446,7 +446,7 @@ mod tests {
         }
     }
 
-    impl Function for MyOutputFormat {
+    impl NamedFunction for MyOutputFormat {
         fn name(&self) -> &str {
             "MyOutputFormat"
         }
@@ -478,7 +478,7 @@ mod tests {
         }
     }
 
-    impl Function for MyCoProcessFunction {
+    impl NamedFunction for MyCoProcessFunction {
         fn name(&self) -> &str {
             "MyCoProcessFunction"
         }
