@@ -11,6 +11,7 @@ use crate::api::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperat
 use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::channel::named_channel;
 use crate::channel::sender::ChannelSender;
+use crate::functions::iterator::ChannelIterator;
 use crate::metrics::Tag;
 use crate::runtime::timer::TimerChannel;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
@@ -181,21 +182,30 @@ impl Runnable for SourceRunnable {
     fn run(&mut self, mut _element: Element) {
         info!("{} running...", self.stream_source.operator_fn.name());
 
-        let tags = vec![
-            Tag::from(("job_id", self.task_id.job_id.0)),
-            Tag::from(("task_number", self.task_id.task_number)),
-        ];
-        let metric_name = format!("Source_{}", self.stream_source.operator_fn.as_ref().name());
-        let (sender, receiver) = named_channel(metric_name.as_str(), tags, 10240);
-        let running = Arc::new(AtomicBool::new(true));
+        let mut element_iter = match self.stream_source.fn_creator() {
+            FunctionCreator::User => {
+                let tags = vec![
+                    Tag::from(("job_id", self.task_id.job_id.0)),
+                    Tag::from(("task_number", self.task_id.task_number)),
+                ];
+                let metric_name =
+                    format!("Source_{}", self.stream_source.operator_fn.as_ref().name());
+                let (sender, receiver) = named_channel(metric_name.as_str(), tags, 10240);
+                let running = Arc::new(AtomicBool::new(true));
 
-        self.poll_input_element(sender.clone(), running.clone());
-        if let FunctionCreator::User = self.stream_source.fn_creator() {
-            self.poll_stream_status(sender.clone(), running.clone());
-            self.poll_checkpoint(sender.clone(), running.clone());
-        }
+                self.poll_input_element(sender.clone(), running.clone());
 
-        while let Ok(element) = receiver.recv() {
+                self.poll_stream_status(sender.clone(), running.clone());
+                self.poll_checkpoint(sender.clone(), running.clone());
+
+                let element_iter: Box<dyn Iterator<Item = Element> + Send> =
+                    Box::new(ChannelIterator::new(receiver));
+                element_iter
+            }
+            FunctionCreator::System => self.stream_source.operator_fn.element_iter(),
+        };
+
+        while let Some(element) = element_iter.next() {
             match element {
                 Element::Record(_) => self.next_runnable.as_mut().unwrap().run(element),
                 Element::Barrier(barrier) => {
