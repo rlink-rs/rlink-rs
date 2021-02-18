@@ -14,6 +14,7 @@ where
     guava_size_name: String,
 
     pub(crate) receiver: Receiver<T>,
+    base_on_bounded: bool,
 
     size: Arc<AtomicI64>,
     drain_counter: Arc<AtomicU64>,
@@ -26,6 +27,7 @@ where
     pub fn new(
         name: &str,
         receiver: Receiver<T>,
+        base_on_bounded: bool,
         size: Arc<AtomicI64>,
         drain_counter: Arc<AtomicU64>,
     ) -> Self {
@@ -33,6 +35,7 @@ where
             name: name.to_string(),
             guava_size_name: CHANNEL_SIZE_PREFIX.to_owned() + name,
             receiver,
+            base_on_bounded,
             size,
             drain_counter,
         }

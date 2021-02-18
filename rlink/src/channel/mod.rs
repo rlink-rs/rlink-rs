@@ -46,12 +46,29 @@ pub fn named_channel<T>(
 where
     T: Clone,
 {
+    named_channel_with_base(name, tags, cap, true)
+}
+
+pub fn named_channel_with_base<T>(
+    name: &str,
+    tags: Vec<Tag>,
+    cap: usize,
+    base_on_bounded: bool,
+) -> (ChannelSender<T>, ChannelReceiver<T>)
+where
+    T: Clone,
+{
     info!("Create channel named with {}, capacity: {}", name, cap);
 
     let size = Arc::new(AtomicI64::new(0));
     let accepted_counter = Arc::new(AtomicU64::new(0));
     let drain_counter = Arc::new(AtomicU64::new(0));
-    let (sender, receiver) = if cap <= 32 { bounded(cap) } else { unbounded() };
+
+    let (sender, receiver) = if base_on_bounded {
+        bounded(cap)
+    } else {
+        unbounded()
+    };
 
     // add_channel_metric(name.to_string(), size.clone(), capacity.clone());
     crate::metrics::global_metrics::register_gauge(
@@ -71,8 +88,15 @@ where
     );
 
     (
-        ChannelSender::new(name, sender, cap, size.clone(), accepted_counter),
-        ChannelReceiver::new(name, receiver, size.clone(), drain_counter),
+        ChannelSender::new(
+            name,
+            sender,
+            base_on_bounded,
+            cap,
+            size.clone(),
+            accepted_counter,
+        ),
+        ChannelReceiver::new(name, receiver, base_on_bounded, size.clone(), drain_counter),
     )
 }
 
@@ -80,14 +104,14 @@ where
 mod tests {
     use std::time::Duration;
 
-    use crate::channel::named_channel;
+    use crate::channel::named_channel_with_base;
     use crate::utils::date_time::current_timestamp;
     use crate::utils::thread::spawn;
 
     #[test]
     pub fn bounded_test() {
-        // let (sender, receiver) = crate::channel::unbounded();
-        let (sender, receiver) = crate::channel::bounded(10000 * 100);
+        let (sender, receiver) = crate::channel::unbounded();
+        // let (sender, receiver) = crate::channel::bounded(10000 * 100);
 
         std::thread::sleep(Duration::from_secs(2));
 
@@ -103,8 +127,12 @@ mod tests {
             let _a = sender;
         }
 
-        let begin = current_timestamp();
-        while let Ok(_n) = receiver.recv() {}
+        let mut begin = Duration::default();
+        while let Ok(_n) = receiver.recv() {
+            if begin.as_nanos() == 0 {
+                begin = current_timestamp();
+            }
+        }
         let end = current_timestamp();
 
         println!("{}", end.checked_sub(begin).unwrap().as_nanos());
@@ -112,20 +140,39 @@ mod tests {
 
     #[test]
     pub fn channel_sender_test() {
-        let (sender, receiver) = named_channel("", vec![], 33);
+        let cap = 1 * 1;
+        let (sender, receiver) = named_channel_with_base("", vec![], cap, true);
 
-        spawn("", move || {
-            std::thread::sleep(Duration::from_secs(30));
-            while let Ok(n) = receiver.recv() {
-                println!("recv: {}", n);
+        let recv_thread_handle = spawn("recv_thread", move || {
+            std::thread::sleep(Duration::from_secs(1));
+
+            let begin = current_timestamp();
+            while let Ok(_n) = receiver.recv() {}
+            let end = current_timestamp();
+
+            println!("{}", end.checked_sub(begin).unwrap().as_nanos());
+        });
+
+        let mut bs = Vec::with_capacity(1024 * 8);
+        for _n in 0..bs.capacity() {
+            bs.push('a' as u8);
+        }
+        let s = String::from_utf8(bs).unwrap();
+
+        let send_thread_handle = spawn("send_thread", move || {
+            for _n in 0..100 * 10000 {
+                sender.send(s.clone()).unwrap();
+            }
+
+            std::thread::sleep(Duration::from_secs(10));
+            for _n in 0..cap {
+                sender.send("".to_string()).unwrap();
             }
         });
 
-        for n in 0..33 * 2 {
-            sender.send(n).unwrap();
-            println!("send: {}", n);
-        }
-
+        send_thread_handle.join().unwrap();
+        recv_thread_handle.join().unwrap();
         println!("finish");
+        std::thread::park();
     }
 }
