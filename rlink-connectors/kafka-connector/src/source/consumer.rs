@@ -7,12 +7,11 @@ use rdkafka::consumer::{Consumer, DefaultConsumerContext, StreamConsumer};
 use rdkafka::{ClientConfig, Message, Offset, TopicPartitionList};
 use rlink::api::runtime::JobId;
 use rlink::channel::handover::Handover;
-use rlink::channel::TrySendError;
 use rlink::utils;
 use rlink::utils::thread::get_runtime;
 
-use crate::build_kafka_record;
-use crate::state::OffsetMetadata;
+use crate::source::deserializer::KafkaRecordDeserializer;
+use crate::state::{KafkaSourceStateCache, OffsetMetadata};
 
 struct TaskHandover {
     task_number: u16,
@@ -41,6 +40,8 @@ pub(crate) fn create_kafka_consumer(
     client_config: ClientConfig,
     partition_offsets: Vec<OffsetMetadata>,
     handover: Handover,
+    deserializer: Box<dyn KafkaRecordDeserializer>,
+    state_cache: Option<KafkaSourceStateCache>,
 ) {
     let kafka_consumer: &Mutex<HashMap<JobId, Vec<TaskHandover>>> = &*KAFKA_CONSUMERS;
     let mut kafka_consumer = kafka_consumer.lock().unwrap();
@@ -57,8 +58,13 @@ pub(crate) fn create_kafka_consumer(
     let handover_clone = handover.clone();
     utils::thread::spawn("kafka-source-block", move || {
         get_runtime().block_on(async {
-            let mut kafka_consumer =
-                KafkaConsumerThread::new(client_config, partition_offsets, handover_clone);
+            let mut kafka_consumer = KafkaConsumerThread::new(
+                client_config,
+                partition_offsets,
+                handover_clone,
+                deserializer,
+                state_cache,
+            );
             kafka_consumer.run().await;
         });
     });
@@ -96,6 +102,8 @@ pub struct KafkaConsumerThread {
     partition_offsets: Vec<OffsetMetadata>,
 
     handover: Handover,
+    deserializer: Box<dyn KafkaRecordDeserializer>,
+    state_cache: Option<KafkaSourceStateCache>,
 }
 
 impl KafkaConsumerThread {
@@ -103,11 +111,15 @@ impl KafkaConsumerThread {
         client_config: ClientConfig,
         partition_offsets: Vec<OffsetMetadata>,
         handover: Handover,
+        deserializer: Box<dyn KafkaRecordDeserializer>,
+        state_cache: Option<KafkaSourceStateCache>,
     ) -> Self {
         KafkaConsumerThread {
             client_config,
             partition_offsets,
             handover,
+            deserializer,
+            state_cache,
         }
     }
 
@@ -137,8 +149,8 @@ impl KafkaConsumerThread {
             self.client_config, self.partition_offsets
         );
 
+        let mut counter = 0u64;
         let mut message_stream = consumer.start();
-
         while let Some(message) = message_stream.next().await {
             match message {
                 Ok(borrowed_message) => {
@@ -149,33 +161,27 @@ impl KafkaConsumerThread {
                     let key = borrowed_message.key().unwrap_or(&utils::EMPTY_SLICE);
                     let payload = borrowed_message.payload().unwrap_or(&utils::EMPTY_SLICE);
 
-                    let mut record =
-                        build_kafka_record(timestamp, key, payload, topic, partition, offset)
-                            .expect("kafka message writer to Record error");
+                    let records = self
+                        .deserializer
+                        .deserialize(timestamp, key, payload, topic, partition, offset);
 
-                    let mut loops = 0;
-                    loop {
-                        match self.handover.try_produce(record) {
-                            Ok(_) => {
-                                break;
-                            }
-                            Err(TrySendError::Full(r)) => {
-                                record = r;
-
-                                if loops == 5 {
-                                    warn!("Handover produce `Full`");
-                                } else if loops == 1000 {
-                                    error!("Handover produce `Full` and try with 1000 times");
-                                    loops = 0;
-                                }
-                                loops += 1;
-
-                                tokio::time::delay_for(Duration::from_millis(100)).await;
-                            }
-                            Err(TrySendError::Disconnected(_r)) => {
+                    for record in records {
+                        match self.handover.produce(record) {
+                            Ok(_) => {}
+                            Err(_e) => {
                                 panic!("handover produce `Disconnected`");
                             }
                         }
+                    }
+
+                    counter += 1;
+                    // same as `self.counter % 4096`
+                    if counter & 4095 == 0 {
+                        self.state_cache.as_ref().unwrap().update(
+                            topic.to_string(),
+                            partition,
+                            offset,
+                        );
                     }
                 }
                 Err(e) => warn!("Kafka error: {}", e),

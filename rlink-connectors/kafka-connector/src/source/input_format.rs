@@ -12,6 +12,7 @@ use rlink::metrics::Tag;
 
 use crate::source::checkpoint::KafkaCheckpointFunction;
 use crate::source::consumer::{create_kafka_consumer, get_kafka_consumer_handover};
+use crate::source::deserializer::KafkaRecordDeserializerBuilder;
 use crate::source::iterator::KafkaRecordIterator;
 
 #[derive(NamedFunction)]
@@ -22,17 +23,25 @@ pub struct KafkaInputFormat {
     buffer_size: usize,
     handover: Option<Handover>,
 
+    deserializer_builder: Box<dyn KafkaRecordDeserializerBuilder>,
+
     checkpoint: Option<KafkaCheckpointFunction>,
 }
 
 impl KafkaInputFormat {
-    pub fn new(client_config: ClientConfig, topics: Vec<String>, buffer_size: usize) -> Self {
+    pub fn new(
+        client_config: ClientConfig,
+        topics: Vec<String>,
+        buffer_size: usize,
+        deserializer_builder: Box<dyn KafkaRecordDeserializerBuilder>,
+    ) -> Self {
         KafkaInputFormat {
             client_config,
             topics,
             buffer_size,
             handover: None,
             checkpoint: None,
+            deserializer_builder,
         }
     }
 }
@@ -80,6 +89,8 @@ impl InputFormat for KafkaInputFormat {
                 client_config,
                 partition_offsets,
                 handover,
+                self.deserializer_builder.build(),
+                self.checkpoint.as_ref().unwrap().state_cache.clone(),
             );
 
             info!("start with consumer and operator mode")
@@ -95,7 +106,6 @@ impl InputFormat for KafkaInputFormat {
     fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record> + Send> {
         Box::new(KafkaRecordIterator::new(
             self.handover.as_ref().unwrap().clone(),
-            self.checkpoint.as_ref().unwrap().clone(),
         ))
     }
 

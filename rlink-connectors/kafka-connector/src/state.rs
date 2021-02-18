@@ -29,7 +29,7 @@ impl KafkaSourceStateCache {
         }
     }
 
-    pub fn update(&mut self, topic: String, partition: i32, offset: i64) {
+    pub fn update(&self, topic: String, partition: i32, offset: i64) {
         let key = PartitionMetadata {
             topic: topic.clone(),
             partition,

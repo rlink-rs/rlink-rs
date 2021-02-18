@@ -19,6 +19,10 @@ pub use source::input_format::KafkaInputFormat;
 
 use std::collections::HashMap;
 
+use crate::source::deserializer::{
+    DefaultKafkaRecordDeserializer, DefaultKafkaRecordDeserializerBuilder,
+    KafkaRecordDeserializerBuilder,
+};
 use rdkafka::ClientConfig;
 use rlink::api::element::BufferReader;
 use rlink::api::element::Record;
@@ -128,17 +132,25 @@ pub fn create_input_format(
     conf_map: HashMap<String, String>,
     topics: Vec<String>,
     buffer_size: Option<usize>,
+    deserializer_builder: Option<Box<dyn KafkaRecordDeserializerBuilder>>,
 ) -> KafkaInputFormat {
     let mut client_config = ClientConfig::new();
     for (key, val) in conf_map {
         client_config.set(key.as_str(), val.as_str());
     }
 
-    KafkaInputFormat::new(
-        client_config,
-        topics,
-        buffer_size.unwrap_or(SOURCE_CHANNEL_SIZE),
-    )
+    let buffer_size = buffer_size.unwrap_or(SOURCE_CHANNEL_SIZE);
+
+    let deserializer_builder = deserializer_builder.unwrap_or_else(|| {
+        let deserializer_builder: Box<dyn KafkaRecordDeserializerBuilder> =
+            Box::new(DefaultKafkaRecordDeserializerBuilder::<
+                DefaultKafkaRecordDeserializer,
+            >::new());
+
+        deserializer_builder
+    });
+
+    KafkaInputFormat::new(client_config, topics, buffer_size, deserializer_builder)
 }
 
 pub fn create_output_format(
