@@ -162,7 +162,7 @@ impl CheckpointAlignManager {
             let complete_checkpoint_id = self.current_ck_id;
             let complete_operator_cks = self.operator_cks.clone();
             // todo storage
-            info!(
+            debug!(
                 "complete checkpoint_id={:?}, checkpoints: {:?}",
                 complete_checkpoint_id, complete_operator_cks
             );
