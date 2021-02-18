@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicI64, AtomicU64};
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::channel::{SendError, Sender, TrySendError, CHANNEL_SIZE_PREFIX};
+use crate::channel::{BaseOn, SendError, Sender, TrySendError, CHANNEL_SIZE_PREFIX};
 
 #[derive(Clone, Debug)]
 pub struct ChannelSender<T>
@@ -14,7 +14,7 @@ where
     guava_size_name: String,
 
     sender: Sender<T>,
-    base_on_bounded: bool,
+    base_on: BaseOn,
     cap: usize,
 
     size: Arc<AtomicI64>,
@@ -28,7 +28,7 @@ where
     pub fn new(
         name: &str,
         sender: Sender<T>,
-        base_on_bounded: bool,
+        base_on: BaseOn,
         cap: usize,
         size: Arc<AtomicI64>,
         counter: Arc<AtomicU64>,
@@ -37,7 +37,7 @@ where
             name: name.to_string(),
             guava_size_name: CHANNEL_SIZE_PREFIX.to_owned() + name,
             sender,
-            base_on_bounded,
+            base_on,
             cap,
             size,
             counter,
@@ -60,7 +60,7 @@ where
     }
 
     pub fn send(&self, event: T) -> Result<(), SendError<T>> {
-        if !self.base_on_bounded {
+        if self.base_on == BaseOn::UnBounded {
             if self.size.load(Ordering::Relaxed) > self.cap as i64 {
                 let mut times = 0;
                 loop {
@@ -90,7 +90,7 @@ where
     }
 
     pub fn try_send(&self, event: T) -> Result<(), TrySendError<T>> {
-        if !self.base_on_bounded {
+        if self.base_on == BaseOn::UnBounded {
             if self.size.load(Ordering::Relaxed) > self.cap as i64 {
                 return Err(TrySendError::Full(event));
             }

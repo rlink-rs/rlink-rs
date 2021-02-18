@@ -32,7 +32,7 @@ impl StreamApp for SimpleStreamApp {
         properties.set_checkpoint(CheckpointBackend::Memory);
     }
 
-    fn build_stream(&self, properties: &Properties, env: &mut StreamExecutionEnvironment) {
+    fn build_stream(&self, _properties: &Properties, env: &mut StreamExecutionEnvironment) {
         let key_selector = SchemaBaseKeySelector::new(vec![model::index::name], &FIELD_TYPE);
         let reduce_function =
             SchemaBaseReduceFunction::new(vec![sum_i64(model::index::value)], &FIELD_TYPE);
@@ -45,7 +45,7 @@ impl StreamApp for SimpleStreamApp {
             key_types
         };
 
-        env.register_source(TestInputFormat::new(properties.clone()), 3)
+        env.register_source(TestInputFormat::new(), 3)
             .flat_map(MyFlatMapFunction::new())
             .filter(MyFilterFunction::new())
             .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(

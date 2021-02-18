@@ -8,7 +8,6 @@ use rlink::api::function::{
     CoProcessFunction, Context, FilterFunction, FlatMapFunction, InputFormat, InputSplit,
     InputSplitSource,
 };
-use rlink::api::properties::Properties;
 use rlink::utils::date_time::current_timestamp_millis;
 
 use crate::buffer_gen::{config, model};
@@ -68,16 +67,11 @@ impl Iterator for RandIterator {
 #[derive(Debug, Function)]
 pub struct TestInputFormat {
     data: Vec<Record>,
-
-    properties: Properties,
 }
 
 impl TestInputFormat {
-    pub fn new(properties: Properties) -> Self {
-        TestInputFormat {
-            data: Vec::new(),
-            properties,
-        }
+    pub fn new() -> Self {
+        TestInputFormat { data: Vec::new() }
     }
 
     fn gen_row(&self) -> Vec<Record> {
