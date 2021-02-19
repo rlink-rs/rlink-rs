@@ -7,6 +7,7 @@ use crate::api::backend::{CheckpointBackend, KeyedStateBackend};
 use crate::api::cluster::MetadataStorageType;
 
 pub type ClusterMode = crate::runtime::ClusterMode;
+pub type ChannelBaseOn = crate::channel::BaseOn;
 
 pub trait SystemProperties {
     fn set_metadata_mode(&mut self, metadata_storage_mode: MetadataStorageType);
@@ -25,6 +26,9 @@ pub trait SystemProperties {
 
     fn set_pub_sub_channel_size(&mut self, channel_size: usize);
     fn get_pub_sub_channel_size(&self) -> anyhow::Result<usize>;
+
+    fn set_pub_sub_channel_base(&mut self, base_on: ChannelBaseOn);
+    fn get_pub_sub_channel_base(&self) -> anyhow::Result<ChannelBaseOn>;
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -109,6 +113,7 @@ pub(crate) const SYSTEM_CHECKPOINT: &str = "SYSTEM_CHECKPOINT";
 pub(crate) const SYSTEM_CHECKPOINT_INTERNAL: &str = "SYSTEM_CHECKPOINT_INTERNAL";
 pub(crate) const SYSTEM_CLUSTER_MODE: &str = "SYSTEM_CLUSTER_MODE";
 pub(crate) const SYSTEM_PUB_SUB_CHANNEL_SIZE: &str = "SYSTEM_PUB_SUB_CHANNEL_SIZE";
+pub(crate) const SYSTEM_PUB_SUB_CHANNEL_BASE_ON: &str = "SYSTEM_PUB_SUB_CHANNEL_BASE_ON";
 
 impl SystemProperties for Properties {
     fn set_metadata_mode(&mut self, metadata_storage_mode: MetadataStorageType) {
@@ -166,6 +171,16 @@ impl SystemProperties for Properties {
     fn get_pub_sub_channel_size(&self) -> anyhow::Result<usize> {
         let value = self.get_string(SYSTEM_PUB_SUB_CHANNEL_SIZE)?;
         usize::from_str(value.as_str()).map_err(|e| anyhow!(e))
+    }
+
+    fn set_pub_sub_channel_base(&mut self, base_on: ChannelBaseOn) {
+        let value = format!("{}", base_on);
+        self.set_string(SYSTEM_PUB_SUB_CHANNEL_BASE_ON.to_string(), value);
+    }
+
+    fn get_pub_sub_channel_base(&self) -> anyhow::Result<ChannelBaseOn> {
+        let value = self.get_string(SYSTEM_PUB_SUB_CHANNEL_BASE_ON)?;
+        ChannelBaseOn::try_from(value.as_str()).map_err(|e| anyhow!(e))
     }
 }
 

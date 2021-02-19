@@ -1,7 +1,8 @@
 use crate::api;
+use crate::api::checkpoint::CheckpointFunction;
 use crate::api::element::{Element, Record};
-use crate::api::function::{Context, Function, InputFormat, InputSplit, InputSplitSource};
-use crate::api::properties::SystemProperties;
+use crate::api::function::{Context, InputFormat, InputSplit, InputSplitSource, NamedFunction};
+use crate::api::properties::{ChannelBaseOn, SystemProperties};
 use crate::api::runtime::TaskId;
 use crate::channel::ElementReceiver;
 use crate::dag::execution_graph::ExecutionEdge;
@@ -44,6 +45,10 @@ impl InputFormat for SystemInputFormat {
             .application_properties
             .get_pub_sub_channel_size()
             .unwrap_or(DEFAULT_CHANNEL_SIZE);
+        let channel_base_on = context
+            .application_properties
+            .get_pub_sub_channel_base()
+            .unwrap_or(ChannelBaseOn::UnBounded);
 
         let mut memory_jobs = Vec::new();
         let mut network_jobs = Vec::new();
@@ -56,11 +61,21 @@ impl InputFormat for SystemInputFormat {
             });
 
         if memory_jobs.len() > 0 {
-            let rx = memory::subscribe(&memory_jobs, &context.task_id, channel_size);
+            let rx = memory::subscribe(
+                &memory_jobs,
+                &context.task_id,
+                channel_size,
+                channel_base_on,
+            );
             self.memory_receiver = Some(rx);
         }
         if network_jobs.len() > 0 {
-            let rx = network::subscribe(&network_jobs, &context.task_id, channel_size);
+            let rx = network::subscribe(
+                &network_jobs,
+                &context.task_id,
+                channel_size,
+                channel_base_on,
+            );
             self.network_receiver = Some(rx);
         }
 
@@ -94,11 +109,13 @@ impl InputFormat for SystemInputFormat {
 
 impl InputSplitSource for SystemInputFormat {}
 
-impl Function for SystemInputFormat {
+impl NamedFunction for SystemInputFormat {
     fn name(&self) -> &str {
         "SystemInputFormat"
     }
 }
+
+impl CheckpointFunction for SystemInputFormat {}
 
 struct SubscribeIterator {
     receiver: ElementReceiver,

@@ -15,8 +15,9 @@ use tokio::sync::RwLock;
 use tokio_util::codec::LengthDelimitedCodec;
 
 use crate::api::element::{Element, Serde};
+use crate::api::properties::ChannelBaseOn;
 use crate::api::runtime::{ChannelKey, TaskId};
-use crate::channel::{named_channel, ElementReceiver, ElementSender, TryRecvError};
+use crate::channel::{named_channel_with_base, ElementReceiver, ElementSender, TryRecvError};
 use crate::metrics::Tag;
 use crate::pub_sub::network::{ElementRequest, ResponseCode};
 use crate::utils::thread::get_runtime;
@@ -29,6 +30,7 @@ pub(crate) fn publish(
     source_task_id: &TaskId,
     target_task_ids: &Vec<TaskId>,
     channel_size: usize,
+    channel_base_on: ChannelBaseOn,
 ) -> Vec<(ChannelKey, ElementSender)> {
     let mut senders = Vec::new();
     for target_task_id in target_task_ids {
@@ -37,7 +39,7 @@ pub(crate) fn publish(
             target_task_id: target_task_id.clone(),
         };
 
-        let (sender, receiver) = named_channel(
+        let (sender, receiver) = named_channel_with_base(
             "NetworkPublish",
             vec![
                 Tag::from(("source_job_id", source_task_id.job_id.0)),
@@ -45,6 +47,7 @@ pub(crate) fn publish(
                 Tag::from(("target_task_number", target_task_id.task_number)),
             ],
             channel_size,
+            channel_base_on,
         );
 
         senders.push((channel_key.clone(), sender));

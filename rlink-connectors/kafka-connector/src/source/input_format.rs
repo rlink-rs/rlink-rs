@@ -3,7 +3,7 @@ use std::time::Duration;
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::{ClientConfig, Offset};
 use rlink::api;
-use rlink::api::checkpoint::CheckpointFunction;
+use rlink::api::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
 use rlink::api::element::Record;
 use rlink::api::function::{Context, InputFormat, InputSplit, InputSplitSource};
 use rlink::api::properties::Properties;
@@ -12,9 +12,10 @@ use rlink::metrics::Tag;
 
 use crate::source::checkpoint::KafkaCheckpointFunction;
 use crate::source::consumer::{create_kafka_consumer, get_kafka_consumer_handover};
+use crate::source::deserializer::KafkaRecordDeserializerBuilder;
 use crate::source::iterator::KafkaRecordIterator;
 
-#[derive(Function)]
+#[derive(NamedFunction)]
 pub struct KafkaInputFormat {
     client_config: ClientConfig,
     topics: Vec<String>,
@@ -22,17 +23,25 @@ pub struct KafkaInputFormat {
     buffer_size: usize,
     handover: Option<Handover>,
 
+    deserializer_builder: Box<dyn KafkaRecordDeserializerBuilder>,
+
     checkpoint: Option<KafkaCheckpointFunction>,
 }
 
 impl KafkaInputFormat {
-    pub fn new(client_config: ClientConfig, topics: Vec<String>, buffer_size: usize) -> Self {
+    pub fn new(
+        client_config: ClientConfig,
+        topics: Vec<String>,
+        buffer_size: usize,
+        deserializer_builder: Box<dyn KafkaRecordDeserializerBuilder>,
+    ) -> Self {
         KafkaInputFormat {
             client_config,
             topics,
             buffer_size,
             handover: None,
             checkpoint: None,
+            deserializer_builder,
         }
     }
 }
@@ -47,7 +56,6 @@ impl InputFormat for KafkaInputFormat {
         if can_create_consumer.to_lowercase().eq("true") {
             let mut kafka_checkpoint =
                 KafkaCheckpointFunction::new(context.application_id.clone(), context.task_id);
-            // todo provide the data from coordinator
             kafka_checkpoint
                 .initialize_state(&context.checkpoint_context(), &context.checkpoint_handle);
             self.checkpoint = Some(kafka_checkpoint);
@@ -81,6 +89,8 @@ impl InputFormat for KafkaInputFormat {
                 client_config,
                 partition_offsets,
                 handover,
+                self.deserializer_builder.build(),
+                self.checkpoint.as_ref().unwrap().state_cache.clone(),
             );
 
             info!("start with consumer and operator mode")
@@ -96,17 +106,26 @@ impl InputFormat for KafkaInputFormat {
     fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record> + Send> {
         Box::new(KafkaRecordIterator::new(
             self.handover.as_ref().unwrap().clone(),
-            self.checkpoint.as_ref().unwrap().clone(),
         ))
     }
 
     fn close(&mut self) -> api::Result<()> {
         Ok(())
     }
+}
 
-    fn checkpoint_function(&mut self) -> Option<Box<&mut dyn CheckpointFunction>> {
+impl CheckpointFunction for KafkaInputFormat {
+    fn initialize_state(
+        &mut self,
+        _context: &FunctionSnapshotContext,
+        _handle: &Option<CheckpointHandle>,
+    ) {
+    }
+
+    /// trigger the method when the `operator` operate a `Barrier` event
+    fn snapshot_state(&mut self, context: &FunctionSnapshotContext) -> Option<CheckpointHandle> {
         match self.checkpoint.as_mut() {
-            Some(checkpoint) => Some(Box::new(checkpoint)),
+            Some(checkpoint) => checkpoint.snapshot_state(context),
             None => None,
         }
     }

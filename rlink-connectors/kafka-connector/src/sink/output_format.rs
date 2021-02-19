@@ -1,14 +1,15 @@
 use rdkafka::ClientConfig;
 use rlink::api::element::Record;
-use rlink::api::function::{Context, Function, OutputFormat};
+use rlink::api::function::{Context, NamedFunction, OutputFormat};
 use rlink::channel::handover::Handover;
 use rlink::metrics::Tag;
 use rlink::utils::thread::get_runtime;
 use rlink::{api, utils};
 
 use crate::sink::producer::KafkaProducerThread;
+use rlink::api::checkpoint::CheckpointFunction;
 
-#[derive(Function)]
+#[derive(NamedFunction)]
 pub struct KafkaOutputFormat {
     client_config: ClientConfig,
     topic: String,
@@ -58,3 +59,5 @@ impl OutputFormat for KafkaOutputFormat {
         Ok(())
     }
 }
+
+impl CheckpointFunction for KafkaOutputFormat {}

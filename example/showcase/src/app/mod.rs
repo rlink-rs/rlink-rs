@@ -2,12 +2,12 @@ pub mod functions;
 
 use std::time::Duration;
 
-use rlink::api::backend::KeyedStateBackend;
+use rlink::api::backend::{CheckpointBackend, KeyedStateBackend};
 use rlink::api::data_stream::{
     CoStream, TConnectedStreams, TDataStream, TKeyedStream, TWindowedStream,
 };
 use rlink::api::env::{StreamApp, StreamExecutionEnvironment};
-use rlink::api::properties::{Properties, SystemProperties};
+use rlink::api::properties::{ChannelBaseOn, Properties, SystemProperties};
 use rlink::api::watermark::BoundedOutOfOrdernessTimestampExtractor;
 use rlink::api::window::SlidingEventTimeWindows;
 use rlink::functions::broadcast_flat_map::BroadcastFlagMapFunction;
@@ -28,9 +28,11 @@ pub struct SimpleStreamApp {}
 impl StreamApp for SimpleStreamApp {
     fn prepare_properties(&self, properties: &mut Properties) {
         properties.set_keyed_state_backend(KeyedStateBackend::Memory);
+        properties.set_checkpoint_internal(Duration::from_secs(15));
+        properties.set_checkpoint(CheckpointBackend::Memory);
     }
 
-    fn build_stream(&self, properties: &Properties, env: &mut StreamExecutionEnvironment) {
+    fn build_stream(&self, _properties: &Properties, env: &mut StreamExecutionEnvironment) {
         let key_selector = SchemaBaseKeySelector::new(vec![model::index::name], &FIELD_TYPE);
         let reduce_function =
             SchemaBaseReduceFunction::new(vec![sum_i64(model::index::value)], &FIELD_TYPE);
@@ -43,7 +45,7 @@ impl StreamApp for SimpleStreamApp {
             key_types
         };
 
-        env.register_source(TestInputFormat::new(properties.clone()), 3)
+        env.register_source(TestInputFormat::new(), 3)
             .flat_map(MyFlatMapFunction::new())
             .filter(MyFilterFunction::new())
             .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
@@ -125,6 +127,7 @@ impl StreamApp for ConnectStreamApp1 {
     fn prepare_properties(&self, properties: &mut Properties) {
         properties.set_keyed_state_backend(KeyedStateBackend::Memory);
         properties.set_pub_sub_channel_size(100000);
+        properties.set_pub_sub_channel_base(ChannelBaseOn::Bounded);
     }
 
     fn build_stream(&self, _properties: &Properties, env: &mut StreamExecutionEnvironment) {

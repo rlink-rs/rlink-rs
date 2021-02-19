@@ -3,12 +3,13 @@ use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-use crate::api::checkpoint::FunctionSnapshotContext;
+use crate::api::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
 use crate::api::element::{Element, Partition};
 use crate::api::function::KeySelectorFunction;
 use crate::api::operator::DefaultStreamOperator;
 use crate::api::runtime::{OperatorId, TaskId};
 use crate::metrics::{register_counter, Tag};
+use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 use crate::utils;
 
@@ -20,6 +21,8 @@ pub(crate) struct KeyByRunnable {
     stream_key_by: DefaultStreamOperator<dyn KeySelectorFunction>,
     next_runnable: Option<Box<dyn Runnable>>,
     partition_size: u16,
+
+    context: Option<RunnableContext>,
 
     counter: Arc<AtomicU64>,
 }
@@ -36,6 +39,7 @@ impl KeyByRunnable {
             stream_key_by,
             next_runnable,
             partition_size: 0,
+            context: None,
             counter: Arc::new(AtomicU64::new(0)),
         }
     }
@@ -44,6 +48,8 @@ impl KeyByRunnable {
 impl Runnable for KeyByRunnable {
     fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
         self.next_runnable.as_mut().unwrap().open(context)?;
+
+        self.context = Some(context.clone());
 
         self.task_id = context.task_descriptor.task_id;
 
@@ -86,6 +92,16 @@ impl Runnable for KeyByRunnable {
 
                 self.counter.fetch_add(1, Ordering::Relaxed);
             }
+            Element::Barrier(barrier) => {
+                let checkpoint_id = barrier.checkpoint_id;
+                let snapshot_context = {
+                    let context = self.context.as_ref().unwrap();
+                    context.checkpoint_context(self.operator_id, checkpoint_id)
+                };
+                self.checkpoint(snapshot_context);
+
+                self.next_runnable.as_mut().unwrap().run(element);
+            }
             _ => {
                 self.next_runnable.as_mut().unwrap().run(element);
             }
@@ -101,5 +117,24 @@ impl Runnable for KeyByRunnable {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, _snapshot_context: FunctionSnapshotContext) {}
+    fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext) {
+        let handle = self
+            .stream_key_by
+            .operator_fn
+            .snapshot_state(&snapshot_context)
+            .unwrap_or(CheckpointHandle::default());
+
+        let ck = Checkpoint {
+            operator_id: snapshot_context.operator_id,
+            task_id: snapshot_context.task_id,
+            checkpoint_id: snapshot_context.checkpoint_id,
+            handle,
+        };
+        submit_checkpoint(ck).map(|ck| {
+            error!(
+                "{:?} submit checkpoint error. maybe report channel is full, checkpoint: {:?}",
+                snapshot_context.operator_id, ck
+            )
+        });
+    }
 }

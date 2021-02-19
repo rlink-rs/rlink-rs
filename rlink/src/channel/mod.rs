@@ -1,3 +1,4 @@
+use std::convert::TryFrom;
 use std::sync::atomic::{AtomicI64, AtomicU64};
 use std::sync::Arc;
 
@@ -38,10 +39,49 @@ pub mod sender;
 pub type ElementReceiver = ChannelReceiver<Element>;
 pub type ElementSender = ChannelSender<Element>;
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum BaseOn {
+    UnBounded,
+    Bounded,
+}
+
+impl<'a> TryFrom<&'a str> for BaseOn {
+    type Error = anyhow::Error;
+
+    fn try_from(mode_str: &'a str) -> Result<Self, Self::Error> {
+        match mode_str {
+            "Bounded" => Ok(BaseOn::Bounded),
+            "UnBounded" => Ok(BaseOn::UnBounded),
+            _ => Err(anyhow!("Unsupported mode {}", mode_str)),
+        }
+    }
+}
+
+impl std::fmt::Display for BaseOn {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BaseOn::Bounded => write!(f, "Bounded"),
+            BaseOn::UnBounded => write!(f, "UnBounded"),
+        }
+    }
+}
+
 pub fn named_channel<T>(
     name: &str,
     tags: Vec<Tag>,
     cap: usize,
+) -> (ChannelSender<T>, ChannelReceiver<T>)
+where
+    T: Clone,
+{
+    named_channel_with_base(name, tags, cap, BaseOn::UnBounded)
+}
+
+pub fn named_channel_with_base<T>(
+    name: &str,
+    tags: Vec<Tag>,
+    cap: usize,
+    base_on: BaseOn,
 ) -> (ChannelSender<T>, ChannelReceiver<T>)
 where
     T: Clone,
@@ -51,7 +91,11 @@ where
     let size = Arc::new(AtomicI64::new(0));
     let accepted_counter = Arc::new(AtomicU64::new(0));
     let drain_counter = Arc::new(AtomicU64::new(0));
-    let (sender, receiver) = if cap <= 32 { bounded(cap) } else { unbounded() };
+
+    let (sender, receiver) = match base_on {
+        BaseOn::Bounded => bounded(cap),
+        BaseOn::UnBounded => unbounded(),
+    };
 
     // add_channel_metric(name.to_string(), size.clone(), capacity.clone());
     crate::metrics::global_metrics::register_gauge(
@@ -71,7 +115,7 @@ where
     );
 
     (
-        ChannelSender::new(name, sender, cap, size.clone(), accepted_counter),
+        ChannelSender::new(name, sender, base_on, cap, size.clone(), accepted_counter),
         ChannelReceiver::new(name, receiver, size.clone(), drain_counter),
     )
 }
@@ -80,14 +124,14 @@ where
 mod tests {
     use std::time::Duration;
 
-    use crate::channel::named_channel;
+    use crate::channel::{named_channel_with_base, BaseOn};
     use crate::utils::date_time::current_timestamp;
     use crate::utils::thread::spawn;
 
     #[test]
     pub fn bounded_test() {
-        // let (sender, receiver) = crate::channel::unbounded();
-        let (sender, receiver) = crate::channel::bounded(10000 * 100);
+        let (sender, receiver) = crate::channel::unbounded();
+        // let (sender, receiver) = crate::channel::bounded(10000 * 100);
 
         std::thread::sleep(Duration::from_secs(2));
 
@@ -103,8 +147,12 @@ mod tests {
             let _a = sender;
         }
 
-        let begin = current_timestamp();
-        while let Ok(_n) = receiver.recv() {}
+        let mut begin = Duration::default();
+        while let Ok(_n) = receiver.recv() {
+            if begin.as_nanos() == 0 {
+                begin = current_timestamp();
+            }
+        }
         let end = current_timestamp();
 
         println!("{}", end.checked_sub(begin).unwrap().as_nanos());
@@ -112,20 +160,39 @@ mod tests {
 
     #[test]
     pub fn channel_sender_test() {
-        let (sender, receiver) = named_channel("", vec![], 33);
+        let cap = 1 * 1;
+        let (sender, receiver) = named_channel_with_base("", vec![], cap, BaseOn::Bounded);
 
-        spawn("", move || {
-            std::thread::sleep(Duration::from_secs(30));
-            while let Ok(n) = receiver.recv() {
-                println!("recv: {}", n);
+        let recv_thread_handle = spawn("recv_thread", move || {
+            std::thread::sleep(Duration::from_secs(1));
+
+            let begin = current_timestamp();
+            while let Ok(_n) = receiver.recv() {}
+            let end = current_timestamp();
+
+            println!("{}", end.checked_sub(begin).unwrap().as_nanos());
+        });
+
+        let mut bs = Vec::with_capacity(1024 * 8);
+        for _n in 0..bs.capacity() {
+            bs.push('a' as u8);
+        }
+        let s = String::from_utf8(bs).unwrap();
+
+        let send_thread_handle = spawn("send_thread", move || {
+            for _n in 0..100 * 10000 {
+                sender.send(s.clone()).unwrap();
+            }
+
+            std::thread::sleep(Duration::from_secs(10));
+            for _n in 0..cap {
+                sender.send("".to_string()).unwrap();
             }
         });
 
-        for n in 0..33 * 2 {
-            sender.send(n).unwrap();
-            println!("send: {}", n);
-        }
-
+        send_thread_handle.join().unwrap();
+        recv_thread_handle.join().unwrap();
         println!("finish");
+        std::thread::park();
     }
 }

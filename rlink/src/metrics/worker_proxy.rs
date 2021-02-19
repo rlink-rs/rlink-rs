@@ -1,6 +1,6 @@
 use tokio::task::JoinHandle;
 
-use crate::runtime::coordinator::heart_beat::global_application_descriptor;
+use crate::runtime::coordinator::heart_beat_manager::global_application_descriptor;
 use crate::runtime::WorkerManagerDescriptor;
 use crate::utils::http_client;
 

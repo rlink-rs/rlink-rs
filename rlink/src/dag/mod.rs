@@ -180,14 +180,15 @@ mod tests {
     use std::time::Duration;
 
     use crate::api;
+    use crate::api::checkpoint::CheckpointFunction;
     use crate::api::data_stream::CoStream;
     use crate::api::data_stream::{TConnectedStreams, TKeyedStream};
     use crate::api::data_stream::{TDataStream, TWindowedStream};
     use crate::api::element::Record;
     use crate::api::env::StreamExecutionEnvironment;
     use crate::api::function::{
-        CoProcessFunction, Context, FlatMapFunction, Function, InputFormat, InputSplit,
-        InputSplitSource, KeySelectorFunction, OutputFormat, ReduceFunction,
+        CoProcessFunction, Context, FlatMapFunction, InputFormat, InputSplit, InputSplitSource,
+        KeySelectorFunction, NamedFunction, OutputFormat, ReduceFunction,
     };
     use crate::api::properties::Properties;
     use crate::api::watermark::{BoundedOutOfOrdernessTimestampExtractor, TimestampAssigner};
@@ -279,7 +280,9 @@ mod tests {
 
     impl InputSplitSource for MyInputFormat {}
 
-    impl Function for MyInputFormat {
+    impl CheckpointFunction for MyInputFormat {}
+
+    impl NamedFunction for MyInputFormat {
         fn name(&self) -> &str {
             "MyInputFormat"
         }
@@ -322,11 +325,13 @@ mod tests {
         }
     }
 
-    impl Function for MyFlatMapFunction {
+    impl NamedFunction for MyFlatMapFunction {
         fn name(&self) -> &str {
             "MyFlatMapFunction"
         }
     }
+
+    impl CheckpointFunction for MyFlatMapFunction {}
 
     #[derive(Serialize, Deserialize, Debug, Clone)]
     pub struct MyTimestampAssigner {}
@@ -347,11 +352,13 @@ mod tests {
         }
     }
 
-    impl Function for MyTimestampAssigner {
+    impl NamedFunction for MyTimestampAssigner {
         fn name(&self) -> &str {
             "MyTimestampAssigner"
         }
     }
+
+    impl CheckpointFunction for MyTimestampAssigner {}
 
     #[derive(Serialize, Deserialize, Debug)]
     pub struct MyKeySelectorFunction {}
@@ -377,11 +384,13 @@ mod tests {
         }
     }
 
-    impl Function for MyKeySelectorFunction {
+    impl NamedFunction for MyKeySelectorFunction {
         fn name(&self) -> &str {
             "MyKeySelectorFunction"
         }
     }
+
+    impl CheckpointFunction for MyKeySelectorFunction {}
 
     #[derive(Serialize, Deserialize, Debug)]
     pub struct MyReduceFunction {}
@@ -406,11 +415,13 @@ mod tests {
         }
     }
 
-    impl Function for MyReduceFunction {
+    impl NamedFunction for MyReduceFunction {
         fn name(&self) -> &str {
             "MyReduceFunction"
         }
     }
+
+    impl CheckpointFunction for MyReduceFunction {}
 
     #[derive(Debug)]
     pub struct MyOutputFormat {
@@ -435,11 +446,13 @@ mod tests {
         }
     }
 
-    impl Function for MyOutputFormat {
+    impl NamedFunction for MyOutputFormat {
         fn name(&self) -> &str {
             "MyOutputFormat"
         }
     }
+
+    impl CheckpointFunction for MyOutputFormat {}
 
     pub struct MyCoProcessFunction {}
 
@@ -465,9 +478,11 @@ mod tests {
         }
     }
 
-    impl Function for MyCoProcessFunction {
+    impl NamedFunction for MyCoProcessFunction {
         fn name(&self) -> &str {
             "MyCoProcessFunction"
         }
     }
+
+    impl CheckpointFunction for MyCoProcessFunction {}
 }

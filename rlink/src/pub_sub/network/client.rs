@@ -16,10 +16,11 @@ use tokio_util::codec::LengthDelimitedCodec;
 use tokio_util::codec::{BytesCodec, FramedWrite};
 
 use crate::api::element::{Element, Serde};
+use crate::api::properties::ChannelBaseOn;
 use crate::api::runtime::{ChannelKey, TaskId};
 use crate::channel::{
-    bounded, named_channel, ElementReceiver, ElementSender, Receiver, Sender, TryRecvError,
-    TrySendError,
+    bounded, named_channel_with_base, ElementReceiver, ElementSender, Receiver, Sender,
+    TryRecvError, TrySendError,
 };
 use crate::metrics::{register_counter, Tag};
 use crate::pub_sub::network::{ElementRequest, ResponseCode};
@@ -39,8 +40,9 @@ pub(crate) fn subscribe(
     source_task_ids: &Vec<TaskId>,
     target_task_id: &TaskId,
     channel_size: usize,
+    channel_base_on: ChannelBaseOn,
 ) -> ElementReceiver {
-    let (sender, receiver) = named_channel(
+    let (sender, receiver) = named_channel_with_base(
         "NetworkSubscribe",
         vec![
             Tag::from(("source_job_id", source_task_ids[0].job_id.0)),
@@ -48,6 +50,7 @@ pub(crate) fn subscribe(
             Tag::from(("target_task_number", target_task_id.task_number)),
         ],
         channel_size,
+        channel_base_on,
     );
 
     for source_task_id in source_task_ids {
