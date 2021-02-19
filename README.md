@@ -17,7 +17,7 @@ rlink = "0.2"
 ```
 
 ```rust
-env.register_source(TestInputFormat::new(properties.clone()), 1)
+env.register_source(TestInputFormat::new(), 1)
     .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
         Duration::from_secs(1),
         SchemaBaseTimestampAssigner::new(model::index::timestamp, &FIELD_TYPE),

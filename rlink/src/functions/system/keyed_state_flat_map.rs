@@ -1,6 +1,7 @@
 use crate::api::backend::KeyedStateBackend;
+use crate::api::checkpoint::CheckpointFunction;
 use crate::api::element::{Element, Record};
-use crate::api::function::{Context, FlatMapFunction, Function};
+use crate::api::function::{Context, FlatMapFunction, NamedFunction};
 use crate::api::properties::SystemProperties;
 use crate::api::runtime::JobId;
 use crate::storage::keyed_state::{ReducingState, StateKey, TReducingState};
@@ -70,11 +71,13 @@ impl FlatMapFunction for KeyedStateFlatMapFunction {
     }
 }
 
-impl Function for KeyedStateFlatMapFunction {
+impl NamedFunction for KeyedStateFlatMapFunction {
     fn name(&self) -> &str {
         "KeyedStateFlatMapFunction"
     }
 }
+
+impl CheckpointFunction for KeyedStateFlatMapFunction {}
 
 // pub(crate) struct BatchIterator<T>
 // where

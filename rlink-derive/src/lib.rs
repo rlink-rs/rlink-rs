@@ -7,6 +7,42 @@ use syn::DeriveInput;
 
 use proc_macro::TokenStream;
 
+#[proc_macro_derive(NamedFunction)]
+pub fn derive_named_function(input: TokenStream) -> TokenStream {
+    // Parse the input tokens into a syntax tree
+    let input = parse_macro_input!(input as DeriveInput);
+
+    // Build the output, possibly using quasi-quotation
+    let name = &input.ident;
+    let (im, ty, wh) = input.generics.split_for_impl();
+    let expanded = quote! {
+        impl #im rlink::api::function::NamedFunction for #name #ty #wh {
+            fn name(&self) -> &str {
+                stringify!(#name)
+            }
+        }
+    };
+
+    // Hand the output tokens back to the compiler
+    TokenStream::from(expanded)
+}
+
+#[proc_macro_derive(CheckpointFunction)]
+pub fn derive_checkpoint_function(input: TokenStream) -> TokenStream {
+    // Parse the input tokens into a syntax tree
+    let input = parse_macro_input!(input as DeriveInput);
+
+    // Build the output, possibly using quasi-quotation
+    let name = &input.ident;
+    let (im, ty, wh) = input.generics.split_for_impl();
+    let expanded = quote! {
+        impl #im rlink::api::checkpoint::CheckpointFunction for #name #ty #wh {}
+    };
+
+    // Hand the output tokens back to the compiler
+    TokenStream::from(expanded)
+}
+
 #[proc_macro_derive(Function)]
 pub fn derive_function(input: TokenStream) -> TokenStream {
     // Parse the input tokens into a syntax tree
@@ -16,11 +52,13 @@ pub fn derive_function(input: TokenStream) -> TokenStream {
     let name = &input.ident;
     let (im, ty, wh) = input.generics.split_for_impl();
     let expanded = quote! {
-        impl #im rlink::api::function::Function for #name #ty #wh {
+        impl #im rlink::api::function::NamedFunction for #name #ty #wh {
             fn name(&self) -> &str {
                 stringify!(#name)
             }
         }
+
+        impl #im rlink::api::checkpoint::CheckpointFunction for #name #ty #wh {}
     };
 
     // Hand the output tokens back to the compiler

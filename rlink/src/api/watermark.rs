@@ -1,8 +1,9 @@
 use std::fmt::Debug;
 use std::time::Duration;
 
-use crate::api::element::{Element, Record};
-use crate::api::function::Function;
+use crate::api::checkpoint::CheckpointFunction;
+use crate::api::element::{Record, StreamStatus};
+use crate::api::function::NamedFunction;
 use crate::utils::date_time::timestamp_str;
 
 pub const MAX_WATERMARK: Watermark = Watermark {
@@ -29,17 +30,17 @@ impl PartialEq for Watermark {
 
 pub trait TimestampAssigner
 where
-    Self: Function + Debug,
+    Self: NamedFunction + CheckpointFunction + Debug,
 {
     fn extract_timestamp(&mut self, row: &mut Record, previous_element_timestamp: u64) -> u64;
 }
 
 pub trait WatermarkAssigner
 where
-    Self: TimestampAssigner + Function + Debug,
+    Self: TimestampAssigner + NamedFunction + Debug,
 {
     /// Return the current `Watermark` and row's timestamp
-    fn watermark(&mut self, element: &Element) -> Option<Watermark>;
+    fn watermark(&mut self, stream_status: &StreamStatus) -> Option<Watermark>;
     fn current_watermark(&self) -> Option<Watermark>;
 }
 
@@ -75,27 +76,23 @@ impl<E> WatermarkAssigner for BoundedOutOfOrdernessTimestampExtractor<E>
 where
     E: TimestampAssigner,
 {
-    fn watermark(&mut self, element: &Element) -> Option<Watermark> {
-        if element.is_stream_status() {
-            let potential_wm = self.current_max_timestamp - self.max_out_of_orderness;
-            debug!(
-                "potential_wm={}, current_max_timestamp={}, max_out_of_orderness={}",
-                timestamp_str(potential_wm),
-                timestamp_str(self.current_max_timestamp),
-                self.max_out_of_orderness,
-            );
-            if potential_wm > self.last_emitted_watermark {
-                self.previous_emitted_watermark = self.last_emitted_watermark;
-                self.last_emitted_watermark = potential_wm;
+    fn watermark(&mut self, _stream_status: &StreamStatus) -> Option<Watermark> {
+        let potential_wm = self.current_max_timestamp - self.max_out_of_orderness;
+        debug!(
+            "potential_wm={}, current_max_timestamp={}, max_out_of_orderness={}",
+            timestamp_str(potential_wm),
+            timestamp_str(self.current_max_timestamp),
+            self.max_out_of_orderness,
+        );
+        if potential_wm > self.last_emitted_watermark {
+            self.previous_emitted_watermark = self.last_emitted_watermark;
+            self.last_emitted_watermark = potential_wm;
 
-                debug!(
-                    "Create Watermark: {}",
-                    timestamp_str(self.last_emitted_watermark)
-                );
-                Some(Watermark::new(self.last_emitted_watermark))
-            } else {
-                None
-            }
+            debug!(
+                "Create Watermark: {}",
+                timestamp_str(self.last_emitted_watermark)
+            );
+            Some(Watermark::new(self.last_emitted_watermark))
         } else {
             None
         }
@@ -125,7 +122,7 @@ where
     }
 }
 
-impl<E> Function for BoundedOutOfOrdernessTimestampExtractor<E>
+impl<E> NamedFunction for BoundedOutOfOrdernessTimestampExtractor<E>
 where
     E: TimestampAssigner,
 {
@@ -133,3 +130,5 @@ where
         "BoundedOutOfOrdernessTimestampExtractor"
     }
 }
+
+impl<E> CheckpointFunction for BoundedOutOfOrdernessTimestampExtractor<E> where E: TimestampAssigner {}

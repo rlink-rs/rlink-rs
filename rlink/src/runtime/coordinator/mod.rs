@@ -23,9 +23,8 @@ use crate::storage::metadata::{
 };
 use crate::utils::date_time::timestamp_str;
 
-// pub mod checkpoint;
 pub mod checkpoint_manager;
-pub mod heart_beat;
+pub mod heart_beat_manager;
 pub mod server;
 pub mod task_distribution;
 
@@ -88,7 +87,8 @@ where
 
         let ck_manager =
             self.build_checkpoint_manager(&dag_metadata, application_descriptor.borrow_mut());
-        info!("CheckpointManager create");
+        ck_manager.run_align_task();
+        info!("start CheckpointManager align task");
 
         self.web_serve(
             application_descriptor.borrow_mut(),
@@ -121,7 +121,7 @@ where
             info!("all worker status is fine");
 
             // heartbeat check. blocking util heartbeat timeout
-            heart_beat::start_heart_beat_timer(self.metadata_storage_mode.clone());
+            heart_beat_manager::start_heart_beat_timer(self.metadata_storage_mode.clone());
             info!("heartbeat has interrupted");
 
             // heartbeat timeout and stop all worker's tasks
@@ -197,7 +197,7 @@ where
                 for operator_id in &task_descriptor.operator_ids {
                     let cks = operator_checkpoints.get(&operator_id).unwrap();
                     if cks.len() == 0 {
-                        info!("operator {:?} checkpoint not found", operator_id);
+                        debug!("operator {:?} checkpoint not found", operator_id);
                         continue;
                     }
 

@@ -10,6 +10,7 @@ use crate::api::operator::{FunctionCreator, StreamOperator};
 use crate::api::runtime::OperatorId;
 use crate::api::watermark::WatermarkAssigner;
 use crate::api::window::WindowAssigner;
+use crate::functions::system::window_base_reduce::WindowBaseReduceFunction;
 
 pub trait TDataStream {
     fn flat_map<F>(self, flat_mapper: F) -> DataStream
@@ -418,7 +419,8 @@ impl TWindowedStream for StreamBuilder {
         F: ReduceFunction + 'static,
     {
         let reduce_func = Box::new(reduce);
-        let stream_reduce = StreamOperator::new_reduce(parallelism, reduce_func);
+        let base_reduce_func = Box::new(WindowBaseReduceFunction::new(reduce_func));
+        let stream_reduce = StreamOperator::new_reduce(parallelism, base_reduce_func);
 
         self.cur_operator_id = self
             .stream_manager

@@ -4,7 +4,7 @@ use dashmap::DashMap;
 use rdkafka::Offset;
 use serde::Serialize;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct PartitionMetadata {
     pub(crate) topic: String,
     pub(crate) partition: i32,
@@ -12,8 +12,6 @@ pub struct PartitionMetadata {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OffsetMetadata {
-    pub(crate) topic: String,
-    pub(crate) partition: i32,
     pub(crate) offset: i64,
 }
 
@@ -29,14 +27,9 @@ impl KafkaSourceStateCache {
         }
     }
 
-    pub fn update(&mut self, topic: String, partition: i32, offset: i64) {
-        let key = PartitionMetadata {
-            topic: topic.clone(),
-            partition,
-        };
+    pub fn update(&self, topic: String, partition: i32, offset: i64) {
+        let key = PartitionMetadata { topic, partition };
         let val = OffsetMetadata {
-            topic,
-            partition,
             offset: Offset::Offset(offset).to_raw(),
         };
 
@@ -48,18 +41,23 @@ impl KafkaSourceStateCache {
         partition_offsets.clone()
     }
 
-    pub fn get(&self, topic: String, partition: i32, default_offset: Offset) -> OffsetMetadata {
+    pub fn get(
+        &self,
+        topic: String,
+        partition: i32,
+        default_offset: Offset,
+    ) -> (PartitionMetadata, OffsetMetadata) {
         let key = PartitionMetadata {
             topic: topic.clone(),
             partition,
         };
-        match self.partition_offsets.get(&key) {
-            Some(offset_metadata) => offset_metadata.clone(),
+        let val = match self.partition_offsets.get(&key) {
+            Some(kv_ref) => kv_ref.clone(),
             None => OffsetMetadata {
-                topic,
-                partition,
                 offset: default_offset.to_raw(),
             },
-        }
+        };
+
+        (key, val)
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "rlink"
-version = "0.2.2-alpha.1"
+version = "0.2.2-alpha.5"
 authors = ["yorkart <wangyue11.4@163.com>>"]
 edition = "2018"
 description = "High performance Stream Processing Framework"
@@ -39,7 +39,7 @@ serde_yaml = "0.8"
 # hash code
 murmur3 = "0.5"
 dashmap = "3.11"
-crossbeam = "0.7.3"
+crossbeam = "0.8"
 
 metrics = "0.12"
 metrics-core = "0.5"

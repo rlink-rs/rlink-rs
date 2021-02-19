@@ -1,9 +1,10 @@
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
 
+use crate::api::checkpoint::CheckpointFunction;
 use crate::api::element::{Element, Partition, Record};
-use crate::api::function::{Context, Function, OutputFormat};
-use crate::api::properties::SystemProperties;
+use crate::api::function::{Context, NamedFunction, OutputFormat};
+use crate::api::properties::{ChannelBaseOn, SystemProperties};
 use crate::api::runtime::{ChannelKey, JobId, TaskId};
 use crate::channel::ElementSender;
 use crate::dag::execution_graph::ExecutionEdge;
@@ -46,6 +47,10 @@ impl OutputFormat for SystemOutputFormat {
             .application_properties
             .get_pub_sub_channel_size()
             .unwrap_or(DEFAULT_CHANNEL_SIZE);
+        let channel_base_on = context
+            .application_properties
+            .get_pub_sub_channel_base()
+            .unwrap_or(ChannelBaseOn::UnBounded);
 
         let mut memory_jobs = Vec::new();
         let mut network_jobs = Vec::new();
@@ -69,7 +74,12 @@ impl OutputFormat for SystemOutputFormat {
         if memory_jobs.len() > 0 {
             self.channel_type = ChannelType::Memory;
 
-            let task_senders = memory::publish(&context.task_id, &memory_jobs, channel_size);
+            let task_senders = memory::publish(
+                &context.task_id,
+                &memory_jobs,
+                channel_size,
+                channel_base_on,
+            );
 
             let mut job_senders = HashMap::new();
             for (channel_key, sender) in task_senders {
@@ -95,7 +105,12 @@ impl OutputFormat for SystemOutputFormat {
 
         if network_jobs.len() > 0 {
             self.channel_type = ChannelType::Network;
-            let task_senders = network::publish(&context.task_id, &network_jobs, channel_size);
+            let task_senders = network::publish(
+                &context.task_id,
+                &network_jobs,
+                channel_size,
+                channel_base_on,
+            );
 
             let child_parallelism = task_senders[0].0.target_task_id.num_tasks;
 
@@ -189,8 +204,10 @@ impl OutputFormat for SystemOutputFormat {
     }
 }
 
-impl Function for SystemOutputFormat {
+impl NamedFunction for SystemOutputFormat {
     fn name(&self) -> &str {
         "SystemOutputFormat"
     }
 }
+
+impl CheckpointFunction for SystemOutputFormat {}

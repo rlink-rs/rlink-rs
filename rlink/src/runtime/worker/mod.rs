@@ -146,12 +146,7 @@ where
             let operator = operators.remove(&operator_id).expect("operator not found");
             let invoke_operator = match operator {
                 StreamOperator::StreamSource(stream_operator) => {
-                    let op = SourceRunnable::new(
-                        operator_id,
-                        self.task_descriptor.input_split.clone(),
-                        stream_operator,
-                        None,
-                    );
+                    let op = SourceRunnable::new(operator_id, stream_operator, None);
                     let op: Box<dyn Runnable> = Box::new(op);
                     op
                 }

@@ -2,7 +2,8 @@ use std::cmp::{max, min};
 use std::fmt::Debug;
 use std::time::Duration;
 
-use crate::api::function::Function;
+use crate::api::checkpoint::CheckpointFunction;
+use crate::api::function::NamedFunction;
 use crate::utils;
 
 pub trait TWindow: Debug + Clone {
@@ -10,7 +11,7 @@ pub trait TWindow: Debug + Clone {
     fn min_timestamp(&self) -> u64;
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
 pub struct TimeWindow {
     start: u64,
     end: u64,
@@ -77,6 +78,12 @@ impl TWindow for Window {
     }
 }
 
+impl Default for Window {
+    fn default() -> Self {
+        Window::TimeWindow(TimeWindow::default())
+    }
+}
+
 #[derive(Debug)]
 pub struct WindowAssignerContext {}
 
@@ -88,7 +95,7 @@ impl WindowAssignerContext {
 
 pub trait WindowAssigner
 where
-    Self: Function + Debug,
+    Self: NamedFunction + CheckpointFunction + Debug,
 {
     fn assign_windows(&self, timestamp: u64, context: WindowAssignerContext) -> Vec<Window>;
 }
@@ -142,8 +149,10 @@ impl WindowAssigner for SlidingEventTimeWindows {
     }
 }
 
-impl Function for SlidingEventTimeWindows {
+impl NamedFunction for SlidingEventTimeWindows {
     fn name(&self) -> &str {
         "SlidingEventTimeWindows"
     }
 }
+
+impl CheckpointFunction for SlidingEventTimeWindows {}

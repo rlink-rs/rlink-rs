@@ -112,14 +112,14 @@ impl Record {
         self.location_windows.as_ref().unwrap_or(&EMPTY_VEC)
     }
 
-    pub(crate) fn min_location_windows(&self) -> Option<&Window> {
+    pub(crate) fn min_location_window(&self) -> Option<&Window> {
         match &self.location_windows {
             Some(windows) => windows.get(0),
             None => None,
         }
     }
 
-    pub(crate) fn max_location_windows(&self) -> Option<&Window> {
+    pub(crate) fn max_location_window(&self) -> Option<&Window> {
         match &self.location_windows {
             Some(windows) => {
                 if windows.len() > 0 {

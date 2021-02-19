@@ -3,7 +3,7 @@ use std::fmt::Debug;
 
 use crate::api::element::Record;
 use crate::api::element::{types, BufferReader, BufferWriter};
-use crate::api::function::{Context, Function, ReduceFunction};
+use crate::api::function::{Context, NamedFunction, ReduceFunction};
 use crate::functions::percentile::{get_percentile_capacity, Percentile};
 use crate::functions::schema_base::FunctionSchema;
 
@@ -460,7 +460,7 @@ impl ReduceFunction for SchemaBaseReduceFunction {
     }
 }
 
-impl Function for SchemaBaseReduceFunction {
+impl NamedFunction for SchemaBaseReduceFunction {
     fn name(&self) -> &str {
         "SchemaBaseReduceFunction"
     }
