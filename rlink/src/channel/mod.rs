@@ -49,8 +49,7 @@ impl<'a> TryFrom<&'a str> for BaseOn {
     type Error = anyhow::Error;
 
     fn try_from(mode_str: &'a str) -> Result<Self, Self::Error> {
-        let mode_str = mode_str.to_ascii_lowercase();
-        match mode_str.as_str() {
+        match mode_str {
             "Bounded" => Ok(BaseOn::Bounded),
             "UnBounded" => Ok(BaseOn::UnBounded),
             _ => Err(anyhow!("Unsupported mode {}", mode_str)),
