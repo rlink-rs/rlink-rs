@@ -3,9 +3,9 @@ members = [
     "rlink",
     "rlink-derive",
 
-#    "rlink-connectors/clickhouse-connector",
-#    "rlink-connectors/kafka-connector",
-#    "rlink-connectors/elasticsearch-connector",
+    "rlink-connectors/clickhouse-connector",
+    "rlink-connectors/kafka-connector",
+    "rlink-connectors/elasticsearch-connector",
 
 #    "rlink-deployment/rlink-standalone",
 
