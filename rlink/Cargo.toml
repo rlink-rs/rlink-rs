@@ -44,14 +44,16 @@ crossbeam = "0.8"
 metrics = "0.14"
 metrics-macros = "0.2"
 metrics-util = "0.6"
-metrics-exporter-prometheus = "0.3"
+#metrics-exporter-prometheus = "0.3"
+parking_lot = "0.11"
+quanta = "0.7"
 
 # net
 bytes = "1.0"
 futures = "0.3"
 tokio = { version = "1", features = ["full"] }
 tokio-util = {version = "0.6", features = ["codec"]}
-hyper = { version = "0.14", features = ["client"]}
+hyper = { version = "0.14", features = ["full"]}
 
 # storage
 mysql = "20.1"

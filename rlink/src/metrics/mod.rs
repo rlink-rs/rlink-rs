@@ -1,14 +1,14 @@
 use std::net::SocketAddr;
 use std::time::Duration;
 
+use metrics_util::MetricKindMask;
 use rand::prelude::*;
 
 use crate::channel::bounded;
-use metrics_exporter_prometheus::PrometheusBuilder;
-use metrics_util::MetricKindMask;
+use crate::metrics::prometheus_exporter::PrometheusBuilder;
 
-// mod exporter_http;
 pub mod global_metrics;
+mod prometheus_exporter;
 mod worker_proxy;
 
 pub use global_metrics::register_counter;
@@ -43,7 +43,7 @@ pub(crate) fn init_metrics2(bind_ip: &str, with_proxy: bool) -> Option<SocketAdd
                             MetricKindMask::COUNTER | MetricKindMask::HISTOGRAM,
                             Some(Duration::from_secs(10)),
                         )
-                        .install();
+                        .install(with_proxy);
 
                     match install_result {
                         Ok(_) => {
@@ -78,60 +78,3 @@ pub(crate) fn init_metrics2(bind_ip: &str, with_proxy: bool) -> Option<SocketAdd
 
     socket_addr
 }
-
-// pub(crate) fn init_metrics2(bind_ip: &str, with_proxy: bool) -> SocketAddr {
-//     let receiver = Receiver::builder()
-//         .histogram(Duration::from_secs(5), Duration::from_millis(100))
-//         .build()
-//         .expect("failed to build receiver");
-//
-//     let controller = receiver.controller();
-//
-//     let (tx, rx) = bounded(1);
-//     let bind_ip = bind_ip.to_string();
-//     let tx_clone = tx.clone();
-//     std::thread::spawn(move || {
-//         get_runtime().block_on(async move {
-//             let mut rng = rand::thread_rng();
-//             let loops = 30;
-//             for _index in 0..loops {
-//                 let port = rng.gen_range(10000, 30000);
-//                 // todo for test
-//                 // if port > 0 {
-//                 //     port = 9939;
-//                 // };
-//
-//                 let address = format!("{}:{}", bind_ip, port);
-//                 let addr: SocketAddr = address
-//                     .parse()
-//                     .expect("failed to parse http listen address");
-//                 //    let builder = JsonBuilder::new().set_pretty_json(true);
-//                 let builder = PrometheusBuilder::new();
-//                 let exporter = HttpExporter::new(controller.clone(), builder);
-//                 match exporter.try_bind(&addr) {
-//                     Ok(addr_incoming) => {
-//                         tx_clone.send(addr.clone()).unwrap();
-//                         exporter
-//                             .async_run1(addr_incoming, with_proxy)
-//                             .await
-//                             .unwrap();
-//                         break;
-//                     }
-//                     Err(e) => warn!("exporter run error. {}", e),
-//                 }
-//             }
-//         });
-//     });
-//
-//     let addr = rx.recv().unwrap();
-//     info!(
-//         "metrics http exporter listen on http://{}, proxy mode={}",
-//         addr.to_string(),
-//         with_proxy
-//     );
-//
-//     receiver.install();
-//     info!("receiver configured");
-//
-//     addr
-// }
