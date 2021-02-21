@@ -18,7 +18,9 @@ use crate::dag::metadata::DagMetadata;
 use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
 use crate::runtime::TaskManagerStatus;
 use crate::storage::metadata::{MetadataStorage, TMetadataStorage};
+use crate::utils::fs::read_file;
 use crate::utils::thread::get_runtime;
+use std::path::PathBuf;
 
 pub(crate) fn web_launch(
     context: Arc<crate::runtime::context::Context>,
@@ -116,9 +118,9 @@ async fn route(req: Request<Body>, web_context: Arc<WebContext>) -> anyhow::Resu
                 "/api/metadata" => get_metadata(req, web_context).await,
                 "/api/checkpoints" => get_checkpoint(req, web_context).await,
                 "/api/dag_metadata" => get_dag_metadata(req, web_context).await,
-                "/api/stream_graph" => get_stream_graph(req, web_context).await,
-                "/api/job_graph" => get_job_graph(req, web_context).await,
-                "/api/execution_graph" => get_execution_graph(req, web_context).await,
+                "/api/dag/stream_graph" => get_stream_graph(req, web_context).await,
+                "/api/dag/job_graph" => get_job_graph(req, web_context).await,
+                "/api/dag/execution_graph" => get_execution_graph(req, web_context).await,
                 _ => page_not_found().await,
             }
         } else if Method::POST.eq(method) {
@@ -131,7 +133,11 @@ async fn route(req: Request<Body>, web_context: Arc<WebContext>) -> anyhow::Resu
             page_not_found().await
         }
     } else {
-        page_not_found().await
+        if Method::GET.eq(method) {
+            static_file(req, web_context).await
+        } else {
+            page_not_found().await
+        }
     }
 }
 
@@ -267,7 +273,6 @@ async fn heartbeat(req: Request<Body>, context: Arc<WebContext>) -> anyhow::Resu
     let whole_body = hyper::body::aggregate(req).await?;
     let heartbeat_model: HeartbeatModel = serde_json::from_reader(whole_body.reader())?;
 
-    info!("heartbeat: {:?}", heartbeat_model);
     if !heartbeat_model.status.eq("ok") {
         error!(
             "heartbeat status: {}, model: {:?} ",
@@ -301,7 +306,6 @@ async fn checkpoint(
 ) -> anyhow::Result<Response<Body>> {
     let whole_body = hyper::body::aggregate(req).await?;
     let ck_model: Checkpoint = serde_json::from_reader(whole_body.reader())?;
-    info!("ck_model: {:?}", ck_model);
 
     let ck_manager = &context.checkpoint_manager;
     debug!("submit checkpoint to coordinator. {:?}", &ck_model);
@@ -320,4 +324,60 @@ async fn checkpoint(
         .status(200)
         .body(Body::from(json))
         .map_err(|e| anyhow!(e))
+}
+
+async fn static_file(
+    req: Request<Body>,
+    context: Arc<WebContext>,
+) -> anyhow::Result<Response<Body>> {
+    let path = {
+        let mut path = req.uri().path();
+        if path.is_empty() || "/".eq(path) {
+            path = "/index.html";
+        };
+
+        &path[1..path.len()]
+    };
+
+    let static_file_path = {
+        let path = PathBuf::from_str(path)?;
+
+        let dashboard_path = context.context.dashboard_path.as_str();
+        let base_path = PathBuf::from_str(dashboard_path)?;
+
+        let n = base_path.join(path);
+        n
+    };
+
+    let ext = {
+        let ext_pos = path.rfind(".").ok_or(anyhow!("file ext name not found"))?;
+        &path[ext_pos + 1..path.len()]
+    };
+
+    let context_type = match ext {
+        "html" => "text/html; charset=utf-8",
+        "js" => "application/javascript",
+        "css" => "text/css",
+        "ico" => "image/x-icon",
+        "gif" => "image/gif",
+        "png" => "image/png",
+        "svg" => "image/svg+xml",
+        "woff" => "application/font-woff",
+        _ => "",
+    };
+
+    match read_file(&static_file_path) {
+        Ok(context) => Response::builder()
+            .header(header::CONTENT_TYPE, context_type)
+            .status(200)
+            .body(Body::from(context))
+            .map_err(|e| anyhow!(e)),
+        Err(e) => {
+            error!(
+                "static file not found. file path: {:?}, error: {}",
+                static_file_path, e
+            );
+            page_not_found().await
+        }
+    }
 }

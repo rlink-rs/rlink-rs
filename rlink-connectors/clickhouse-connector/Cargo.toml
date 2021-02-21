@@ -34,7 +34,7 @@ serde_json = "1.0"
 
 futures = "0.3"
 
-tokio = { version = "0.2", features = ["full"] }
+tokio = { version = "1", features = ["full"] }
 
 #clickhouse-rs = { git = "https://github.com/suharev7/clickhouse-rs", rev = "a1d2b29d0f01de2b3d9183ae95a61c6c72ffb8c4" }
 clickhouse-rs = "1.0.0-alpha.1"
