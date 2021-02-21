@@ -12,7 +12,7 @@ license = "MIT/Apache-2.0"
 name = "rlink"
 
 [dependencies]
-serbuffer = "1.0"
+serbuffer = "1.1"
 
 log = "0.4"
 log4rs = "0.12"
@@ -41,24 +41,17 @@ murmur3 = "0.5"
 dashmap = "3.11"
 crossbeam = "0.8"
 
-metrics = "0.12"
-metrics-core = "0.5"
-metrics-runtime = "0.13"
-#metrics-exporter-http = "0.3"
+metrics = "0.14"
+metrics-macros = "0.2"
+metrics-util = "0.6"
+metrics-exporter-prometheus = "0.3"
 
 # net
-bytes = "0.5"
+bytes = "1.0"
 futures = "0.3"
-futures-util = { version = "0.3", default-features = false, features = ["sink"] }
-tokio = { version = "0.2", features = ["full"] }
-tokio-util = {version = "0.3", features = ["codec"]}
-hyper = "0.13"
-
-# web
-actix-rt = "1.1"
-actix-web = "3.1"
-actix-files = "0.5"
-awc = "2.0"
+tokio = { version = "1", features = ["full"] }
+tokio-util = {version = "0.6", features = ["codec"]}
+hyper = { version = "0.14", features = ["client"]}
 
 # storage
 mysql = "20.1"

@@ -1,5 +1,4 @@
 use bytes::buf::Buf;
-use bytes::buf::BufExt;
 use hyper::{Body, Client, Request};
 use serde::Serialize;
 
@@ -57,8 +56,8 @@ pub async fn get(url: &str) -> Result<String, Box<dyn std::error::Error + Send +
     // asynchronously aggregate the chunks of the body
     let result = hyper::body::to_bytes(res).await?;
 
-    let bs = result.bytes();
-    let s = String::from_utf8(bs.to_vec())?;
+    let bs = result.to_vec();
+    let s = String::from_utf8(bs)?;
 
     Ok(s)
 }

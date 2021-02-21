@@ -62,7 +62,7 @@ pub(crate) fn serve_sync(
     checkpoint_manager: CheckpointManager,
     dag_metadata: DagMetadata,
 ) {
-    actix_rt::System::new("Coordinator Web UI")
+    actix_rt::System::new()
         .block_on(serve(
             job_context,
             metadata_mode,
