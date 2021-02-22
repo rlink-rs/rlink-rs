@@ -9,7 +9,7 @@ use crate::channel::{bounded, Receiver, Sender};
 use crate::dag::metadata::DagMetadata;
 use crate::runtime::context::Context;
 use crate::runtime::ApplicationDescriptor;
-use crate::storage::checkpoint::CheckpointStorage;
+use crate::storage::checkpoint::{CheckpointStorage, TCheckpointStorage};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct OperatorCheckpoint {
@@ -161,13 +161,35 @@ impl CheckpointAlignManager {
         if self.is_align() {
             let complete_checkpoint_id = self.current_ck_id;
             let complete_operator_cks = self.operator_cks.clone();
-            // todo storage
+
             debug!(
                 "complete checkpoint_id={:?}, checkpoints: {:?}",
                 complete_checkpoint_id, complete_operator_cks
             );
-
             self.finish_operator_cks = complete_operator_cks;
+
+            match self.storage.as_mut() {
+                Some(storage) => {
+                    let cks = {
+                        let mut cks = Vec::new();
+                        self.finish_operator_cks.iter().for_each(|(_, v)| {
+                            let operator_cks: Vec<Checkpoint> =
+                                v.current_cks.iter().map(|x| x.1.clone()).collect();
+                            cks.extend_from_slice(operator_cks.as_slice());
+                        });
+                        cks
+                    };
+
+                    storage.save(
+                        self.application_name.as_str(),
+                        self.application_id.as_str(),
+                        complete_checkpoint_id,
+                        cks,
+                        Duration::from_secs(60 * 10).as_millis() as u64,
+                    )?;
+                }
+                None => {}
+            }
         }
 
         Ok(())

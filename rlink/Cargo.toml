@@ -1,6 +1,6 @@
 [package]
 name = "rlink"
-version = "0.2.2-alpha.5"
+version = "0.2.2-alpha.6"
 authors = ["yorkart <wangyue11.4@163.com>>"]
 edition = "2018"
 description = "High performance Stream Processing Framework"
@@ -12,10 +12,10 @@ license = "MIT/Apache-2.0"
 name = "rlink"
 
 [dependencies]
-serbuffer = "1.0"
+serbuffer = "1.1"
 
 log = "0.4"
-log4rs = "0.12"
+log4rs = "1.0"
 
 #num_cpus = "1.12.0"
 chrono="0.4"
@@ -28,7 +28,7 @@ hostname = "0.3"
 dns-lookup = "1.0"
 
 # randomness
-rand = "0.7"
+rand = "0.8"
 
 # serialization
 serde = "1.0"
@@ -38,27 +38,22 @@ serde_yaml = "0.8"
 
 # hash code
 murmur3 = "0.5"
-dashmap = "3.11"
+dashmap = "4.0"
 crossbeam = "0.8"
 
-metrics = "0.12"
-metrics-core = "0.5"
-metrics-runtime = "0.13"
-#metrics-exporter-http = "0.3"
+metrics = "0.14"
+metrics-macros = "0.2"
+metrics-util = "0.6"
+#metrics-exporter-prometheus = "0.3"
+parking_lot = "0.11"
+quanta = "0.7"
 
 # net
-bytes = "0.5"
+bytes = "1.0"
 futures = "0.3"
-futures-util = { version = "0.3", default-features = false, features = ["sink"] }
-tokio = { version = "0.2", features = ["full"] }
-tokio-util = {version = "0.3", features = ["codec"]}
-hyper = "0.13"
-
-# web
-actix-rt = "1.1"
-actix-web = "3.1"
-actix-files = "0.5"
-awc = "2.0"
+tokio = { version = "1", features = ["full"] }
+tokio-util = {version = "0.6", features = ["codec"]}
+hyper = { version = "0.14", features = ["full"]}
 
 # storage
 mysql = "20.1"

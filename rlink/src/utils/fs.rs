@@ -16,8 +16,8 @@ pub fn write_file(path: PathBuf, file_name: &str, values: &Vec<String>) -> std::
     Ok(())
 }
 
-pub fn read_file(path: PathBuf) -> std::io::Result<String> {
-    let mut file = File::open(&path)?;
+pub fn read_file(path: &PathBuf) -> std::io::Result<String> {
+    let mut file = File::open(path)?;
 
     let mut s = String::new();
     file.read_to_string(&mut s)?;

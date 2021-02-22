@@ -3,9 +3,6 @@ use std::io::{BufRead, Write};
 use std::process::Stdio;
 use std::sync::Arc;
 
-use serde::Deserialize;
-use serde::Serialize;
-
 use crate::api::cluster::TaskResourceInfo;
 use crate::api::env::{StreamApp, StreamExecutionEnvironment};
 use crate::channel::{bounded, Receiver, Sender};
