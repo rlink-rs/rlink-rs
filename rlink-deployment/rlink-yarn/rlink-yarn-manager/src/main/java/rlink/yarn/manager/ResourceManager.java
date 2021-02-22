@@ -3,6 +3,8 @@ package rlink.yarn.manager;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.commons.lang.StringUtils;
+import org.apache.hadoop.yarn.api.records.*;
 import rlink.yarn.manager.model.Command;
 import rlink.yarn.manager.model.ContainerInfo;
 import rlink.yarn.manager.model.LaunchParam;
@@ -13,16 +15,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterResponse;
-import org.apache.hadoop.yarn.api.records.Container;
-import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
-import org.apache.hadoop.yarn.api.records.ContainerStatus;
-import org.apache.hadoop.yarn.api.records.LocalResource;
-import org.apache.hadoop.yarn.api.records.LocalResourceType;
-import org.apache.hadoop.yarn.api.records.LocalResourceVisibility;
-import org.apache.hadoop.yarn.api.records.NodeReport;
-import org.apache.hadoop.yarn.api.records.Priority;
-import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.client.api.AMRMClient;
 import org.apache.hadoop.yarn.client.api.async.AMRMClientAsync;
 import org.apache.hadoop.yarn.client.api.async.NMClientAsync;
@@ -67,6 +59,9 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
     private Command curCommand;
     private boolean commandRunning;
 
+    private List<TaskResourceInfo> stopTaskList = new ArrayList<>();
+    private List<ContainerId> stopContainerList = new ArrayList<>();
+
     public void launch(LaunchParam launchParam) throws Exception {
         String webUrl = launchParam.getWebUrl();
         resourcePath = launchParam.getResourcePath();
@@ -97,6 +92,9 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
             case allocate:
                 executeAllocate(command);
                 break;
+            case stop:
+                executeStop(command);
+                break;
             default:
                 throw new RuntimeException("invalid command");
         }
@@ -120,6 +118,22 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
                 requestYarnContainer(memoryMb, vCores, containerCount);
             } catch (Exception e) {
                 LOGGER.error("executeAllocate error", e);
+            }
+        });
+    }
+
+    private void executeStop(Command command) {
+        executor.execute(() -> {
+            try {
+                List<Map> data = command.getData();
+                List<TaskResourceInfo> taskInfoList = JSONArray.parseArray(JSON.toJSONString(data), TaskResourceInfo.class);
+                stopTaskList = taskInfoList;
+                stopContainerList = new ArrayList<>();
+                for (TaskResourceInfo taskResourceInfo : taskInfoList) {
+                    stopTaskContainer(taskResourceInfo);
+                }
+            } catch (Exception e) {
+                LOGGER.error("executeStop error", e);
             }
         });
     }
@@ -167,6 +181,20 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
             nodeManagerClient.startContainerAsync(container, taskExecutorLaunchContext);
         } catch (Throwable t) {
             LOGGER.error("start container error", t);
+        }
+    }
+
+    private void stopTaskContainer(TaskResourceInfo taskResourceInfo) {
+        try {
+            ContainerInfo containerInfo = taskResourceInfo.getResourceInfo();
+            ContainerId containerId = ContainerId.fromString(containerInfo.getContainerId());
+            String host = StringUtils.substringBefore(containerInfo.getNodeId(), ":");
+            String port = StringUtils.substringAfter(containerInfo.getNodeId(), ":");
+            NodeId nodeId = NodeId.newInstance(host, Integer.parseInt(port));
+            nodeManagerClient.stopContainerAsync(containerId, nodeId);
+            LOGGER.info("stopTaskContainer containerInfo={}", JSON.toJSONString(containerInfo));
+        } catch (Exception e) {
+            LOGGER.error("stop container error,taskResourceInfo={}", JSON.toJSONString(taskResourceInfo), e);
         }
     }
 
@@ -255,12 +283,18 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
 
     @Override
     public void onContainerStopped(ContainerId containerId) {
-
+        stopContainerList.add(containerId);
+        LOGGER.info("Succeeded stop container {}. [{}/{}]", containerId, stopContainerList.size(), stopTaskList.size());
+        if (stopContainerList.size() == stopTaskList.size()) {
+            List<Map> data = JSONArray.parseArray(JSON.toJSONString(stopContainerList), Map.class);
+            Command commandMsg = new Command(curCommand.getCmd(), curCommand.getCmdId(), data);
+            MessageUtil.send(commandMsg);
+        }
     }
 
     @Override
     public void onStartContainerError(ContainerId containerId, Throwable t) {
-
+        LOGGER.error("Error start container {}.", containerId, t);
     }
 
     @Override
@@ -270,6 +304,6 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
 
     @Override
     public void onStopContainerError(ContainerId containerId, Throwable t) {
-
+        LOGGER.error("Error stop container {}.", containerId, t);
     }
 }
