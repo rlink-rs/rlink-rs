@@ -7,7 +7,7 @@ members = [
     "rlink-connectors/kafka-connector",
     "rlink-connectors/elasticsearch-connector",
 
-#    "rlink-deployment/rlink-standalone",
+    "rlink-deployment/rlink-standalone",
 
     "example/showcase",
 ]

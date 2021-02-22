@@ -161,7 +161,7 @@ impl ClickhouseSinkTask {
             match self.batch_send(client.borrow_mut()).await {
                 Ok(len) => {
                     if len == 0 {
-                        tokio::time::delay_for(Duration::from_secs(1)).await;
+                        tokio::time::sleep(Duration::from_secs(1)).await;
                     }
                 }
                 Err(e) => {
@@ -177,7 +177,7 @@ impl ClickhouseSinkTask {
     async fn reconnection(&mut self, client: &mut ClientHandle) -> anyhow::Result<()> {
         let mut err = None;
         for _ in 0..180 {
-            tokio::time::delay_for(Duration::from_secs(1)).await;
+            tokio::time::sleep(Duration::from_secs(1)).await;
             match client.check_connection().await {
                 Ok(_) => {
                     err = None;
@@ -207,7 +207,7 @@ impl ClickhouseSinkTask {
                     size = n;
                 }
                 Err(_e) => {
-                    tokio::time::delay_for(Duration::from_millis(100)).await;
+                    tokio::time::sleep(Duration::from_millis(100)).await;
                     let current_timestamp = utils::date_time::current_timestamp();
                     if current_timestamp - begin_timestamp > self.batch_timeout {
                         break;

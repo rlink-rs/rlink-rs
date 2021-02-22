@@ -139,7 +139,7 @@ mod tests {
         .unwrap()
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     pub async fn producer2_result_test() {
         let topic = "rust-demo";
 
