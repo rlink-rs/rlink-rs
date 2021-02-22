@@ -30,7 +30,7 @@ impl KafkaSourceStateCache {
     pub fn update(&self, topic: String, partition: i32, offset: i64) {
         let key = PartitionMetadata { topic, partition };
         let val = OffsetMetadata {
-            offset: Offset::Offset(offset).to_raw(),
+            offset: Offset::Offset(offset).to_raw().unwrap(),
         };
 
         self.partition_offsets.insert(key, val);
@@ -54,7 +54,7 @@ impl KafkaSourceStateCache {
         let val = match self.partition_offsets.get(&key) {
             Some(kv_ref) => kv_ref.clone(),
             None => OffsetMetadata {
-                offset: default_offset.to_raw(),
+                offset: default_offset.to_raw().unwrap(),
             },
         };
 

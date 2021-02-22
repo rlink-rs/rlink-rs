@@ -240,6 +240,6 @@ fn metrics_serve(bind_ip: &str, cluster_mode: &ClusterMode, manager_type: &Manag
         false
     };
 
-    let addr = crate::metrics::init_metrics2(bind_ip, with_proxy);
+    let addr = crate::metrics::init_metrics2(bind_ip, with_proxy).unwrap();
     format!("http://{}:{}", bind_ip, addr.port())
 }

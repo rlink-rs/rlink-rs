@@ -5,7 +5,6 @@ use std::borrow::BorrowMut;
 use std::convert::TryFrom;
 use std::fmt::Debug;
 
-use serde::Serialize;
 use thiserror::Error;
 
 use crate::api::function::InputSplit;

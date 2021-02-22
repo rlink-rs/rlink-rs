@@ -14,8 +14,8 @@ use crate::dag::DagManager;
 use crate::deployment::TResourceManager;
 use crate::runtime::context::Context;
 use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
-use crate::runtime::coordinator::server::web_launch;
 use crate::runtime::coordinator::task_distribution::build_application_descriptor;
+use crate::runtime::coordinator::web_server::web_launch;
 use crate::runtime::{ApplicationDescriptor, TaskManagerStatus};
 use crate::storage::metadata::{
     loop_delete_application_descriptor, loop_read_application_descriptor,
@@ -25,8 +25,8 @@ use crate::utils::date_time::timestamp_str;
 
 pub mod checkpoint_manager;
 pub mod heart_beat_manager;
-pub mod server;
 pub mod task_distribution;
+pub mod web_server;
 
 pub(crate) struct CoordinatorTask<S, R>
 where

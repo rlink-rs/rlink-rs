@@ -568,7 +568,7 @@ impl Serde for Element {
     }
 
     fn deserialize(bytes: &mut BytesMut) -> Self {
-        let tag = bytes.bytes()[0];
+        let tag = bytes.as_ref()[0];
         match tag {
             SER_DE_RECORD => {
                 let record = Record::deserialize(bytes);

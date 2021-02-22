@@ -177,12 +177,12 @@ impl ElasticsearchWriteThread {
             match self.batch_send(&converter).await {
                 Ok(len) => {
                     if len == 0 {
-                        tokio::time::delay_for(Duration::from_secs(1)).await;
+                        tokio::time::sleep(Duration::from_secs(1)).await;
                     }
                 }
                 Err(e) => {
                     error!("write elasticsearch error. {}", e);
-                    tokio::time::delay_for(Duration::from_millis(100)).await;
+                    tokio::time::sleep(Duration::from_millis(100)).await;
                 }
             }
         }

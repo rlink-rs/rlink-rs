@@ -126,11 +126,13 @@ impl KafkaConsumerThread {
     pub async fn run(&mut self) {
         let mut assignment = TopicPartitionList::new();
         for (partition_metadata, offset_metadata) in &self.partition_offsets {
-            assignment.add_partition_offset(
-                partition_metadata.topic.as_str(),
-                partition_metadata.partition,
-                Offset::from_raw(offset_metadata.offset),
-            )
+            assignment
+                .add_partition_offset(
+                    partition_metadata.topic.as_str(),
+                    partition_metadata.partition,
+                    Offset::from_raw(offset_metadata.offset),
+                )
+                .unwrap();
         }
 
         // let group_id = format!("rlink{}", Uuid::new_v4());
@@ -150,7 +152,7 @@ impl KafkaConsumerThread {
         );
 
         let mut counter = 0u64;
-        let mut message_stream = consumer.start();
+        let mut message_stream = consumer.stream();
         while let Some(message) = message_stream.next().await {
             match message {
                 Ok(borrowed_message) => {
