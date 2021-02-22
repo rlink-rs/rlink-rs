@@ -3,9 +3,8 @@ use std::convert::TryFrom;
 use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
 use std::sync::Arc;
-use std::time::Duration;
 
-use bytes::{Buf, BufMut, BytesMut};
+use bytes::{BufMut, BytesMut};
 use dashmap::DashMap;
 use futures::{SinkExt, StreamExt};
 use rand::prelude::*;
@@ -130,7 +129,7 @@ impl Server {
         let mut rng = rand::thread_rng();
         let loops = 30;
         for index in 0..loops {
-            let port = rng.gen_range(10000, 30000);
+            let port = rng.gen_range(10000..30000);
             let address = format!("0.0.0.0:{}", port);
 
             match TcpListener::bind(&address).await {
@@ -147,7 +146,7 @@ impl Server {
         panic!("port inuse");
     }
 
-    pub async fn session_accept(self, mut listener: TcpListener) -> std::io::Result<()> {
+    pub async fn session_accept(self, listener: TcpListener) -> std::io::Result<()> {
         loop {
             let (socket, remote_addr) = listener.accept().await?;
             info!(
@@ -155,7 +154,7 @@ impl Server {
                 self.sock_addr_to_str(&remote_addr)
             );
 
-            socket.set_keepalive(Option::Some(Duration::from_secs(120)))?;
+            // socket.set_keepalive(Option::Some(Duration::from_secs(120)))?;
 
             tokio::spawn(self.clone().session_process(socket, remote_addr));
         }
@@ -260,7 +259,7 @@ impl Server {
         element: Option<Element>,
         framed_read: &mut tokio::net::TcpStream,
     ) -> Result<(), std::io::Error> {
-        let mut req = match element {
+        let req = match element {
             Some(element) => {
                 let element_len = element.capacity();
                 let mut req = bytes::BytesMut::with_capacity(4 + 1 + element_len);
@@ -282,7 +281,7 @@ impl Server {
             .length_field_length(4)
             .new_framed(framed_read);
 
-        codec_framed0.send(req.to_bytes()).await
+        codec_framed0.send(req.freeze()).await
     }
 
     fn sock_addr_to_str(&self, addr: &std::net::SocketAddr) -> String {

@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use crate::api::cluster::StdResponse;
-use crate::runtime::coordinator::server::HeartbeatModel;
+use crate::runtime::coordinator::web_server::HeartbeatModel;
 use crate::utils::http_client::post;
 use crate::utils::thread::get_runtime;
 use crate::utils::{date_time, panic};
@@ -92,7 +92,7 @@ pub(crate) async fn start_heart_beat_timer_async(
 ) {
     info!("heartbeat loop starting...");
     loop {
-        tokio::time::delay_for(Duration::from_secs(10)).await;
+        tokio::time::sleep(Duration::from_secs(10)).await;
 
         status_heartbeat_async(
             coordinator,

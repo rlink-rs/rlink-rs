@@ -1,6 +1,6 @@
 [package]
 name = "rlink-kafka-connector"
-version = "0.2.2-alpha.5"
+version = "0.2.2-alpha.6"
 authors = ["yorkart <wangyue11.4@163.com>>"]
 edition = "2018"
 description = "High performance Stream Processing Framework"
@@ -12,18 +12,18 @@ license = "MIT/Apache-2.0"
 name = "rlink_kafka_connector"
 
 [dependencies.rlink]
-version = "0.2.2-alpha.5"
+version = "0.2.2-alpha.6"
 path = "../../rlink"
 
 [dependencies.rlink-derive]
-version = "0.2.2-alpha.5"
+version = "0.2.2-alpha.6"
 path = "../../rlink-derive"
 
 [dependencies]
 log = "0.4"
 lazy_static = "1.4.0"
 anyhow = "1.0"
-dashmap = "3.11"
+dashmap = "4.0"
 
 # serde
 serde = "1.0"
@@ -32,7 +32,7 @@ serde_json = "1.0"
 
 futures = "0.3"
 
-tokio = { version = "0.2", features = ["full"] }
+tokio = { version = "1", features = ["full"] }
 
 # kafka
-rdkafka = { version = "0.24", features = ["cmake-build"] }
+rdkafka = { version = "0.25", features = ["cmake-build"] }
