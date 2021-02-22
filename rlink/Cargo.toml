@@ -15,7 +15,7 @@ name = "rlink"
 serbuffer = "1.1"
 
 log = "0.4"
-log4rs = "0.12"
+log4rs = "1.0"
 
 #num_cpus = "1.12.0"
 chrono="0.4"
@@ -28,7 +28,7 @@ hostname = "0.3"
 dns-lookup = "1.0"
 
 # randomness
-rand = "0.7"
+rand = "0.8"
 
 # serialization
 serde = "1.0"
@@ -38,7 +38,7 @@ serde_yaml = "0.8"
 
 # hash code
 murmur3 = "0.5"
-dashmap = "3.11"
+dashmap = "4.0"
 crossbeam = "0.8"
 
 metrics = "0.14"

@@ -22,11 +22,11 @@ pub(crate) fn init_log(log_config_path: Option<String>) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn load_config_from_file(path: PathBuf) -> Result<Config, log4rs::Error> {
-    log4rs::load_config_file(path, Default::default())
+fn load_config_from_file(path: PathBuf) -> anyhow::Result<Config> {
+    log4rs::config::load_config_file(path, Default::default())
 }
 
-fn init_default() -> Result<Config, log4rs::config::Errors> {
+fn init_default() -> Result<Config, log4rs::config::runtime::ConfigErrors> {
     let name = "console";
     let default_level = LevelFilter::Info;
     let encoder =

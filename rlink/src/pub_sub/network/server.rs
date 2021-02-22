@@ -129,7 +129,7 @@ impl Server {
         let mut rng = rand::thread_rng();
         let loops = 30;
         for index in 0..loops {
-            let port = rng.gen_range(10000, 30000);
+            let port = rng.gen_range(10000..30000);
             let address = format!("0.0.0.0:{}", port);
 
             match TcpListener::bind(&address).await {

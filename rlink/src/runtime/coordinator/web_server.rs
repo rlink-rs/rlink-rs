@@ -64,7 +64,7 @@ async fn serve_with_rand_port(
 ) {
     let mut rng = rand::thread_rng();
     for _ in 0..30 {
-        let port = rng.gen_range(10000, 30000);
+        let port = rng.gen_range(10000..30000);
         let address = format!("{}:{}", bind_id.as_str(), port);
         let socket_addr = SocketAddr::from_str(address.as_str()).unwrap();
 

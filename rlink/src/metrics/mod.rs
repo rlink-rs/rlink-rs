@@ -30,7 +30,7 @@ pub(crate) fn init_metrics2(bind_ip: &str, with_proxy: bool) -> Option<SocketAdd
                 let mut rng = rand::thread_rng();
                 let loops = 30;
                 for _index in 0..loops {
-                    let port = rng.gen_range(10000, 30000);
+                    let port = rng.gen_range(10000..30000);
                     let addr: SocketAddr = format!("{}:{}", bind_ip, port)
                         .as_str()
                         .parse()
