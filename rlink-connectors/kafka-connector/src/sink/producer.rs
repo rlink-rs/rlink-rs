@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use rdkafka::producer::{FutureProducer, FutureRecord};
+use rdkafka::producer::{FutureProducer, FutureRecord, Producer};
 use rdkafka::ClientConfig;
 use rlink::channel::handover::Handover;
 use rlink::channel::TryRecvError;
@@ -78,9 +78,9 @@ impl KafkaProducerThread {
             if future_queue.len() == 0 {
                 idle_counter += 1;
                 if idle_counter < 30 {
-                    tokio::time::delay_for(idle_delay_10).await;
+                    tokio::time::sleep(idle_delay_10).await;
                 } else {
-                    tokio::time::delay_for(idle_delay_300).await;
+                    tokio::time::sleep(idle_delay_300).await;
                 }
             } else {
                 idle_counter = 0;
@@ -139,7 +139,7 @@ mod tests {
         .unwrap()
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     pub async fn producer2_result_test() {
         let topic = "rust-demo";
 

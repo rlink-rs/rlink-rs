@@ -46,7 +46,7 @@ pub(crate) fn start_report_checkpoint(coordinator_address: &str) {
                         report_checkpoint0(coordinator_address.as_str(), ck).await;
                     }
                     Err(TryRecvError::Empty) => {
-                        tokio::time::delay_for(Duration::from_secs(2)).await;
+                        tokio::time::sleep(Duration::from_secs(2)).await;
                     }
                     Err(TryRecvError::Disconnected) => {
                         panic!("the Checkpoint channel is disconnected")

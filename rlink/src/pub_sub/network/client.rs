@@ -1,5 +1,5 @@
 use std::borrow::BorrowMut;
-use std::net::{Shutdown, SocketAddr};
+use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
@@ -7,10 +7,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use bytes::{Buf, BytesMut};
-use futures_util::sink::SinkExt;
 use tokio::net::tcp::ReadHalf;
 use tokio::net::TcpStream;
-use tokio::stream::StreamExt;
 use tokio_util::codec::FramedRead;
 use tokio_util::codec::LengthDelimitedCodec;
 use tokio_util::codec::{BytesCodec, FramedWrite};
@@ -26,6 +24,8 @@ use crate::metrics::{register_counter, Tag};
 use crate::pub_sub::network::{ElementRequest, ResponseCode};
 use crate::runtime::ApplicationDescriptor;
 use crate::utils::thread::get_runtime;
+use futures::{SinkExt, StreamExt};
+use tokio::io::AsyncWriteExt;
 
 const BATCH_PULL_SIZE: u16 = 6000;
 
@@ -104,7 +104,7 @@ async fn subscribe_listen(application_descriptor: Arc<ApplicationDescriptor>) {
             Err(TryRecvError::Empty) => {
                 idle_counter += 1;
                 if idle_counter < 20 * 120 {
-                    tokio::time::delay_for(delay).await;
+                    tokio::time::sleep(delay).await;
                 } else {
                     // all task registration must be completed within 2 minute
                     info!("subscribe listen task finish");
@@ -132,11 +132,11 @@ async fn client_task(
     let mut client = Client::new(channel_key, sender.clone(), addr, batch_pull_size).await?;
     match client.send().await {
         Ok(()) => {
-            client.close_rough();
+            client.close_rough().await;
             Ok(())
         }
         Err(e) => {
-            client.close_rough();
+            client.close_rough().await;
             Err(e)
         }
     }
@@ -158,7 +158,7 @@ async fn loop_client_task(
             }
         }
 
-        tokio::time::delay_for(Duration::from_secs(3)).await;
+        tokio::time::sleep(Duration::from_secs(3)).await;
     }
 }
 
@@ -225,8 +225,8 @@ impl Client {
                 batch_pull_size: self.batch_pull_size,
             };
 
-            let mut buffer: BytesMut = request.into();
-            sink.send(buffer.to_bytes()).await?;
+            let buffer: BytesMut = request.into();
+            sink.send(buffer.freeze()).await?;
 
             loop {
                 match codec_framed.next().await {
@@ -253,7 +253,7 @@ impl Client {
                                     break;
                                 }
                                 ResponseCode::Empty => {
-                                    tokio::time::delay_for(Duration::from_millis(1000)).await;
+                                    tokio::time::sleep(Duration::from_millis(1000)).await;
                                     debug!("No rows in remote");
 
                                     break;
@@ -297,7 +297,7 @@ impl Client {
                     }
                     loops += 1;
 
-                    tokio::time::delay_for(Duration::from_secs(1)).await;
+                    tokio::time::sleep(Duration::from_secs(1)).await;
                     ele
                 }
                 Err(TrySendError::Disconnected(_)) => panic!("net input channel Disconnected"),
@@ -307,13 +307,13 @@ impl Client {
 
     // maybe lost data in send/recv buffer
     #[allow(dead_code)]
-    pub fn close(self) -> std::io::Result<()> {
-        self.stream.shutdown(Shutdown::Both)
+    pub async fn close(mut self) -> std::io::Result<()> {
+        self.stream.shutdown().await
     }
 
     #[allow(dead_code)]
-    pub fn close_rough(self) {
-        match self.close() {
+    pub async fn close_rough(self) {
+        match self.close().await {
             Ok(_) => {}
             Err(e) => {
                 error!("close client error {}", e);
