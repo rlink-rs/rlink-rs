@@ -1,14 +1,15 @@
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::ops::Deref;
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
 use bytes::Buf;
 use hyper::http::header;
 use hyper::service::{make_service_fn, service_fn};
-use hyper::Server;
 use hyper::{Body, Method, Request, Response};
+use hyper::{Server, StatusCode};
 use rand::Rng;
 
 use crate::api::checkpoint::Checkpoint;
@@ -20,7 +21,6 @@ use crate::runtime::TaskManagerStatus;
 use crate::storage::metadata::{MetadataStorage, TMetadataStorage};
 use crate::utils::fs::read_file;
 use crate::utils::thread::get_runtime;
-use std::path::PathBuf;
 
 pub(crate) fn web_launch(
     context: Arc<crate::runtime::context::Context>,
@@ -152,7 +152,7 @@ pub(crate) struct HeartbeatModel {
 
 async fn page_not_found() -> anyhow::Result<Response<Body>> {
     Response::builder()
-        .status(404)
+        .status(StatusCode::NOT_FOUND)
         .body(Body::from("Page not found"))
         .map_err(|e| anyhow!(e))
 }
@@ -167,7 +167,7 @@ async fn get_context(
     let json = serde_json::to_string(&resp).unwrap();
     Response::builder()
         .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
-        .status(200)
+        .status(StatusCode::OK)
         .body(Body::from(json))
         .map_err(|e| anyhow!(e))
 }
@@ -184,7 +184,7 @@ async fn get_metadata(
 
     Response::builder()
         .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
-        .status(200)
+        .status(StatusCode::OK)
         .body(Body::from(json))
         .map_err(|e| anyhow!(e))
 }
@@ -200,7 +200,7 @@ async fn get_checkpoint(
 
     Response::builder()
         .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
-        .status(200)
+        .status(StatusCode::OK)
         .body(Body::from(json))
         .map_err(|e| anyhow!(e))
 }
@@ -216,7 +216,7 @@ async fn get_dag_metadata(
 
     Response::builder()
         .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
-        .status(200)
+        .status(StatusCode::OK)
         .body(Body::from(json))
         .map_err(|e| anyhow!(e))
 }
@@ -232,7 +232,7 @@ async fn get_stream_graph(
 
     Response::builder()
         .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
-        .status(200)
+        .status(StatusCode::OK)
         .body(Body::from(json))
         .map_err(|e| anyhow!(e))
 }
@@ -248,7 +248,7 @@ async fn get_job_graph(
 
     Response::builder()
         .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
-        .status(200)
+        .status(StatusCode::OK)
         .body(Body::from(json))
         .map_err(|e| anyhow!(e))
 }
@@ -264,7 +264,7 @@ async fn get_execution_graph(
 
     Response::builder()
         .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
-        .status(200)
+        .status(StatusCode::OK)
         .body(Body::from(json))
         .map_err(|e| anyhow!(e))
 }
@@ -295,7 +295,7 @@ async fn heartbeat(req: Request<Body>, context: Arc<WebContext>) -> anyhow::Resu
     let json = serde_json::to_string(&resp).unwrap();
     Response::builder()
         .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
-        .status(200)
+        .status(StatusCode::OK)
         .body(Body::from(json))
         .map_err(|e| anyhow!(e))
 }
@@ -321,7 +321,7 @@ async fn checkpoint(
     let json = serde_json::to_string(&resp).unwrap();
     Response::builder()
         .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
-        .status(200)
+        .status(StatusCode::OK)
         .body(Body::from(json))
         .map_err(|e| anyhow!(e))
 }
@@ -369,7 +369,7 @@ async fn static_file(
     match read_file(&static_file_path) {
         Ok(context) => Response::builder()
             .header(header::CONTENT_TYPE, context_type)
-            .status(200)
+            .status(StatusCode::OK)
             .body(Body::from(context))
             .map_err(|e| anyhow!(e)),
         Err(e) => {
