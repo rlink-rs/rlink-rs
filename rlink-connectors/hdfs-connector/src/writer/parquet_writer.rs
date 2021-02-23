@@ -66,7 +66,7 @@ pub struct ParquetWriter {
     max_bytes: i64,
     total_bytes: i64,
     converter: Box<dyn BlockConverter>,
-    blocks: Box<dyn Blocks>,
+    blocks: Option<Box<dyn Blocks>>,
 }
 
 impl ParquetWriter {
@@ -88,11 +88,16 @@ impl ParquetWriter {
             max_bytes,
             total_bytes: 0,
             converter,
-            blocks,
+            blocks: Some(blocks),
         }
     }
 
-    fn flush_buffer(&mut self, batch_values: Vec<ColumnValues>) -> anyhow::Result<i64> {
+    fn flush_buffer(&mut self) -> anyhow::Result<i64> {
+        if self.blocks.is_none() {
+            return Ok(0);
+        }
+
+        let batch_values = self.blocks.as_mut().unwrap().flush();
         let mut batch_values_iter = batch_values.into_iter();
 
         let mut row_group_writer = self.writer.next_row_group()?;
@@ -174,100 +179,31 @@ impl BlockWriter for ParquetWriter {
     fn open(&mut self) {}
 
     fn append(&mut self, record: Record) -> anyhow::Result<bool> {
-        let block_size = self.blocks.append(record);
+        let block_size = self.blocks.as_mut().unwrap().append(record);
         if block_size < self.row_group_size {
             return Ok(false);
         }
 
-        let batch_values = self.blocks.flush();
-        let mut batch_values_iter = batch_values.into_iter();
+        let byte_size = self.flush_buffer()?;
 
-        let mut row_group_writer = self.writer.next_row_group()?;
-        while let Some(mut col_writer) = row_group_writer.next_column()? {
-            let column_values = batch_values_iter
-                .next()
-                .ok_or(anyhow!("column inconsistency"))?;
-
-            match col_writer {
-                ColumnWriter::BoolColumnWriter(ref mut typed) => {
-                    if let ColumnValues::BoolValues(values) = column_values {
-                        typed.write_batch(values, None, None)?;
-                    } else {
-                        panic!("type inconsistency");
-                    }
-                }
-                ColumnWriter::Int32ColumnWriter(ref mut typed) => {
-                    if let ColumnValues::Int32Values(values) = column_values {
-                        typed.write_batch(values, None, None)?;
-                    } else {
-                        panic!("type inconsistency");
-                    }
-                }
-                ColumnWriter::Int64ColumnWriter(ref mut typed) => {
-                    if let ColumnValues::Int64Values(values) = column_values {
-                        typed.write_batch(values, None, None)?;
-                    } else {
-                        panic!("type inconsistency");
-                    }
-                }
-                ColumnWriter::Int96ColumnWriter(ref mut typed) => {
-                    if let ColumnValues::Int96Values(values) = column_values {
-                        typed.write_batch(values, None, None)?;
-                    } else {
-                        panic!("type inconsistency");
-                    }
-                }
-                ColumnWriter::FloatColumnWriter(ref mut typed) => {
-                    if let ColumnValues::FloatValues(values) = column_values {
-                        typed.write_batch(values, None, None)?;
-                    } else {
-                        panic!("type inconsistency");
-                    }
-                }
-                ColumnWriter::DoubleColumnWriter(ref mut typed) => {
-                    if let ColumnValues::DoubleValues(values) = column_values {
-                        typed.write_batch(values, None, None)?;
-                    } else {
-                        panic!("type inconsistency");
-                    }
-                }
-                ColumnWriter::ByteArrayColumnWriter(ref mut typed) => {
-                    if let ColumnValues::ByteArrayValues(values) = column_values {
-                        typed.write_batch(values, None, None)?;
-                    } else {
-                        panic!("type inconsistency");
-                    }
-                }
-                ColumnWriter::FixedLenByteArrayColumnWriter(ref mut typed) => {
-                    if let ColumnValues::FixedLenByteArrayValues(values) = column_values {
-                        typed.write_batch(values, None, None)?;
-                    } else {
-                        panic!("type inconsistency");
-                    }
-                }
-            }
-
-            row_group_writer.close_column(col_writer)?;
-        }
-
-        let metadata = row_group_writer.close()?;
-        self.writer.close_row_group(row_group_writer)?;
-
-        self.total_bytes += metadata.total_byte_size();
+        self.total_bytes += byte_size;
         if self.total_bytes >= self.max_bytes {
-            self.writer.close()?;
-
+            self.blocks = None;
             Ok(true)
         } else {
-            self.blocks = self.converter.create_batch(self.row_group_size);
+            self.blocks = Some(self.converter.create_batch(self.row_group_size));
             Ok(false)
         }
     }
 
-    fn close(self) -> Option<Vec<u8>> {
-        let cursor = self.cursor.clone();
+    fn close(mut self) -> anyhow::Result<Vec<u8>> {
+        self.flush_buffer()?;
+
+        self.writer.close()?;
+
+        // let cursor = self.cursor.clone();
         // cursor.into_inner()
-        Some(cursor.data())
+        Ok(self.cursor.data())
     }
 }
 
@@ -344,21 +280,25 @@ message Document {
         let blocks = DefaultBlockConverter::<TestBlocks>::new();
         let blocks = Box::new(blocks);
 
-        let mut writer = ParquetWriter::new(10000 * 10, 1024 * 10, schema, props, blocks);
+        let mut writer = ParquetWriter::new(10000 * 10, 1024 * 1024, schema, props, blocks);
 
         let begin = current_timestamp();
-        let mut index = 0;
-        while !writer.append(Record::new()).unwrap() {
-            // println!("-");
-            index += 1;
+
+        let loops = 10000 * 1000;
+        for _ in 0..loops {
+            let full = writer.append(Record::with_capacity(1)).unwrap();
+            if full {
+                break;
+            }
         }
+        let bytes = writer.close();
+
         let end = current_timestamp();
 
-        let bytes = writer.close();
         println!(
             "len: {}, loops: {}, ts: {}",
             bytes.as_ref().unwrap().len(),
-            index,
+            loops,
             end.checked_sub(begin).unwrap().as_millis()
         );
 
