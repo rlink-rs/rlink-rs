@@ -9,6 +9,10 @@ pub trait FileSystem {
     fn close_file(&mut self) -> anyhow::Result<()>;
 }
 
+pub trait FileSystemFactory: Send + Sync {
+    fn build(&self) -> Box<dyn FileSystem>;
+}
+
 pub trait PathLocation {
     fn path(&self, record: &mut Record) -> anyhow::Result<String>;
 }
@@ -19,13 +23,12 @@ pub trait BlockWriter {
     fn close(self) -> anyhow::Result<Vec<u8>>;
 }
 
-pub trait BlockWriterManager<T, L, FS>
+pub trait BlockWriterManager<T, L>
 where
     T: BlockWriter,
     L: PathLocation,
-    FS: FileSystem,
 {
-    fn open<F>(&mut self, path_location: L, block_writer_builder: F, fs: FS)
+    fn open<F>(&mut self, path_location: L, block_writer_builder: F)
     where
         F: Fn() -> T + 'static;
     fn append(&mut self, record: Record) -> anyhow::Result<()>;

@@ -1,69 +1,65 @@
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
-use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
 use std::time::Duration;
 
-use dashmap::DashMap;
 use rlink::api::element::Record;
+use rlink::channel::{bounded, Receiver, Sender};
 use rlink::utils::date_time::current_timestamp;
 
 use crate::writer::parquet_writer::ParquetBlockWriter;
-use crate::writer::{BlockWriter, BlockWriterManager, FileSystem, PathLocation};
+use crate::writer::{BlockWriter, BlockWriterManager, FileSystemFactory, PathLocation};
 
-struct PathWriter<FS>
-where
-    FS: FileSystem,
-{
-    path: String,
-    block_writer: ParquetBlockWriter,
-    fs: Arc<FS>,
-    create_timestamp: Duration,
-}
-
-pub struct ParquetBlockWriterManager<L, FS>
+pub struct ParquetBlockWriterManager<L>
 where
     L: PathLocation,
-    FS: FileSystem,
 {
-    path_writers: HashMap<String, (ParquetBlockWriter, FS)>,
-    path_ttl: Arc<DashMap<String, (Duration, AtomicBool)>>,
+    path_writers: HashMap<String, (ParquetBlockWriter, Duration)>,
 
     path_location: Option<L>,
     block_writer_builder: Option<Box<dyn Fn() -> ParquetBlockWriter>>,
-    fs_builder: Option<Box<dyn Fn() -> FS>>,
+
+    bytes_flush_sender: Sender<(String, Vec<u8>)>,
 }
 
-impl<L, FS> ParquetBlockWriterManager<L, FS>
+impl<L> ParquetBlockWriterManager<L>
 where
     L: PathLocation,
-    FS: FileSystem,
 {
-    pub fn new() -> Self {
-        ParquetBlockWriterManager {
+    pub fn new<FSF>(ttl: Duration, fs_factory: FSF) -> Self
+    where
+        FSF: FileSystemFactory + 'static,
+    {
+        let (sender, receiver) = bounded(10);
+        Self::fs_write(ttl, fs_factory, receiver);
+        Self {
             path_writers: HashMap::new(),
-            path_ttl: Arc::new(DashMap::new()),
             path_location: None,
             block_writer_builder: None,
-            fs_builder: None,
+            bytes_flush_sender: sender,
         }
     }
 
-    fn flush(&mut self, mut fs: FS, path: &str, bytes: Vec<u8>) -> anyhow::Result<()> {
-        fs.create_file(path)?;
-        fs.write_all(bytes)?;
-        fs.close_file()
-    }
+    fn fs_write<FSF>(_ttl: Duration, fs_factory: FSF, bytes_receiver: Receiver<(String, Vec<u8>)>)
+    where
+        FSF: FileSystemFactory + 'static,
+    {
+        rlink::utils::thread::spawn("", move || {
+            let mut fs = fs_factory.build();
 
-    fn ttl_check(ttl: Duration) {}
+            while let Ok((path, bytes)) = bytes_receiver.recv() {
+                fs.create_file(path.as_str()).unwrap();
+                fs.write_all(bytes).unwrap();
+                fs.close_file().unwrap();
+            }
+        });
+    }
 }
 
-impl<L, FS> BlockWriterManager<ParquetBlockWriter, L, FS> for ParquetBlockWriterManager<L, FS>
+impl<L> BlockWriterManager<ParquetBlockWriter, L> for ParquetBlockWriterManager<L>
 where
     L: PathLocation,
-    FS: FileSystem,
 {
-    fn open<F>(&mut self, path_location: L, block_writer_builder: F, fs: FS)
+    fn open<F>(&mut self, path_location: L, block_writer_builder: F)
     where
         F: Fn() -> ParquetBlockWriter + 'static,
     {
@@ -81,12 +77,9 @@ where
         let mut fs_writer = self.path_writers.get_mut(path.as_str());
         if fs_writer.is_none() {
             let writer_builder = self.block_writer_builder.as_ref().unwrap();
-            let fs = self.fs_builder.as_ref().unwrap();
 
             self.path_writers
-                .insert(path.clone(), (writer_builder(), fs()));
-            self.path_ttl
-                .insert(path.clone(), (current_timestamp(), AtomicBool::new(false)));
+                .insert(path.clone(), (writer_builder(), current_timestamp()));
 
             fs_writer = self.path_writers.get_mut(path.as_str())
         }
@@ -96,13 +89,12 @@ where
         if full {
             let (writer, fs) = self.path_writers.remove(path.as_str()).unwrap();
             let bytes = writer.close()?;
-            self.flush(fs, path.as_str(), bytes)?;
+
+            self.bytes_flush_sender.send((path, bytes)).unwrap();
         }
 
         Ok(())
     }
 
-    fn close(&mut self) {
-        unimplemented!()
-    }
+    fn close(&mut self) {}
 }
