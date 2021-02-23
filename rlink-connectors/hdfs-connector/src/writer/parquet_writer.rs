@@ -1,10 +1,9 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use parquet::basic::Compression;
 use parquet::column::writer::ColumnWriter;
 use parquet::data_type::{ByteArray, FixedLenByteArray, Int96};
-use parquet::file::properties::{WriterProperties, WriterPropertiesPtr, WriterVersion};
+use parquet::file::properties::WriterPropertiesPtr;
 use parquet::file::writer::{FileWriter, InMemoryWriteableCursor, SerializedFileWriter};
 use parquet::schema::types::Type;
 use rlink::api::element::Record;
@@ -57,7 +56,7 @@ where
     }
 }
 
-pub struct ParquetWriter {
+pub struct ParquetBlockWriter {
     cursor: InMemoryWriteableCursor,
 
     writer: SerializedFileWriter<InMemoryWriteableCursor>,
@@ -69,7 +68,7 @@ pub struct ParquetWriter {
     blocks: Option<Box<dyn Blocks>>,
 }
 
-impl ParquetWriter {
+impl ParquetBlockWriter {
     pub fn new(
         row_group_size: usize,
         max_bytes: i64,
@@ -175,7 +174,7 @@ impl ParquetWriter {
     }
 }
 
-impl BlockWriter for ParquetWriter {
+impl BlockWriter for ParquetBlockWriter {
     fn open(&mut self) {}
 
     fn append(&mut self, record: Record) -> anyhow::Result<bool> {
@@ -220,7 +219,7 @@ mod tests {
     use rlink::utils::date_time::current_timestamp;
 
     use crate::writer::parquet_writer::{
-        Blocks, ColumnValues, DefaultBlockConverter, ParquetWriter,
+        Blocks, ColumnValues, DefaultBlockConverter, ParquetBlockWriter,
     };
     use crate::writer::BlockWriter;
 
@@ -247,7 +246,7 @@ mod tests {
     }
 
     impl Blocks for TestBlocks {
-        fn append(&mut self, record: Record) -> usize {
+        fn append(&mut self, _record: Record) -> usize {
             self.col0.push(1);
             self.col1.push(ByteArray::from("0123456789"));
 
@@ -280,7 +279,7 @@ message Document {
         let blocks = DefaultBlockConverter::<TestBlocks>::new();
         let blocks = Box::new(blocks);
 
-        let mut writer = ParquetWriter::new(10000 * 10, 1024 * 1024, schema, props, blocks);
+        let mut writer = ParquetBlockWriter::new(10000 * 10, 1024 * 1024, schema, props, blocks);
 
         let begin = current_timestamp();
 
