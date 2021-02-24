@@ -30,6 +30,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -54,7 +55,7 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
     private Path resourcePath;
 
     private List<Map> allocateParams;
-    private List<TaskResourceInfo> list = new ArrayList<>();
+    private CopyOnWriteArrayList<TaskResourceInfo> allocateTaskList = new CopyOnWriteArrayList<>();
     private int containerCount;
     private Command preCommand;
     private Command curCommand;
@@ -116,6 +117,7 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
             try {
                 allocateParams = command.getData();
                 containerCount = command.getData().size();
+                allocateTaskList = new CopyOnWriteArrayList<>();
                 requestYarnContainer(memoryMb, vCores, containerCount);
             } catch (Exception e) {
                 LOGGER.error("executeAllocate error", e);
@@ -234,11 +236,11 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
         for (Container container : containers) {
             TaskResourceInfo taskResourceInfo = new TaskResourceInfo(container.getId().toString(),
                     new ContainerInfo(container.getId().toString(), container.getNodeId().toString()));
-            startTaskExecutorInContainer(container, allocateParams.get(list.size()));
-            list.add(taskResourceInfo);
+            startTaskExecutorInContainer(container, allocateParams.get(allocateTaskList.size()));
+            allocateTaskList.add(taskResourceInfo);
         }
-        if (list.size() == containerCount) {
-            List<Map> data = JSONArray.parseArray(JSON.toJSONString(list), Map.class);
+        if (allocateTaskList.size() == containerCount) {
+            List<Map> data = JSONArray.parseArray(JSON.toJSONString(allocateTaskList), Map.class);
             Command commandMsg = new Command(curCommand.getCmd(), curCommand.getCmdId(), data);
             MessageUtil.send(commandMsg);
         }
@@ -284,8 +286,8 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
 
     @Override
     public void onContainerStopped(ContainerId containerId) {
-        stopContainerCount.addAndGet(1);
-        LOGGER.info("Succeeded stop container {}. [{}/{}]", containerId, stopContainerCount.get(), stopTaskList.size());
+        int count = stopContainerCount.addAndGet(1);
+        LOGGER.info("Succeeded stop container {}. [{}/{}]", containerId, count, stopTaskList.size());
         if (stopContainerCount.get() == stopTaskList.size()) {
             List<Map> data = JSONArray.parseArray(JSON.toJSONString(stopTaskList), Map.class);
             Command commandMsg = new Command(curCommand.getCmd(), curCommand.getCmdId(), data);
