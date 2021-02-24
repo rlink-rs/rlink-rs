@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClientAsync.CallbackHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(ResourceManager.class);
@@ -60,7 +61,7 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
     private boolean commandRunning;
 
     private List<TaskResourceInfo> stopTaskList = new ArrayList<>();
-    private List<ContainerId> stopContainerList = new ArrayList<>();
+    private AtomicInteger stopContainerCount = new AtomicInteger(0);
 
     public void launch(LaunchParam launchParam) throws Exception {
         String webUrl = launchParam.getWebUrl();
@@ -128,7 +129,7 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
                 List<Map> data = command.getData();
                 List<TaskResourceInfo> taskInfoList = JSONArray.parseArray(JSON.toJSONString(data), TaskResourceInfo.class);
                 stopTaskList = taskInfoList;
-                stopContainerList = new ArrayList<>();
+                stopContainerCount = new AtomicInteger(0);
                 for (TaskResourceInfo taskResourceInfo : taskInfoList) {
                     stopTaskContainer(taskResourceInfo);
                 }
@@ -283,10 +284,10 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
 
     @Override
     public void onContainerStopped(ContainerId containerId) {
-        stopContainerList.add(containerId);
-        LOGGER.info("Succeeded stop container {}. [{}/{}]", containerId, stopContainerList.size(), stopTaskList.size());
-        if (stopContainerList.size() == stopTaskList.size()) {
-            List<Map> data = JSONArray.parseArray(JSON.toJSONString(stopContainerList), Map.class);
+        stopContainerCount.addAndGet(1);
+        LOGGER.info("Succeeded stop container {}. [{}/{}]", containerId, stopContainerCount.get(), stopTaskList.size());
+        if (stopContainerCount.get() == stopTaskList.size()) {
+            List<Map> data = JSONArray.parseArray(JSON.toJSONString(stopTaskList), Map.class);
             Command commandMsg = new Command(curCommand.getCmd(), curCommand.getCmdId(), data);
             MessageUtil.send(commandMsg);
         }
