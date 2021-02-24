@@ -288,7 +288,7 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
     public void onContainerStopped(ContainerId containerId) {
         int count = stopContainerCount.addAndGet(1);
         LOGGER.info("Succeeded stop container {}. [{}/{}]", containerId, count, stopTaskList.size());
-        if (stopContainerCount.get() == stopTaskList.size()) {
+        if (count == stopTaskList.size()) {
             List<Map> data = JSONArray.parseArray(JSON.toJSONString(stopTaskList), Map.class);
             Command commandMsg = new Command(curCommand.getCmd(), curCommand.getCmdId(), data);
             MessageUtil.send(commandMsg);
