@@ -4,17 +4,12 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.lang.StringUtils;
-import org.apache.hadoop.yarn.api.records.*;
-import rlink.yarn.manager.model.Command;
-import rlink.yarn.manager.model.ContainerInfo;
-import rlink.yarn.manager.model.LaunchParam;
-import rlink.yarn.manager.model.TaskResourceInfo;
-import rlink.yarn.manager.utils.MessageUtil;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterResponse;
+import org.apache.hadoop.yarn.api.records.*;
 import org.apache.hadoop.yarn.client.api.AMRMClient;
 import org.apache.hadoop.yarn.client.api.async.AMRMClientAsync;
 import org.apache.hadoop.yarn.client.api.async.NMClientAsync;
@@ -23,13 +18,14 @@ import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.Records;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import rlink.yarn.manager.model.Command;
+import rlink.yarn.manager.model.ContainerInfo;
+import rlink.yarn.manager.model.LaunchParam;
+import rlink.yarn.manager.model.TaskResourceInfo;
+import rlink.yarn.manager.utils.MessageUtil;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -233,7 +229,11 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
 
     @Override
     public void onContainersAllocated(List<Container> containers) {
+        LOGGER.info("onContainersAllocated,size=" + containers.size());
         for (Container container : containers) {
+            if (allocateTaskList.size() == containerCount) {
+                break;
+            }
             TaskResourceInfo taskResourceInfo = new TaskResourceInfo(container.getId().toString(),
                     new ContainerInfo(container.getId().toString(), container.getNodeId().toString()));
             startTaskExecutorInContainer(container, allocateParams.get(allocateTaskList.size()));
