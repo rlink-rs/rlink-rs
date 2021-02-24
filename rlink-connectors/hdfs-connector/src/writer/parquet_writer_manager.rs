@@ -10,8 +10,9 @@ use rlink::api::element::Record;
 use rlink::channel::{bounded, Receiver, Sender};
 use rlink::utils::date_time::current_timestamp;
 
-use crate::writer::parquet_writer::{BlockConverter, ParquetBlockWriter};
+use crate::writer::parquet_writer::{BlocksBuilder, ParquetBlockWriter};
 use crate::writer::{BlockWriter, BlockWriterManager, FileSystem, FileSystemBuilder, PathLocation};
+use rlink::api::runtime::TaskId;
 
 enum FlushData {
     Bytes((String, Vec<u8>)),
@@ -23,11 +24,10 @@ pub struct ParquetBlockWriterManager {
     max_bytes: i64,
     schema: TypePtr,
     props: WriterPropertiesPtr,
-    block_converter: Arc<Box<dyn BlockConverter>>,
+    blocks_builder: Arc<Box<dyn BlocksBuilder>>,
+    path_location: Box<dyn PathLocation>,
 
     path_writers: HashMap<String, (ParquetBlockWriter, Duration)>,
-
-    path_location: Option<Box<dyn PathLocation>>,
 
     bytes_flush_sender: Sender<FlushData>,
 }
@@ -38,7 +38,8 @@ impl ParquetBlockWriterManager {
         max_bytes: i64,
         schema: TypePtr,
         props: WriterPropertiesPtr,
-        block_converter: Arc<Box<dyn BlockConverter>>,
+        blocks_builder: Arc<Box<dyn BlocksBuilder>>,
+        path_location: Box<dyn PathLocation>,
         ttl: Duration,
         fs_factory: FsB,
     ) -> Self
@@ -54,9 +55,9 @@ impl ParquetBlockWriterManager {
             max_bytes,
             schema,
             props,
-            block_converter,
+            blocks_builder,
+            path_location,
             path_writers: HashMap::new(),
-            path_location: None,
             bytes_flush_sender: sender,
         }
     }
@@ -90,22 +91,32 @@ impl ParquetBlockWriterManager {
             self.max_bytes,
             self.schema.clone(),
             self.props.clone(),
-            self.block_converter.clone(),
+            self.blocks_builder.clone(),
         )
+    }
+
+    fn flush(&mut self) -> anyhow::Result<()> {
+        let paths: Vec<String> = self.path_writers.keys().map(|x| x.clone()).collect();
+        for path in paths {
+            let (writer, _fs) = self.path_writers.remove(path.as_str()).unwrap();
+            let bytes = writer.close()?;
+
+            self.bytes_flush_sender
+                .send(FlushData::Bytes((path, bytes)))
+                .unwrap();
+        }
+
+        Ok(())
     }
 }
 
 impl BlockWriterManager for ParquetBlockWriterManager {
-    fn open(&mut self, path_location: Box<dyn PathLocation>) {
-        self.path_location = Some(path_location);
+    fn open(&mut self) -> anyhow::Result<()> {
+        Ok(())
     }
 
-    fn append(&mut self, mut record: Record) -> anyhow::Result<()> {
-        let path = self
-            .path_location
-            .as_mut()
-            .unwrap()
-            .path(record.borrow_mut())?;
+    fn append(&mut self, mut record: Record, task_id: &TaskId) -> anyhow::Result<()> {
+        let path = self.path_location.path(record.borrow_mut(), task_id)?;
 
         let mut fs_writer = self.path_writers.get_mut(path.as_str());
         if fs_writer.is_none() {
@@ -130,16 +141,12 @@ impl BlockWriterManager for ParquetBlockWriterManager {
         Ok(())
     }
 
-    fn close(&mut self) -> anyhow::Result<()> {
-        let paths: Vec<String> = self.path_writers.keys().map(|x| x.clone()).collect();
-        for path in paths {
-            let (writer, _fs) = self.path_writers.remove(path.as_str()).unwrap();
-            let bytes = writer.close()?;
+    fn snapshot(&mut self) -> anyhow::Result<()> {
+        self.flush()
+    }
 
-            self.bytes_flush_sender
-                .send(FlushData::Bytes((path, bytes)))
-                .unwrap();
-        }
+    fn close(&mut self) -> anyhow::Result<()> {
+        self.flush()?;
 
         let (sender, receiver) = bounded(0);
         self.bytes_flush_sender

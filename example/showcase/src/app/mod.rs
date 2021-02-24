@@ -1,4 +1,5 @@
 pub mod functions;
+pub mod hdfs_sink;
 
 use std::time::Duration;
 
@@ -19,6 +20,7 @@ use rlink::functions::schema_base::timestamp_assigner::SchemaBaseTimestampAssign
 use rlink::functions::schema_base::FunctionSchema;
 
 use crate::app::functions::*;
+use crate::app::hdfs_sink::create_hdfs_sink;
 use crate::buffer_gen::model;
 use crate::buffer_gen::model::FIELD_TYPE;
 
@@ -175,6 +177,6 @@ impl StreamApp for ConnectStreamApp1 {
                 vec![CoStream::from(data_stream_right1)],
                 MyCoProcessFunction {},
             )
-            .add_sink(PrintOutputFormat::new(output_schema_types.as_slice()));
+            .add_sink(create_hdfs_sink(output_schema_types.as_slice()));
     }
 }

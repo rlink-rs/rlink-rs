@@ -26,32 +26,36 @@ pub trait Blocks: Send + Sync {
     fn flush(&mut self) -> Vec<ColumnValues>;
 }
 
-pub trait BlockConverter: Send + Sync {
+pub trait BlocksBuilder: Send + Sync {
     fn create_batch(&self, batch_size: usize) -> Box<dyn Blocks>;
 }
 
-pub struct DefaultBlockConverter<T>
+pub struct RecordBlocksBuilder<T>
 where
-    T: From<usize> + Blocks + 'static,
+    T: From<(usize, Vec<u8>)> + Blocks + 'static,
 {
+    schema: Vec<u8>,
     a: PhantomData<T>,
 }
 
-impl<T> DefaultBlockConverter<T>
+impl<T> RecordBlocksBuilder<T>
 where
-    T: From<usize> + Blocks + 'static,
+    T: From<(usize, Vec<u8>)> + Blocks + 'static,
 {
-    pub fn new() -> Self {
-        DefaultBlockConverter { a: PhantomData }
+    pub fn new(schema: &[u8]) -> Self {
+        RecordBlocksBuilder {
+            schema: schema.to_vec(),
+            a: PhantomData,
+        }
     }
 }
 
-impl<T> BlockConverter for DefaultBlockConverter<T>
+impl<T> BlocksBuilder for RecordBlocksBuilder<T>
 where
-    T: From<usize> + Blocks + 'static,
+    T: From<(usize, Vec<u8>)> + Blocks + 'static,
 {
     fn create_batch(&self, batch_size: usize) -> Box<dyn Blocks> {
-        let t: Box<dyn Blocks> = Box::new(T::from(batch_size));
+        let t: Box<dyn Blocks> = Box::new(T::from((batch_size, self.schema.clone())));
         t
     }
 }
@@ -64,7 +68,7 @@ pub struct ParquetBlockWriter {
     row_group_size: usize,
     max_bytes: i64,
     total_bytes: i64,
-    converter: Arc<Box<dyn BlockConverter>>,
+    converter: Arc<Box<dyn BlocksBuilder>>,
     blocks: Option<Box<dyn Blocks>>,
 }
 
@@ -74,7 +78,7 @@ impl ParquetBlockWriter {
         max_bytes: i64,
         schema: TypePtr,
         props: WriterPropertiesPtr,
-        converter: Arc<Box<dyn BlockConverter>>,
+        converter: Arc<Box<dyn BlocksBuilder>>,
     ) -> Self {
         let cursor = InMemoryWriteableCursor::default();
         let writer = SerializedFileWriter::new(cursor.clone(), schema, props).unwrap();

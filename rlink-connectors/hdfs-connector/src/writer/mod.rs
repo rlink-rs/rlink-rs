@@ -3,6 +3,7 @@ use std::io::Write;
 use parquet::schema::parser::parse_message_type;
 use parquet::schema::types::TypePtr;
 use rlink::api::element::Record;
+use rlink::api::runtime::TaskId;
 use std::sync::Arc;
 
 pub mod file_system;
@@ -26,7 +27,7 @@ where
 }
 
 pub trait PathLocation {
-    fn path(&mut self, record: &mut Record) -> anyhow::Result<String>;
+    fn path(&mut self, record: &mut Record, task_id: &TaskId) -> anyhow::Result<String>;
 }
 
 pub trait BlockWriter {
@@ -36,8 +37,9 @@ pub trait BlockWriter {
 }
 
 pub trait BlockWriterManager {
-    fn open(&mut self, path_location: Box<dyn PathLocation>);
-    fn append(&mut self, record: Record) -> anyhow::Result<()>;
+    fn open(&mut self) -> anyhow::Result<()>;
+    fn append(&mut self, record: Record, task_id: &TaskId) -> anyhow::Result<()>;
+    fn snapshot(&mut self) -> anyhow::Result<()>;
     fn close(&mut self) -> anyhow::Result<()>;
 }
 
@@ -63,10 +65,11 @@ mod tests {
 
     use crate::writer::file_system::LocalFileSystemBuilder;
     use crate::writer::parquet_writer::{
-        BlockConverter, Blocks, ColumnValues, DefaultBlockConverter, ParquetBlockWriter,
+        Blocks, BlocksBuilder, ColumnValues, ParquetBlockWriter, RecordBlocksBuilder,
     };
     use crate::writer::parquet_writer_manager::ParquetBlockWriterManager;
     use crate::writer::{BlockWriter, BlockWriterManager, PathLocation};
+    use rlink::api::runtime::TaskId;
 
     const SCHEMA_STR: &'static str = r#"
 message Document {
@@ -130,7 +133,7 @@ message Document {
     }
 
     impl PathLocation for TestPathLocation {
-        fn path(&mut self, _record: &mut Record) -> anyhow::Result<String> {
+        fn path(&mut self, _record: &mut Record, task_id: &TaskId) -> anyhow::Result<String> {
             let p = format!("{}.{}", self.test_file.clone(), self.index);
 
             self.index += 1;
@@ -152,8 +155,8 @@ message Document {
                 .build(),
         );
         let block_converter = {
-            let blocks = DefaultBlockConverter::<TestBlocks>::new();
-            let block_converter: Box<dyn BlockConverter> = Box::new(blocks);
+            let blocks = RecordBlocksBuilder::<TestBlocks>::new(Vec::new().as_slice());
+            let block_converter: Box<dyn BlocksBuilder> = Box::new(blocks);
             Arc::new(block_converter)
         };
 
@@ -179,16 +182,11 @@ message Document {
             loops,
             end.checked_sub(begin).unwrap().as_millis()
         );
-
-        {
-            let mut file = std::fs::File::create("test.parquet").expect("create failed");
-            file.write_all(bytes.as_ref().unwrap().as_slice())
-                .expect("write failed");
-        }
     }
 
     #[test]
     pub fn writer_manager_test() {
+        let task_id = TaskId::default();
         let fs_builder = LocalFileSystemBuilder {};
         let path_location = Box::new(TestPathLocation::new());
         let schema = Arc::new(parse_message_type(SCHEMA_STR).unwrap());
@@ -198,9 +196,9 @@ message Document {
                 .set_writer_version(WriterVersion::PARQUET_2_0)
                 .build(),
         );
-        let block_converter = {
-            let blocks = DefaultBlockConverter::<TestBlocks>::new();
-            let block_converter: Box<dyn BlockConverter> = Box::new(blocks);
+        let blocks_builder = {
+            let blocks = RecordBlocksBuilder::<TestBlocks>::new(Vec::new().as_slice());
+            let block_converter: Box<dyn BlocksBuilder> = Box::new(blocks);
             Arc::new(block_converter)
         };
 
@@ -209,16 +207,17 @@ message Document {
             1024 * 1024,
             schema,
             props,
-            block_converter,
+            blocks_builder,
+            path_location,
             Duration::from_secs(10),
             fs_builder,
         );
-        manager.open(path_location);
+        manager.open();
 
         let begin = current_timestamp();
         let loops = 10000 * 10;
         for _ in 0..loops {
-            manager.append(Record::with_capacity(1)).unwrap();
+            manager.append(Record::with_capacity(1), &task_id).unwrap();
         }
         manager.close().unwrap();
 
