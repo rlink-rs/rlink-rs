@@ -64,7 +64,7 @@ pub struct ParquetBlockWriter {
     row_group_size: usize,
     max_bytes: i64,
     total_bytes: i64,
-    converter: Box<dyn BlockConverter>,
+    converter: Arc<Box<dyn BlockConverter>>,
     blocks: Option<Box<dyn Blocks>>,
 }
 
@@ -74,7 +74,7 @@ impl ParquetBlockWriter {
         max_bytes: i64,
         schema: Arc<Type>,
         props: WriterPropertiesPtr,
-        converter: Box<dyn BlockConverter>,
+        converter: Arc<Box<dyn BlockConverter>>,
     ) -> Self {
         let cursor = InMemoryWriteableCursor::default();
         let writer = SerializedFileWriter::new(cursor.clone(), schema, props).unwrap();
@@ -203,108 +203,5 @@ impl BlockWriter for ParquetBlockWriter {
         // let cursor = self.cursor.clone();
         // cursor.into_inner()
         Ok(self.cursor.data())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::io::Write;
-    use std::sync::Arc;
-
-    use parquet::basic::Compression;
-    use parquet::data_type::ByteArray;
-    use parquet::file::properties::{WriterProperties, WriterVersion};
-    use parquet::schema::parser::parse_message_type;
-    use rlink::api::element::Record;
-    use rlink::utils::date_time::current_timestamp;
-
-    use crate::writer::parquet_writer::{
-        Blocks, ColumnValues, DefaultBlockConverter, ParquetBlockWriter,
-    };
-    use crate::writer::BlockWriter;
-
-    struct TestBlocks {
-        capacity: usize,
-        col0: Vec<i32>,
-        col1: Vec<ByteArray>,
-    }
-
-    impl TestBlocks {
-        pub fn with_capacity(capacity: usize) -> Self {
-            TestBlocks {
-                capacity,
-                col0: Vec::with_capacity(capacity),
-                col1: Vec::with_capacity(capacity),
-            }
-        }
-    }
-
-    impl From<usize> for TestBlocks {
-        fn from(batch_size: usize) -> Self {
-            TestBlocks::with_capacity(batch_size)
-        }
-    }
-
-    impl Blocks for TestBlocks {
-        fn append(&mut self, _record: Record) -> usize {
-            self.col0.push(1);
-            self.col1.push(ByteArray::from("0123456789"));
-
-            self.col0.len()
-        }
-
-        fn flush(&mut self) -> Vec<ColumnValues> {
-            println!("flush");
-            let mut row_values = Vec::new();
-            row_values.push(ColumnValues::Int32Values(self.col0.as_slice()));
-            row_values.push(ColumnValues::ByteArrayValues(self.col1.as_slice()));
-            row_values
-        }
-    }
-
-    #[test]
-    pub fn writer_test() {
-        let schema_str = r#"
-message Document {
-    required int32 DocId;
-    required binary Context (UTF8);
-}"#;
-        let schema = Arc::new(parse_message_type(schema_str).unwrap());
-        let props = Arc::new(
-            WriterProperties::builder()
-                .set_compression(Compression::SNAPPY)
-                .set_writer_version(WriterVersion::PARQUET_2_0)
-                .build(),
-        );
-        let blocks = DefaultBlockConverter::<TestBlocks>::new();
-        let blocks = Box::new(blocks);
-
-        let mut writer = ParquetBlockWriter::new(10000 * 10, 1024 * 1024, schema, props, blocks);
-
-        let begin = current_timestamp();
-
-        let loops = 10000 * 1000;
-        for _ in 0..loops {
-            let full = writer.append(Record::with_capacity(1)).unwrap();
-            if full {
-                break;
-            }
-        }
-        let bytes = writer.close();
-
-        let end = current_timestamp();
-
-        println!(
-            "len: {}, loops: {}, ts: {}",
-            bytes.as_ref().unwrap().len(),
-            loops,
-            end.checked_sub(begin).unwrap().as_millis()
-        );
-
-        {
-            let mut file = std::fs::File::create("test.parquet").expect("create failed");
-            file.write_all(bytes.as_ref().unwrap().as_slice())
-                .expect("write failed");
-        }
     }
 }
