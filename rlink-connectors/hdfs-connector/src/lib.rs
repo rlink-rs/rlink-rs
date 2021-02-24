@@ -6,4 +6,4 @@ extern crate anyhow;
 extern crate rlink_derive;
 
 pub mod sink;
-mod writer;
+pub mod writer;

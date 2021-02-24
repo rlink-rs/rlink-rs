@@ -18,10 +18,7 @@ enum FlushData {
     Finish(Sender<bool>),
 }
 
-pub struct ParquetBlockWriterManager<L>
-where
-    L: PathLocation,
-{
+pub struct ParquetBlockWriterManager {
     row_group_size: usize,
     max_bytes: i64,
     schema: TypePtr,
@@ -30,15 +27,12 @@ where
 
     path_writers: HashMap<String, (ParquetBlockWriter, Duration)>,
 
-    path_location: Option<L>,
+    path_location: Option<Box<dyn PathLocation>>,
 
     bytes_flush_sender: Sender<FlushData>,
 }
 
-impl<L> ParquetBlockWriterManager<L>
-where
-    L: PathLocation,
-{
+impl ParquetBlockWriterManager {
     pub fn new<FsB, FS, W>(
         row_group_size: usize,
         max_bytes: i64,
@@ -101,11 +95,8 @@ where
     }
 }
 
-impl<L> BlockWriterManager<L> for ParquetBlockWriterManager<L>
-where
-    L: PathLocation,
-{
-    fn open(&mut self, path_location: L) {
+impl BlockWriterManager for ParquetBlockWriterManager {
+    fn open(&mut self, path_location: Box<dyn PathLocation>) {
         self.path_location = Some(path_location);
     }
 

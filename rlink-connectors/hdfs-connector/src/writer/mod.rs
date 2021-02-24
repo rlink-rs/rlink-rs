@@ -1,6 +1,9 @@
 use std::io::Write;
 
+use parquet::schema::parser::parse_message_type;
+use parquet::schema::types::TypePtr;
 use rlink::api::element::Record;
+use std::sync::Arc;
 
 pub mod file_system;
 pub mod parquet_writer;
@@ -32,13 +35,17 @@ pub trait BlockWriter {
     fn close(self) -> anyhow::Result<Vec<u8>>;
 }
 
-pub trait BlockWriterManager<L>
-where
-    L: PathLocation,
-{
-    fn open(&mut self, path_location: L);
+pub trait BlockWriterManager {
+    fn open(&mut self, path_location: Box<dyn PathLocation>);
     fn append(&mut self, record: Record) -> anyhow::Result<()>;
     fn close(&mut self) -> anyhow::Result<()>;
+}
+
+pub fn parse_parquet_message_type(schema: &str) -> anyhow::Result<TypePtr> {
+    match parse_message_type(schema) {
+        Ok(t) => Ok(Arc::new(t)),
+        Err(e) => Err(anyhow!(e)),
+    }
 }
 
 #[cfg(test)]
@@ -68,7 +75,6 @@ message Document {
 }"#;
 
     struct TestBlocks {
-        capacity: usize,
         col0: Vec<i32>,
         col1: Vec<ByteArray>,
     }
@@ -76,7 +82,6 @@ message Document {
     impl TestBlocks {
         pub fn with_capacity(capacity: usize) -> Self {
             TestBlocks {
-                capacity,
                 col0: Vec::with_capacity(capacity),
                 col1: Vec::with_capacity(capacity),
             }
@@ -185,7 +190,7 @@ message Document {
     #[test]
     pub fn writer_manager_test() {
         let fs_builder = LocalFileSystemBuilder {};
-        let path_location = TestPathLocation::new();
+        let path_location = Box::new(TestPathLocation::new());
         let schema = Arc::new(parse_message_type(SCHEMA_STR).unwrap());
         let props = Arc::new(
             WriterProperties::builder()
