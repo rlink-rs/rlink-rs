@@ -9,13 +9,13 @@ use rlink::api::element::Record;
 use rlink::api::runtime::TaskId;
 use rlink::api::window::TWindow;
 use rlink::utils::date_time::fmt_date_time;
-use rlink_hdfs_connector::sink::output_format::HdfsOutputFormat;
-use rlink_hdfs_connector::writer::file_system::LocalFileSystemBuilder;
-use rlink_hdfs_connector::writer::parquet_writer::{
+use rlink_files_connector::sink::output_format::HdfsOutputFormat;
+use rlink_files_connector::writer::file_system::LocalFileSystemBuilder;
+use rlink_files_connector::writer::parquet_writer::{
     Blocks, BlocksBuilder, ColumnValues, RecordBlocksBuilder,
 };
-use rlink_hdfs_connector::writer::parquet_writer_manager::ParquetBlockWriterManager;
-use rlink_hdfs_connector::writer::PathLocation;
+use rlink_files_connector::writer::parquet_writer_manager::ParquetBlockWriterManager;
+use rlink_files_connector::writer::PathLocation;
 
 pub fn create_hdfs_sink(field_types: &[u8]) -> HdfsOutputFormat {
     let fs_builder = LocalFileSystemBuilder {};

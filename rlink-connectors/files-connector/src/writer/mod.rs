@@ -52,7 +52,6 @@ pub fn parse_parquet_message_type(schema: &str) -> anyhow::Result<TypePtr> {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Write;
     use std::sync::Arc;
     use std::time::Duration;
 
@@ -91,8 +90,8 @@ message Document {
         }
     }
 
-    impl From<usize> for TestBlocks {
-        fn from(batch_size: usize) -> Self {
+    impl From<(usize, Vec<u8>)> for TestBlocks {
+        fn from((batch_size, _schema): (usize, Vec<u8>)) -> Self {
             TestBlocks::with_capacity(batch_size)
         }
     }
@@ -133,7 +132,7 @@ message Document {
     }
 
     impl PathLocation for TestPathLocation {
-        fn path(&mut self, _record: &mut Record, task_id: &TaskId) -> anyhow::Result<String> {
+        fn path(&mut self, _record: &mut Record, _task_id: &TaskId) -> anyhow::Result<String> {
             let p = format!("{}.{}", self.test_file.clone(), self.index);
 
             self.index += 1;
@@ -154,14 +153,14 @@ message Document {
                 .set_writer_version(WriterVersion::PARQUET_2_0)
                 .build(),
         );
-        let block_converter = {
+        let blocks_builder = {
             let blocks = RecordBlocksBuilder::<TestBlocks>::new(Vec::new().as_slice());
-            let block_converter: Box<dyn BlocksBuilder> = Box::new(blocks);
-            Arc::new(block_converter)
+            let blocks_builder: Box<dyn BlocksBuilder> = Box::new(blocks);
+            Arc::new(blocks_builder)
         };
 
         let mut writer =
-            ParquetBlockWriter::new(10000 * 10, 1024 * 1024, schema, props, block_converter);
+            ParquetBlockWriter::new(10000 * 10, 1024 * 1024, schema, props, blocks_builder);
 
         let begin = current_timestamp();
 
@@ -212,7 +211,7 @@ message Document {
             Duration::from_secs(10),
             fs_builder,
         );
-        manager.open();
+        manager.open().unwrap();
 
         let begin = current_timestamp();
         let loops = 10000 * 10;

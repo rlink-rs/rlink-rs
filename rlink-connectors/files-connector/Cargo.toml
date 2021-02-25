@@ -1,5 +1,5 @@
 [package]
-name = "rlink-hdfs-connector"
+name = "rlink-files-connector"
 version = "0.2.2-alpha.6"
 authors = ["yorkart <wangyue11.4@163.com>>"]
 edition = "2018"
@@ -9,7 +9,7 @@ repository = "https://github.com/rlink-rs/rlink-rs.git"
 license = "MIT/Apache-2.0"
 
 [lib]
-name = "rlink_hdfs_connector"
+name = "rlink_files_connector"
 
 [dependencies.rlink]
 version = "0.2.2-alpha.6"
