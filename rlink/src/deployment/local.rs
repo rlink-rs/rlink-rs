@@ -77,6 +77,6 @@ impl TResourceManager for LocalResourceManager {
     }
 
     fn stop_workers(&self, _task_ids: Vec<TaskResourceInfo>) -> anyhow::Result<()> {
-        unimplemented!()
+        Ok(())
     }
 }

@@ -1,4 +1,4 @@
-use std::convert::Infallible;
+use std::convert::{Infallible, TryFrom};
 use std::net::SocketAddr;
 use std::ops::Deref;
 use std::path::PathBuf;
@@ -17,6 +17,7 @@ use crate::api::cluster::{MetadataStorageType, ResponseCode, StdResponse};
 use crate::channel::{bounded, Sender};
 use crate::dag::metadata::DagMetadata;
 use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
+use crate::runtime::HeartBeatStatus;
 use crate::runtime::TaskManagerStatus;
 use crate::storage::metadata::{MetadataStorage, TMetadataStorage};
 use crate::utils::fs::read_file;
@@ -273,17 +274,19 @@ async fn heartbeat(req: Request<Body>, context: Arc<WebContext>) -> anyhow::Resu
     let whole_body = hyper::body::aggregate(req).await?;
     let heartbeat_model: HeartbeatModel = serde_json::from_reader(whole_body.reader())?;
 
-    if !heartbeat_model.status.eq("ok") {
-        error!(
-            "heartbeat status: {}, model: {:?} ",
-            heartbeat_model.status.as_str(),
-            heartbeat_model
-        );
-    }
+    let heartbeat_status = HeartBeatStatus::try_from(heartbeat_model.status.as_str())?;
+    // if !heartbeat_status.eq("ok") {
+    //     error!(
+    //         "heartbeat status: {}, model: {:?} ",
+    //         heartbeat_model.status.as_str(),
+    //         heartbeat_model
+    //     );
+    // }
 
     let metadata_storage = MetadataStorage::new(&context.metadata_mode);
     metadata_storage
         .update_task_manager_status(
+            heartbeat_status,
             heartbeat_model.task_manager_id.as_str(),
             heartbeat_model.task_manager_address.as_str(),
             TaskManagerStatus::Registered,

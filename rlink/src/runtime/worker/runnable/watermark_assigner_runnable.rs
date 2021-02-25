@@ -97,15 +97,16 @@ impl Runnable for WatermarkAssignerRunnable {
             }
             Element::StreamStatus(stream_status) => {
                 if stream_status.end {
-                    self.next_runnable
-                        .as_mut()
-                        .unwrap()
-                        .run(Element::new_watermark(
-                            self.task_id.task_number,
-                            self.task_id.num_tasks,
-                            MAX_WATERMARK.timestamp,
-                            stream_status,
-                        ));
+                    // self.next_runnable
+                    //     .as_mut()
+                    //     .unwrap()
+                    //     .run(Element::new_watermark(
+                    //         self.task_id.task_number,
+                    //         self.task_id.num_tasks,
+                    //         MAX_WATERMARK.timestamp,
+                    //         stream_status,
+                    //     ));
+                    self.next_runnable.as_mut().unwrap().run(element);
                 } else {
                     match watermark_assigner.watermark(stream_status) {
                         Some(watermark) => {

@@ -94,7 +94,8 @@ pub fn start_window_timer() -> WindowTimer {
                         }
                         Err(TryRecvError::Empty) => break,
                         Err(TryRecvError::Disconnected) => {
-                            panic!("window timer channel disconnected");
+                            info!("window timer channel disconnected");
+                            return;
                         }
                     }
                 }

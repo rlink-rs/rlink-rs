@@ -14,6 +14,7 @@ use crate::dag::DagManager;
 use crate::deployment::TResourceManager;
 use crate::runtime::context::Context;
 use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
+use crate::runtime::coordinator::heart_beat_manager::HeartbeatResult;
 use crate::runtime::coordinator::task_distribution::build_cluster_descriptor;
 use crate::runtime::coordinator::web_server::web_launch;
 use crate::runtime::{ClusterDescriptor, TaskManagerStatus};
@@ -112,7 +113,8 @@ where
             info!("all worker status is fine");
 
             // heartbeat check. blocking util heartbeat timeout
-            heart_beat_manager::start_heart_beat_timer(self.metadata_storage_mode.clone());
+            let heartbeat_result =
+                heart_beat_manager::start_heartbeat_timer(self.metadata_storage_mode.clone());
             info!("heartbeat has interrupted");
 
             // heartbeat timeout and stop all worker's tasks
@@ -122,6 +124,10 @@ where
             // clear metadata from storage
             self.clear_metadata();
             info!("clear metadata from storage");
+
+            if let HeartbeatResult::End = heartbeat_result {
+                return Ok(());
+            }
         }
     }
 

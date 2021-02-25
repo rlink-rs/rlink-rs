@@ -7,7 +7,7 @@ use rlink::api::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnaps
 use rlink::api::element::Record;
 use rlink::api::function::{Context, InputFormat, InputSplit, InputSplitSource};
 use rlink::api::properties::Properties;
-use rlink::channel::handover::Handover;
+use rlink::channel::utils::handover::Handover;
 use rlink::metrics::Tag;
 
 use crate::source::checkpoint::KafkaCheckpointFunction;

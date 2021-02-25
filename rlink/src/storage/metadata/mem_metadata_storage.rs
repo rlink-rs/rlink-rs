@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 
-use crate::runtime::{ClusterDescriptor, TaskManagerStatus};
+use crate::runtime::{ClusterDescriptor, HeartBeatStatus, TaskManagerStatus};
 use crate::storage::metadata::TMetadataStorage;
 use crate::utils;
 
@@ -61,6 +61,7 @@ impl TMetadataStorage for MemoryMetadataStorage {
 
     fn update_task_manager_status(
         &self,
+        heartbeat_status: HeartBeatStatus,
         task_manager_id: &str,
         task_manager_address: &str,
         task_manager_status: TaskManagerStatus,
@@ -76,6 +77,7 @@ impl TMetadataStorage for MemoryMetadataStorage {
             if task_manager_descriptor.task_manager_id.eq(task_manager_id) {
                 task_manager_descriptor.task_manager_address = task_manager_address.to_string();
                 task_manager_descriptor.task_status = task_manager_status;
+                task_manager_descriptor.latest_heart_beat_status = heartbeat_status;
                 task_manager_descriptor.latest_heart_beat_ts =
                     utils::date_time::current_timestamp_millis();
                 task_manager_descriptor.metrics_address = metrics_address.to_string();

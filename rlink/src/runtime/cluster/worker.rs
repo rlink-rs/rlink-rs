@@ -12,7 +12,9 @@ use crate::runtime::context::Context;
 use crate::runtime::timer::{start_window_timer, WindowTimer};
 use crate::runtime::worker::checkpoint::start_report_checkpoint;
 use crate::runtime::worker::heart_beat::{start_heart_beat_timer, status_heartbeat};
-use crate::runtime::{worker, ClusterDescriptor, TaskManagerStatus, WorkerManagerDescriptor};
+use crate::runtime::{
+    worker, ClusterDescriptor, HeartBeatStatus, TaskManagerStatus, WorkerManagerDescriptor,
+};
 use crate::storage::metadata::MetadataLoader;
 use crate::utils;
 
@@ -32,8 +34,11 @@ where
     let server_addr = bootstrap_publish_serve(context.bind_ip.to_string());
     info!("bootstrap publish server, listen: {}", server_addr);
 
-    bootstrap_timer_task(&cluster_descriptor, context.deref(), server_addr);
-    info!("bootstrap timer task");
+    start_heartbeat_timer(&cluster_descriptor, context.deref(), server_addr);
+    info!("start heartbeat timer");
+
+    start_checkpoint_timer(&cluster_descriptor);
+    info!("start checkpoint timer");
 
     let window_timer = start_window_timer();
     info!("bootstrap window timer");
@@ -48,9 +53,9 @@ where
     info!("bootstrap subscribe client");
 
     let join_handles = run_tasks(
-        cluster_descriptor,
+        cluster_descriptor.clone(),
         dag_metadata,
-        context,
+        context.clone(),
         window_timer,
         stream_env,
         stream_app,
@@ -60,7 +65,10 @@ where
     join_handles.into_iter().for_each(|join_handle| {
         join_handle.join().unwrap();
     });
+
+    stop_heartbeat_timer(cluster_descriptor.as_ref(), context.deref(), server_addr);
     info!("work end");
+
     Ok(())
 }
 
@@ -97,7 +105,7 @@ fn bootstrap_subscribe_client(cluster_descriptor: Arc<ClusterDescriptor>) {
     });
 }
 
-fn bootstrap_timer_task(
+fn start_heartbeat_timer(
     cluster_descriptor: &ClusterDescriptor,
     context: &Context,
     bind_addr: SocketAddr,
@@ -112,6 +120,7 @@ fn bootstrap_timer_task(
         context.task_manager_id.as_str(),
         bind_addr.to_string().as_str(),
         context.metric_addr.as_str(),
+        Some(HeartBeatStatus::Ok),
     );
 
     // heat beat timer
@@ -121,8 +130,32 @@ fn bootstrap_timer_task(
         bind_addr.to_string().as_str(),
         context.metric_addr.as_str(),
     );
+}
 
-    // report checkpoint timer
+fn stop_heartbeat_timer(
+    cluster_descriptor: &ClusterDescriptor,
+    context: &Context,
+    bind_addr: SocketAddr,
+) {
+    let coordinator_address = cluster_descriptor
+        .coordinator_manager
+        .coordinator_address
+        .as_str();
+
+    status_heartbeat(
+        coordinator_address,
+        context.task_manager_id.as_str(),
+        bind_addr.to_string().as_str(),
+        context.metric_addr.as_str(),
+        Some(HeartBeatStatus::End),
+    );
+}
+
+fn start_checkpoint_timer(cluster_descriptor: &ClusterDescriptor) {
+    let coordinator_address = cluster_descriptor
+        .coordinator_manager
+        .coordinator_address
+        .as_str();
     start_report_checkpoint(coordinator_address);
 }
 

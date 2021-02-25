@@ -102,9 +102,40 @@ pub enum TaskManagerStatus {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
+pub enum HeartBeatStatus {
+    Ok,
+    Panic,
+    End,
+}
+
+impl std::fmt::Display for HeartBeatStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HeartBeatStatus::Ok => write!(f, "ok"),
+            HeartBeatStatus::Panic => write!(f, "panic"),
+            HeartBeatStatus::End => write!(f, "end"),
+        }
+    }
+}
+
+impl<'a> TryFrom<&'a str> for HeartBeatStatus {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        match value {
+            "ok" => Ok(HeartBeatStatus::Ok),
+            "panic" => Ok(HeartBeatStatus::Panic),
+            "end" => Ok(HeartBeatStatus::End),
+            _ => Err(anyhow!("unrecognized status: {}", value)),
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct WorkerManagerDescriptor {
     pub task_status: TaskManagerStatus,
     pub latest_heart_beat_ts: u64,
+    pub latest_heart_beat_status: HeartBeatStatus,
     pub task_manager_id: String,
     pub task_manager_address: String,
     pub metrics_address: String,

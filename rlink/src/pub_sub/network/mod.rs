@@ -94,10 +94,12 @@ pub enum ResponseCode {
     BatchFinish = 2,
     /// there is no data in the channel, then send a package with the `Empty` code
     Empty = 3,
+    /// the target channel is closed, then send a package with the `Empty` code
+    NoService = 4,
     /// parse the Request error, then send a package with the `ParseErr` code
-    ParseErr = 4,
+    ParseErr = 5,
     /// read the Request error, then send a package with the `ReadErr` code
-    ReadErr = 5,
+    ReadErr = 6,
 }
 
 impl From<u8> for ResponseCode {
@@ -106,8 +108,9 @@ impl From<u8> for ResponseCode {
             1 => ResponseCode::Ok,
             2 => ResponseCode::BatchFinish,
             3 => ResponseCode::Empty,
-            4 => ResponseCode::ParseErr,
-            5 => ResponseCode::ReadErr,
+            4 => ResponseCode::NoService,
+            5 => ResponseCode::ParseErr,
+            6 => ResponseCode::ReadErr,
             _ => ResponseCode::Unknown,
         }
     }
@@ -119,6 +122,7 @@ impl std::fmt::Display for ResponseCode {
             ResponseCode::Ok => write!(f, "OK"),
             ResponseCode::BatchFinish => write!(f, "BatchFinish"),
             ResponseCode::Empty => write!(f, "Empty"),
+            ResponseCode::NoService => write!(f, "NoService"),
             ResponseCode::ParseErr => write!(f, "ParseErr"),
             ResponseCode::ReadErr => write!(f, "ReadErr"),
             ResponseCode::Unknown => write!(f, "Unknown"),

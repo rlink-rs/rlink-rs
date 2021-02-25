@@ -3,12 +3,17 @@ use std::sync::RwLock;
 use std::time::Duration;
 
 use crate::api::cluster::MetadataStorageType;
-use crate::runtime::ClusterDescriptor;
+use crate::runtime::{ClusterDescriptor, HeartBeatStatus};
 use crate::storage::metadata::{loop_read_cluster_descriptor, MetadataStorage};
 use crate::utils;
 
 lazy_static! {
     pub(crate) static ref CLUSTER_DESCRIPTOR: RwLock<Option<ClusterDescriptor>> = RwLock::new(None);
+}
+
+pub enum HeartbeatResult {
+    Timeout,
+    End,
 }
 
 fn update_global_cluster_descriptor(cluster_descriptor: ClusterDescriptor) {
@@ -23,7 +28,7 @@ pub(crate) fn global_cluster_descriptor() -> Option<ClusterDescriptor> {
     j.deref().clone()
 }
 
-pub(crate) fn start_heart_beat_timer(metadata_storage_mode: MetadataStorageType) {
+pub(crate) fn start_heartbeat_timer(metadata_storage_mode: MetadataStorageType) -> HeartbeatResult {
     let metadata_storage = MetadataStorage::new(&metadata_storage_mode);
     loop {
         std::thread::sleep(Duration::from_secs(5));
@@ -33,7 +38,12 @@ pub(crate) fn start_heart_beat_timer(metadata_storage_mode: MetadataStorageType)
 
         let current_timestamp = utils::date_time::current_timestamp().as_millis() as u64;
 
+        let mut end_task_managers = 0;
         for task_manager_descriptor in &job_descriptor.worker_managers {
+            if let HeartBeatStatus::End = task_manager_descriptor.latest_heart_beat_status {
+                end_task_managers += 1;
+                continue;
+            }
             if current_timestamp < task_manager_descriptor.latest_heart_beat_ts {
                 continue;
             }
@@ -54,7 +64,7 @@ pub(crate) fn start_heart_beat_timer(metadata_storage_mode: MetadataStorageType)
                     dur.as_secs(),
                     task_manager_descriptor.task_manager_address
                 );
-                return;
+                return HeartbeatResult::Timeout;
             }
         }
 
@@ -62,5 +72,9 @@ pub(crate) fn start_heart_beat_timer(metadata_storage_mode: MetadataStorageType)
             "all({}) task is final",
             job_descriptor.worker_managers.len()
         );
+
+        if end_task_managers == job_descriptor.worker_managers.len() {
+            return HeartbeatResult::End;
+        }
     }
 }

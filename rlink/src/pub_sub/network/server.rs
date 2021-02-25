@@ -230,7 +230,11 @@ impl Server {
                                     return self.send(ResponseCode::Empty, None, framed_read).await;
                                 }
                                 Err(TryRecvError::Disconnected) => {
-                                    panic!(format!("channel_key({:?}) close", channel_key))
+                                    // panic!(format!("channel_key({:?}) close", channel_key))
+                                    info!("channel_key({:?}) close", channel_key);
+                                    return self
+                                        .send(ResponseCode::NoService, None, framed_read)
+                                        .await;
                                 }
                             }
                         }

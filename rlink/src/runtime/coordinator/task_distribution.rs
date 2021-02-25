@@ -2,6 +2,7 @@ use crate::api::properties::Properties;
 use crate::api::runtime::CheckpointId;
 use crate::dag::DagManager;
 use crate::runtime::context::Context;
+use crate::runtime::HeartBeatStatus;
 use crate::runtime::{
     ClusterDescriptor, CoordinatorManagerDescriptor, OperatorDescriptor, TaskDescriptor,
     TaskManagerStatus, WorkerManagerDescriptor,
@@ -42,6 +43,7 @@ pub(crate) fn build_cluster_descriptor(
         let task_manager_descriptor = WorkerManagerDescriptor {
             task_status: TaskManagerStatus::Pending,
             latest_heart_beat_ts: 0,
+            latest_heart_beat_status: HeartBeatStatus::Ok,
             task_manager_id: task_manager_instance.worker_manager_id.clone(),
             task_manager_address: "".to_string(),
             metrics_address: "".to_string(),
