@@ -23,7 +23,6 @@ pub(crate) struct SourceRunnable {
     context: Option<RunnableContext>,
 
     task_id: TaskId,
-    parent_execution_size: usize,
 
     stream_source: DefaultStreamOperator<dyn InputFormat>,
     next_runnable: Option<Box<dyn Runnable>>,
@@ -31,6 +30,7 @@ pub(crate) struct SourceRunnable {
     stream_status_timer: Option<TimerChannel>,
     checkpoint_timer: Option<TimerChannel>,
 
+    waiting_end_flags: usize,
     barrier_align: BarrierAlignManager,
     watermark_align: WatermarkAlignManager,
 }
@@ -46,13 +46,13 @@ impl SourceRunnable {
             context: None,
             task_id: TaskId::default(),
 
-            parent_execution_size: 0,
             stream_source,
             next_runnable,
 
             stream_status_timer: None,
             checkpoint_timer: None,
 
+            waiting_end_flags: 0,
             barrier_align: BarrierAlignManager::default(),
             watermark_align: WatermarkAlignManager::default(),
         }
@@ -97,11 +97,12 @@ impl SourceRunnable {
         running: Arc<AtomicBool>,
     ) -> anyhow::Result<()> {
         loop {
+            let running = running.load(Ordering::Relaxed);
+
             let window_time = stream_status_timer.recv().map_err(|e| anyhow!(e))?;
-            let stream_status = Element::new_stream_status(window_time, false);
+            let stream_status = Element::new_stream_status(window_time, !running);
             sender.send(stream_status).map_err(|e| anyhow!(e))?;
 
-            let running = running.load(Ordering::Relaxed);
             if !running {
                 info!("StreamStatus WindowTimer stop");
                 break;
@@ -169,9 +170,14 @@ impl Runnable for SourceRunnable {
             self.checkpoint_timer = Some(checkpoint_timer);
         }
 
-        self.parent_execution_size = context.parent_executions(&self.task_id).len();
-        self.barrier_align = BarrierAlignManager::new(self.parent_execution_size);
-        self.watermark_align = WatermarkAlignManager::new(self.parent_execution_size, 120);
+        let parent_execution_size = context.parent_executions(&self.task_id).len();
+        self.waiting_end_flags = if parent_execution_size == 0 {
+            1
+        } else {
+            parent_execution_size
+        };
+        self.barrier_align = BarrierAlignManager::new(parent_execution_size);
+        self.watermark_align = WatermarkAlignManager::new(parent_execution_size, 120);
 
         info!(
             "SourceRunnable Opened, operator_id={:?}, task_id={:?}, ElementEventAlign parent_execution_size={:?}",
@@ -241,29 +247,29 @@ impl Runnable for SourceRunnable {
                 Element::StreamStatus(stream_status) => {
                     if stream_status.end {
                         end_flags += 1;
-                        if end_flags == self.parent_execution_size {
+                        if end_flags == self.waiting_end_flags {
                             let stream_status = Element::new_stream_status(0, true);
                             self.next_runnable.as_mut().unwrap().run(stream_status);
 
                             info!("break source loop");
                             break;
                         }
-                    }
-
-                    let (align, align_watermark) =
-                        self.watermark_align.apply_stream_status(&stream_status);
-                    if align {
-                        match align_watermark {
-                            Some(w) => self
-                                .next_runnable
-                                .as_mut()
-                                .unwrap()
-                                .run(Element::Watermark(w)),
-                            None => self
-                                .next_runnable
-                                .as_mut()
-                                .unwrap()
-                                .run(Element::StreamStatus(stream_status)),
+                    } else {
+                        let (align, align_watermark) =
+                            self.watermark_align.apply_stream_status(&stream_status);
+                        if align {
+                            match align_watermark {
+                                Some(w) => self
+                                    .next_runnable
+                                    .as_mut()
+                                    .unwrap()
+                                    .run(Element::Watermark(w)),
+                                None => self
+                                    .next_runnable
+                                    .as_mut()
+                                    .unwrap()
+                                    .run(Element::StreamStatus(stream_status)),
+                            }
                         }
                     }
                 }

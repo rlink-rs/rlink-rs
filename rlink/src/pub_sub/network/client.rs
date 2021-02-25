@@ -139,7 +139,7 @@ async fn client_task(
     match client.send().await {
         Ok(()) => {
             client.close_rough().await;
-            info!("client({:?}) close", channel_key);
+            info!("client close({:?})", channel_key);
             Ok(())
         }
         Err(e) => {

@@ -190,7 +190,7 @@ impl Server {
                     }
                 }
                 Err(err) => {
-                    error!(
+                    warn!(
                         "Socket closed with error. remote addr: {}, error: {:?}",
                         self.sock_addr_to_str(&remote_addr),
                         err

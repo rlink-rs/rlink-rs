@@ -133,9 +133,9 @@ impl Iterator for ChannelIterator {
     fn next(&mut self) -> Option<Self::Item> {
         match self.receiver.recv() {
             Ok(element) => {
-                if element.is_stream_status() && element.as_stream_status().end {
-                    return None;
-                }
+                // if element.is_stream_status() && element.as_stream_status().end {
+                //     return None;
+                // }
                 return Some(element);
             }
             Err(_e) => {
@@ -172,9 +172,9 @@ impl Iterator for MultiChannelIterator {
 
             match res {
                 Ok(element) => {
-                    if element.is_stream_status() && element.as_stream_status().end {
-                        return None;
-                    }
+                    // if element.is_stream_status() && element.as_stream_status().end {
+                    //     return None;
+                    // }
                     return Some(element);
                 }
                 Err(TryRecvError::Empty) => continue,

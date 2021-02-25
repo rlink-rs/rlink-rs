@@ -5,7 +5,7 @@ use crate::api::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotConte
 use crate::api::element::Element;
 use crate::api::operator::DefaultStreamOperator;
 use crate::api::runtime::{OperatorId, TaskId};
-use crate::api::watermark::{Watermark, WatermarkAssigner, MAX_WATERMARK, MIN_WATERMARK};
+use crate::api::watermark::{Watermark, WatermarkAssigner, MIN_WATERMARK};
 use crate::metrics::{register_counter, register_gauge, Tag};
 use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
