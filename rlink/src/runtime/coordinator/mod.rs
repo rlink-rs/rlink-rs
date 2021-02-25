@@ -194,22 +194,23 @@ where
 
         for task_manager_descriptor in &mut application_descriptor.worker_managers {
             for task_descriptor in &mut task_manager_descriptor.task_descriptors {
-                for operator_id in &task_descriptor.operator_ids {
-                    let cks = operator_checkpoints.get(&operator_id).unwrap();
+                let task_number = task_descriptor.task_id.task_number;
+                for operator in &mut task_descriptor.operators {
+                    let cks = operator_checkpoints.get(&operator.operator_id).unwrap();
                     if cks.len() == 0 {
-                        debug!("operator {:?} checkpoint not found", operator_id);
+                        debug!("operator {:?} checkpoint not found", operator.operator_id);
                         continue;
                     }
 
                     let ck = cks
                         .iter()
-                        .find(|ck| ck.task_id.task_number == task_descriptor.task_id.task_number)
+                        .find(|ck| ck.task_id.task_number == task_number)
                         .unwrap();
-                    task_descriptor.checkpoint_id = ck.checkpoint_id;
-                    task_descriptor.checkpoint_handle = Some(CheckpointHandle {
+                    operator.checkpoint_id = ck.checkpoint_id;
+                    operator.checkpoint_handle = Some(CheckpointHandle {
                         handle: ck.handle.handle.clone(),
                     });
-                    info!("task_descriptor {:?} checkpoint loaded", task_descriptor);
+                    info!("operator {:?} checkpoint loaded", operator);
                 }
             }
         }

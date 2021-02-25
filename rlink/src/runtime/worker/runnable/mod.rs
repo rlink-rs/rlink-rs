@@ -57,13 +57,20 @@ impl RunnableContext {
             .map(|(node, edge)| (node.clone(), edge.clone()))
             .collect();
 
+        let operator = self
+            .task_descriptor
+            .operators
+            .iter()
+            .find(|x| x.operator_id.eq(&operator_id))
+            .unwrap();
+
         FunctionContext {
             application_id: coordinator_manager.application_id.clone(),
             application_properties: coordinator_manager.application_properties.clone(),
             operator_id,
             task_id: self.task_descriptor.task_id.clone(),
-            checkpoint_id: self.task_descriptor.checkpoint_id,
-            checkpoint_handle: self.task_descriptor.checkpoint_handle.clone(),
+            checkpoint_id: operator.checkpoint_id,
+            checkpoint_handle: operator.checkpoint_handle.clone(),
 
             parents,
             children,

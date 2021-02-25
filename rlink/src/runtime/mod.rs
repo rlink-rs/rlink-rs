@@ -77,6 +77,20 @@ impl std::fmt::Display for ManagerType {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct OperatorDescriptor {
+    pub operator_id: OperatorId,
+    pub checkpoint_id: CheckpointId,
+    pub checkpoint_handle: Option<CheckpointHandle>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct TaskDescriptor {
+    pub task_id: TaskId,
+    pub operators: Vec<OperatorDescriptor>,
+    pub input_split: InputSplit,
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub enum TaskManagerStatus {
     /// waiting for the TaskManager register
@@ -85,16 +99,6 @@ pub enum TaskManagerStatus {
     Registered = 1,
     /// TaskManager lost and try to recreate a new TaskManager
     Migration = 2,
-}
-
-// todo rename to TaskDescriptor
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct TaskDescriptor {
-    pub task_id: TaskId,
-    pub operator_ids: Vec<OperatorId>,
-    pub input_split: InputSplit,
-    pub checkpoint_id: CheckpointId,
-    pub checkpoint_handle: Option<CheckpointHandle>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
