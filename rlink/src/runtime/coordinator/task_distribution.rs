@@ -3,16 +3,16 @@ use crate::api::runtime::CheckpointId;
 use crate::dag::DagManager;
 use crate::runtime::context::Context;
 use crate::runtime::{
-    ApplicationDescriptor, CoordinatorManagerDescriptor, OperatorDescriptor, TaskDescriptor,
+    ClusterDescriptor, CoordinatorManagerDescriptor, OperatorDescriptor, TaskDescriptor,
     TaskManagerStatus, WorkerManagerDescriptor,
 };
 
-pub(crate) fn build_application_descriptor(
+pub(crate) fn build_cluster_descriptor(
     job_name: &str,
     dag_manager: &DagManager,
     application_properties: &Properties,
     context: &Context,
-) -> ApplicationDescriptor {
+) -> ClusterDescriptor {
     let worker_instances = dag_manager
         .physic_graph()
         .alloc_by_instance(context.num_task_managers);
@@ -60,7 +60,7 @@ pub(crate) fn build_application_descriptor(
         coordinator_status: TaskManagerStatus::Pending,
     };
 
-    ApplicationDescriptor {
+    ClusterDescriptor {
         coordinator_manager: job_manager,
         worker_managers,
     }

@@ -5,13 +5,13 @@ use crate::api::cluster::{BatchExecuteRequest, ResponseCode, StdResponse, TaskRe
 use crate::api::env::{StreamApp, StreamExecutionEnvironment};
 use crate::deployment::{Resource, TResourceManager};
 use crate::runtime::context::Context;
-use crate::runtime::{ApplicationDescriptor, ManagerType};
+use crate::runtime::{ClusterDescriptor, ManagerType};
 use crate::utils::http_client;
 
 #[derive(Clone, Debug)]
 pub(crate) struct StandaloneResourceManager {
     context: Arc<Context>,
-    job_descriptor: Option<ApplicationDescriptor>,
+    job_descriptor: Option<ClusterDescriptor>,
 }
 
 impl StandaloneResourceManager {
@@ -24,7 +24,7 @@ impl StandaloneResourceManager {
 }
 
 impl TResourceManager for StandaloneResourceManager {
-    fn prepare(&mut self, _context: &Context, job_descriptor: &ApplicationDescriptor) {
+    fn prepare(&mut self, _context: &Context, job_descriptor: &ClusterDescriptor) {
         self.job_descriptor = Some(job_descriptor.clone());
     }
 

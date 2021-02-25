@@ -22,7 +22,7 @@ use crate::channel::{
 };
 use crate::metrics::{register_counter, Tag};
 use crate::pub_sub::network::{ElementRequest, ResponseCode};
-use crate::runtime::ApplicationDescriptor;
+use crate::runtime::ClusterDescriptor;
 use crate::utils::thread::get_runtime;
 use futures::{SinkExt, StreamExt};
 use tokio::io::AsyncWriteExt;
@@ -73,11 +73,11 @@ fn subscribe_post(channel_key: ChannelKey, sender: ElementSender) {
     c.0.send((channel_key, sender)).unwrap()
 }
 
-pub(crate) fn run_subscribe(application_descriptor: Arc<ApplicationDescriptor>) {
-    get_runtime().block_on(subscribe_listen(application_descriptor));
+pub(crate) fn run_subscribe(cluster_descriptor: Arc<ClusterDescriptor>) {
+    get_runtime().block_on(subscribe_listen(cluster_descriptor));
 }
 
-async fn subscribe_listen(application_descriptor: Arc<ApplicationDescriptor>) {
+async fn subscribe_listen(cluster_descriptor: Arc<ClusterDescriptor>) {
     let c: &(
         Sender<(ChannelKey, ElementSender)>,
         Receiver<(ChannelKey, ElementSender)>,
@@ -89,7 +89,7 @@ async fn subscribe_listen(application_descriptor: Arc<ApplicationDescriptor>) {
     loop {
         match c.1.try_recv() {
             Ok((channel_key, sender)) => {
-                let worker_manager_descriptor = application_descriptor
+                let worker_manager_descriptor = cluster_descriptor
                     .get_worker_manager(&channel_key.source_task_id)
                     .expect("WorkerManagerDescriptor not found");
                 let addr = SocketAddr::from_str(&worker_manager_descriptor.task_manager_address)

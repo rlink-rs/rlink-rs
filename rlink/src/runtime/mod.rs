@@ -124,12 +124,12 @@ pub struct CoordinatorManagerDescriptor {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct ApplicationDescriptor {
+pub struct ClusterDescriptor {
     pub coordinator_manager: CoordinatorManagerDescriptor,
     pub worker_managers: Vec<WorkerManagerDescriptor>,
 }
 
-impl ApplicationDescriptor {
+impl ClusterDescriptor {
     pub fn get_worker_manager(&self, task_id: &TaskId) -> Option<&WorkerManagerDescriptor> {
         self.worker_managers
             .iter()

@@ -1,11 +1,11 @@
 use std::sync::Mutex;
 
-use crate::runtime::{ApplicationDescriptor, TaskManagerStatus};
+use crate::runtime::{ClusterDescriptor, TaskManagerStatus};
 use crate::storage::metadata::TMetadataStorage;
 use crate::utils;
 
 lazy_static! {
-    pub static ref METADATA_STORAGE: Mutex<Option<ApplicationDescriptor>> = Mutex::new(None);
+    pub static ref METADATA_STORAGE: Mutex<Option<ClusterDescriptor>> = Mutex::new(None);
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -18,7 +18,7 @@ impl MemoryMetadataStorage {
 }
 
 impl TMetadataStorage for MemoryMetadataStorage {
-    fn save(&mut self, metadata: ApplicationDescriptor) -> anyhow::Result<()> {
+    fn save(&mut self, metadata: ClusterDescriptor) -> anyhow::Result<()> {
         let mut lock = METADATA_STORAGE
             .lock()
             .expect("METADATA_STORAGE lock failed");
@@ -38,7 +38,7 @@ impl TMetadataStorage for MemoryMetadataStorage {
         Ok(())
     }
 
-    fn load(&self) -> anyhow::Result<ApplicationDescriptor> {
+    fn load(&self) -> anyhow::Result<ClusterDescriptor> {
         let lock = METADATA_STORAGE
             .lock()
             .expect("METADATA_STORAGE lock failed");
@@ -52,7 +52,7 @@ impl TMetadataStorage for MemoryMetadataStorage {
         let mut lock = METADATA_STORAGE
             .lock()
             .expect("METADATA_STORAGE lock failed");
-        let mut job_descriptor: ApplicationDescriptor = lock.clone().unwrap();
+        let mut job_descriptor: ClusterDescriptor = lock.clone().unwrap();
         job_descriptor.coordinator_manager.coordinator_status = job_manager_status;
 
         *lock = Some(job_descriptor);
@@ -71,7 +71,7 @@ impl TMetadataStorage for MemoryMetadataStorage {
         let mut lock = METADATA_STORAGE
             .lock()
             .expect("METADATA_STORAGE lock failed");
-        let mut job_descriptor: ApplicationDescriptor = lock.clone().unwrap();
+        let mut job_descriptor: ClusterDescriptor = lock.clone().unwrap();
         for mut task_manager_descriptor in &mut job_descriptor.worker_managers {
             if task_manager_descriptor.task_manager_id.eq(task_manager_id) {
                 task_manager_descriptor.task_manager_address = task_manager_address.to_string();

@@ -12,7 +12,7 @@ use crate::dag::metadata::DagMetadata;
 use crate::dag::stream_graph::StreamNode;
 use crate::runtime::timer::WindowTimer;
 use crate::runtime::worker::FunctionContext;
-use crate::runtime::{ApplicationDescriptor, TaskDescriptor};
+use crate::runtime::{ClusterDescriptor, TaskDescriptor};
 
 pub mod co_process_runnable;
 pub mod filter_runnable;
@@ -36,14 +36,14 @@ pub(crate) use window_assigner_runnable::WindowAssignerRunnable;
 #[derive(Clone, Debug)]
 pub(crate) struct RunnableContext {
     pub(crate) dag_metadata: Arc<DagMetadata>,
-    pub(crate) application_descriptor: Arc<ApplicationDescriptor>,
+    pub(crate) cluster_descriptor: Arc<ClusterDescriptor>,
     pub(crate) task_descriptor: TaskDescriptor,
     pub(crate) window_timer: WindowTimer,
 }
 
 impl RunnableContext {
     pub(crate) fn to_fun_context(&self, operator_id: OperatorId) -> FunctionContext {
-        let coordinator_manager = &self.application_descriptor.coordinator_manager;
+        let coordinator_manager = &self.cluster_descriptor.coordinator_manager;
         let parents = self
             .dag_metadata
             .execution_parents(&self.task_descriptor.task_id)
@@ -86,7 +86,7 @@ impl RunnableContext {
     }
 
     pub(crate) fn checkpoint_internal(&self, default_value: Duration) -> Duration {
-        self.application_descriptor
+        self.cluster_descriptor
             .coordinator_manager
             .application_properties
             .get_checkpoint_internal()

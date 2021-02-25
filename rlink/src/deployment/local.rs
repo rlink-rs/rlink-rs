@@ -5,26 +5,26 @@ use crate::api::cluster::TaskResourceInfo;
 use crate::api::env::{StreamApp, StreamExecutionEnvironment};
 use crate::deployment::{Resource, TResourceManager};
 use crate::runtime::context::Context;
-use crate::runtime::{cluster, ApplicationDescriptor, ManagerType};
+use crate::runtime::{cluster, ClusterDescriptor, ManagerType};
 
 #[derive(Clone, Debug)]
 pub(crate) struct LocalResourceManager {
     context: Arc<Context>,
-    application_descriptor: Option<ApplicationDescriptor>,
+    cluster_descriptor: Option<ClusterDescriptor>,
 }
 
 impl LocalResourceManager {
     pub fn new(context: Arc<Context>) -> Self {
         LocalResourceManager {
             context,
-            application_descriptor: None,
+            cluster_descriptor: None,
         }
     }
 }
 
 impl TResourceManager for LocalResourceManager {
-    fn prepare(&mut self, _context: &Context, job_descriptor: &ApplicationDescriptor) {
-        self.application_descriptor = Some(job_descriptor.clone());
+    fn prepare(&mut self, _context: &Context, cluster_descriptor: &ClusterDescriptor) {
+        self.cluster_descriptor = Some(cluster_descriptor.clone());
     }
 
     fn worker_allocate<S>(
@@ -35,8 +35,8 @@ impl TResourceManager for LocalResourceManager {
     where
         S: StreamApp + 'static,
     {
-        let application_descriptor = self.application_descriptor.as_ref().unwrap();
-        for task_manager_descriptor in &application_descriptor.worker_managers {
+        let cluster_descriptor = self.cluster_descriptor.as_ref().unwrap();
+        for task_manager_descriptor in &cluster_descriptor.worker_managers {
             let resource = Resource::new(
                 task_manager_descriptor.physical_memory,
                 task_manager_descriptor.cpu_cores,
@@ -49,7 +49,7 @@ impl TResourceManager for LocalResourceManager {
             let mut context_clone = self.context.deref().clone();
             context_clone.manager_type = ManagerType::Worker;
             context_clone.task_manager_id = task_manager_descriptor.task_manager_id.clone();
-            context_clone.coordinator_address = application_descriptor
+            context_clone.coordinator_address = cluster_descriptor
                 .coordinator_manager
                 .coordinator_address
                 .clone();

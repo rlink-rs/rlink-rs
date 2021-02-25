@@ -115,7 +115,7 @@ async fn route(req: Request<Body>, web_context: Arc<WebContext>) -> anyhow::Resu
         if Method::GET.eq(method) {
             match path {
                 "/api/context" => get_context(req, web_context).await,
-                "/api/metadata" => get_metadata(req, web_context).await,
+                "/api/cluster_metadata" => get_cluster_metadata(req, web_context).await,
                 "/api/checkpoints" => get_checkpoint(req, web_context).await,
                 "/api/dag_metadata" => get_dag_metadata(req, web_context).await,
                 "/api/dag/stream_graph" => get_stream_graph(req, web_context).await,
@@ -172,7 +172,7 @@ async fn get_context(
         .map_err(|e| anyhow!(e))
 }
 
-async fn get_metadata(
+async fn get_cluster_metadata(
     _req: Request<Body>,
     context: Arc<WebContext>,
 ) -> anyhow::Result<Response<Body>> {

@@ -12,7 +12,7 @@ use crate::runtime::context::Context;
 use crate::runtime::timer::{start_window_timer, WindowTimer};
 use crate::runtime::worker::checkpoint::start_report_checkpoint;
 use crate::runtime::worker::heart_beat::{start_heart_beat_timer, status_heartbeat};
-use crate::runtime::{worker, ApplicationDescriptor, TaskManagerStatus, WorkerManagerDescriptor};
+use crate::runtime::{worker, ClusterDescriptor, TaskManagerStatus, WorkerManagerDescriptor};
 use crate::storage::metadata::MetadataLoader;
 use crate::utils;
 
@@ -26,29 +26,29 @@ where
 {
     let mut metadata_loader = MetadataLoader::new(context.coordinator_address.as_str());
 
-    let application_descriptor = metadata_loader.get_application_descriptor();
-    info!("preload `ApplicationDescriptor`");
+    let cluster_descriptor = metadata_loader.get_cluster_descriptor();
+    info!("preload `ClusterDescriptor`");
 
     let server_addr = bootstrap_publish_serve(context.bind_ip.to_string());
     info!("bootstrap publish server, listen: {}", server_addr);
 
-    bootstrap_timer_task(&application_descriptor, context.deref(), server_addr);
+    bootstrap_timer_task(&cluster_descriptor, context.deref(), server_addr);
     info!("bootstrap timer task");
 
     let window_timer = start_window_timer();
     info!("bootstrap window timer");
 
-    let application_descriptor = waiting_all_task_manager_fine(metadata_loader.borrow_mut());
+    let cluster_descriptor = waiting_all_task_manager_fine(metadata_loader.borrow_mut());
     info!("all task manager is fine");
 
     let dag_metadata = load_dag_metadata(metadata_loader.borrow_mut());
     info!("load dag metadata success");
 
-    bootstrap_subscribe_client(application_descriptor.clone());
+    bootstrap_subscribe_client(cluster_descriptor.clone());
     info!("bootstrap subscribe client");
 
     let join_handles = run_tasks(
-        application_descriptor,
+        cluster_descriptor,
         dag_metadata,
         context,
         window_timer,
@@ -66,9 +66,9 @@ where
 
 fn get_task_manager_descriptor(
     task_manager_id: &str,
-    application_descriptor: &ApplicationDescriptor,
+    cluster_descriptor: &ClusterDescriptor,
 ) -> Option<WorkerManagerDescriptor> {
-    for task_manager_descriptors in &application_descriptor.worker_managers {
+    for task_manager_descriptors in &cluster_descriptor.worker_managers {
         if task_manager_descriptors.task_manager_id.eq(task_manager_id) {
             return Some(task_manager_descriptors.clone());
         }
@@ -91,18 +91,18 @@ fn bootstrap_publish_serve(bind_ip: String) -> SocketAddr {
     }
 }
 
-fn bootstrap_subscribe_client(application_descriptor: Arc<ApplicationDescriptor>) {
+fn bootstrap_subscribe_client(cluster_descriptor: Arc<ClusterDescriptor>) {
     utils::thread::spawn("subscribe_client", move || {
-        network::run_subscribe(application_descriptor)
+        network::run_subscribe(cluster_descriptor)
     });
 }
 
 fn bootstrap_timer_task(
-    application_descriptor: &ApplicationDescriptor,
+    cluster_descriptor: &ClusterDescriptor,
     context: &Context,
     bind_addr: SocketAddr,
 ) {
-    let coordinator_address = application_descriptor
+    let coordinator_address = cluster_descriptor
         .coordinator_manager
         .coordinator_address
         .as_str();
@@ -126,21 +126,16 @@ fn bootstrap_timer_task(
     start_report_checkpoint(coordinator_address);
 }
 
-fn waiting_all_task_manager_fine(
-    metadata_loader: &mut MetadataLoader,
-) -> Arc<ApplicationDescriptor> {
+fn waiting_all_task_manager_fine(metadata_loader: &mut MetadataLoader) -> Arc<ClusterDescriptor> {
     Arc::new(waiting_all_task_manager_fine0(metadata_loader))
 }
 
-fn waiting_all_task_manager_fine0(metadata_loader: &mut MetadataLoader) -> ApplicationDescriptor {
+fn waiting_all_task_manager_fine0(metadata_loader: &mut MetadataLoader) -> ClusterDescriptor {
     loop {
-        let application_descriptor = metadata_loader.get_application_descriptor();
-        match application_descriptor
-            .coordinator_manager
-            .coordinator_status
-        {
+        let cluster_descriptor = metadata_loader.get_cluster_descriptor();
+        match cluster_descriptor.coordinator_manager.coordinator_status {
             TaskManagerStatus::Registered => {
-                return application_descriptor;
+                return cluster_descriptor;
             }
             _ => std::thread::sleep(Duration::from_secs(2)),
         }
@@ -152,7 +147,7 @@ fn load_dag_metadata(metadata_loader: &mut MetadataLoader) -> Arc<DagMetadata> {
 }
 
 fn run_tasks<S>(
-    application_descriptor: Arc<ApplicationDescriptor>,
+    cluster_descriptor: Arc<ClusterDescriptor>,
     dag_metadata: Arc<DagMetadata>,
     context: Arc<Context>,
     window_timer: WindowTimer,
@@ -165,7 +160,7 @@ where
     let task_manager_id = context.task_manager_id.as_str();
     // todo error check
     let task_manager_descriptors =
-        get_task_manager_descriptor(task_manager_id, application_descriptor.borrow()).unwrap();
+        get_task_manager_descriptor(task_manager_id, cluster_descriptor.borrow()).unwrap();
 
     task_manager_descriptors
         .task_descriptors
@@ -174,7 +169,7 @@ where
             worker::run(
                 context.clone(),
                 dag_metadata.clone(),
-                application_descriptor.clone(),
+                cluster_descriptor.clone(),
                 task_descriptor.clone(),
                 stream_app.clone(),
                 &stream_env,

@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use crate::api::cluster::MetadataStorageType;
-use crate::runtime::{ApplicationDescriptor, TaskManagerStatus};
+use crate::runtime::{ClusterDescriptor, TaskManagerStatus};
 use crate::storage::metadata::mem_metadata_storage::MemoryMetadataStorage;
 
 pub mod mem_metadata_storage;
@@ -10,9 +10,9 @@ pub mod metadata_loader;
 pub(crate) use metadata_loader::MetadataLoader;
 
 pub trait TMetadataStorage: Debug {
-    fn save(&mut self, metadata: ApplicationDescriptor) -> anyhow::Result<()>;
+    fn save(&mut self, metadata: ClusterDescriptor) -> anyhow::Result<()>;
     fn delete(&mut self) -> anyhow::Result<()>;
-    fn load(&self) -> anyhow::Result<ApplicationDescriptor>;
+    fn load(&self) -> anyhow::Result<ClusterDescriptor>;
     fn update_application_status(
         &self,
         job_manager_status: TaskManagerStatus,
@@ -43,7 +43,7 @@ impl MetadataStorage {
 }
 
 impl TMetadataStorage for MetadataStorage {
-    fn save(&mut self, metadata: ApplicationDescriptor) -> anyhow::Result<()> {
+    fn save(&mut self, metadata: ClusterDescriptor) -> anyhow::Result<()> {
         match self {
             MetadataStorage::MemoryMetadataStorage(storage) => storage.save(metadata),
         }
@@ -55,7 +55,7 @@ impl TMetadataStorage for MetadataStorage {
         }
     }
 
-    fn load(&self) -> anyhow::Result<ApplicationDescriptor> {
+    fn load(&self) -> anyhow::Result<ClusterDescriptor> {
         match self {
             MetadataStorage::MemoryMetadataStorage(storage) => storage.load(),
         }
@@ -90,23 +90,23 @@ impl TMetadataStorage for MetadataStorage {
     }
 }
 
-pub(crate) fn loop_read_application_descriptor(
+pub(crate) fn loop_read_cluster_descriptor(
     metadata_storage: &MetadataStorage,
-) -> ApplicationDescriptor {
+) -> ClusterDescriptor {
     loop_fn!(metadata_storage.load(), std::time::Duration::from_secs(2))
 }
 
-pub(crate) fn loop_save_application_descriptor(
+pub(crate) fn loop_save_cluster_descriptor(
     metadata_storage: &mut MetadataStorage,
-    application_descriptor: ApplicationDescriptor,
+    cluster_descriptor: ClusterDescriptor,
 ) {
     loop_fn!(
-        metadata_storage.save(application_descriptor.clone()),
+        metadata_storage.save(cluster_descriptor.clone()),
         std::time::Duration::from_secs(2)
     );
 }
 
-pub(crate) fn loop_delete_application_descriptor(metadata_storage: &mut MetadataStorage) {
+pub(crate) fn loop_delete_cluster_descriptor(metadata_storage: &mut MetadataStorage) {
     loop_fn!(metadata_storage.delete(), std::time::Duration::from_secs(2));
 }
 

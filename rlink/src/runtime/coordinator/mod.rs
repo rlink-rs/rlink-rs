@@ -14,12 +14,12 @@ use crate::dag::DagManager;
 use crate::deployment::TResourceManager;
 use crate::runtime::context::Context;
 use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
-use crate::runtime::coordinator::task_distribution::build_application_descriptor;
+use crate::runtime::coordinator::task_distribution::build_cluster_descriptor;
 use crate::runtime::coordinator::web_server::web_launch;
-use crate::runtime::{ApplicationDescriptor, TaskManagerStatus};
+use crate::runtime::{ClusterDescriptor, TaskManagerStatus};
 use crate::storage::metadata::{
-    loop_delete_application_descriptor, loop_read_application_descriptor,
-    loop_save_application_descriptor, loop_update_application_status, MetadataStorage,
+    loop_delete_cluster_descriptor, loop_read_cluster_descriptor, loop_save_cluster_descriptor,
+    loop_update_application_status, MetadataStorage,
 };
 use crate::utils::date_time::timestamp_str;
 
@@ -79,37 +79,28 @@ where
         let dag_metadata = DagMetadata::from(&dag_manager);
         info!("DagMetadata: {}", dag_metadata.to_string());
 
-        let mut application_descriptor = self.build_metadata(&dag_manager, &application_properties);
-        info!(
-            "ApplicationDescriptor : {}",
-            application_descriptor.to_string()
-        );
+        let mut cluster_descriptor = self.build_metadata(&dag_manager, &application_properties);
+        info!("ApplicationDescriptor : {}", cluster_descriptor.to_string());
 
         let ck_manager =
-            self.build_checkpoint_manager(&dag_metadata, application_descriptor.borrow_mut());
+            self.build_checkpoint_manager(&dag_metadata, cluster_descriptor.borrow_mut());
         ck_manager.run_align_task();
         info!("start CheckpointManager align task");
 
-        self.web_serve(
-            application_descriptor.borrow_mut(),
-            ck_manager,
-            dag_metadata,
-        );
+        self.web_serve(cluster_descriptor.borrow_mut(), ck_manager, dag_metadata);
         info!(
             "serve coordinator web ui {}",
-            &application_descriptor
-                .coordinator_manager
-                .coordinator_address
+            &cluster_descriptor.coordinator_manager.coordinator_address
         );
 
         self.resource_manager
-            .prepare(&self.context, &application_descriptor);
+            .prepare(&self.context, &cluster_descriptor);
         info!("ResourceManager prepared");
 
         // loop restart all tasks when some task is failure
         loop {
             // save metadata to storage
-            self.save_metadata(application_descriptor.clone());
+            self.save_metadata(cluster_descriptor.clone());
             info!("save metadata to storage");
 
             // allocate all worker's resources
@@ -155,8 +146,8 @@ where
         &mut self,
         dag_manager: &DagManager,
         application_properties: &Properties,
-    ) -> ApplicationDescriptor {
-        let application_descriptor = build_application_descriptor(
+    ) -> ClusterDescriptor {
+        let cluster_descriptor = build_cluster_descriptor(
             self.stream_env.application_name.as_str(),
             dag_manager,
             application_properties,
@@ -164,35 +155,31 @@ where
         );
         // let mut metadata_storage = MetadataStorage::new(&self.metadata_storage_mode);
         // loop_save_job_descriptor(metadata_storage.borrow_mut(), job_descriptor.clone());
-        application_descriptor
+        cluster_descriptor
     }
 
-    fn save_metadata(&self, application_descriptor: ApplicationDescriptor) {
+    fn save_metadata(&self, cluster_descriptor: ClusterDescriptor) {
         let mut metadata_storage = MetadataStorage::new(&self.metadata_storage_mode);
-        loop_save_application_descriptor(
-            metadata_storage.borrow_mut(),
-            application_descriptor.clone(),
-        );
+        loop_save_cluster_descriptor(metadata_storage.borrow_mut(), cluster_descriptor.clone());
     }
 
     fn clear_metadata(&self) {
         let mut metadata_storage = MetadataStorage::new(&self.metadata_storage_mode);
-        loop_delete_application_descriptor(metadata_storage.borrow_mut());
+        loop_delete_cluster_descriptor(metadata_storage.borrow_mut());
     }
 
     fn build_checkpoint_manager(
         &self,
         dag_manager: &DagMetadata,
-        application_descriptor: &mut ApplicationDescriptor,
+        cluster_descriptor: &mut ClusterDescriptor,
     ) -> CheckpointManager {
-        let mut ck_manager =
-            CheckpointManager::new(dag_manager, &self.context, application_descriptor);
+        let mut ck_manager = CheckpointManager::new(dag_manager, &self.context, cluster_descriptor);
         let operator_checkpoints = ck_manager.load().expect("load checkpoints error");
         if operator_checkpoints.len() == 0 {
             return ck_manager;
         }
 
-        for task_manager_descriptor in &mut application_descriptor.worker_managers {
+        for task_manager_descriptor in &mut cluster_descriptor.worker_managers {
             for task_descriptor in &mut task_manager_descriptor.task_descriptors {
                 let task_number = task_descriptor.task_id.task_number;
                 for operator in &mut task_descriptor.operators {
@@ -220,7 +207,7 @@ where
 
     fn web_serve(
         &self,
-        application_descriptor: &mut ApplicationDescriptor,
+        cluster_descriptor: &mut ClusterDescriptor,
         checkpoint_manager: CheckpointManager,
         dag_metadata: DagMetadata,
     ) {
@@ -233,9 +220,7 @@ where
             checkpoint_manager,
             dag_metadata,
         );
-        application_descriptor
-            .coordinator_manager
-            .coordinator_address = address;
+        cluster_descriptor.coordinator_manager.coordinator_address = address;
     }
 
     fn allocate_worker(&self) -> Vec<TaskResourceInfo> {
@@ -249,7 +234,7 @@ where
         loop {
             info!("waiting all workers status fine...");
 
-            let job_descriptor = loop_read_application_descriptor(&metadata_storage);
+            let job_descriptor = loop_read_cluster_descriptor(&metadata_storage);
 
             let unregister_worker = job_descriptor
                 .worker_managers

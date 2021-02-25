@@ -3,23 +3,22 @@ use std::sync::RwLock;
 use std::time::Duration;
 
 use crate::api::cluster::MetadataStorageType;
-use crate::runtime::ApplicationDescriptor;
-use crate::storage::metadata::{loop_read_application_descriptor, MetadataStorage};
+use crate::runtime::ClusterDescriptor;
+use crate::storage::metadata::{loop_read_cluster_descriptor, MetadataStorage};
 use crate::utils;
 
 lazy_static! {
-    pub(crate) static ref APPLICATION_DESCRIPTOR: RwLock<Option<ApplicationDescriptor>> =
-        RwLock::new(None);
+    pub(crate) static ref CLUSTER_DESCRIPTOR: RwLock<Option<ClusterDescriptor>> = RwLock::new(None);
 }
 
-fn update_global_application_descriptor(job_descriptor: ApplicationDescriptor) {
-    let job_descriptor_rw: &RwLock<Option<ApplicationDescriptor>> = &*APPLICATION_DESCRIPTOR;
+fn update_global_cluster_descriptor(cluster_descriptor: ClusterDescriptor) {
+    let job_descriptor_rw: &RwLock<Option<ClusterDescriptor>> = &*CLUSTER_DESCRIPTOR;
     let mut j = job_descriptor_rw.write().unwrap();
-    *j = Some(job_descriptor);
+    *j = Some(cluster_descriptor);
 }
 
-pub(crate) fn global_application_descriptor() -> Option<ApplicationDescriptor> {
-    let job_descriptor_rw: &RwLock<Option<ApplicationDescriptor>> = &*APPLICATION_DESCRIPTOR;
+pub(crate) fn global_cluster_descriptor() -> Option<ClusterDescriptor> {
+    let job_descriptor_rw: &RwLock<Option<ClusterDescriptor>> = &*CLUSTER_DESCRIPTOR;
     let j = job_descriptor_rw.read().unwrap();
     j.deref().clone()
 }
@@ -29,8 +28,8 @@ pub(crate) fn start_heart_beat_timer(metadata_storage_mode: MetadataStorageType)
     loop {
         std::thread::sleep(Duration::from_secs(5));
 
-        let job_descriptor = loop_read_application_descriptor(&metadata_storage);
-        update_global_application_descriptor(job_descriptor.clone());
+        let job_descriptor = loop_read_cluster_descriptor(&metadata_storage);
+        update_global_cluster_descriptor(job_descriptor.clone());
 
         let current_timestamp = utils::date_time::current_timestamp().as_millis() as u64;
 
