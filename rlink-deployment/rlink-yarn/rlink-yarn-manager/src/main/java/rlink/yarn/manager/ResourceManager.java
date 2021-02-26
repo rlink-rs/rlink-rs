@@ -191,6 +191,7 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
             String port = StringUtils.substringAfter(containerInfo.getNodeId(), ":");
             NodeId nodeId = NodeId.newInstance(host, Integer.parseInt(port));
             nodeManagerClient.stopContainerAsync(containerId, nodeId);
+            resourceManagerClient.releaseAssignedContainer(containerId);
             LOGGER.info("stopTaskContainer containerInfo={}", JSON.toJSONString(containerInfo));
         } catch (Exception e) {
             LOGGER.error("stop container error,taskResourceInfo={}", JSON.toJSONString(taskResourceInfo), e);
@@ -232,7 +233,9 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
         LOGGER.info("onContainersAllocated,size=" + containers.size());
         for (Container container : containers) {
             if (allocateTaskList.size() == containerCount) {
-                break;
+                resourceManagerClient.releaseAssignedContainer(container.getId());
+                LOGGER.info("releaseAssignedContainer,containerId={}", container.getId());
+                continue;
             }
             TaskResourceInfo taskResourceInfo = new TaskResourceInfo(container.getId().toString(),
                     new ContainerInfo(container.getId().toString(), container.getNodeId().toString()));
