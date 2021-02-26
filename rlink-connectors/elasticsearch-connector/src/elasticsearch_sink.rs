@@ -13,7 +13,7 @@ use elasticsearch::{BulkParts, Elasticsearch};
 use rlink::api::checkpoint::CheckpointFunction;
 use rlink::api::element::Record;
 use rlink::api::function::{Context, NamedFunction, OutputFormat};
-use rlink::channel::handover::Handover;
+use rlink::channel::utils::handover::Handover;
 use rlink::metrics::Tag;
 use rlink::utils::thread::get_runtime;
 use rlink::{api, utils};

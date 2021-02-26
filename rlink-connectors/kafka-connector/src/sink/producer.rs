@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use rdkafka::producer::{FutureProducer, FutureRecord, Producer};
 use rdkafka::ClientConfig;
-use rlink::channel::handover::Handover;
+use rlink::channel::utils::handover::Handover;
 use rlink::channel::TryRecvError;
 use rlink::utils::EMPTY_SLICE;
 
@@ -121,7 +121,7 @@ mod tests {
 
     use rdkafka::ClientConfig;
     use rlink::api::element::Record;
-    use rlink::channel::handover::Handover;
+    use rlink::channel::utils::handover::Handover;
     use rlink::utils::date_time::current_timestamp_millis;
 
     use crate::sink::producer::KafkaProducerThread;

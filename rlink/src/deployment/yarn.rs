@@ -8,13 +8,13 @@ use crate::api::env::{StreamApp, StreamExecutionEnvironment};
 use crate::channel::{bounded, Receiver, Sender};
 use crate::deployment::TResourceManager;
 use crate::runtime::context::Context;
-use crate::runtime::{ApplicationDescriptor, ManagerType};
+use crate::runtime::{ClusterDescriptor, ManagerType};
 use crate::utils;
 
 #[derive(Debug)]
 pub(crate) struct YarnResourceManager {
     context: Arc<Context>,
-    job_descriptor: Option<ApplicationDescriptor>,
+    cluster_descriptor: Option<ClusterDescriptor>,
 
     yarn_command: Option<YarnCliCommand>,
 }
@@ -23,15 +23,15 @@ impl YarnResourceManager {
     pub fn new(context: Arc<Context>) -> Self {
         YarnResourceManager {
             context,
-            job_descriptor: None,
+            cluster_descriptor: None,
             yarn_command: None,
         }
     }
 }
 
 impl TResourceManager for YarnResourceManager {
-    fn prepare(&mut self, context: &Context, job_descriptor: &ApplicationDescriptor) {
-        self.job_descriptor = Some(job_descriptor.clone());
+    fn prepare(&mut self, context: &Context, job_descriptor: &ClusterDescriptor) {
+        self.cluster_descriptor = Some(job_descriptor.clone());
 
         self.yarn_command = Some(YarnCliCommand::new(&context, job_descriptor));
     }
@@ -44,10 +44,10 @@ impl TResourceManager for YarnResourceManager {
     where
         S: StreamApp + 'static,
     {
-        let application_descriptor = self.job_descriptor.as_ref().unwrap();
+        let cluster_descriptor = self.cluster_descriptor.as_ref().unwrap();
 
         let mut task_args = Vec::new();
-        for task_manager_descriptor in &application_descriptor.worker_managers {
+        for task_manager_descriptor in &cluster_descriptor.worker_managers {
             let mut args = HashMap::new();
             args.insert(
                 "cluster_mode".to_string(),
@@ -64,7 +64,7 @@ impl TResourceManager for YarnResourceManager {
             );
             args.insert(
                 "coordinator_address".to_string(),
-                application_descriptor
+                cluster_descriptor
                     .coordinator_manager
                     .coordinator_address
                     .clone(),
@@ -104,7 +104,7 @@ struct YarnCliCommand {
 }
 
 impl YarnCliCommand {
-    pub fn new(context: &Context, job_descriptor: &ApplicationDescriptor) -> Self {
+    pub fn new(context: &Context, job_descriptor: &ClusterDescriptor) -> Self {
         let child = std::process::Command::new("java")
             .arg("-Xmx256M")
             // .arg("rlink.yarn.manager.ResourceManagerCli")
