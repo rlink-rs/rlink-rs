@@ -44,6 +44,7 @@ public class ClientExecutor {
         int masterMemoryMb = submitParam.getMasterMemoryMb();
         int masterVCores = submitParam.getMasterVCores();
         String queue = submitParam.getQueue();
+        int maxAppAttempts = submitParam.getMaxAppAttempts();
 
         // Create yarnClient
         YarnConfiguration yarnConfiguration = new YarnConfiguration();
@@ -69,7 +70,7 @@ public class ClientExecutor {
         appContext.setAMContainerSpec(resourceManagerContext);
         appContext.setResource(capability);
         appContext.setQueue(queue);
-        appContext.setMaxAppAttempts(1);
+        appContext.setMaxAppAttempts(maxAppAttempts);
 
         // Submit application
         LOGGER.info("Submitting application {}, appContext={}", appId, appContext.toString());

@@ -16,6 +16,7 @@ public class SubmitParam implements Serializable {
     private int masterMemoryMb;
     private int masterVCores;
     private String queue;
+    private int maxAppAttempts;
     private Map<String, String> paramMap;
 
     public String getApplicationName() {
@@ -88,6 +89,14 @@ public class SubmitParam implements Serializable {
 
     public void setQueue(String queue) {
         this.queue = queue;
+    }
+
+    public int getMaxAppAttempts() {
+        return maxAppAttempts;
+    }
+
+    public void setMaxAppAttempts(int maxAppAttempts) {
+        this.maxAppAttempts = maxAppAttempts;
     }
 
     public Map<String, String> getParamMap() {

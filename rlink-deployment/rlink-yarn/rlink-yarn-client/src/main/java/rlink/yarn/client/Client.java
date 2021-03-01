@@ -23,6 +23,7 @@ public class Client {
     public static final String MASTER_VIRTUAL_CORES_KEY = "master_v_cores";
     public static final String QUEUE_KEY = "queue";
     public static final String APPLICATION_ID_KEY = "application_id";
+    public static final String MAX_ATTEMPTS_KEY = "max_attempts";
 
     public static void main(String[] args) {
         try {
@@ -118,6 +119,18 @@ public class Client {
         }
         parameterMap.remove(QUEUE_KEY);
         submitParam.setQueue(queue);
+
+        String maxAttempts = parameterMap.get(MAX_ATTEMPTS_KEY);
+        if (StringUtils.isBlank(maxAttempts)) {
+            submitParam.setMaxAppAttempts(1);
+        } else {
+            try {
+                submitParam.setMaxAppAttempts(Integer.parseInt(maxAttempts));
+            } catch (NumberFormatException e) {
+                throw new RuntimeException(MAX_ATTEMPTS_KEY + " is not Integer.");
+            }
+        }
+        parameterMap.remove(MAX_ATTEMPTS_KEY);
 
         submitParam.setParamMap(parameterMap);
 
