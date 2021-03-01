@@ -40,6 +40,8 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
             new LinkedBlockingQueue<>(4096),
             new ThreadFactoryBuilder().setNameFormat("exec-pool-%d").build());
 
+    private static final Priority RM_REQUEST_PRIORITY = Priority.newInstance(1);
+
     private AMRMClientAsync<AMRMClient.ContainerRequest> resourceManagerClient;
 
     private NMClientAsync nodeManagerClient;
@@ -48,11 +50,12 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
 
     private int memoryMb;
     private int vCores;
+    private Resource resource;
     private Path resourcePath;
 
     private List<Map> allocateParams;
     private CopyOnWriteArrayList<TaskResourceInfo> allocateTaskList = new CopyOnWriteArrayList<>();
-    private int containerCount;
+    private AtomicInteger startContainerCount = new AtomicInteger(0);
     private Command preCommand;
     private Command curCommand;
     private boolean commandRunning;
@@ -65,6 +68,7 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
         resourcePath = launchParam.getResourcePath();
         memoryMb = launchParam.getMemoryMb();
         vCores = launchParam.getvCores();
+        resource = Resource.newInstance(memoryMb, vCores);
 
         int hostStartIndex = !webUrl.contains("://") ? 0 : webUrl.indexOf("://") + 3;
         int hostEndIndex = webUrl.indexOf(":", hostStartIndex);
@@ -112,9 +116,9 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
         executor.execute(() -> {
             try {
                 allocateParams = command.getData();
-                containerCount = command.getData().size();
                 allocateTaskList = new CopyOnWriteArrayList<>();
-                requestYarnContainer(memoryMb, vCores, containerCount);
+                startContainerCount = new AtomicInteger(0);
+                requestYarnContainer(allocateParams.size());
             } catch (Exception e) {
                 LOGGER.error("executeAllocate error", e);
             }
@@ -164,11 +168,10 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
         return nodeManagerClient;
     }
 
-    private void requestYarnContainer(int containerMemory, int containerVCores, int numContainers) {
-        Resource resource = Resource.newInstance(containerMemory, containerVCores);
-        AMRMClient.ContainerRequest containerRequest = new AMRMClient.ContainerRequest(resource, null, null, Priority.newInstance(1));
+    private void requestYarnContainer(int numContainers) {
         for (int i = 0; i < numContainers; i++) {
             LOGGER.info("requestYarnContainer {}", i);
+            AMRMClient.ContainerRequest containerRequest = new AMRMClient.ContainerRequest(resource, null, null, RM_REQUEST_PRIORITY);
             resourceManagerClient.addContainerRequest(containerRequest);
         }
     }
@@ -218,6 +221,17 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
         return containerLaunchContext;
     }
 
+    private List<AMRMClient.ContainerRequest> getPendingRequest() {
+        List<? extends Collection<AMRMClient.ContainerRequest>> matchingRequests =
+                resourceManagerClient.getMatchingRequests(RM_REQUEST_PRIORITY, ResourceRequest.ANY, resource);
+        if (matchingRequests.isEmpty()) {
+            return new ArrayList<>();
+        }
+        ArrayList<AMRMClient.ContainerRequest> list = new ArrayList<>(matchingRequests.get(0));
+        LOGGER.info("getMatchingRequests,size={}", list.size());
+        return list;
+    }
+
     // ------------------------------------------------------------------------
     //  AMRMClientAsync CallbackHandler methods
     // ------------------------------------------------------------------------
@@ -231,8 +245,13 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
     @Override
     public void onContainersAllocated(List<Container> containers) {
         LOGGER.info("onContainersAllocated,size=" + containers.size());
+        Iterator<AMRMClient.ContainerRequest> requestIterator = getPendingRequest().iterator();
         for (Container container : containers) {
-            if (allocateTaskList.size() == containerCount) {
+            AMRMClient.ContainerRequest containerRequest = requestIterator.next();
+            resourceManagerClient.removeContainerRequest(containerRequest);
+            LOGGER.info("removeContainerRequest,{}", containerRequest);
+
+            if (allocateTaskList.size() == allocateParams.size()) {
                 resourceManagerClient.releaseAssignedContainer(container.getId());
                 LOGGER.info("releaseAssignedContainer,containerId={}", container.getId());
                 continue;
@@ -241,11 +260,6 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
                     new ContainerInfo(container.getId().toString(), container.getNodeId().toString()));
             startTaskExecutorInContainer(container, allocateParams.get(allocateTaskList.size()));
             allocateTaskList.add(taskResourceInfo);
-        }
-        if (allocateTaskList.size() == containerCount) {
-            List<Map> data = JSONArray.parseArray(JSON.toJSONString(allocateTaskList), Map.class);
-            Command commandMsg = new Command(curCommand.getCmd(), curCommand.getCmdId(), data);
-            MessageUtil.send(commandMsg);
         }
     }
 
@@ -278,8 +292,13 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
 
     @Override
     public void onContainerStarted(ContainerId containerId, Map<String, ByteBuffer> allServiceResponse) {
-        LOGGER.info("Succeeded to call YARN Node Manager to start container {}.", containerId);
-
+        int count = startContainerCount.addAndGet(1);
+        LOGGER.info("Succeeded to call YARN Node Manager to start container {}.[{}/{}]", containerId, count, allocateParams.size());
+        if (count == allocateParams.size()) {
+            List<Map> data = JSONArray.parseArray(JSON.toJSONString(allocateTaskList), Map.class);
+            Command commandMsg = new Command(curCommand.getCmd(), curCommand.getCmdId(), data);
+            MessageUtil.send(commandMsg);
+        }
     }
 
     @Override
