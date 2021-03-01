@@ -28,7 +28,7 @@ pub mod client {
     use hyper::{Body, Client, Request};
     use serde::Serialize;
 
-    use crate::utils::thread::get_runtime;
+    use crate::utils::thread::async_runtime;
 
     pub fn post_sync<T>(
         url: String,
@@ -37,7 +37,7 @@ pub mod client {
     where
         T: Serialize + serde::de::DeserializeOwned + 'static,
     {
-        get_runtime().block_on(post(url, body))
+        async_runtime().block_on(post(url, body))
     }
 
     pub async fn post<T>(
@@ -66,7 +66,7 @@ pub mod client {
 
     pub fn get_sync(url: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         let url = url.to_string();
-        get_runtime().block_on(get(url.as_str()))
+        async_runtime().block_on(get(url.as_str()))
     }
 
     pub async fn get(url: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {

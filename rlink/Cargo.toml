@@ -51,7 +51,7 @@ quanta = "0.7"
 # net
 bytes = "1.0"
 futures = "0.3"
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "time", "io-util"] }
 tokio-util = {version = "0.6", features = ["codec"]}
 hyper = { version = "0.14", features = ["client", "server", "http1", "tcp"]}
 

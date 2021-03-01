@@ -4,7 +4,7 @@ use crate::api::cluster::StdResponse;
 use crate::runtime::coordinator::web_server::HeartbeatModel;
 use crate::runtime::HeartBeatStatus;
 use crate::utils::http::client::post;
-use crate::utils::thread::get_runtime;
+use crate::utils::thread::async_runtime;
 use crate::utils::{date_time, panic};
 
 pub(crate) fn status_heartbeat(
@@ -19,7 +19,7 @@ pub(crate) fn status_heartbeat(
     let task_manager_address = task_manager_address.to_string();
     let metrics_address = metrics_address.to_string();
 
-    get_runtime().block_on(status_heartbeat_async(
+    async_runtime().block_on(status_heartbeat_async(
         coordinator_address.as_str(),
         task_manager_id.as_str(),
         task_manager_address.as_str(),
@@ -85,7 +85,7 @@ pub(crate) fn start_heart_beat_timer(
     let metrics_address = metrics_address.to_string();
 
     crate::utils::thread::spawn("heartbeat", move || {
-        get_runtime().block_on(start_heart_beat_timer_async(
+        async_runtime().block_on(start_heart_beat_timer_async(
             coordinator.as_str(),
             task_manager_id.as_str(),
             task_manager_address.as_str(),

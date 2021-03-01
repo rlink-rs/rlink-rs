@@ -22,7 +22,7 @@ use crate::runtime::TaskManagerStatus;
 use crate::storage::metadata::{MetadataStorage, TMetadataStorage};
 use crate::utils::fs::read_file;
 use crate::utils::http::server::{as_ok_json, page_not_found};
-use crate::utils::thread::get_runtime;
+use crate::utils::thread::async_runtime;
 
 pub(crate) fn web_launch(
     context: Arc<crate::runtime::context::Context>,
@@ -35,7 +35,7 @@ pub(crate) fn web_launch(
     std::thread::Builder::new()
         .name("WebUI".to_string())
         .spawn(move || {
-            get_runtime().block_on(async move {
+            async_runtime().block_on(async move {
                 let ip = context.bind_ip.clone();
                 let web_context = Arc::new(WebContext {
                     context,

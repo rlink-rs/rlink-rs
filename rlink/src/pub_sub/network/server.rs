@@ -19,7 +19,7 @@ use crate::api::runtime::{ChannelKey, TaskId};
 use crate::channel::{named_channel_with_base, ElementReceiver, ElementSender, TryRecvError};
 use crate::metrics::Tag;
 use crate::pub_sub::network::{ElementRequest, ResponseCode};
-use crate::utils::thread::get_runtime;
+use crate::utils::thread::async_runtime;
 
 lazy_static! {
     static ref NETWORK_CHANNELS: DashMap<ChannelKey, ElementReceiver> = DashMap::new();
@@ -88,7 +88,7 @@ impl Server {
 
     pub fn bind_addr_sync(&self) -> Option<SocketAddr> {
         let self_clone = self.clone();
-        get_runtime().block_on(self_clone.bind_addr())
+        async_runtime().block_on(self_clone.bind_addr())
     }
 
     pub async fn bind_addr(&self) -> Option<SocketAddr> {
@@ -99,7 +99,7 @@ impl Server {
 
     pub fn serve_sync(&self) -> std::io::Result<()> {
         let self_clone = self.clone();
-        get_runtime().block_on(self_clone.serve())
+        async_runtime().block_on(self_clone.serve())
     }
 
     pub async fn serve(&self) -> std::io::Result<()> {
