@@ -4,7 +4,7 @@ use crate::api::checkpoint::Checkpoint;
 use crate::api::cluster::StdResponse;
 use crate::channel::{bounded, Receiver, Sender, TryRecvError, TrySendError};
 use crate::utils::date_time;
-use crate::utils::http_client::post;
+use crate::utils::http::client::post;
 use crate::utils::thread::get_runtime;
 
 pub struct CheckpointChannel {

@@ -113,6 +113,13 @@ impl<T> StdResponse<T> {
     pub fn new(code: ResponseCode, data: Option<T>) -> Self {
         StdResponse { code, data }
     }
+
+    pub fn ok(data: Option<T>) -> Self {
+        StdResponse {
+            code: ResponseCode::OK,
+            data,
+        }
+    }
 }
 
 #[cfg(test)]
