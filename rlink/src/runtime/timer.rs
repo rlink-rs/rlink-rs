@@ -73,7 +73,7 @@ pub fn start_window_timer() -> WindowTimer {
         named_channel("WindowTimerRegister", vec![], 1000);
 
     utils::thread::spawn("window-timer", move || {
-        utils::thread::get_runtime().block_on(async move {
+        utils::thread::async_runtime().block_on(async move {
             let start = Instant::now() + Duration::from_secs(2);
             let mut interval = interval_at(start, Duration::from_secs(3));
 

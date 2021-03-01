@@ -25,7 +25,7 @@ use crate::channel::{
 use crate::metrics::{register_counter, Tag};
 use crate::pub_sub::network::{ElementRequest, ResponseCode};
 use crate::runtime::ClusterDescriptor;
-use crate::utils::thread::get_runtime;
+use crate::utils::thread::async_runtime;
 
 const BATCH_PULL_SIZE: u16 = 6000;
 
@@ -74,7 +74,7 @@ fn subscribe_post(channel_key: ChannelKey, sender: ElementSender) {
 }
 
 pub(crate) fn run_subscribe(cluster_descriptor: Arc<ClusterDescriptor>) {
-    get_runtime().block_on(subscribe_listen(cluster_descriptor));
+    async_runtime().block_on(subscribe_listen(cluster_descriptor));
     info!("network subscribe task stop");
 }
 

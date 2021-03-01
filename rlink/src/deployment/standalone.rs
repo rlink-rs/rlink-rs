@@ -6,7 +6,7 @@ use crate::api::env::{StreamApp, StreamExecutionEnvironment};
 use crate::deployment::{Resource, TResourceManager};
 use crate::runtime::context::Context;
 use crate::runtime::{ClusterDescriptor, ManagerType};
-use crate::utils::http_client;
+use crate::utils::http;
 
 #[derive(Clone, Debug)]
 pub(crate) struct StandaloneResourceManager {
@@ -145,7 +145,7 @@ impl StandaloneClusterClient {
 
         let request_body = BatchExecuteRequest { batch_args: args };
         let body = serde_json::to_string(&request_body).unwrap();
-        let result: StdResponse<String> = http_client::post_sync(url, body)?;
+        let result: StdResponse<String> = http::client::post_sync(url, body)?;
 
         info!("allocation success. `code`={:?}", result.code);
 
@@ -191,7 +191,7 @@ impl StandaloneClusterClient {
 
         info!("stop all workers, url={}, body={:?}", url, body.as_str());
 
-        let result: StdResponse<String> = http_client::post_sync(url, body)?;
+        let result: StdResponse<String> = http::client::post_sync(url, body)?;
 
         match &result.code {
             ResponseCode::OK => {

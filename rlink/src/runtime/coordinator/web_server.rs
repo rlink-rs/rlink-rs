@@ -13,7 +13,7 @@ use hyper::{Server, StatusCode};
 use rand::Rng;
 
 use crate::api::checkpoint::Checkpoint;
-use crate::api::cluster::{MetadataStorageType, ResponseCode, StdResponse};
+use crate::api::cluster::{MetadataStorageType, StdResponse};
 use crate::channel::{bounded, Sender};
 use crate::dag::metadata::DagMetadata;
 use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
@@ -21,7 +21,8 @@ use crate::runtime::HeartBeatStatus;
 use crate::runtime::TaskManagerStatus;
 use crate::storage::metadata::{MetadataStorage, TMetadataStorage};
 use crate::utils::fs::read_file;
-use crate::utils::thread::get_runtime;
+use crate::utils::http::server::{as_ok_json, page_not_found};
+use crate::utils::thread::async_runtime;
 
 pub(crate) fn web_launch(
     context: Arc<crate::runtime::context::Context>,
@@ -34,7 +35,7 @@ pub(crate) fn web_launch(
     std::thread::Builder::new()
         .name("WebUI".to_string())
         .spawn(move || {
-            get_runtime().block_on(async move {
+            async_runtime().block_on(async move {
                 let ip = context.bind_ip.clone();
                 let web_context = Arc::new(WebContext {
                     context,
@@ -151,26 +152,12 @@ pub(crate) struct HeartbeatModel {
     pub status: String,
 }
 
-async fn page_not_found() -> anyhow::Result<Response<Body>> {
-    Response::builder()
-        .status(StatusCode::NOT_FOUND)
-        .body(Body::from("Page not found"))
-        .map_err(|e| anyhow!(e))
-}
-
 async fn get_context(
     _req: Request<Body>,
     context: Arc<WebContext>,
 ) -> anyhow::Result<Response<Body>> {
     let c = context.context.deref().clone();
-    let resp = StdResponse::new(ResponseCode::OK, Some(c));
-
-    let json = serde_json::to_string(&resp).unwrap();
-    Response::builder()
-        .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
-        .status(StatusCode::OK)
-        .body(Body::from(json))
-        .map_err(|e| anyhow!(e))
+    as_ok_json(&StdResponse::ok(Some(c)))
 }
 
 async fn get_cluster_metadata(
@@ -178,16 +165,8 @@ async fn get_cluster_metadata(
     context: Arc<WebContext>,
 ) -> anyhow::Result<Response<Body>> {
     let metadata_storage = MetadataStorage::new(&context.metadata_mode);
-    let job_descriptor = metadata_storage.load().unwrap();
-
-    let resp = StdResponse::new(ResponseCode::OK, Some(job_descriptor));
-    let json = serde_json::to_string(&resp).unwrap();
-
-    Response::builder()
-        .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
-        .status(StatusCode::OK)
-        .body(Body::from(json))
-        .map_err(|e| anyhow!(e))
+    let cluster_descriptor = metadata_storage.load().unwrap();
+    as_ok_json(&StdResponse::ok(Some(cluster_descriptor)))
 }
 
 async fn get_checkpoint(
@@ -195,15 +174,7 @@ async fn get_checkpoint(
     context: Arc<WebContext>,
 ) -> anyhow::Result<Response<Body>> {
     let cks = context.checkpoint_manager.get();
-
-    let resp = StdResponse::new(ResponseCode::OK, Some(cks));
-    let json = serde_json::to_string(&resp).unwrap();
-
-    Response::builder()
-        .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
-        .status(StatusCode::OK)
-        .body(Body::from(json))
-        .map_err(|e| anyhow!(e))
+    as_ok_json(&StdResponse::ok(Some(cks)))
 }
 
 async fn get_dag_metadata(
@@ -211,15 +182,7 @@ async fn get_dag_metadata(
     context: Arc<WebContext>,
 ) -> anyhow::Result<Response<Body>> {
     let json_dag = context.dag_metadata.clone();
-
-    let resp = StdResponse::new(ResponseCode::OK, Some(json_dag));
-    let json = serde_json::to_string(&resp).unwrap();
-
-    Response::builder()
-        .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
-        .status(StatusCode::OK)
-        .body(Body::from(json))
-        .map_err(|e| anyhow!(e))
+    as_ok_json(&StdResponse::ok(Some(json_dag)))
 }
 
 async fn get_stream_graph(
@@ -227,15 +190,7 @@ async fn get_stream_graph(
     context: Arc<WebContext>,
 ) -> anyhow::Result<Response<Body>> {
     let json_dag = context.dag_metadata.stream_graph().clone();
-
-    let resp = StdResponse::new(ResponseCode::OK, Some(json_dag));
-    let json = serde_json::to_string(&resp).unwrap();
-
-    Response::builder()
-        .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
-        .status(StatusCode::OK)
-        .body(Body::from(json))
-        .map_err(|e| anyhow!(e))
+    as_ok_json(&StdResponse::ok(Some(json_dag)))
 }
 
 async fn get_job_graph(
@@ -243,15 +198,7 @@ async fn get_job_graph(
     context: Arc<WebContext>,
 ) -> anyhow::Result<Response<Body>> {
     let json_dag = context.dag_metadata.job_graph().clone();
-
-    let resp = StdResponse::new(ResponseCode::OK, Some(json_dag));
-    let json = serde_json::to_string(&resp).unwrap();
-
-    Response::builder()
-        .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
-        .status(StatusCode::OK)
-        .body(Body::from(json))
-        .map_err(|e| anyhow!(e))
+    as_ok_json(&StdResponse::ok(Some(json_dag)))
 }
 
 async fn get_execution_graph(
@@ -259,15 +206,7 @@ async fn get_execution_graph(
     context: Arc<WebContext>,
 ) -> anyhow::Result<Response<Body>> {
     let json_dag = context.dag_metadata.execution_graph().clone();
-
-    let resp = StdResponse::new(ResponseCode::OK, Some(json_dag));
-    let json = serde_json::to_string(&resp).unwrap();
-
-    Response::builder()
-        .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
-        .status(StatusCode::OK)
-        .body(Body::from(json))
-        .map_err(|e| anyhow!(e))
+    as_ok_json(&StdResponse::ok(Some(json_dag)))
 }
 
 async fn heartbeat(req: Request<Body>, context: Arc<WebContext>) -> anyhow::Result<Response<Body>> {
@@ -294,13 +233,7 @@ async fn heartbeat(req: Request<Body>, context: Arc<WebContext>) -> anyhow::Resu
         )
         .unwrap();
 
-    let resp = StdResponse::new(ResponseCode::OK, Some(true));
-    let json = serde_json::to_string(&resp).unwrap();
-    Response::builder()
-        .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
-        .status(StatusCode::OK)
-        .body(Body::from(json))
-        .map_err(|e| anyhow!(e))
+    as_ok_json(&StdResponse::ok(Some(true)))
 }
 
 async fn checkpoint(
@@ -320,13 +253,7 @@ async fn checkpoint(
         }
     };
 
-    let resp = StdResponse::new(ResponseCode::OK, Some(resp.to_string()));
-    let json = serde_json::to_string(&resp).unwrap();
-    Response::builder()
-        .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
-        .status(StatusCode::OK)
-        .body(Body::from(json))
-        .map_err(|e| anyhow!(e))
+    as_ok_json(&StdResponse::ok(Some(resp.to_string())))
 }
 
 async fn static_file(

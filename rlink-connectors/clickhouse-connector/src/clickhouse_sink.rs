@@ -9,7 +9,7 @@ use rlink::api::element::Record;
 use rlink::api::function::{Context, NamedFunction, OutputFormat};
 use rlink::channel::utils::handover::Handover;
 use rlink::metrics::Tag;
-use rlink::utils::thread::get_runtime;
+use rlink::utils::thread::{async_runtime, async_sleep, async_spawn};
 use rlink::{api, utils};
 
 pub type CkBlock = clickhouse_rs::Block;
@@ -83,7 +83,7 @@ impl OutputFormat for ClickhouseSink {
         );
         let tasks = self.tasks;
         utils::thread::spawn("clickhouse-sink-block", move || {
-            get_runtime().block_on(async {
+            async_runtime().block_on(async {
                 task.run(tasks).await;
             });
         });
@@ -138,7 +138,7 @@ impl ClickhouseSinkTask {
         for _ in 0..tasks {
             let mut self_clone = self.clone();
 
-            let handler = tokio::spawn(async move {
+            let handler = async_spawn(async move {
                 match self_clone.run0().await {
                     Ok(_) => {}
                     Err(e) => {
@@ -161,7 +161,7 @@ impl ClickhouseSinkTask {
             match self.batch_send(client.borrow_mut()).await {
                 Ok(len) => {
                     if len == 0 {
-                        tokio::time::sleep(Duration::from_secs(1)).await;
+                        async_sleep(Duration::from_secs(1)).await;
                     }
                 }
                 Err(e) => {
@@ -177,7 +177,7 @@ impl ClickhouseSinkTask {
     async fn reconnection(&mut self, client: &mut ClientHandle) -> anyhow::Result<()> {
         let mut err = None;
         for _ in 0..180 {
-            tokio::time::sleep(Duration::from_secs(1)).await;
+            async_sleep(Duration::from_secs(1)).await;
             match client.check_connection().await {
                 Ok(_) => {
                     err = None;
@@ -207,7 +207,7 @@ impl ClickhouseSinkTask {
                     size = n;
                 }
                 Err(_e) => {
-                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    async_sleep(Duration::from_millis(100)).await;
                     let current_timestamp = utils::date_time::current_timestamp();
                     if current_timestamp - begin_timestamp > self.batch_timeout {
                         break;

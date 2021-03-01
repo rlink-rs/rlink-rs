@@ -1,7 +1,7 @@
 use crate::api::cluster::{ResponseCode, StdResponse};
 use crate::dag::metadata::DagMetadata;
 use crate::runtime::ClusterDescriptor;
-use crate::utils::http_client::get_sync;
+use crate::utils::http::client::get_sync;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub(crate) struct MetadataLoader {

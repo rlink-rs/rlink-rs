@@ -2,7 +2,7 @@ pub mod date_time;
 pub mod fs;
 pub mod generator;
 pub mod hash;
-pub mod http_client;
+pub mod http;
 pub mod ip;
 pub mod panic;
 pub mod process;

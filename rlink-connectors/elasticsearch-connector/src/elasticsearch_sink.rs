@@ -15,7 +15,7 @@ use rlink::api::element::Record;
 use rlink::api::function::{Context, NamedFunction, OutputFormat};
 use rlink::channel::utils::handover::Handover;
 use rlink::metrics::Tag;
-use rlink::utils::thread::get_runtime;
+use rlink::utils::thread::{async_runtime, async_sleep, async_spawn};
 use rlink::{api, utils};
 use serde_json::Value;
 use thiserror::Error;
@@ -97,7 +97,7 @@ impl OutputFormat for ElasticsearchOutputFormat {
 
         let convert = self.builder.clone();
         utils::thread::spawn("elastic-sink-block", move || {
-            get_runtime().block_on(async {
+            async_runtime().block_on(async {
                 write_thead.run(convert, 5).await;
             });
         });
@@ -160,7 +160,7 @@ impl ElasticsearchWriteThread {
             let mut self_clone = self.clone();
             let converter = converters.clone();
 
-            let handler = tokio::spawn(async move {
+            let handler = async_spawn(async move {
                 self_clone.run0(converter).await;
             });
 
@@ -177,12 +177,12 @@ impl ElasticsearchWriteThread {
             match self.batch_send(&converter).await {
                 Ok(len) => {
                     if len == 0 {
-                        tokio::time::sleep(Duration::from_secs(1)).await;
+                        async_sleep(Duration::from_secs(1)).await;
                     }
                 }
                 Err(e) => {
                     error!("write elasticsearch error. {}", e);
-                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    async_sleep(Duration::from_millis(100)).await;
                 }
             }
         }
