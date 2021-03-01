@@ -14,6 +14,13 @@ pub mod server {
             .body(Body::from(json))
             .map_err(|e| anyhow!(e));
     }
+
+    pub async fn page_not_found() -> anyhow::Result<Response<Body>> {
+        Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(Body::from("Page not found"))
+            .map_err(|e| anyhow!(e))
+    }
 }
 
 pub mod client {

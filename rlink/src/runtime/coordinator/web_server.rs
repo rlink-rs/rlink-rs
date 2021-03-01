@@ -21,7 +21,7 @@ use crate::runtime::HeartBeatStatus;
 use crate::runtime::TaskManagerStatus;
 use crate::storage::metadata::{MetadataStorage, TMetadataStorage};
 use crate::utils::fs::read_file;
-use crate::utils::http::server::as_ok_json;
+use crate::utils::http::server::{as_ok_json, page_not_found};
 use crate::utils::thread::get_runtime;
 
 pub(crate) fn web_launch(
@@ -150,13 +150,6 @@ pub(crate) struct HeartbeatModel {
     pub metrics_address: String,
     // ok, panic
     pub status: String,
-}
-
-async fn page_not_found() -> anyhow::Result<Response<Body>> {
-    Response::builder()
-        .status(StatusCode::NOT_FOUND)
-        .body(Body::from("Page not found"))
-        .map_err(|e| anyhow!(e))
 }
 
 async fn get_context(
