@@ -77,6 +77,20 @@ impl std::fmt::Display for ManagerType {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct OperatorDescriptor {
+    pub operator_id: OperatorId,
+    pub checkpoint_id: CheckpointId,
+    pub checkpoint_handle: Option<CheckpointHandle>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct TaskDescriptor {
+    pub task_id: TaskId,
+    pub operators: Vec<OperatorDescriptor>,
+    pub input_split: InputSplit,
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub enum TaskManagerStatus {
     /// waiting for the TaskManager register
@@ -87,20 +101,41 @@ pub enum TaskManagerStatus {
     Migration = 2,
 }
 
-// todo rename to TaskDescriptor
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct TaskDescriptor {
-    pub task_id: TaskId,
-    pub operator_ids: Vec<OperatorId>,
-    pub input_split: InputSplit,
-    pub checkpoint_id: CheckpointId,
-    pub checkpoint_handle: Option<CheckpointHandle>,
+pub enum HeartBeatStatus {
+    Ok,
+    Panic,
+    End,
+}
+
+impl std::fmt::Display for HeartBeatStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HeartBeatStatus::Ok => write!(f, "ok"),
+            HeartBeatStatus::Panic => write!(f, "panic"),
+            HeartBeatStatus::End => write!(f, "end"),
+        }
+    }
+}
+
+impl<'a> TryFrom<&'a str> for HeartBeatStatus {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        match value {
+            "ok" => Ok(HeartBeatStatus::Ok),
+            "panic" => Ok(HeartBeatStatus::Panic),
+            "end" => Ok(HeartBeatStatus::End),
+            _ => Err(anyhow!("unrecognized status: {}", value)),
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct WorkerManagerDescriptor {
     pub task_status: TaskManagerStatus,
     pub latest_heart_beat_ts: u64,
+    pub latest_heart_beat_status: HeartBeatStatus,
     pub task_manager_id: String,
     pub task_manager_address: String,
     pub metrics_address: String,
@@ -120,12 +155,12 @@ pub struct CoordinatorManagerDescriptor {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct ApplicationDescriptor {
+pub struct ClusterDescriptor {
     pub coordinator_manager: CoordinatorManagerDescriptor,
     pub worker_managers: Vec<WorkerManagerDescriptor>,
 }
 
-impl ApplicationDescriptor {
+impl ClusterDescriptor {
     pub fn get_worker_manager(&self, task_id: &TaskId) -> Option<&WorkerManagerDescriptor> {
         self.worker_managers
             .iter()

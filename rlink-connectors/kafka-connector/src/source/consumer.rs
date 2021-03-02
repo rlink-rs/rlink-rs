@@ -6,9 +6,9 @@ use futures::StreamExt;
 use rdkafka::consumer::{Consumer, DefaultConsumerContext, StreamConsumer};
 use rdkafka::{ClientConfig, Message, Offset, TopicPartitionList};
 use rlink::api::runtime::JobId;
-use rlink::channel::handover::Handover;
+use rlink::channel::utils::handover::Handover;
 use rlink::utils;
-use rlink::utils::thread::get_runtime;
+use rlink::utils::thread::async_runtime;
 
 use crate::source::deserializer::KafkaRecordDeserializer;
 use crate::state::{KafkaSourceStateCache, OffsetMetadata, PartitionMetadata};
@@ -57,7 +57,7 @@ pub(crate) fn create_kafka_consumer(
 
     let handover_clone = handover.clone();
     utils::thread::spawn("kafka-source-block", move || {
-        get_runtime().block_on(async {
+        async_runtime().block_on(async {
             let mut kafka_consumer = KafkaConsumerThread::new(
                 client_config,
                 partition_offsets,

@@ -8,7 +8,7 @@ use crate::api::runtime::{CheckpointId, JobId, OperatorId};
 use crate::channel::{bounded, Receiver, Sender};
 use crate::dag::metadata::DagMetadata;
 use crate::runtime::context::Context;
-use crate::runtime::ApplicationDescriptor;
+use crate::runtime::ClusterDescriptor;
 use crate::storage::checkpoint::{CheckpointStorage, TCheckpointStorage};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -86,9 +86,9 @@ impl CheckpointAlignManager {
     pub fn new(
         dag_manager: &DagMetadata,
         context: &Context,
-        application_descriptor: &ApplicationDescriptor,
+        cluster_descriptor: &ClusterDescriptor,
     ) -> Self {
-        let checkpoint_backend = application_descriptor
+        let checkpoint_backend = cluster_descriptor
             .coordinator_manager
             .application_properties
             .get_checkpoint()
@@ -261,14 +261,14 @@ impl CheckpointManager {
     pub fn new(
         dag_manager: &DagMetadata,
         context: &Context,
-        application_descriptor: &ApplicationDescriptor,
+        cluster_descriptor: &ClusterDescriptor,
     ) -> Self {
         let (sender, receiver) = bounded(100);
         CheckpointManager {
             ck_align_manager_task: Arc::new(RwLock::new(CheckpointAlignManager::new(
                 dag_manager,
                 context,
-                application_descriptor,
+                cluster_descriptor,
             ))),
             sender,
             receiver,

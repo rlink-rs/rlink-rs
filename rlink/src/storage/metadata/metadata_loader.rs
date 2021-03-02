@@ -1,12 +1,12 @@
 use crate::api::cluster::{ResponseCode, StdResponse};
 use crate::dag::metadata::DagMetadata;
-use crate::runtime::ApplicationDescriptor;
-use crate::utils::http_client::get_sync;
+use crate::runtime::ClusterDescriptor;
+use crate::utils::http::client::get_sync;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub(crate) struct MetadataLoader {
     coordinator_address: String,
-    application_descriptor_cache: Option<ApplicationDescriptor>,
+    cluster_descriptor_cache: Option<ClusterDescriptor>,
     dag_metadata_cache: Option<DagMetadata>,
 }
 
@@ -14,17 +14,17 @@ impl MetadataLoader {
     pub fn new(coordinator_address: &str) -> Self {
         MetadataLoader {
             coordinator_address: coordinator_address.to_string(),
-            application_descriptor_cache: None,
+            cluster_descriptor_cache: None,
             dag_metadata_cache: None,
         }
     }
 
-    pub fn get_application_descriptor(&mut self) -> ApplicationDescriptor {
-        let url = format!("{}/api/metadata", self.coordinator_address);
+    pub fn get_cluster_descriptor(&mut self) -> ClusterDescriptor {
+        let url = format!("{}/api/cluster_metadata", self.coordinator_address);
         loop {
             match get_sync(url.as_str()) {
                 Ok(resp) => {
-                    let resp_model: StdResponse<ApplicationDescriptor> =
+                    let resp_model: StdResponse<ClusterDescriptor> =
                         serde_json::from_str(resp.as_str()).unwrap();
                     let StdResponse { code, data } = resp_model;
                     if code != ResponseCode::OK || data.is_none() {
@@ -33,10 +33,10 @@ impl MetadataLoader {
                         );
                     }
 
-                    let application_descriptor = data.unwrap();
-                    self.application_descriptor_cache = Some(application_descriptor.clone());
+                    let cluster_descriptor = data.unwrap();
+                    self.cluster_descriptor_cache = Some(cluster_descriptor.clone());
 
-                    return application_descriptor;
+                    return cluster_descriptor;
                 }
                 Err(e) => {
                     error!("get metadata(`JobDescriptor`) error. {}", e);

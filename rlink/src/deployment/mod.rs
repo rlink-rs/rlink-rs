@@ -7,7 +7,7 @@ use crate::deployment::local::LocalResourceManager;
 use crate::deployment::standalone::StandaloneResourceManager;
 use crate::deployment::yarn::YarnResourceManager;
 use crate::runtime::context::Context;
-use crate::runtime::{ApplicationDescriptor, ClusterMode};
+use crate::runtime::{ClusterDescriptor, ClusterMode};
 
 pub mod local;
 pub mod standalone;
@@ -28,7 +28,7 @@ pub(crate) trait TResourceManager
 where
     Self: Debug,
 {
-    fn prepare(&mut self, context: &Context, job_descriptor: &ApplicationDescriptor);
+    fn prepare(&mut self, context: &Context, job_descriptor: &ClusterDescriptor);
 
     /// worker resource allocate
     /// Return a resource location.
@@ -67,7 +67,7 @@ impl ResourceManager {
 }
 
 impl TResourceManager for ResourceManager {
-    fn prepare(&mut self, context: &Context, job_descriptor: &ApplicationDescriptor) {
+    fn prepare(&mut self, context: &Context, job_descriptor: &ClusterDescriptor) {
         match self {
             ResourceManager::LocalResourceManager(rm) => rm.prepare(context, job_descriptor),
             ResourceManager::StandaloneResourceManager(rm) => rm.prepare(context, job_descriptor),

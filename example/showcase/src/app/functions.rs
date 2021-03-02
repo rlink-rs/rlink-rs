@@ -54,7 +54,7 @@ impl Iterator for RandIterator {
         let v = thread_rng.gen_range(0i32, 100i32) as i64;
         let model = model::Entity {
             timestamp: current_timestamp_millis(),
-            name: v.to_string(),
+            name: format!("name-{}", v),
             value: v,
         };
         let mut record = Record::new();

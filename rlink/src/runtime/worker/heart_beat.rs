@@ -2,8 +2,9 @@ use std::time::Duration;
 
 use crate::api::cluster::StdResponse;
 use crate::runtime::coordinator::web_server::HeartbeatModel;
-use crate::utils::http_client::post;
-use crate::utils::thread::get_runtime;
+use crate::runtime::HeartBeatStatus;
+use crate::utils::http::client::post;
+use crate::utils::thread::async_runtime;
 use crate::utils::{date_time, panic};
 
 pub(crate) fn status_heartbeat(
@@ -11,17 +12,19 @@ pub(crate) fn status_heartbeat(
     task_manager_id: &str,
     task_manager_address: &str,
     metrics_address: &str,
+    status: Option<HeartBeatStatus>,
 ) {
     let coordinator_address = coordinator_address.to_string();
     let task_manager_id = task_manager_id.to_string();
     let task_manager_address = task_manager_address.to_string();
     let metrics_address = metrics_address.to_string();
 
-    get_runtime().block_on(status_heartbeat_async(
+    async_runtime().block_on(status_heartbeat_async(
         coordinator_address.as_str(),
         task_manager_id.as_str(),
         task_manager_address.as_str(),
         metrics_address.as_str(),
+        status,
     ));
 }
 
@@ -30,14 +33,21 @@ pub(crate) async fn status_heartbeat_async(
     task_manager_id: &str,
     task_manager_address: &str,
     metrics_address: &str,
+    status: Option<HeartBeatStatus>,
 ) {
     let url = format!("{}/api/heartbeat", coordinator_address);
 
-    let status = if panic::is_panic() {
-        "panic".to_string()
-    } else {
-        "ok".to_string()
+    let status = match status {
+        Some(status) => status.to_string(),
+        None => {
+            if panic::is_panic() {
+                HeartBeatStatus::Panic.to_string()
+            } else {
+                HeartBeatStatus::Ok.to_string()
+            }
+        }
     };
+
     let model = HeartbeatModel {
         task_manager_id: task_manager_id.to_string(),
         task_manager_address: task_manager_address.to_string(),
@@ -75,7 +85,7 @@ pub(crate) fn start_heart_beat_timer(
     let metrics_address = metrics_address.to_string();
 
     crate::utils::thread::spawn("heartbeat", move || {
-        get_runtime().block_on(start_heart_beat_timer_async(
+        async_runtime().block_on(start_heart_beat_timer_async(
             coordinator.as_str(),
             task_manager_id.as_str(),
             task_manager_address.as_str(),
@@ -99,6 +109,7 @@ pub(crate) async fn start_heart_beat_timer_async(
             task_manager_id,
             task_manager_address,
             metrics_address,
+            None,
         )
         .await;
     }

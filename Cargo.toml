@@ -6,6 +6,7 @@ members = [
     "rlink-connectors/clickhouse-connector",
     "rlink-connectors/kafka-connector",
     "rlink-connectors/elasticsearch-connector",
+    "rlink-connectors/files-connector",
 
     "rlink-deployment/rlink-standalone",
 
