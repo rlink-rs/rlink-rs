@@ -7,7 +7,6 @@ use parquet::file::properties::{WriterProperties, WriterVersion};
 use parquet::schema::parser::parse_message_type;
 use rlink::api::element::Record;
 use rlink::api::runtime::TaskId;
-use rlink::api::window::TWindow;
 use rlink::utils::date_time::fmt_date_time;
 use rlink_example_utils::buffer_gen::model;
 use rlink_files_connector::sink::output_format::HdfsOutputFormat;
@@ -117,8 +116,10 @@ impl TmpPathLocation {
 
 impl PathLocation for TmpPathLocation {
     fn path(&mut self, record: &mut Record, task_id: &TaskId) -> anyhow::Result<String> {
-        let min_timestamp = record.trigger_window().unwrap().min_timestamp();
-        let time_string = fmt_date_time(Duration::from_millis(min_timestamp), "%Y-%m-%dT%H_%M_00");
+        // let timestamp = record.trigger_window().unwrap().min_timestamp();
+        let entity = model::Entity::parse(record.as_buffer()).unwrap();
+        let timestamp = entity.timestamp;
+        let time_string = fmt_date_time(Duration::from_millis(timestamp), "%Y-%m-%dT%H_%M_00");
         let p = format!(
             "{}.{}_{}.{}.parquet",
             self.test_file.clone(),

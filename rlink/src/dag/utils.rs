@@ -13,7 +13,6 @@ where
     #[serde(rename = "type")]
     ty: String,
     detail: N,
-    dept: isize,
 }
 
 impl<N> JsonNode<N>
@@ -77,22 +76,37 @@ where
         let mut node_map = HashMap::new();
         let mut edges = Vec::new();
 
-        for edge in dag.raw_edges() {
-            let source_json_node = JsonDag::crate_json_node(dag, edge.source());
-            let target_json_node = JsonDag::crate_json_node(dag, edge.target());
+        if dag.raw_edges().len() > 0 {
+            for edge in dag.raw_edges() {
+                let source_json_node = JsonDag::crate_json_node(dag, edge.source());
+                let target_json_node = JsonDag::crate_json_node(dag, edge.target());
 
-            let json_edge = {
-                JsonEdge {
-                    source: source_json_node.id.clone(),
-                    target: target_json_node.id.clone(),
-                    detail: edge.weight.clone(),
-                }
-            };
+                let json_edge = {
+                    JsonEdge {
+                        source: source_json_node.id.clone(),
+                        target: target_json_node.id.clone(),
+                        detail: edge.weight.clone(),
+                    }
+                };
 
-            node_map.insert(source_json_node.id.clone(), source_json_node);
-            node_map.insert(target_json_node.id.clone(), target_json_node);
+                node_map.insert(source_json_node.id.clone(), source_json_node);
+                node_map.insert(target_json_node.id.clone(), target_json_node);
 
-            edges.push(json_edge);
+                edges.push(json_edge);
+            }
+        } else {
+            // no edges
+            let mut n = 0;
+            dag.raw_nodes().iter().for_each(|node| {
+                let json_node = JsonNode {
+                    id: n.to_string(),
+                    ty: "begin".to_string(),
+                    detail: node.weight.clone(),
+                };
+                node_map.insert(json_node.id.clone(), json_node);
+
+                n += 1;
+            });
         }
 
         let nodes = node_map.into_iter().map(|(_, node)| node).collect();
@@ -129,7 +143,6 @@ where
             id,
             ty: ty.to_string(),
             detail: n.clone(),
-            dept: -1,
         }
     }
 
