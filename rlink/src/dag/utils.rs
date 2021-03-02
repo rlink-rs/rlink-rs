@@ -10,8 +10,6 @@ where
     N: Serialize,
 {
     id: String,
-    #[serde(rename = "type")]
-    ty: String,
     detail: N,
 }
 
@@ -100,7 +98,6 @@ where
             dag.raw_nodes().iter().for_each(|node| {
                 let json_node = JsonNode {
                     id: n.to_string(),
-                    ty: "begin".to_string(),
                     detail: node.weight.clone(),
                 };
                 node_map.insert(json_node.id.clone(), json_node);
@@ -120,28 +117,12 @@ where
     N: Clone + Serialize,
     E: Clone + Serialize,
 {
-    fn get_node_type(dag: &Dag<N, E>, node_index: NodeIndex) -> &str {
-        let parent_count = dag.parents(node_index).iter(dag).count();
-        if parent_count == 0 {
-            "begin"
-        } else {
-            let child_count = dag.children(node_index).iter(dag).count();
-            if child_count == 0 {
-                "end"
-            } else {
-                ""
-            }
-        }
-    }
-
     fn crate_json_node(dag: &Dag<N, E>, node_index: NodeIndex) -> JsonNode<N> {
         let n = dag.index(node_index);
         let id = node_index.index().to_string();
-        let ty = JsonDag::get_node_type(dag, node_index);
 
         JsonNode {
             id,
-            ty: ty.to_string(),
             detail: n.clone(),
         }
     }
