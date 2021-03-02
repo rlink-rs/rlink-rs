@@ -115,6 +115,7 @@ fn get_window_start_with_offset(timestamp: u64, window_size: u64) -> u64 {
 }
 
 fn check_window(timer_channels: &mut Vec<TimerChannel>) {
+    let mut full_errs = 0;
     let ts = utils::date_time::current_timestamp_millis();
     for timer_channel in timer_channels {
         let window_start =
@@ -123,12 +124,25 @@ fn check_window(timer_channels: &mut Vec<TimerChannel>) {
             timer_channel.front_window = window_start;
 
             match timer_channel.sender.try_send(window_start) {
-                Ok(_) => {}
-                Err(e) => error!(
-                    "TimerChannel(interval={}ms) is full. {}",
-                    timer_channel.interval.as_millis(),
-                    e
-                ),
+                Ok(_) => {
+                    if full_errs > 0 {
+                        info!(
+                            "TimerChannel(interval={}ms) has resumed to normal",
+                            timer_channel.interval.as_millis(),
+                        )
+                    }
+                    full_errs = 0;
+                }
+                Err(e) => {
+                    if full_errs == 0 {
+                        error!(
+                            "TimerChannel(interval={}ms) is full. {}",
+                            timer_channel.interval.as_millis(),
+                            e
+                        )
+                    }
+                    full_errs += 1;
+                }
             }
         }
     }
