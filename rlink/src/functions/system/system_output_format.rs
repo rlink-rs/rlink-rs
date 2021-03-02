@@ -2,7 +2,7 @@ use std::borrow::BorrowMut;
 use std::collections::HashMap;
 
 use crate::api::checkpoint::CheckpointFunction;
-use crate::api::element::{Element, Partition, Record};
+use crate::api::element::{Element, Partition, Record, StreamStatus};
 use crate::api::function::{Context, NamedFunction, OutputFormat};
 use crate::api::properties::{ChannelBaseOn, SystemProperties};
 use crate::api::runtime::{ChannelKey, JobId, TaskId};
@@ -200,6 +200,13 @@ impl OutputFormat for SystemOutputFormat {
     }
 
     fn close(&mut self) -> crate::api::Result<()> {
+        let stream_status = Element::StreamStatus(StreamStatus::new(0, true));
+        self.job_senders.iter().for_each(|(_job_id, task_senders)| {
+            task_senders.iter().for_each(|(_task_id, sender)| {
+                sender.send(stream_status.clone()).unwrap();
+            });
+        });
+
         Ok(())
     }
 }

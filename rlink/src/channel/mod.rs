@@ -31,10 +31,10 @@ pub fn bounded<T>(cap: usize) -> (Sender<T>, Receiver<T>) {
     crossbeam::channel::bounded(cap)
 }
 
-pub mod handover;
 pub mod receiver;
 pub mod select;
 pub mod sender;
+pub mod utils;
 
 pub type ElementReceiver = ChannelReceiver<Element>;
 pub type ElementSender = ChannelSender<Element>;

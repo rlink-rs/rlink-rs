@@ -11,7 +11,7 @@ use crate::api::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperat
 use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::channel::named_channel;
 use crate::channel::sender::ChannelSender;
-use crate::functions::iterator::ChannelIterator;
+use crate::channel::utils::iter::ChannelIterator;
 use crate::metrics::Tag;
 use crate::runtime::timer::TimerChannel;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
@@ -30,6 +30,7 @@ pub(crate) struct SourceRunnable {
     stream_status_timer: Option<TimerChannel>,
     checkpoint_timer: Option<TimerChannel>,
 
+    waiting_end_flags: usize,
     barrier_align: BarrierAlignManager,
     watermark_align: WatermarkAlignManager,
 }
@@ -51,6 +52,7 @@ impl SourceRunnable {
             stream_status_timer: None,
             checkpoint_timer: None,
 
+            waiting_end_flags: 0,
             barrier_align: BarrierAlignManager::default(),
             watermark_align: WatermarkAlignManager::default(),
         }
@@ -96,16 +98,17 @@ impl SourceRunnable {
     ) -> anyhow::Result<()> {
         loop {
             let running = running.load(Ordering::Relaxed);
-            let window_time = stream_status_timer.recv().map_err(|e| anyhow!(e))?;
 
+            let window_time = stream_status_timer.recv().map_err(|e| anyhow!(e))?;
             let stream_status = Element::new_stream_status(window_time, !running);
             sender.send(stream_status).map_err(|e| anyhow!(e))?;
 
             if !running {
                 info!("StreamStatus WindowTimer stop");
-                // break;
+                break;
             }
         }
+        Ok(())
     }
 
     fn poll_checkpoint(&mut self, sender: ChannelSender<Element>, running: Arc<AtomicBool>) {
@@ -124,18 +127,17 @@ impl SourceRunnable {
         running: Arc<AtomicBool>,
     ) -> anyhow::Result<()> {
         loop {
-            let running = running.load(Ordering::Relaxed);
-
             let window_time = checkpoint_timer.recv().map_err(|e| anyhow!(e))?;
-
             let barrier = Element::new_barrier(CheckpointId(window_time));
             sender.send(barrier).map_err(|e| anyhow!(e))?;
 
+            let running = running.load(Ordering::Relaxed);
             if !running {
                 info!("Checkpoint WindowTimer stop");
-                // break;
+                break;
             }
         }
+        Ok(())
     }
 }
 
@@ -169,6 +171,11 @@ impl Runnable for SourceRunnable {
         }
 
         let parent_execution_size = context.parent_executions(&self.task_id).len();
+        self.waiting_end_flags = if parent_execution_size == 0 {
+            1
+        } else {
+            parent_execution_size
+        };
         self.barrier_align = BarrierAlignManager::new(parent_execution_size);
         self.watermark_align = WatermarkAlignManager::new(parent_execution_size, 120);
 
@@ -205,6 +212,7 @@ impl Runnable for SourceRunnable {
             FunctionCreator::System => self.stream_source.operator_fn.element_iter(),
         };
 
+        let mut end_flags = 0;
         while let Some(element) = element_iter.next() {
             match element {
                 Element::Record(_) => self.next_runnable.as_mut().unwrap().run(element),
@@ -237,20 +245,31 @@ impl Runnable for SourceRunnable {
                     }
                 }
                 Element::StreamStatus(stream_status) => {
-                    let (align, align_watermark) =
-                        self.watermark_align.apply_stream_status(&stream_status);
-                    if align {
-                        match align_watermark {
-                            Some(w) => self
-                                .next_runnable
-                                .as_mut()
-                                .unwrap()
-                                .run(Element::Watermark(w)),
-                            None => self
-                                .next_runnable
-                                .as_mut()
-                                .unwrap()
-                                .run(Element::StreamStatus(stream_status)),
+                    if stream_status.end {
+                        end_flags += 1;
+                        if end_flags == self.waiting_end_flags {
+                            let stream_status = Element::new_stream_status(0, true);
+                            self.next_runnable.as_mut().unwrap().run(stream_status);
+
+                            info!("break source loop");
+                            break;
+                        }
+                    } else {
+                        let (align, align_watermark) =
+                            self.watermark_align.apply_stream_status(&stream_status);
+                        if align {
+                            match align_watermark {
+                                Some(w) => self
+                                    .next_runnable
+                                    .as_mut()
+                                    .unwrap()
+                                    .run(Element::Watermark(w)),
+                                None => self
+                                    .next_runnable
+                                    .as_mut()
+                                    .unwrap()
+                                    .run(Element::StreamStatus(stream_status)),
+                            }
                         }
                     }
                 }

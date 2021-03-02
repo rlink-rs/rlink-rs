@@ -4,9 +4,9 @@ use crate::api::element::{Element, Record};
 use crate::api::function::{Context, InputFormat, InputSplit, InputSplitSource, NamedFunction};
 use crate::api::properties::{ChannelBaseOn, SystemProperties};
 use crate::api::runtime::TaskId;
-use crate::channel::ElementReceiver;
+use crate::channel::select::ChannelSelect;
+use crate::channel::{ElementReceiver, TryRecvError};
 use crate::dag::execution_graph::ExecutionEdge;
-use crate::functions::iterator::{ChannelIterator, MultiChannelIterator};
 use crate::pub_sub::{memory, network, DEFAULT_CHANNEL_SIZE};
 
 pub(crate) struct SystemInputFormat {
@@ -117,20 +117,68 @@ impl NamedFunction for SystemInputFormat {
 
 impl CheckpointFunction for SystemInputFormat {}
 
-struct SubscribeIterator {
+struct ChannelIterator {
     receiver: ElementReceiver,
 }
 
-impl Iterator for SubscribeIterator {
+impl ChannelIterator {
+    pub fn new(receiver: ElementReceiver) -> Self {
+        ChannelIterator { receiver }
+    }
+}
+
+impl Iterator for ChannelIterator {
     type Item = Element;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.receiver.recv() {
             Ok(element) => {
+                // if element.is_stream_status() && element.as_stream_status().end {
+                //     return None;
+                // }
                 return Some(element);
             }
             Err(_e) => {
                 panic!("network_receiver Disconnected");
+            }
+        }
+    }
+}
+
+pub struct MultiChannelIterator {
+    receivers: Vec<ElementReceiver>,
+}
+
+impl MultiChannelIterator {
+    pub fn new(receivers: Vec<ElementReceiver>) -> Self {
+        MultiChannelIterator { receivers }
+    }
+}
+
+impl Iterator for MultiChannelIterator {
+    type Item = Element;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // Build a list of operations.
+        let mut sel = ChannelSelect::new();
+        for r in &self.receivers {
+            sel.recv(r);
+        }
+
+        loop {
+            // Wait until a receive operation becomes ready and try executing it.
+            let index = sel.ready();
+            let res = self.receivers[index].try_recv();
+
+            match res {
+                Ok(element) => {
+                    // if element.is_stream_status() && element.as_stream_status().end {
+                    //     return None;
+                    // }
+                    return Some(element);
+                }
+                Err(TryRecvError::Empty) => continue,
+                Err(TryRecvError::Disconnected) => panic!("the channel is Disconnected"),
             }
         }
     }

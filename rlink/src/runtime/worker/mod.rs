@@ -17,7 +17,7 @@ use crate::runtime::worker::runnable::{
     FilterRunnable, FlatMapRunnable, KeyByRunnable, ReduceRunnable, Runnable, RunnableContext,
     SinkRunnable, SourceRunnable, WatermarkAssignerRunnable, WindowAssignerRunnable,
 };
-use crate::runtime::{ApplicationDescriptor, TaskDescriptor};
+use crate::runtime::{ClusterDescriptor, TaskDescriptor};
 
 pub mod checkpoint;
 pub mod heart_beat;
@@ -28,7 +28,7 @@ pub(crate) type FunctionContext = crate::api::function::Context;
 pub(crate) fn run<S>(
     context: Arc<Context>,
     dag_metadata: Arc<DagMetadata>,
-    application_descriptor: Arc<ApplicationDescriptor>,
+    cluster_descriptor: Arc<ClusterDescriptor>,
     task_descriptor: TaskDescriptor,
     stream_app: S,
     stream_env: &StreamExecutionEnvironment,
@@ -48,7 +48,7 @@ where
             let worker_task = WorkerTask::new(
                 context,
                 dag_metadata,
-                application_descriptor,
+                cluster_descriptor,
                 task_descriptor,
                 stream_app,
                 stream_env,
@@ -67,7 +67,7 @@ where
 {
     context: Arc<Context>,
     dag_metadata: Arc<DagMetadata>,
-    application_descriptor: Arc<ApplicationDescriptor>,
+    cluster_descriptor: Arc<ClusterDescriptor>,
     task_descriptor: TaskDescriptor,
     stream_app: S,
     stream_env: StreamExecutionEnvironment,
@@ -81,7 +81,7 @@ where
     pub(crate) fn new(
         context: Arc<Context>,
         dag_metadata: Arc<DagMetadata>,
-        application_descriptor: Arc<ApplicationDescriptor>,
+        cluster_descriptor: Arc<ClusterDescriptor>,
         task_descriptor: TaskDescriptor,
         stream_app: S,
         stream_env: StreamExecutionEnvironment,
@@ -90,7 +90,7 @@ where
         WorkerTask {
             context,
             dag_metadata,
-            application_descriptor,
+            cluster_descriptor,
             task_descriptor,
             stream_app,
             stream_env,
@@ -100,7 +100,7 @@ where
 
     pub fn run(mut self) -> anyhow::Result<()> {
         let application_properties = &self
-            .application_descriptor
+            .cluster_descriptor
             .coordinator_manager
             .application_properties;
         self.stream_app
@@ -114,7 +114,7 @@ where
 
         let runnable_context = RunnableContext {
             dag_metadata: self.dag_metadata.clone(),
-            application_descriptor: self.application_descriptor.clone(),
+            cluster_descriptor: self.cluster_descriptor.clone(),
             task_descriptor: self.task_descriptor.clone(),
             window_timer: self.window_timer.clone(),
         };

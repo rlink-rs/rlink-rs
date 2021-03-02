@@ -1,5 +1,4 @@
 pub mod broadcast_flat_map;
-pub mod iterator;
 pub mod percentile;
 pub mod round_robin_flat_map;
 pub mod schema_base;

@@ -1,11 +1,11 @@
 use tokio::task::JoinHandle;
 
-use crate::runtime::coordinator::heart_beat_manager::global_application_descriptor;
+use crate::runtime::coordinator::heart_beat_manager::global_cluster_descriptor;
 use crate::runtime::WorkerManagerDescriptor;
-use crate::utils::http_client;
+use crate::utils::http;
 
 pub(crate) async fn collect_worker_metrics() -> String {
-    let job_descriptor = global_application_descriptor();
+    let job_descriptor = global_cluster_descriptor();
     match job_descriptor {
         Some(job_descriptor) => collect_worker_metrics0(&job_descriptor.worker_managers).await,
         None => "".to_string(),
@@ -17,7 +17,7 @@ async fn collect_worker_metrics0(workers_address: &Vec<WorkerManagerDescriptor>)
     for task_manager_descriptor in workers_address {
         let addr = task_manager_descriptor.metrics_address.clone();
         let r: JoinHandle<String> = tokio::spawn(async move {
-            match http_client::get(addr.as_str()).await {
+            match http::client::get(addr.as_str()).await {
                 Ok(r) => r,
                 Err(e) => {
                     error!("proxy {} metrics error, {}", addr, e);

@@ -8,6 +8,7 @@ use crate::api::element::{Element, Record, StreamStatus};
 use crate::api::function::{BaseReduceFunction, KeySelectorFunction};
 use crate::api::operator::DefaultStreamOperator;
 use crate::api::runtime::{OperatorId, TaskId};
+use crate::api::watermark::MAX_WATERMARK;
 use crate::api::window::{TWindow, Window};
 use crate::metrics::{register_counter, Tag};
 use crate::runtime::worker::checkpoint::submit_checkpoint;
@@ -154,7 +155,29 @@ impl Runnable for ReduceRunnable {
                     .unwrap()
                     .run(Element::Barrier(barrier));
             }
-            Element::StreamStatus(_) => unreachable!("shouldn't catch `StreamStatus` in reduce"),
+            Element::StreamStatus(stream_status) => {
+                if !stream_status.end {
+                    unreachable!("shouldn't catch `StreamStatus` in reduce");
+                }
+
+                // clean all reduce state
+                let drop_events = self
+                    .stream_reduce
+                    .operator_fn
+                    .as_mut()
+                    .drop_state(MAX_WATERMARK.timestamp);
+                for drop_event in drop_events {
+                    self.next_runnable
+                        .as_mut()
+                        .unwrap()
+                        .run(Element::from(drop_event));
+                }
+
+                self.next_runnable
+                    .as_mut()
+                    .unwrap()
+                    .run(Element::StreamStatus(stream_status));
+            }
         }
     }
 

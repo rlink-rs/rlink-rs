@@ -1,18 +1,19 @@
 use crate::api::properties::Properties;
-use crate::api::runtime::{CheckpointId, OperatorId};
+use crate::api::runtime::CheckpointId;
 use crate::dag::DagManager;
 use crate::runtime::context::Context;
+use crate::runtime::HeartBeatStatus;
 use crate::runtime::{
-    ApplicationDescriptor, CoordinatorManagerDescriptor, TaskDescriptor, TaskManagerStatus,
-    WorkerManagerDescriptor,
+    ClusterDescriptor, CoordinatorManagerDescriptor, OperatorDescriptor, TaskDescriptor,
+    TaskManagerStatus, WorkerManagerDescriptor,
 };
 
-pub(crate) fn build_application_descriptor(
+pub(crate) fn build_cluster_descriptor(
     job_name: &str,
     dag_manager: &DagManager,
     application_properties: &Properties,
     context: &Context,
-) -> ApplicationDescriptor {
+) -> ClusterDescriptor {
     let worker_instances = dag_manager
         .physic_graph()
         .alloc_by_instance(context.num_task_managers);
@@ -21,18 +22,20 @@ pub(crate) fn build_application_descriptor(
     for task_manager_instance in worker_instances {
         let mut task_descriptors = Vec::new();
         for task_instance in &task_manager_instance.task_instances {
-            let operator_ids: Vec<OperatorId> = task_instance
+            let operators: Vec<OperatorDescriptor> = task_instance
                 .stream_nodes
                 .iter()
-                .map(|stream_node| stream_node.id)
+                .map(|stream_node| OperatorDescriptor {
+                    operator_id: stream_node.id,
+                    checkpoint_id: CheckpointId::default(),
+                    checkpoint_handle: None,
+                })
                 .collect();
 
             let task_descriptor = TaskDescriptor {
                 task_id: task_instance.task_id.clone(),
-                operator_ids,
+                operators,
                 input_split: task_instance.input_split.clone(),
-                checkpoint_id: CheckpointId::default(),
-                checkpoint_handle: None,
             };
             task_descriptors.push(task_descriptor);
         }
@@ -40,6 +43,7 @@ pub(crate) fn build_application_descriptor(
         let task_manager_descriptor = WorkerManagerDescriptor {
             task_status: TaskManagerStatus::Pending,
             latest_heart_beat_ts: 0,
+            latest_heart_beat_status: HeartBeatStatus::Ok,
             task_manager_id: task_manager_instance.worker_manager_id.clone(),
             task_manager_address: "".to_string(),
             metrics_address: "".to_string(),
@@ -58,7 +62,7 @@ pub(crate) fn build_application_descriptor(
         coordinator_status: TaskManagerStatus::Pending,
     };
 
-    ApplicationDescriptor {
+    ClusterDescriptor {
         coordinator_manager: job_manager,
         worker_managers,
     }

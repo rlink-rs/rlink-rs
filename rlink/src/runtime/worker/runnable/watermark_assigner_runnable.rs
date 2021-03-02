@@ -5,7 +5,7 @@ use crate::api::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotConte
 use crate::api::element::Element;
 use crate::api::operator::DefaultStreamOperator;
 use crate::api::runtime::{OperatorId, TaskId};
-use crate::api::watermark::{Watermark, WatermarkAssigner, MAX_WATERMARK, MIN_WATERMARK};
+use crate::api::watermark::{Watermark, WatermarkAssigner, MIN_WATERMARK};
 use crate::metrics::{register_counter, register_gauge, Tag};
 use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
@@ -97,15 +97,16 @@ impl Runnable for WatermarkAssignerRunnable {
             }
             Element::StreamStatus(stream_status) => {
                 if stream_status.end {
-                    self.next_runnable
-                        .as_mut()
-                        .unwrap()
-                        .run(Element::new_watermark(
-                            self.task_id.task_number,
-                            self.task_id.num_tasks,
-                            MAX_WATERMARK.timestamp,
-                            stream_status,
-                        ));
+                    // self.next_runnable
+                    //     .as_mut()
+                    //     .unwrap()
+                    //     .run(Element::new_watermark(
+                    //         self.task_id.task_number,
+                    //         self.task_id.num_tasks,
+                    //         MAX_WATERMARK.timestamp,
+                    //         stream_status,
+                    //     ));
+                    self.next_runnable.as_mut().unwrap().run(element);
                 } else {
                     match watermark_assigner.watermark(stream_status) {
                         Some(watermark) => {

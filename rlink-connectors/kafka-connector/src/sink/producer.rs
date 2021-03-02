@@ -5,11 +5,12 @@ use std::time::Duration;
 
 use rdkafka::producer::{FutureProducer, FutureRecord, Producer};
 use rdkafka::ClientConfig;
-use rlink::channel::handover::Handover;
+use rlink::channel::utils::handover::Handover;
 use rlink::channel::TryRecvError;
 use rlink::utils::EMPTY_SLICE;
 
 use crate::KafkaRecord;
+use rlink::utils::thread::async_sleep;
 
 #[derive(Clone)]
 pub struct KafkaProducerThread {
@@ -78,9 +79,9 @@ impl KafkaProducerThread {
             if future_queue.len() == 0 {
                 idle_counter += 1;
                 if idle_counter < 30 {
-                    tokio::time::sleep(idle_delay_10).await;
+                    async_sleep(idle_delay_10).await;
                 } else {
-                    tokio::time::sleep(idle_delay_300).await;
+                    async_sleep(idle_delay_300).await;
                 }
             } else {
                 idle_counter = 0;
@@ -121,7 +122,7 @@ mod tests {
 
     use rdkafka::ClientConfig;
     use rlink::api::element::Record;
-    use rlink::channel::handover::Handover;
+    use rlink::channel::utils::handover::Handover;
     use rlink::utils::date_time::current_timestamp_millis;
 
     use crate::sink::producer::KafkaProducerThread;

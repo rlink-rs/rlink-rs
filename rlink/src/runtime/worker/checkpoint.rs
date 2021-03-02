@@ -4,8 +4,8 @@ use crate::api::checkpoint::Checkpoint;
 use crate::api::cluster::StdResponse;
 use crate::channel::{bounded, Receiver, Sender, TryRecvError, TrySendError};
 use crate::utils::date_time;
-use crate::utils::http_client::post;
-use crate::utils::thread::get_runtime;
+use crate::utils::http::client::post;
+use crate::utils::thread::async_runtime;
 
 pub struct CheckpointChannel {
     sender: Sender<Checkpoint>,
@@ -37,7 +37,7 @@ pub(crate) fn submit_checkpoint(ck: Checkpoint) -> Option<Checkpoint> {
 pub(crate) fn start_report_checkpoint(coordinator_address: &str) {
     let coordinator_address = coordinator_address.to_string();
     crate::utils::thread::spawn("checkpoint", move || {
-        get_runtime().block_on(async {
+        async_runtime().block_on(async {
             let ck_channel = &*CK_CHANNEL;
 
             loop {
