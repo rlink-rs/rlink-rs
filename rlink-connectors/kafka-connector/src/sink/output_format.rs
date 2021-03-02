@@ -12,14 +12,14 @@ use rlink::api::checkpoint::CheckpointFunction;
 #[derive(NamedFunction)]
 pub struct KafkaOutputFormat {
     client_config: ClientConfig,
-    topic: String,
+    topic: Option<String>,
 
     buffer_size: usize,
     handover: Option<Handover>,
 }
 
 impl KafkaOutputFormat {
-    pub fn new(client_config: ClientConfig, topic: String, buffer_size: usize) -> Self {
+    pub fn new(client_config: ClientConfig, topic: Option<String>, buffer_size: usize) -> Self {
         KafkaOutputFormat {
             client_config,
             topic,
@@ -32,7 +32,10 @@ impl KafkaOutputFormat {
 impl OutputFormat for KafkaOutputFormat {
     fn open(&mut self, context: &Context) -> api::Result<()> {
         let tags = vec![
-            Tag::from(("topic", self.topic.as_str())),
+            Tag::from((
+                "topic",
+                self.topic.as_ref().map(|x| x.as_str()).unwrap_or(""),
+            )),
             Tag::from(("job_id", context.task_id.job_id().0)),
             Tag::from(("task_number", context.task_id.task_number())),
         ];
