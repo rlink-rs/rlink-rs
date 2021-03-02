@@ -1,5 +1,5 @@
 [package]
-name = "rlink-showcase"
+name = "rlink-example-files"
 version = "0.2.2-alpha.6"
 authors = ["yorkart <wangyue11.4@163.com>>"]
 edition = "2018"
@@ -16,13 +16,13 @@ path = "../../rlink"
 version = "0.2.2-alpha.6"
 path = "../../rlink-derive"
 
-[dependencies.rlink-kafka-connector]
-version = "0.2.2-alpha.6"
-path = "../../rlink-connectors/kafka-connector"
-
 [dependencies.rlink-files-connector]
 version = "0.2.2-alpha.6"
 path = "../../rlink-connectors/files-connector"
+
+[dependencies.rlink-example-utils]
+version = "0.2.2-alpha.6"
+path = "../example-utils"
 
 [dependencies]
 serbuffer = "1.1"

@@ -10,5 +10,8 @@ members = [
 
     "rlink-deployment/rlink-standalone",
 
-    "example/showcase",
+    "example/example-utils",
+    "example/example-simple",
+    "example/example-connect",
+    "example/example-files",
 ]

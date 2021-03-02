@@ -1,0 +1,32 @@
+[package]
+name = "rlink-example-simple"
+version = "0.2.2-alpha.6"
+authors = ["yorkart <wangyue11.4@163.com>>"]
+edition = "2018"
+description = "High performance Stream Processing Framework"
+keywords = ["stream", "window", "flink", "spark"]
+repository = "https://github.com/rlink-rs/rlink-rs.git"
+license = "MIT/Apache-2.0"
+
+[dependencies.rlink]
+version = "0.2.2-alpha.6"
+path = "../../rlink"
+
+[dependencies.rlink-derive]
+version = "0.2.2-alpha.6"
+path = "../../rlink-derive"
+
+[dependencies.rlink-example-utils]
+version = "0.2.2-alpha.6"
+path = "../example-utils"
+
+[dependencies]
+serbuffer = "1.1"
+
+log = "0.4.8"
+anyhow = "1.0"
+rand = "0.7"
+chrono="0.4"
+
+[build-dependencies]
+serbuffer-gen = "1.0"
