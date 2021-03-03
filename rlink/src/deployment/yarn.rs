@@ -76,8 +76,8 @@ impl TResourceManager for YarnResourceManager {
         self.yarn_command.as_ref().unwrap().allocate(task_args)
     }
 
-    fn stop_workers(&self, _task_ids: Vec<TaskResourceInfo>) -> anyhow::Result<()> {
-        unimplemented!()
+    fn stop_workers(&self, task_ids: Vec<TaskResourceInfo>) -> anyhow::Result<()> {
+        self.yarn_command.as_ref().unwrap().stop(task_ids)
     }
 }
 
@@ -96,6 +96,8 @@ impl<T> Data<T> {
 
 type Command = Data<Vec<HashMap<String, String>>>;
 type Response = Data<Vec<TaskResourceInfo>>;
+
+type StopCommand = Data<Vec<TaskResourceInfo>>;
 
 #[derive(Debug)]
 struct YarnCliCommand {
@@ -227,6 +229,34 @@ impl YarnCliCommand {
             Err(anyhow::Error::msg("`cmd_id` is inconsistency"))
         } else {
             Ok(response.data)
+        }
+    }
+
+    pub fn stop(
+        &self,
+        task_infos: Vec<TaskResourceInfo>,
+    ) -> anyhow::Result<()> {
+        let cmd_id = utils::generator::gen_with_ts();
+        let command = StopCommand::new("stop".to_string(), cmd_id.to_string(), task_infos);
+        let command_json = serde_json::to_string(&command).unwrap();
+
+        let cmd_str = format!("{}\n", command_json);
+
+        info!("send command: {}", cmd_str);
+        match self.cmd_sender.send(cmd_str) {
+            Ok(_) => {}
+            Err(e) => {
+                error!("send command error. {}", e);
+            }
+        }
+
+        let txt = self.ret_receiver.recv()?;
+        let response = serde_json::from_slice::<Response>(txt.as_bytes())?;
+
+        if !response.cmd_id.eq(cmd_id.as_str()) {
+            Err(anyhow::Error::msg("`cmd_id` is inconsistency"))
+        } else {
+            Ok(())
         }
     }
 }

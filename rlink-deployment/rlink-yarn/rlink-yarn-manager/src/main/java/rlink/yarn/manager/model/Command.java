@@ -48,6 +48,8 @@ public class Command implements Serializable {
 
     public enum CommandType {
         // allocate resource
-        allocate
+        allocate,
+        // stop container
+        stop
     }
 }

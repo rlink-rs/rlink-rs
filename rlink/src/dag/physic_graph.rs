@@ -77,6 +77,17 @@ impl PhysicGraph {
     fn merge_forward_task(&mut self, execution_graph: &ExecutionGraph) -> Vec<ForwardTaskChain> {
         let execution_dag = &execution_graph.dag;
 
+        if execution_dag.raw_edges().len() == 0 {
+            // no edges, each `ExecutionNode` a `ForwardTaskChain`
+            return execution_dag
+                .raw_nodes()
+                .iter()
+                .map(|node| ForwardTaskChain {
+                    tasks: vec![node.weight.clone()],
+                })
+                .collect();
+        }
+
         let mut all_task_set = HashSet::new();
         let mut forward_task_set = HashSet::new();
         for edge in execution_dag.raw_edges() {
