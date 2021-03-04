@@ -20,6 +20,7 @@ pub enum ClusterMode {
     Local = 0,
     Standalone = 1,
     YARN = 2,
+    Kubernetes = 3,
 }
 
 impl<'a> TryFrom<&'a str> for ClusterMode {
@@ -32,6 +33,7 @@ impl<'a> TryFrom<&'a str> for ClusterMode {
             "local" => Ok(ClusterMode::Local),
             "standalone" => Ok(ClusterMode::Standalone),
             "yarn" => Ok(ClusterMode::YARN),
+            "kubernetes" => Ok(ClusterMode::Kubernetes),
             _ => Err(anyhow!("Unsupported mode {}", mode_str)),
         }
     }
@@ -43,6 +45,7 @@ impl std::fmt::Display for ClusterMode {
             ClusterMode::Local => write!(f, "Local"),
             ClusterMode::Standalone => write!(f, "Standalone"),
             ClusterMode::YARN => write!(f, "Yarn"),
+            ClusterMode::Kubernetes => write!(f, "Kubernetes"),
         }
     }
 }

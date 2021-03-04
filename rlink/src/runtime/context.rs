@@ -119,7 +119,9 @@ impl Context {
 
         let application_id = match cluster_mode {
             ClusterMode::Local => utils::generator::gen_with_ts(),
-            ClusterMode::Standalone | ClusterMode::YARN => parse_arg("application_id")?,
+            ClusterMode::Standalone | ClusterMode::YARN | ClusterMode::Kubernetes => {
+                parse_arg("application_id")?
+            }
         };
 
         let task_manager_id = match manager_type {
@@ -131,7 +133,7 @@ impl Context {
         let num_task_managers = match manager_type {
             ManagerType::Coordinator => match cluster_mode {
                 ClusterMode::Local => 1,
-                ClusterMode::Standalone | ClusterMode::YARN => {
+                ClusterMode::Standalone | ClusterMode::YARN | ClusterMode::Kubernetes => {
                     let num_task_managers = parse_arg("num_task_managers")?;
                     let num_task_managers =
                         u32::from_str(num_task_managers.as_str()).map_err(|_e| {
@@ -158,7 +160,7 @@ impl Context {
                 let cluster_config = parse_arg("cluster_config")?;
                 load_config(PathBuf::from(cluster_config))?
             }
-            ClusterMode::YARN => ClusterConfig::new_local(),
+            ClusterMode::YARN | ClusterMode::Kubernetes => ClusterConfig::new_local(),
         };
 
         let (yarn_manager_main_class, worker_process_path, memory_mb, v_cores) = match cluster_mode
@@ -183,6 +185,21 @@ impl Context {
                         memory_mb,
                         v_cores,
                     )
+                }
+                _ => ("".to_string(), "".to_string(), 0, 0),
+            },
+            ClusterMode::Kubernetes => match manager_type {
+                ManagerType::Coordinator => {
+                    let memory_mb = parse_arg("memory_mb")?;
+                    let memory_mb = usize::from_str(memory_mb.as_str()).map_err(|_e| {
+                        anyhow!("parse `memory_mb`=`{}` to usize error", memory_mb)
+                    })?;
+
+                    let v_cores = parse_arg("v_cores")?;
+                    let v_cores = usize::from_str(v_cores.as_str())
+                        .map_err(|_e| anyhow!("parse `v_cores`=`{}` to usize error", v_cores))?;
+
+                    ("".to_string(), "".to_string(), memory_mb, v_cores)
                 }
                 _ => ("".to_string(), "".to_string(), 0, 0),
             },

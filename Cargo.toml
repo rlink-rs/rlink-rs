@@ -9,6 +9,7 @@ members = [
     "rlink-connectors/files-connector",
 
     "rlink-deployment/rlink-standalone",
+    "rlink-deployment/rlink-kubernetes",
 
     "example/example-utils",
     "example/example-simple",
