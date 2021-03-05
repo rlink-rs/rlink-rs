@@ -4,7 +4,12 @@ mod config;
 #[tokio::main]
 async fn main() {
     //todo clusterId use args
-    match cli::job_manager::run(config::k8s_config::JobConfig::default(),String::new()).await{
+
+    //todo check cluster_name unique
+
+ 
+
+    match cli::job_manager::run(config::k8s_config::Config::try_default(),String::new()).await{
         Ok(o)=>{
             println!(" cluster start successful :{}",o);
         }
