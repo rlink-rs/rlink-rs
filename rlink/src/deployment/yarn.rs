@@ -176,9 +176,9 @@ impl YarnCliCommand {
                 let ret_sender = ret_sender.clone();
                 std::thread::spawn(move || {
                     std::io::BufReader::new(stderr).lines().for_each(|txt| {
-                        debug!("command line: {:?}", txt);
+                        error!("command line: {:?}", txt);
                         parse_line(&txt)
-                            .map(|command| ret_sender.send(command.to_string()).unwrap());
+                            .map(|command| ret_sender.send(command.to_string()));
                     });
                 });
             }
@@ -188,9 +188,9 @@ impl YarnCliCommand {
             Some(stdout) => {
                 std::thread::spawn(move || {
                     std::io::BufReader::new(stdout).lines().for_each(|txt| {
-                        debug!("command line: {:?}", txt);
+                        info!("command line: {:?}", txt);
                         parse_line(&txt)
-                            .map(|command| ret_sender.send(command.to_string()).unwrap());
+                            .map(|command| ret_sender.send(command.to_string()));
                     });
                 });
             }
