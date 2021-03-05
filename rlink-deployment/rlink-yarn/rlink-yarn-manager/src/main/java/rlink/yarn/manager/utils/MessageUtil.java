@@ -9,7 +9,7 @@ public class MessageUtil {
     private static final Logger LOGGER = LoggerFactory.getLogger(MessageUtil.class);
 
     // message format: /*Rust*/ message
-    private static final String MESSAGE_FORMAT = "/*Rust*/ %s";
+    private static final String MESSAGE_FORMAT = "/*rlink-rs_yarn*/ %s";
 
     public static void send(Command command) {
         String msg = String.format(MESSAGE_FORMAT, JSON.toJSONString(command));
