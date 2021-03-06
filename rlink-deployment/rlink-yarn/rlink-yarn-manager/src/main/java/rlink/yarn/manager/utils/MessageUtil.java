@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory;
 public class MessageUtil {
     private static final Logger LOGGER = LoggerFactory.getLogger(MessageUtil.class);
 
-    // message format: /*Rust*/ message
+    // message format: /*rlink-rs_yarn*/ message
     private static final String MESSAGE_FORMAT = "/*rlink-rs_yarn*/ %s";
 
     public static void send(Command command) {
