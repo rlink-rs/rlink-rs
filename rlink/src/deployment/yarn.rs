@@ -99,6 +99,21 @@ type Response = Data<Vec<TaskResourceInfo>>;
 
 type StopCommand = Data<Vec<TaskResourceInfo>>;
 
+const COMMAND_PREFIX: &'static str = "/*rlink-rs_yarn*/";
+
+fn parse_command(command_line: &str) -> Option<&str> {
+    command_line
+        .find(COMMAND_PREFIX)
+        .map(|pos| &command_line[pos + COMMAND_PREFIX.len()..command_line.len()])
+}
+
+fn parse_line(command_line: &std::io::Result<String>) -> Option<&str> {
+    command_line
+        .as_ref()
+        .map(|x| parse_command(x.as_str()))
+        .unwrap_or(None)
+}
+
 #[derive(Debug)]
 struct YarnCliCommand {
     cmd_sender: Sender<String>,
@@ -161,16 +176,9 @@ impl YarnCliCommand {
                 let ret_sender = ret_sender.clone();
                 std::thread::spawn(move || {
                     std::io::BufReader::new(stderr).lines().for_each(|txt| {
-                        let txt = txt.unwrap();
-                        error!("{}", txt);
-
-                        match txt.find("/*Rust*/") {
-                            Some(pos) => {
-                                let ret = &txt[pos + 8..txt.len()];
-                                ret_sender.send(ret.to_string()).unwrap();
-                            }
-                            None => {}
-                        }
+                        error!("command line: {:?}", txt);
+                        parse_line(&txt)
+                            .map(|command| ret_sender.send(command.to_string()).unwrap());
                     });
                 });
             }
@@ -180,16 +188,9 @@ impl YarnCliCommand {
             Some(stdout) => {
                 std::thread::spawn(move || {
                     std::io::BufReader::new(stdout).lines().for_each(|txt| {
-                        let txt = txt.unwrap();
-                        info!("{}", txt);
-
-                        match txt.find("/*Rust*/") {
-                            Some(pos) => {
-                                let ret = &txt[pos + 8..txt.len()];
-                                ret_sender.send(ret.to_string()).unwrap();
-                            }
-                            None => {}
-                        }
+                        info!("command line: {:?}", txt);
+                        parse_line(&txt)
+                            .map(|command| ret_sender.send(command.to_string()).unwrap());
                     });
                 });
             }
@@ -232,10 +233,7 @@ impl YarnCliCommand {
         }
     }
 
-    pub fn stop(
-        &self,
-        task_infos: Vec<TaskResourceInfo>,
-    ) -> anyhow::Result<()> {
+    pub fn stop(&self, task_infos: Vec<TaskResourceInfo>) -> anyhow::Result<()> {
         let cmd_id = utils::generator::gen_with_ts();
         let command = StopCommand::new("stop".to_string(), cmd_id.to_string(), task_infos);
         let command_json = serde_json::to_string(&command).unwrap();

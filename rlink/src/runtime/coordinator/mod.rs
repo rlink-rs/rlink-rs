@@ -78,10 +78,10 @@ where
         info!("DagManager build success");
 
         let dag_metadata = DagMetadata::from(&dag_manager);
-        info!("DagMetadata: {}", dag_metadata.to_string());
+        debug!("DagMetadata: {}", dag_metadata.to_string());
 
         let mut cluster_descriptor = self.build_metadata(&dag_manager, &application_properties);
-        info!("ApplicationDescriptor : {}", cluster_descriptor.to_string());
+        debug!("ApplicationDescriptor : {}", cluster_descriptor.to_string());
 
         let ck_manager =
             self.build_checkpoint_manager(&dag_metadata, cluster_descriptor.borrow_mut());
