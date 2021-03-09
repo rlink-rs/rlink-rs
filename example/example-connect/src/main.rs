@@ -7,5 +7,5 @@ mod app;
 mod co_connect;
 
 pub fn main() {
-    rlink::api::env::execute("rlink-connect", crate::app::ConnectStreamApp0 {});
+    rlink::api::env::execute("rlink-connect", crate::app::ConnectStreamApp1 {});
 }

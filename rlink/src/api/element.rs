@@ -217,6 +217,8 @@ pub struct Watermark {
     // current watermark timestamp
     pub(crate) timestamp: u64,
 
+    pub(crate) channel_key: ChannelKey,
+
     // watermark timestamp location windows based on assign function
     pub(crate) location_windows: Option<Vec<Window>>,
     pub(crate) downstream: bool,
@@ -236,6 +238,7 @@ impl Watermark {
             num_tasks,
             status_timestamp: stream_status.timestamp,
             timestamp,
+            channel_key: ChannelKey::default(),
             location_windows: None,
             downstream: false,
             drop_windows: None,
@@ -294,6 +297,7 @@ impl Serde for Watermark {
             num_tasks,
             status_timestamp,
             timestamp,
+            channel_key: ChannelKey::default(),
             location_windows: None,
             downstream: false,
             drop_windows: None,
@@ -306,6 +310,8 @@ pub struct StreamStatus {
     partition_num: u16,
     pub(crate) timestamp: u64,
 
+    pub(crate) channel_key: ChannelKey,
+
     pub(crate) end: bool,
 }
 
@@ -314,6 +320,7 @@ impl StreamStatus {
         StreamStatus {
             partition_num: 0,
             timestamp,
+            channel_key: ChannelKey::default(),
             end,
         }
     }
@@ -351,6 +358,7 @@ impl Serde for StreamStatus {
         StreamStatus {
             partition_num: 0,
             timestamp,
+            channel_key: ChannelKey::default(),
             end: end == 1,
         }
     }

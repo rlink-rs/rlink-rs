@@ -163,6 +163,18 @@ impl OutputFormat for SystemOutputFormat {
                                 target_task_id: *task_id,
                             };
                         }
+                        Element::Watermark(watermark) => {
+                            watermark.channel_key = ChannelKey {
+                                source_task_id: self.task_id,
+                                target_task_id: *task_id,
+                            };
+                        }
+                        Element::StreamStatus(stream_status) => {
+                            stream_status.channel_key = ChannelKey {
+                                source_task_id: self.task_id,
+                                target_task_id: *task_id,
+                            };
+                        }
                         _ => {}
                     }
                     sender.send(element).unwrap()
@@ -172,6 +184,18 @@ impl OutputFormat for SystemOutputFormat {
                         match element.borrow_mut() {
                             Element::Record(record) => {
                                 record.channel_key = ChannelKey {
+                                    source_task_id: self.task_id,
+                                    target_task_id: *task_id,
+                                };
+                            }
+                            Element::Watermark(watermark) => {
+                                watermark.channel_key = ChannelKey {
+                                    source_task_id: self.task_id,
+                                    target_task_id: *task_id,
+                                };
+                            }
+                            Element::StreamStatus(stream_status) => {
+                                stream_status.channel_key = ChannelKey {
                                     source_task_id: self.task_id,
                                     target_task_id: *task_id,
                                 };
