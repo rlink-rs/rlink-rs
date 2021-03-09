@@ -249,7 +249,7 @@ impl Runnable for SourceRunnable {
                     let align_watermark = self.watermark_align.apply_watermark(watermark);
                     match align_watermark {
                         Some(w) => {
-                            info!(
+                            debug!(
                                 "Watermark aligned, status_timestamp: {}",
                                 w.status_timestamp
                             );
@@ -278,7 +278,7 @@ impl Runnable for SourceRunnable {
                         if align {
                             match align_watermark {
                                 Some(w) => {
-                                    info!(
+                                    debug!(
                                         "Watermark&StreamStatus aligned, status_timestamp: {}",
                                         w.status_timestamp
                                     );
@@ -288,7 +288,7 @@ impl Runnable for SourceRunnable {
                                         .run(Element::Watermark(w))
                                 }
                                 None => {
-                                    info!(
+                                    debug!(
                                         "StreamStatus aligned, status_timestamp: {}",
                                         stream_status.timestamp
                                     );
@@ -552,7 +552,7 @@ impl WatermarkAlignManagerV2 {
                 error!("the new StreamStatus reached");
             }
 
-            info!(
+            debug!(
                 "new status reached. status_timestamp: {}, old: {}",
                 stream_status.timestamp, self.current_status_timestamp,
             );
@@ -576,7 +576,7 @@ impl WatermarkAlignManagerV2 {
         match align_manager {
             StatusAlignManager::StreamStatus(stream_status_manager) => {
                 match stream_status_manager.apply(stream_status.timestamp, stream_status.clone()) {
-                    Ok(_) => info!(
+                    Ok(_) => debug!(
                         "status_timestamp: {}, apply StreamStatus from task {:?} success",
                         self.current_status_timestamp, stream_status.channel_key.source_task_id,
                     ),
@@ -613,7 +613,7 @@ impl WatermarkAlignManagerV2 {
                 error!("the new Watermark reached before un-align");
             }
 
-            info!(
+            debug!(
                 "new Watermark reached. status_timestamp: {}, old: {}",
                 watermark.status_timestamp, self.current_status_timestamp,
             );
@@ -638,7 +638,7 @@ impl WatermarkAlignManagerV2 {
             }
             StatusAlignManager::Watermark(watermark_manager) => {
                 match watermark_manager.apply(watermark.status_timestamp, watermark.clone()) {
-                    Ok(_) => info!(
+                    Ok(_) => debug!(
                         "status_timestamp: {}, apply Watermark from task: {:?} success",
                         self.current_status_timestamp, watermark.channel_key.source_task_id,
                     ),
