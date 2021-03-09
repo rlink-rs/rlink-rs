@@ -98,9 +98,12 @@ impl Runnable for WatermarkAssignerRunnable {
                 if stream_status.end {
                     self.next_runnable.as_mut().unwrap().run(element);
                 } else {
-                    let watermark = watermark_assigner
-                        .watermark(stream_status)
-                        .unwrap_or(MIN_WATERMARK.clone());
+                    let watermark = match watermark_assigner.watermark(stream_status) {
+                        Some(watermark) => watermark,
+                        None => watermark_assigner
+                            .current_watermark()
+                            .unwrap_or(MIN_WATERMARK.clone()),
+                    };
 
                     self.watermark = watermark;
                     self.watermark_gauge
