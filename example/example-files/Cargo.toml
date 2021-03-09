@@ -1,6 +1,6 @@
 [package]
 name = "rlink-example-files"
-version = "0.2.3-alpha.1"
+version = "0.2.3-alpha.2"
 authors = ["yorkart <wangyue11.4@163.com>"]
 edition = "2018"
 description = "High performance Stream Processing Framework"
@@ -9,19 +9,19 @@ repository = "https://github.com/rlink-rs/rlink-rs.git"
 license = "MIT/Apache-2.0"
 
 [dependencies.rlink]
-version = "0.2.3-alpha.1"
+version = "0.2.3-alpha.2"
 path = "../../rlink"
 
 [dependencies.rlink-derive]
-version = "0.2.3-alpha.1"
+version = "0.2.3-alpha.2"
 path = "../../rlink-derive"
 
 [dependencies.rlink-files-connector]
-version = "0.2.3-alpha.1"
+version = "0.2.3-alpha.2"
 path = "../../rlink-connectors/files-connector"
 
 [dependencies.rlink-example-utils]
-version = "0.2.3-alpha.1"
+version = "0.2.3-alpha.2"
 path = "../example-utils"
 
 [dependencies]
