@@ -7,6 +7,7 @@ use std::fmt::Debug;
 use bytes::{Buf, BufMut, BytesMut};
 
 use crate::api::runtime::{ChannelKey, CheckpointId};
+use crate::api::watermark::MIN_WATERMARK;
 use crate::api::window::Window;
 
 lazy_static! {
@@ -254,6 +255,10 @@ impl Watermark {
             Some(windows) => windows.get(0),
             None => None,
         }
+    }
+
+    pub(crate) fn is_min(&self) -> bool {
+        self.timestamp == MIN_WATERMARK.timestamp
     }
 }
 

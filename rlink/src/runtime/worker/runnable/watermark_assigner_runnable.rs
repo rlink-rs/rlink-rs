@@ -1,3 +1,4 @@
+use std::borrow::BorrowMut;
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -9,8 +10,6 @@ use crate::api::watermark::{Watermark, WatermarkAssigner, MIN_WATERMARK};
 use crate::metrics::{register_counter, register_gauge, Tag};
 use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
-use crate::utils::date_time::timestamp_str;
-use std::borrow::BorrowMut;
 
 #[derive(Debug)]
 pub(crate) struct WatermarkAssignerRunnable {
@@ -97,34 +96,22 @@ impl Runnable for WatermarkAssignerRunnable {
             }
             Element::StreamStatus(stream_status) => {
                 if stream_status.end {
-                    // self.next_runnable
-                    //     .as_mut()
-                    //     .unwrap()
-                    //     .run(Element::new_watermark(
-                    //         self.task_id.task_number,
-                    //         self.task_id.num_tasks,
-                    //         MAX_WATERMARK.timestamp,
-                    //         stream_status,
-                    //     ));
                     self.next_runnable.as_mut().unwrap().run(element);
                 } else {
-                    match watermark_assigner.watermark(stream_status) {
-                        Some(watermark) => {
-                            debug!("Emit watermark {:?}", timestamp_str(watermark.timestamp));
-                            self.watermark = watermark;
-                            self.watermark_gauge
-                                .store(self.watermark.timestamp as i64, Ordering::Relaxed);
-                            let watermark_ele = Element::new_watermark(
-                                self.task_id.task_number,
-                                self.task_id.num_tasks,
-                                self.watermark.timestamp,
-                                stream_status,
-                            );
+                    let watermark = watermark_assigner
+                        .watermark(stream_status)
+                        .unwrap_or(MIN_WATERMARK.clone());
 
-                            self.next_runnable.as_mut().unwrap().run(watermark_ele);
-                        }
-                        None => {}
-                    }
+                    self.watermark = watermark;
+                    self.watermark_gauge
+                        .store(self.watermark.timestamp as i64, Ordering::Relaxed);
+                    let watermark_ele = Element::new_watermark(
+                        self.task_id.task_number,
+                        self.task_id.num_tasks,
+                        self.watermark.timestamp,
+                        stream_status,
+                    );
+                    self.next_runnable.as_mut().unwrap().run(watermark_ele);
                 }
             }
             Element::Barrier(barrier) => {

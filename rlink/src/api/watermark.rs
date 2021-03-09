@@ -41,7 +41,7 @@ where
 {
     /// Return the current `Watermark` and row's timestamp
     fn watermark(&mut self, stream_status: &StreamStatus) -> Option<Watermark>;
-    fn current_watermark(&self) -> Option<Watermark>;
+    // fn current_watermark(&self) -> Option<Watermark>;
 }
 
 #[derive(Debug)]
@@ -98,13 +98,13 @@ where
         }
     }
 
-    fn current_watermark(&self) -> Option<Watermark> {
-        if self.last_emitted_watermark == 0 {
-            None
-        } else {
-            Some(Watermark::new(self.last_emitted_watermark))
-        }
-    }
+    // fn current_watermark(&self) -> Option<Watermark> {
+    //     if self.last_emitted_watermark == 0 {
+    //         None
+    //     } else {
+    //         Some(Watermark::new(self.last_emitted_watermark))
+    //     }
+    // }
 }
 
 impl<E> TimestampAssigner for BoundedOutOfOrdernessTimestampExtractor<E>

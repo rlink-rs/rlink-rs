@@ -527,6 +527,7 @@ impl WatermarkAlignManagerV2 {
                 StatusAlignManager::Watermark(watermark_manager) => watermark_manager
                     .elements()
                     .iter()
+                    .filter(|w| !w.is_min())
                     .min_by_key(|w| w.timestamp),
             })
             .min_by_key(|w| w.timestamp)
@@ -609,7 +610,7 @@ impl WatermarkAlignManagerV2 {
 
         if watermark.status_timestamp > self.current_status_timestamp {
             if self.current_status_timestamp > 0 && !self.is_aligned() {
-                error!("the new Watermark reached");
+                error!("the new Watermark reached before un-align");
             }
 
             info!(
