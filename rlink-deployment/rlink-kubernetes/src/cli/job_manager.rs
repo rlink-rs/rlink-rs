@@ -1,12 +1,12 @@
 use crate::config::k8s_config::Config;
 use k8s_openapi::api::apps::v1::Deployment;
 use kube::{
-    api::{Api, Meta, PostParams},
+    api::{Api,  PostParams},
     Client,
 };
 use serde_json::json;
 
-pub async fn run(cfg: Config) -> anyhow::Result<String> {
+pub async fn run(cfg: Config) -> anyhow::Result<()> {
     let client = Client::try_default().await?;
 
     let namespace = std::env::var("NAMESPACE").unwrap_or(cfg.namespace.clone().into());
@@ -66,17 +66,11 @@ pub async fn run(cfg: Config) -> anyhow::Result<String> {
     let pp = PostParams::default();
 
     match deployment.create(&pp, &d).await {
-        Ok(o) => {
-            // let name = Meta::name(&o);
-            let uid = Meta::meta(&o).uid.clone().expect("kind has metadata.uid");
-            return Ok(uid);
-        }
+        Ok(_o) => {}
         Err(kube::Error::Api(ae)) => {
             assert_eq!(ae.code, 409);
         }
         Err(e) => return Err(e.into()), // any other case is probably bad
     }
-    Ok(String::default())
+    Ok(())
 }
-
-
