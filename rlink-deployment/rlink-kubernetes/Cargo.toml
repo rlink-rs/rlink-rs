@@ -9,7 +9,7 @@ edition = "2018"
 
 
 [dependencies.rlink]
-version = "0.2.2-alpha.6"
+version = "0.2.2"
 path = "../../rlink"
 
 [dependencies]
