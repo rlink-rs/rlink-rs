@@ -14,7 +14,7 @@ use rlink::utils::thread::async_sleep;
 
 #[derive(Clone)]
 pub struct KafkaProducerThread {
-    topic: String,
+    topic: Option<String>,
     producer: FutureProducer,
     handover: Handover,
 
@@ -23,7 +23,7 @@ pub struct KafkaProducerThread {
 }
 
 impl KafkaProducerThread {
-    pub fn new(topic: String, client_config: ClientConfig, handover: Handover) -> Self {
+    pub fn new(topic: Option<String>, client_config: ClientConfig, handover: Handover) -> Self {
         let producer: FutureProducer = client_config.create().expect("Consumer creation failed");
 
         KafkaProducerThread {
@@ -50,11 +50,22 @@ impl KafkaProducerThread {
                     Ok(mut record) => {
                         let mut reader = KafkaRecord::new(record.borrow_mut());
 
+                        let topic = reader.get_kafka_topic().unwrap();
+                        let topic = match self.topic.as_ref() {
+                            Some(topic) => topic.as_str(),
+                            None => {
+                                if topic.is_empty() {
+                                    panic!("topic not found in `KafkaRecord`");
+                                }
+                                topic.as_str()
+                            }
+                        };
+
                         let timestamp = reader.get_kafka_timestamp().unwrap_or_default();
                         let key = reader.get_kafka_key().unwrap_or(&EMPTY_SLICE).to_vec();
                         let payload = reader.get_kafka_payload().unwrap_or(&EMPTY_SLICE);
 
-                        let future_record = FutureRecord::to(self.topic.as_str())
+                        let future_record = FutureRecord::to(topic)
                             .payload(payload)
                             .timestamp(timestamp as i64)
                             .key(&key);
@@ -159,7 +170,7 @@ mod tests {
         });
 
         let mut kafka_producer =
-            KafkaProducerThread::new(topic.to_string(), client_config, handover);
+            KafkaProducerThread::new(Some(topic.to_string()), client_config, handover);
 
         let kafka_producer_clone = kafka_producer.clone();
         std::thread::spawn(move || loop {

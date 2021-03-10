@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::ops::Index;
 
-use daggy::{Dag, NodeIndex, Walker};
+use daggy::{Dag, NodeIndex};
 use serde::Serialize;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

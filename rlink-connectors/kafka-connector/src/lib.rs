@@ -156,7 +156,7 @@ pub fn create_input_format(
 
 pub fn create_output_format(
     conf_map: HashMap<String, String>,
-    topic: String,
+    topic: Option<String>,
     buffer_size: Option<usize>,
 ) -> KafkaOutputFormat {
     let mut client_config = ClientConfig::new();
