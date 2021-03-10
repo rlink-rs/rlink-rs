@@ -65,6 +65,9 @@ pub(crate) struct Context {
     pub worker_process_path: String,
     pub memory_mb: usize,
     pub v_cores: usize,
+
+    //on k8s
+    pub image_path: String,
 }
 
 impl Context {
@@ -84,6 +87,7 @@ impl Context {
         worker_process_path: String,
         memory_mb: usize,
         v_cores: usize,
+        image_path: String,
     ) -> Self {
         Context {
             application_name,
@@ -101,6 +105,7 @@ impl Context {
             worker_process_path,
             memory_mb,
             v_cores,
+            image_path,
         }
     }
 
@@ -228,6 +233,14 @@ impl Context {
             _ => parse_arg("coordinator_address")?,
         };
 
+        let image_path = match cluster_mode {
+            ClusterMode::Kubernetes => match manager_type {
+                ManagerType::Coordinator => parse_arg("image_path")?,
+                _ => String::new(),
+            },
+            _ => String::new(),
+        };
+
         Ok(Context::new(
             application_name.to_string(),
             application_id,
@@ -244,6 +257,7 @@ impl Context {
             worker_process_path,
             memory_mb,
             v_cores,
+            image_path,
         ))
     }
 }

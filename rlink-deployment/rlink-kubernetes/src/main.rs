@@ -7,15 +7,12 @@ async fn main() {
 
     //todo check cluster_name unique
 
- 
-
-    match cli::job_manager::run(config::k8s_config::Config::try_default(),String::new()).await{
-        Ok(o)=>{
-            println!(" cluster start successful :{}",o);
+    match cli::job_manager::run(config::k8s_config::Config::try_default()).await {
+        Ok(_o) => {
+            println!(" cluster start successful");
         }
-        _=>{
-            panic!("faild hahahahaha");
+        Err(e) => {
+            println!(" cluster start faild :{}", e);
         }
     }
-    
 }
