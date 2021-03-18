@@ -1,4 +1,4 @@
-use std::convert::{Infallible, TryFrom};
+use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::ops::Deref;
 use std::path::PathBuf;
@@ -17,7 +17,7 @@ use crate::api::cluster::{MetadataStorageType, StdResponse};
 use crate::channel::{bounded, Sender};
 use crate::dag::metadata::DagMetadata;
 use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
-use crate::runtime::HeartBeatStatus;
+use crate::runtime::HeartbeatRequest;
 use crate::runtime::TaskManagerStatus;
 use crate::storage::metadata::{MetadataStorage, TMetadataStorage};
 use crate::utils::fs::read_file;
@@ -143,15 +143,6 @@ async fn route(req: Request<Body>, web_context: Arc<WebContext>) -> anyhow::Resu
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub(crate) struct HeartbeatModel {
-    pub task_manager_id: String,
-    pub task_manager_address: String,
-    pub metrics_address: String,
-    // ok, panic
-    pub status: String,
-}
-
 async fn get_context(
     _req: Request<Body>,
     context: Arc<WebContext>,
@@ -211,26 +202,14 @@ async fn get_execution_graph(
 
 async fn heartbeat(req: Request<Body>, context: Arc<WebContext>) -> anyhow::Result<Response<Body>> {
     let whole_body = hyper::body::aggregate(req).await?;
-    let heartbeat_model: HeartbeatModel = serde_json::from_reader(whole_body.reader())?;
-
-    let heartbeat_status = HeartBeatStatus::try_from(heartbeat_model.status.as_str())?;
-    // if !heartbeat_status.eq("ok") {
-    //     error!(
-    //         "heartbeat status: {}, model: {:?} ",
-    //         heartbeat_model.status.as_str(),
-    //         heartbeat_model
-    //     );
-    // }
+    let HeartbeatRequest {
+        task_manager_id,
+        change_items,
+    } = serde_json::from_reader(whole_body.reader())?;
 
     let metadata_storage = MetadataStorage::new(&context.metadata_mode);
     metadata_storage
-        .update_task_manager_status(
-            heartbeat_status,
-            heartbeat_model.task_manager_id.as_str(),
-            heartbeat_model.task_manager_address.as_str(),
-            TaskManagerStatus::Registered,
-            heartbeat_model.metrics_address.as_str(),
-        )
+        .update_task_manager_status(task_manager_id, change_items, TaskManagerStatus::Registered)
         .unwrap();
 
     as_ok_json(&StdResponse::ok(Some(true)))

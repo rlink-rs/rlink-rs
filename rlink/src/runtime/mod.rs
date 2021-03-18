@@ -179,6 +179,20 @@ impl ClusterDescriptor {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub enum HeartbeatItem {
+    WorkerManagerAddress(String),
+    MetricsAddress(String),
+    HeartBeatStatus(HeartBeatStatus),
+    TaskThreadId { task_id: TaskId, thread_id: u64 },
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub(crate) struct HeartbeatRequest {
+    pub task_manager_id: String,
+    pub change_items: Vec<HeartbeatItem>,
+}
+
 pub fn run<S>(stream_env: StreamExecutionEnvironment, stream_app: S) -> anyhow::Result<()>
 where
     S: StreamApp + 'static,

@@ -11,9 +11,10 @@ use crate::pub_sub::network;
 use crate::runtime::context::Context;
 use crate::runtime::timer::{start_window_timer, WindowTimer};
 use crate::runtime::worker::checkpoint::start_report_checkpoint;
-use crate::runtime::worker::heart_beat::{start_heart_beat_timer, status_heartbeat};
+use crate::runtime::worker::heart_beat::{start_heart_beat_timer, submit_heartbeat};
 use crate::runtime::{
-    worker, ClusterDescriptor, HeartBeatStatus, TaskManagerStatus, WorkerManagerDescriptor,
+    worker, ClusterDescriptor, HeartBeatStatus, HeartbeatItem, TaskManagerStatus,
+    WorkerManagerDescriptor,
 };
 use crate::storage::metadata::MetadataLoader;
 use crate::utils;
@@ -66,7 +67,7 @@ where
         join_handle.join().unwrap();
     });
 
-    stop_heartbeat_timer(cluster_descriptor.as_ref(), context.deref(), server_addr);
+    stop_heartbeat_timer();
     info!("work end");
 
     Ok(())
@@ -115,40 +116,15 @@ fn start_heartbeat_timer(
         .coordinator_address
         .as_str();
 
-    status_heartbeat(
-        coordinator_address,
-        context.task_manager_id.as_str(),
-        bind_addr.to_string().as_str(),
-        context.metric_addr.as_str(),
-        Some(HeartBeatStatus::Ok),
-    );
+    submit_heartbeat(HeartbeatItem::WorkerManagerAddress(bind_addr.to_string()));
+    submit_heartbeat(HeartbeatItem::MetricsAddress(context.metric_addr.clone()));
 
     // heat beat timer
-    start_heart_beat_timer(
-        coordinator_address,
-        context.task_manager_id.as_str(),
-        bind_addr.to_string().as_str(),
-        context.metric_addr.as_str(),
-    );
+    start_heart_beat_timer(coordinator_address, context.task_manager_id.as_str());
 }
 
-fn stop_heartbeat_timer(
-    cluster_descriptor: &ClusterDescriptor,
-    context: &Context,
-    bind_addr: SocketAddr,
-) {
-    let coordinator_address = cluster_descriptor
-        .coordinator_manager
-        .coordinator_address
-        .as_str();
-
-    status_heartbeat(
-        coordinator_address,
-        context.task_manager_id.as_str(),
-        bind_addr.to_string().as_str(),
-        context.metric_addr.as_str(),
-        Some(HeartBeatStatus::End),
-    );
+fn stop_heartbeat_timer() {
+    submit_heartbeat(HeartbeatItem::HeartBeatStatus(HeartBeatStatus::End));
 }
 
 fn start_checkpoint_timer(cluster_descriptor: &ClusterDescriptor) {
