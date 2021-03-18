@@ -89,6 +89,7 @@ pub struct TaskDescriptor {
     pub task_id: TaskId,
     pub operators: Vec<OperatorDescriptor>,
     pub input_split: InputSplit,
+    pub thread_id: String,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
