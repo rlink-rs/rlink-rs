@@ -4,7 +4,6 @@ use crate::api::cluster::StdResponse;
 use crate::channel::{unbounded, Receiver, Sender, TrySendError};
 use crate::runtime::{HeartBeatStatus, HeartbeatItem, HeartbeatRequest};
 use crate::utils::http::client::post;
-use crate::utils::thread::async_runtime;
 use crate::utils::{date_time, panic};
 
 pub struct HeartbeatChannel {
@@ -36,19 +35,7 @@ pub(crate) fn submit_heartbeat(ck: HeartbeatItem) {
     }
 }
 
-pub(crate) fn start_heart_beat_timer(coordinator: &str, task_manager_id: &str) {
-    let coordinator = coordinator.to_string();
-    let task_manager_id = task_manager_id.to_string();
-
-    crate::utils::thread::spawn("heartbeat", move || {
-        async_runtime().block_on(start_heart_beat_timer_async(
-            coordinator.as_str(),
-            task_manager_id.as_str(),
-        ));
-    });
-}
-
-pub(crate) async fn start_heart_beat_timer_async(coordinator: &str, task_manager_id: &str) {
+pub(crate) async fn start_heartbeat_timer(coordinator_address: String, task_manager_id: String) {
     info!("heartbeat loop starting...");
     let hb_channel = &*HB_CHANNEL;
 
@@ -61,13 +48,18 @@ pub(crate) async fn start_heart_beat_timer_async(coordinator: &str, task_manager
             change_items
         };
 
-        status_heartbeat_async(coordinator, task_manager_id, change_items).await;
+        report_heartbeat(
+            coordinator_address.as_str(),
+            task_manager_id.as_str(),
+            change_items,
+        )
+        .await;
 
         tokio::time::sleep(Duration::from_secs(10)).await;
     }
 }
 
-pub(crate) async fn status_heartbeat_async(
+pub(crate) async fn report_heartbeat(
     coordinator_address: &str,
     task_manager_id: &str,
     mut change_items: Vec<HeartbeatItem>,
