@@ -1,10 +1,10 @@
 [package]
 name = "rlink-derive"
-version = "0.2.3-alpha.6"
+version = "0.2.3"
 authors = ["yorkart <wangyue11.4@163.com>"]
 edition = "2018"
 description = "High performance Stream Processing Framework"
-keywords = ["stream", "window", "flink", "spark"]
+keywords = ["stream", "window", "flink"]
 repository = "https://github.com/rlink-rs/rlink-rs.git"
 license = "MIT/Apache-2.0"
 

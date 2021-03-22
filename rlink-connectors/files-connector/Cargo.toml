@@ -1,10 +1,10 @@
 [package]
 name = "rlink-files-connector"
-version = "0.2.3-alpha.6"
+version = "0.2.3"
 authors = ["yorkart <wangyue11.4@163.com>"]
 edition = "2018"
 description = "High performance Stream Processing Framework"
-keywords = ["stream", "window", "flink", "spark", "hdfs"]
+keywords = ["stream", "window", "flink", "hdfs"]
 repository = "https://github.com/rlink-rs/rlink-rs.git"
 license = "MIT/Apache-2.0"
 
@@ -12,12 +12,10 @@ license = "MIT/Apache-2.0"
 name = "rlink_files_connector"
 
 [dependencies.rlink]
-version = "0.2.3-alpha.6"
-path = "../../rlink"
+version = "0.2.3"
 
 [dependencies.rlink-derive]
-version = "0.2.3-alpha.6"
-path = "../../rlink-derive"
+version = "0.2.3"
 
 [dependencies]
 log = "0.4"
