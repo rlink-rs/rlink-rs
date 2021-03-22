@@ -249,9 +249,11 @@ impl Client {
                                             record.channel_key = self.channel_key
                                         }
                                         Element::Watermark(watermark) => {
+                                            watermark.channel_key = self.channel_key;
                                             debug!("client recv Watermark {}", watermark.timestamp);
                                         }
                                         Element::StreamStatus(stream_status) => {
+                                            stream_status.channel_key = self.channel_key;
                                             end = stream_status.end;
                                         }
                                         _ => {}

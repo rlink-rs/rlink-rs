@@ -42,6 +42,7 @@ pub(crate) fn publish(
             "NetworkPublish",
             vec![
                 Tag::from(("source_job_id", source_task_id.job_id.0)),
+                Tag::from(("source_task_number", source_task_id.task_number)),
                 Tag::from(("target_job_id", target_task_id.job_id.0)),
                 Tag::from(("target_task_number", target_task_id.task_number)),
             ],

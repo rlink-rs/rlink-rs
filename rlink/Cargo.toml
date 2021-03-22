@@ -1,10 +1,10 @@
 [package]
 name = "rlink"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["yorkart <wangyue11.4@163.com>"]
 edition = "2018"
 description = "High performance Stream Processing Framework"
-keywords = ["stream", "window", "flink", "spark"]
+keywords = ["stream", "window", "flink"]
 repository = "https://github.com/rlink-rs/rlink-rs.git"
 license = "MIT/Apache-2.0"
 
@@ -17,8 +17,8 @@ serbuffer = "1.1"
 log = "0.4"
 log4rs = "1.0"
 
-#num_cpus = "1.12.0"
-chrono="0.4"
+thread-id = "3"
+chrono = "0.4"
 lazy_static = "1.4.0"
 backtrace = "0.3"
 anyhow = "1.0"
@@ -52,8 +52,8 @@ quanta = "0.7"
 bytes = "1.0"
 futures = "0.3"
 tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "time", "io-util"] }
-tokio-util = {version = "0.6", features = ["codec"]}
-hyper = { version = "0.14", features = ["client", "server", "http1", "tcp"]}
+tokio-util = { version = "0.6", features = ["codec"] }
+hyper = { version = "0.14", features = ["client", "server", "http1", "tcp"] }
 
 # storage
 mysql = "20.1"

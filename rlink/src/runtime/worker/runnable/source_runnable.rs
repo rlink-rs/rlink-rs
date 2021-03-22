@@ -1,4 +1,5 @@
-use std::collections::BTreeMap;
+use std::borrow::BorrowMut;
+use std::collections::HashMap;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -8,7 +9,7 @@ use crate::api::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotConte
 use crate::api::element::{Element, StreamStatus, Watermark};
 use crate::api::function::InputFormat;
 use crate::api::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
-use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
+use crate::api::runtime::{CheckpointId, JobId, OperatorId, TaskId};
 use crate::channel::named_channel;
 use crate::channel::sender::ChannelSender;
 use crate::channel::utils::iter::ChannelIterator;
@@ -31,8 +32,8 @@ pub(crate) struct SourceRunnable {
     checkpoint_timer: Option<TimerChannel>,
 
     waiting_end_flags: usize,
-    barrier_align: BarrierAlignManager,
-    watermark_align: WatermarkAlignManager,
+    barrier_alignment: BarrierAlignManager,
+    status_alignment: StatusAlignmentManager,
 }
 
 impl SourceRunnable {
@@ -53,8 +54,8 @@ impl SourceRunnable {
             checkpoint_timer: None,
 
             waiting_end_flags: 0,
-            barrier_align: BarrierAlignManager::default(),
-            watermark_align: WatermarkAlignManager::default(),
+            barrier_alignment: BarrierAlignManager::default(),
+            status_alignment: StatusAlignmentManager::default(),
         }
     }
 
@@ -176,8 +177,15 @@ impl Runnable for SourceRunnable {
         } else {
             parent_execution_size
         };
-        self.barrier_align = BarrierAlignManager::new(parent_execution_size);
-        self.watermark_align = WatermarkAlignManager::new(parent_execution_size, 120);
+
+        let mut parent_jobs = HashMap::new();
+        for (node, _edge) in context.parent_executions(&self.task_id) {
+            let job_parallelism = parent_jobs.entry(node.task_id.job_id).or_insert(0);
+            *job_parallelism = *job_parallelism + 1;
+        }
+
+        self.barrier_alignment = BarrierAlignManager::new(parent_execution_size);
+        self.status_alignment = StatusAlignmentManager::new(parent_jobs);
 
         info!(
             "SourceRunnable Opened, operator_id={:?}, task_id={:?}, ElementEventAlign parent_execution_size={:?}",
@@ -217,7 +225,7 @@ impl Runnable for SourceRunnable {
             match element {
                 Element::Record(_) => self.next_runnable.as_mut().unwrap().run(element),
                 Element::Barrier(barrier) => {
-                    let is_barrier_align = self.barrier_align.apply(barrier.checkpoint_id.0);
+                    let is_barrier_align = self.barrier_alignment.apply(barrier.checkpoint_id.0);
                     if is_barrier_align {
                         debug!("barrier align and checkpoint");
                         let checkpoint_id = barrier.checkpoint_id;
@@ -234,13 +242,18 @@ impl Runnable for SourceRunnable {
                     }
                 }
                 Element::Watermark(watermark) => {
-                    let align_watermark = self.watermark_align.apply_watermark(watermark);
+                    let align_watermark = self.status_alignment.apply_watermark(watermark);
                     match align_watermark {
-                        Some(w) => self
-                            .next_runnable
-                            .as_mut()
-                            .unwrap()
-                            .run(Element::Watermark(w)),
+                        Some(w) => {
+                            debug!(
+                                "Watermark aligned, status_timestamp: {}",
+                                w.status_timestamp
+                            );
+                            self.next_runnable
+                                .as_mut()
+                                .unwrap()
+                                .run(Element::Watermark(w))
+                        }
                         None => {}
                     }
                 }
@@ -255,20 +268,31 @@ impl Runnable for SourceRunnable {
                             break;
                         }
                     } else {
-                        let (align, align_watermark) =
-                            self.watermark_align.apply_stream_status(&stream_status);
+                        let (align, align_watermark) = self
+                            .status_alignment
+                            .apply_stream_status(stream_status.clone());
                         if align {
                             match align_watermark {
-                                Some(w) => self
-                                    .next_runnable
-                                    .as_mut()
-                                    .unwrap()
-                                    .run(Element::Watermark(w)),
-                                None => self
-                                    .next_runnable
-                                    .as_mut()
-                                    .unwrap()
-                                    .run(Element::StreamStatus(stream_status)),
+                                Some(w) => {
+                                    debug!(
+                                        "Watermark&StreamStatus aligned, status_timestamp: {}",
+                                        w.status_timestamp
+                                    );
+                                    self.next_runnable
+                                        .as_mut()
+                                        .unwrap()
+                                        .run(Element::Watermark(w))
+                                }
+                                None => {
+                                    debug!(
+                                        "StreamStatus aligned, status_timestamp: {}",
+                                        stream_status.timestamp
+                                    );
+                                    self.next_runnable
+                                        .as_mut()
+                                        .unwrap()
+                                        .run(Element::StreamStatus(stream_status))
+                                }
                             }
                         }
                     }
@@ -357,197 +381,318 @@ impl BarrierAlignManager {
 }
 
 #[derive(Debug, Default)]
-struct WatermarkAlign {
+struct Alignment<T, E>
+where
+    T: Ord + PartialOrd + std::fmt::Display + Default,
+{
     parent_execution_size: usize,
 
-    statue_timestamp: u64,
-    reached_size: usize,
-
-    watermarks: Vec<Watermark>,
+    batch_id: T,
+    elements: Vec<E>,
 }
 
-impl WatermarkAlign {
-    pub fn new(parent_execution_size: usize, statue_timestamp: u64) -> Self {
-        WatermarkAlign {
+impl<T, E> Alignment<T, E>
+where
+    T: Ord + PartialOrd + std::fmt::Display + Default,
+{
+    pub fn new(parent_execution_size: usize, batch_id: T) -> Self {
+        Alignment {
             parent_execution_size,
-            statue_timestamp,
-            reached_size: 0,
-            watermarks: Vec::new(),
+            batch_id,
+            elements: Vec::new(),
         }
     }
 
-    fn min_watermark(&self) -> Option<Watermark> {
+    pub fn elements(&self) -> &[E] {
+        self.elements.as_slice()
+    }
+
+    pub fn reset(&mut self, batch_id: T) {
+        self.batch_id = batch_id;
+        self.elements.clear();
+    }
+
+    pub fn is_aligned(&self) -> bool {
+        self.elements.len() == self.parent_execution_size
+    }
+
+    pub fn apply(&mut self, batch_id: T, element: E) -> anyhow::Result<()> {
         if self.parent_execution_size == 0 {
-            self.watermarks.get(0).map(|w| w.clone())
-        } else {
-            self.watermarks
-                .iter()
-                .min_by_key(|w| w.timestamp)
-                .map(|w| w.clone())
+            return Ok(());
+        }
+
+        match self.batch_id.cmp(&batch_id) {
+            std::cmp::Ordering::Equal => {
+                self.elements.push(element);
+
+                if self.elements.len() > self.parent_execution_size {
+                    return Err(anyhow!(
+                        "reached elements more than expect size {}",
+                        self.parent_execution_size
+                    ));
+                }
+            }
+            std::cmp::Ordering::Less => {
+                self.batch_id = batch_id;
+                self.elements.push(element);
+            }
+            std::cmp::Ordering::Greater => {
+                return Err(anyhow!(
+                    "event delay, current {}, reached {}",
+                    self.batch_id,
+                    batch_id
+                ));
+            }
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+enum StatusAlignment {
+    StreamStatus(Alignment<u64, StreamStatus>),
+    Watermark(Alignment<u64, Watermark>),
+}
+
+impl StatusAlignment {
+    pub fn is_aligned(&self) -> bool {
+        match self {
+            StatusAlignment::StreamStatus(stream_status_manager) => {
+                stream_status_manager.is_aligned()
+            }
+            StatusAlignment::Watermark(watermark_manager) => watermark_manager.is_aligned(),
         }
     }
 
-    pub fn apply_stream_status(
-        &mut self,
-        stream_status: &StreamStatus,
-    ) -> (bool, Option<Watermark>) {
-        self.apply(stream_status.timestamp, None)
-    }
-
-    pub fn apply_watermark(&mut self, watermark: Watermark) -> Option<Watermark> {
-        // ignore 0(`align`) field
-        self.apply(watermark.status_timestamp, Some(watermark)).1
-    }
-
-    fn apply(
-        &mut self,
-        status_timestamp: u64,
-        watermark: Option<Watermark>,
-    ) -> (bool, Option<Watermark>) {
-        if self.statue_timestamp != status_timestamp {
-            panic!("the `status_timestamp` confusion");
-        }
-
-        if self.parent_execution_size == 0 {
-            return (true, watermark);
-        }
-
-        self.reached_size += 1;
-        if let Some(watermark) = watermark {
-            self.watermarks.push(watermark);
-        }
-
-        if self.reached_size > self.parent_execution_size {
-            unreachable!()
-        }
-
-        if self.reached_size == self.parent_execution_size {
-            (true, self.min_watermark())
-        } else {
-            (false, None)
+    pub fn reset(&mut self, batch_id: u64) {
+        match self {
+            StatusAlignment::StreamStatus(stream_status_manager) => {
+                stream_status_manager.reset(batch_id);
+            }
+            StatusAlignment::Watermark(watermark_manager) => {
+                watermark_manager.reset(batch_id);
+            }
         }
     }
 }
 
 #[derive(Debug, Default)]
-struct WatermarkAlignManager {
-    parent_execution_size: usize,
-    watermarks: BTreeMap<u64, WatermarkAlign>,
-    latest_align_status_timestamp: u64,
-    max_waiting_size: usize,
+struct StatusAlignmentManager {
+    job_aligns: HashMap<JobId, StatusAlignment>,
+    parent_jobs: HashMap<JobId, u16>,
+
+    current_status_timestamp: u64,
 }
 
-impl WatermarkAlignManager {
-    pub fn new(parent_execution_size: usize, max_waiting_size: usize) -> Self {
-        WatermarkAlignManager {
-            parent_execution_size,
-            watermarks: BTreeMap::new(),
-            latest_align_status_timestamp: 0,
-            max_waiting_size,
+impl StatusAlignmentManager {
+    pub fn new(parent_jobs: HashMap<JobId, u16>) -> Self {
+        StatusAlignmentManager {
+            job_aligns: HashMap::new(),
+            parent_jobs,
+            current_status_timestamp: 0,
         }
     }
 
-    /// apply StreamStatus and align check
-    /// only align and return true
-    pub fn apply_stream_status(
-        &mut self,
-        stream_status: &StreamStatus,
-    ) -> (bool, Option<Watermark>) {
-        self.out_of_capacity_check();
+    fn clean(&mut self, status_timestamp: u64) {
+        for (_job_id, align_manager) in self.job_aligns.borrow_mut() {
+            align_manager.reset(status_timestamp);
+        }
+    }
 
-        let status_timestamp = stream_status.timestamp;
-        if status_timestamp <= self.latest_align_status_timestamp {
-            warn!("delay `StreamStatus` reached");
+    fn is_aligned(&self) -> bool {
+        let aligned_count = self
+            .parent_jobs
+            .iter()
+            .filter(|(job_id, _)| {
+                self.job_aligns
+                    .get(&job_id)
+                    .map(|align_manager| align_manager.is_aligned())
+                    .unwrap_or(false)
+            })
+            .count();
+
+        self.parent_jobs.len() == aligned_count
+    }
+
+    fn min_watermark(&self) -> Option<Watermark> {
+        self.job_aligns
+            .iter()
+            .filter_map(|(_job_id, align_manager)| match align_manager {
+                StatusAlignment::StreamStatus(_stream_status_manager) => None,
+                StatusAlignment::Watermark(watermark_manager) => watermark_manager
+                    .elements()
+                    .iter()
+                    .filter(|w| !w.is_min())
+                    .min_by_key(|w| w.timestamp),
+            })
+            .min_by_key(|w| w.timestamp)
+            .map(|w| w.clone())
+    }
+
+    fn apply_stream_status(&mut self, stream_status: StreamStatus) -> (bool, Option<Watermark>) {
+        if self.parent_jobs.len() == 0 {
+            return (true, None);
+        }
+
+        if stream_status.timestamp < self.current_status_timestamp {
+            error!(
+                "delay StreamStatus reached. {} < {}",
+                stream_status.timestamp, self.current_status_timestamp
+            );
             return (false, None);
         }
 
-        let watermark_align =
-            self.watermarks
-                .entry(status_timestamp)
-                .or_insert(WatermarkAlign::new(
-                    self.parent_execution_size,
-                    status_timestamp,
-                ));
+        if stream_status.timestamp > self.current_status_timestamp {
+            if self.current_status_timestamp > 0 && !self.is_aligned() {
+                error!("the new StreamStatus reached");
+            }
 
-        let (align, watermark) = watermark_align.apply_stream_status(stream_status);
-        if align {
-            self.latest_align_status_timestamp = watermark_align.statue_timestamp;
-            let statue_timestamp = watermark_align.statue_timestamp;
-            self.watermarks.remove(&statue_timestamp);
-        } else {
-            if self.watermarks.len() > self.max_waiting_size {
-                let status_timestamp = self
-                    .watermarks
-                    .iter()
-                    .next()
-                    .map(|(status_timestamp, _)| *status_timestamp)
-                    .unwrap();
-                let watermark_align = self.watermarks.remove(&status_timestamp).unwrap();
+            debug!(
+                "new status reached. status_timestamp: {}, old: {}",
+                stream_status.timestamp, self.current_status_timestamp,
+            );
+            self.current_status_timestamp = stream_status.timestamp;
+            self.clean(self.current_status_timestamp);
+        }
 
-                self.latest_align_status_timestamp = watermark_align.statue_timestamp;
+        let parent_job_id = stream_status.channel_key.source_task_id.job_id;
+        let parent_job_parallelism = match self.parent_jobs.get(&parent_job_id) {
+            Some(parent_job_parallelism) => *parent_job_parallelism,
+            None => panic!("parent job not found. {:?}", parent_job_id),
+        };
+        let current_status_timestamp = self.current_status_timestamp;
+        let align_manager = self.job_aligns.entry(parent_job_id).or_insert_with(|| {
+            StatusAlignment::StreamStatus(Alignment::new(
+                parent_job_parallelism as usize,
+                current_status_timestamp,
+            ))
+        });
+
+        match align_manager {
+            StatusAlignment::StreamStatus(stream_status_manager) => {
+                match stream_status_manager.apply(stream_status.timestamp, stream_status.clone()) {
+                    Ok(_) => debug!(
+                        "status_timestamp: {}, apply StreamStatus from task {:?} success",
+                        self.current_status_timestamp, stream_status.channel_key.source_task_id,
+                    ),
+                    Err(e) => error!(
+                        "status_timestamp: {},apply StreamStatus from task {:?} error. {}",
+                        self.current_status_timestamp, stream_status.channel_key.source_task_id, e
+                    ),
+                }
+            }
+            StatusAlignment::Watermark(_watermark_manager) => {
+                error!("unreached, try apply a `Watermark` to StreamStatusAlign");
             }
         }
 
-        (align, watermark)
+        if self.is_aligned() {
+            (true, self.min_watermark())
+        } else {
+            (false, None)
+        }
     }
 
-    /// apply Watermark and align check
-    /// align or expire return true
-    pub fn apply_watermark(&mut self, watermark: Watermark) -> Option<Watermark> {
-        self.out_of_capacity_check();
+    fn apply_watermark(&mut self, watermark: Watermark) -> Option<Watermark> {
+        if self.parent_jobs.len() == 0 {
+            return Some(watermark);
+        }
 
-        let status_timestamp = watermark.status_timestamp;
-        if status_timestamp <= self.latest_align_status_timestamp {
-            warn!("delay `StreamStatus` reached");
+        if watermark.status_timestamp < self.current_status_timestamp {
+            error!("delay Watermark reached. {}", watermark.status_timestamp);
             return None;
         }
 
-        let watermark_align =
-            self.watermarks
-                .entry(status_timestamp)
-                .or_insert(WatermarkAlign::new(
-                    self.parent_execution_size,
-                    status_timestamp,
-                ));
+        if watermark.status_timestamp > self.current_status_timestamp {
+            if self.current_status_timestamp > 0 && !self.is_aligned() {
+                error!("the new Watermark reached before un-align");
+            }
 
-        let mut align_watermark = watermark_align.apply_watermark(watermark);
-
-        if align_watermark.is_none() && self.watermarks.len() > self.max_waiting_size {
-            let status_timestamp = self
-                .watermarks
-                .iter()
-                .next()
-                .map(|(status_timestamp, _)| *status_timestamp)
-                .unwrap();
-            let watermark_align = self.watermarks.remove(&status_timestamp).unwrap();
-            align_watermark = watermark_align.min_watermark()
+            debug!(
+                "new Watermark reached. status_timestamp: {}, old: {}",
+                watermark.status_timestamp, self.current_status_timestamp,
+            );
+            self.current_status_timestamp = watermark.status_timestamp;
+            self.clean(self.current_status_timestamp);
         }
 
-        match align_watermark {
-            Some(w) => {
-                self.latest_align_status_timestamp = w.status_timestamp;
-                self.watermarks.remove(&w.status_timestamp);
-                Some(w)
+        let parent_job_id = watermark.channel_key.source_task_id.job_id;
+        let parent_job_parallelism = *self.parent_jobs.get(&parent_job_id).unwrap();
+        let current_status_timestamp = self.current_status_timestamp;
+        let align_manager = self.job_aligns.entry(parent_job_id).or_insert_with(|| {
+            StatusAlignment::Watermark(Alignment::new(
+                parent_job_parallelism as usize,
+                current_status_timestamp,
+            ))
+        });
+
+        match align_manager {
+            StatusAlignment::StreamStatus(_stream_status_manager) => {
+                error!("unreached, try apply a `StreamStatus` to WatermarkAlign");
+                None
             }
-            None => None,
+            StatusAlignment::Watermark(watermark_manager) => {
+                match watermark_manager.apply(watermark.status_timestamp, watermark.clone()) {
+                    Ok(_) => debug!(
+                        "status_timestamp: {}, apply Watermark from task: {:?} success",
+                        self.current_status_timestamp, watermark.channel_key.source_task_id,
+                    ),
+                    Err(e) => error!(
+                        "status_timestamp: {}, apply Watermark from task: {:?} error. {}",
+                        self.current_status_timestamp, watermark.channel_key.source_task_id, e
+                    ),
+                }
+
+                if self.is_aligned() {
+                    self.min_watermark()
+                } else {
+                    None
+                }
+            }
         }
     }
+}
 
-    fn out_of_capacity_check(&mut self) {
-        if self.watermarks.len() <= 1 {
-            return;
+#[cfg(test)]
+mod tests {
+    use crate::runtime::worker::runnable::source_runnable::Alignment;
+
+    #[test]
+    pub fn align_manager_test() {
+        {
+            let align_manager = Alignment::<usize, usize>::new(0, 0);
+            assert_eq!(align_manager.is_aligned(), true);
         }
 
-        let expired: Vec<u64> = self
-            .watermarks
-            .iter()
-            .map(|(status_timestamp, _)| *status_timestamp)
-            .filter(|status_timestamp| *status_timestamp <= self.latest_align_status_timestamp)
-            .collect();
+        {
+            let mut align_manager = Alignment::new(1, 1);
+            assert_eq!(align_manager.is_aligned(), false);
 
-        for status_timestamp in expired {
-            self.watermarks.remove(&status_timestamp);
-            warn!("remove expire status: {}", status_timestamp);
+            align_manager.apply(1, 1).unwrap();
+            assert_eq!(align_manager.is_aligned(), true);
+        }
+
+        {
+            let mut align_manager = Alignment::new(2, 1);
+            assert_eq!(align_manager.is_aligned(), false);
+
+            align_manager.apply(1, 1).unwrap();
+            assert_eq!(align_manager.is_aligned(), false);
+
+            align_manager.apply(1, 2).unwrap();
+            assert_eq!(align_manager.is_aligned(), true);
+
+            assert_eq!(align_manager.apply(1, 3).is_err(), true);
+            assert_eq!(align_manager.apply(0, 4).is_err(), true);
+
+            align_manager.reset(2);
+
+            align_manager.apply(2, 0).unwrap();
+            assert_eq!(align_manager.is_aligned(), false);
+
+            align_manager.apply(2, 1).unwrap();
+            assert_eq!(align_manager.is_aligned(), true);
         }
     }
 }

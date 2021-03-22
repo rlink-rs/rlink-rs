@@ -15,6 +15,8 @@ use crate::source::consumer::{create_kafka_consumer, get_kafka_consumer_handover
 use crate::source::deserializer::KafkaRecordDeserializerBuilder;
 use crate::source::iterator::KafkaRecordIterator;
 
+const CREATE_KAFKA_CONNECTION: &'static str = "create_kafka_connection";
+
 #[derive(NamedFunction)]
 pub struct KafkaInputFormat {
     client_config: ClientConfig,
@@ -52,7 +54,7 @@ impl InputFormat for KafkaInputFormat {
 
         let can_create_consumer = input_split
             .properties()
-            .get_string("create_kafka_connection")?;
+            .get_string(CREATE_KAFKA_CONNECTION)?;
         if can_create_consumer.to_lowercase().eq("true") {
             let mut kafka_checkpoint =
                 KafkaCheckpointFunction::new(context.application_id.clone(), context.task_id);
@@ -157,7 +159,7 @@ impl InputSplitSource for KafkaInputFormat {
                 let mut properties = Properties::new();
                 properties.set_str("topic", topic.as_str());
                 properties.set_i32("partition", partition.id());
-                properties.set_str("create_kafka_connection", "true");
+                properties.set_str(CREATE_KAFKA_CONNECTION, "true");
 
                 let input_split = InputSplit::new(index, properties);
                 index += 1;
@@ -182,7 +184,7 @@ impl InputSplitSource for KafkaInputFormat {
                 for input_split in &input_splits {
                     let split_number = input_split.split_number();
                     let mut properties = input_split.properties().clone();
-                    properties.set_str("create_kafka_connection", "false");
+                    properties.set_str(CREATE_KAFKA_CONNECTION, "false");
 
                     extend_input_splits.push(InputSplit::new(split_number, properties));
                 }

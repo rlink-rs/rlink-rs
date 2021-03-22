@@ -1,10 +1,10 @@
 [package]
 name = "rlink-derive"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["yorkart <wangyue11.4@163.com>"]
 edition = "2018"
 description = "High performance Stream Processing Framework"
-keywords = ["stream", "window", "flink", "spark"]
+keywords = ["stream", "window", "flink"]
 repository = "https://github.com/rlink-rs/rlink-rs.git"
 license = "MIT/Apache-2.0"
 
@@ -15,4 +15,4 @@ proc-macro = true
 [dependencies]
 proc-macro2 = "1.0"
 quote = "1.0"
-syn = {version = "1.0", features = ["full"]}
+syn = { version = "1.0", features = ["full"] }

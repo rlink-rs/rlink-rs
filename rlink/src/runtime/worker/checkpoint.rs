@@ -5,7 +5,6 @@ use crate::api::cluster::StdResponse;
 use crate::channel::{bounded, Receiver, Sender, TryRecvError, TrySendError};
 use crate::utils::date_time;
 use crate::utils::http::client::post;
-use crate::utils::thread::async_runtime;
 
 pub struct CheckpointChannel {
     sender: Sender<Checkpoint>,
@@ -34,30 +33,27 @@ pub(crate) fn submit_checkpoint(ck: Checkpoint) -> Option<Checkpoint> {
     }
 }
 
-pub(crate) fn start_report_checkpoint(coordinator_address: &str) {
-    let coordinator_address = coordinator_address.to_string();
-    crate::utils::thread::spawn("checkpoint", move || {
-        async_runtime().block_on(async {
-            let ck_channel = &*CK_CHANNEL;
+pub(crate) async fn start_report_checkpoint(coordinator_address: String) {
+    info!("checkpoint loop starting...");
 
-            loop {
-                match ck_channel.receiver.try_recv() {
-                    Ok(ck) => {
-                        report_checkpoint0(coordinator_address.as_str(), ck).await;
-                    }
-                    Err(TryRecvError::Empty) => {
-                        tokio::time::sleep(Duration::from_secs(2)).await;
-                    }
-                    Err(TryRecvError::Disconnected) => {
-                        panic!("the Checkpoint channel is disconnected")
-                    }
-                }
+    let ck_channel = &*CK_CHANNEL;
+
+    loop {
+        match ck_channel.receiver.try_recv() {
+            Ok(ck) => {
+                report_checkpoint(coordinator_address.as_str(), ck).await;
             }
-        });
-    });
+            Err(TryRecvError::Empty) => {
+                tokio::time::sleep(Duration::from_secs(2)).await;
+            }
+            Err(TryRecvError::Disconnected) => {
+                panic!("the Checkpoint channel is disconnected")
+            }
+        }
+    }
 }
 
-pub(crate) async fn report_checkpoint0(coordinator_address: &str, ck: Checkpoint) {
+pub(crate) async fn report_checkpoint(coordinator_address: &str, ck: Checkpoint) {
     let url = format!("{}/api/checkpoint", coordinator_address);
 
     let body = serde_json::to_string(&ck).unwrap();
