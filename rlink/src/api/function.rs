@@ -198,8 +198,12 @@ where
     /// This method is called for each element in the first of the connected streams.
     ///
     /// `stream_seq` is the `DataStream` index
-    fn process_left(&self, record: Record) -> Box<dyn Iterator<Item = Record>>;
-    fn process_right(&self, stream_seq: usize, record: Record) -> Box<dyn Iterator<Item = Record>>;
+    fn process_left(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>>;
+    fn process_right(
+        &mut self,
+        stream_seq: usize,
+        record: Record,
+    ) -> Box<dyn Iterator<Item = Record>>;
     fn close(&mut self) -> crate::api::Result<()>;
 }
 
