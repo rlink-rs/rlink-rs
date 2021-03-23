@@ -460,12 +460,12 @@ mod tests {
             Ok(())
         }
 
-        fn process_left(&self, record: Record) -> Box<dyn Iterator<Item = Record>> {
+        fn process_left(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>> {
             Box::new(vec![record].into_iter())
         }
 
         fn process_right(
-            &self,
+            &mut self,
             _stream_seq: usize,
             _record: Record,
         ) -> Box<dyn Iterator<Item = Record>> {
