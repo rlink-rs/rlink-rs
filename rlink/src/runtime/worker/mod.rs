@@ -12,12 +12,13 @@ use crate::dag::metadata::DagMetadata;
 use crate::dag::OperatorType;
 use crate::runtime::context::Context;
 use crate::runtime::timer::WindowTimer;
+use crate::runtime::worker::heart_beat::submit_heartbeat;
 use crate::runtime::worker::runnable::co_process_runnable::CoProcessRunnable;
 use crate::runtime::worker::runnable::{
     FilterRunnable, FlatMapRunnable, KeyByRunnable, ReduceRunnable, Runnable, RunnableContext,
     SinkRunnable, SourceRunnable, WatermarkAssignerRunnable, WindowAssignerRunnable,
 };
-use crate::runtime::{ClusterDescriptor, TaskDescriptor};
+use crate::runtime::{ClusterDescriptor, HeartbeatItem, TaskDescriptor};
 
 pub mod checkpoint;
 pub mod heart_beat;
@@ -44,6 +45,11 @@ where
             task_descriptor.task_id.job_id.0, task_descriptor.task_id.task_number,
         ))
         .spawn(move || {
+            submit_heartbeat(HeartbeatItem::TaskThreadId {
+                task_id: task_descriptor.task_id.clone(),
+                thread_id: thread_id::get() as u64,
+            });
+
             let stream_env = StreamExecutionEnvironment::new(application_name);
             let worker_task = WorkerTask::new(
                 context,

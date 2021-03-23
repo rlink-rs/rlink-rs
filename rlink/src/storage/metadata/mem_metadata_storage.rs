@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 
-use crate::runtime::{ClusterDescriptor, HeartBeatStatus, TaskManagerStatus};
+use crate::runtime::{ClusterDescriptor, HeartbeatItem, TaskManagerStatus};
 use crate::storage::metadata::TMetadataStorage;
 use crate::utils;
 
@@ -61,11 +61,9 @@ impl TMetadataStorage for MemoryMetadataStorage {
 
     fn update_task_manager_status(
         &self,
-        heartbeat_status: HeartBeatStatus,
-        task_manager_id: &str,
-        task_manager_address: &str,
+        task_manager_id: String,
+        heartbeat_items: Vec<HeartbeatItem>,
         task_manager_status: TaskManagerStatus,
-        metrics_address: &str,
     ) -> anyhow::Result<()> {
         let mut update_success = false;
 
@@ -74,13 +72,34 @@ impl TMetadataStorage for MemoryMetadataStorage {
             .expect("METADATA_STORAGE lock failed");
         let mut job_descriptor: ClusterDescriptor = lock.clone().unwrap();
         for mut task_manager_descriptor in &mut job_descriptor.worker_managers {
-            if task_manager_descriptor.task_manager_id.eq(task_manager_id) {
-                task_manager_descriptor.task_manager_address = task_manager_address.to_string();
+            if task_manager_descriptor
+                .task_manager_id
+                .eq(task_manager_id.as_str())
+            {
                 task_manager_descriptor.task_status = task_manager_status;
-                task_manager_descriptor.latest_heart_beat_status = heartbeat_status;
                 task_manager_descriptor.latest_heart_beat_ts =
                     utils::date_time::current_timestamp_millis();
-                task_manager_descriptor.metrics_address = metrics_address.to_string();
+
+                for heartbeat_item in heartbeat_items {
+                    match heartbeat_item {
+                        HeartbeatItem::MetricsAddress(addr) => {
+                            task_manager_descriptor.metrics_address = addr;
+                        }
+                        HeartbeatItem::WorkerManagerAddress(addr) => {
+                            task_manager_descriptor.task_manager_address = addr;
+                        }
+                        HeartbeatItem::HeartBeatStatus(status) => {
+                            task_manager_descriptor.latest_heart_beat_status = status;
+                        }
+                        HeartbeatItem::TaskThreadId { task_id, thread_id } => {
+                            for task_descriptor in &mut task_manager_descriptor.task_descriptors {
+                                if task_descriptor.task_id.eq(&task_id) {
+                                    task_descriptor.thread_id = format!("0x{:x}", thread_id);
+                                }
+                            }
+                        }
+                    }
+                }
 
                 update_success = true;
                 break;

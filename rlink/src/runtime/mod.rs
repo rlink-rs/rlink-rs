@@ -89,6 +89,7 @@ pub struct TaskDescriptor {
     pub task_id: TaskId,
     pub operators: Vec<OperatorDescriptor>,
     pub input_split: InputSplit,
+    pub thread_id: String,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
@@ -176,6 +177,20 @@ impl ClusterDescriptor {
     pub fn to_string(&self) -> String {
         serde_json::to_string(self).unwrap()
     }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub enum HeartbeatItem {
+    WorkerManagerAddress(String),
+    MetricsAddress(String),
+    HeartBeatStatus(HeartBeatStatus),
+    TaskThreadId { task_id: TaskId, thread_id: u64 },
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub(crate) struct HeartbeatRequest {
+    pub task_manager_id: String,
+    pub change_items: Vec<HeartbeatItem>,
 }
 
 pub fn run<S>(stream_env: StreamExecutionEnvironment, stream_app: S) -> anyhow::Result<()>

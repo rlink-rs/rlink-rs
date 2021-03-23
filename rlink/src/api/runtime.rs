@@ -28,9 +28,13 @@ impl TaskId {
     pub fn num_tasks(&self) -> u16 {
         self.num_tasks
     }
+
+    pub fn is_default(&self) -> bool {
+        self.job_id.0 == 0 && self.task_number == 0 && self.num_tasks == 0
+    }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Default)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash, Default)]
 pub(crate) struct ChannelKey {
     pub(crate) source_task_id: TaskId,
     pub(crate) target_task_id: TaskId,

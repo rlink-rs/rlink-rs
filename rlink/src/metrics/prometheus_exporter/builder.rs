@@ -25,6 +25,8 @@ use crate::metrics::prometheus_exporter::common::InstallError;
 use crate::metrics::prometheus_exporter::common::Matcher;
 use crate::metrics::prometheus_exporter::distribution::DistributionBuilder;
 use crate::metrics::prometheus_exporter::recorder::{Inner, PrometheusRecorder};
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
 /// Builder for creating and installing a Prometheus recorder/exporter.
 pub struct PrometheusBuilder {
@@ -155,20 +157,24 @@ impl PrometheusBuilder {
     /// installing the recorder as the global recorder.
     // #[cfg(feature = "tokio-exporter")]
     pub fn install(self, with_proxy: bool) -> Result<(), InstallError> {
-        let runtime = runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()?;
+        let bind_notify = Arc::new(AtomicBool::new(false));
+        let running = Arc::new(AtomicBool::new(true));
 
-        let (recorder, exporter) = {
-            runtime.enter();
-            self.build_with_exporter(with_proxy)?
-        };
-        metrics::set_boxed_recorder(Box::new(recorder))?;
-
-        thread::Builder::new()
+        let bind_notify_c = bind_notify.clone();
+        let running_c = running.clone();
+        let n = thread::Builder::new()
             .name("metrics-exporter-prometheus-http".to_string())
             .spawn(move || {
-                runtime.block_on(async move {
+                let runtime = runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap();
+
+                let n: Result<(), InstallError> = runtime.block_on(async move {
+                    let (recorder, exporter) = self.build_with_exporter(with_proxy)?;
+                    metrics::set_boxed_recorder(Box::new(recorder))?;
+                    bind_notify_c.store(true, std::sync::atomic::Ordering::SeqCst);
+
                     pin!(exporter);
                     loop {
                         select! {
@@ -176,9 +182,20 @@ impl PrometheusBuilder {
                         }
                     }
                 });
+
+                running_c.store(false, std::sync::atomic::Ordering::SeqCst);
+                n
             })?;
 
-        Ok(())
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            if bind_notify.load(std::sync::atomic::Ordering::SeqCst) {
+                return Ok(());
+            }
+            if !running.load(std::sync::atomic::Ordering::SeqCst) {
+                return n.join().unwrap();
+            }
+        }
     }
 
     /// Builds the recorder and returns it.

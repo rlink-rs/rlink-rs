@@ -137,3 +137,211 @@ pub(crate) fn compute_gauge() {
         gauge!(name, val, &labels);
     }
 }
+
+//use std::collections::hash_map::Iter;
+// use std::collections::HashMap;
+//
+// pub struct SafeValue {
+//     v: AtomicI64,
+// }
+//
+// impl SafeValue {
+//     pub fn new() -> Self {
+//         SafeValue {
+//             v: AtomicI64::new(0),
+//         }
+//     }
+//
+//     #[inline]
+//     pub fn store(&self, v: i64) {
+//         self.v.store(v, std::sync::atomic::Ordering::Relaxed);
+//     }
+//
+//     #[inline]
+//     pub fn incr(&self, v: i64) {
+//         self.v.fetch_add(v, std::sync::atomic::Ordering::Relaxed);
+//     }
+//
+//     #[inline]
+//     pub fn load(&self) -> i64 {
+//         self.v.load(std::sync::atomic::Ordering::Relaxed)
+//     }
+// }
+//
+// pub struct UnSafeValue {
+//     v: i64,
+// }
+//
+// impl UnSafeValue {
+//     pub fn new() -> Self {
+//         UnSafeValue { v: 0 }
+//     }
+//
+//     #[inline]
+//     fn as_ptr(&self) -> *mut Self {
+//         self as *const UnSafeValue as *mut UnSafeValue
+//     }
+//
+//     #[inline]
+//     pub fn store(&self, v: i64) {
+//         let ptr = self.as_ptr();
+//         unsafe {
+//             (*ptr).v = v;
+//         }
+//     }
+//
+//     #[inline]
+//     pub fn incr(&self, v: i64) {
+//         let ptr = self.as_ptr();
+//         unsafe {
+//             (*ptr).v = (*ptr).v + v;
+//         }
+//     }
+//
+//     #[inline]
+//     pub fn load(&self) -> i64 {
+//         self.v
+//     }
+// }
+//
+// pub struct Metric {
+//     name: String,
+//     tags: Vec<Tag>,
+//     value: Arc<UnSafeValue>,
+// }
+//
+// pub struct Recorder {
+//     raw: Arc<RwLock<RecorderRaw>>,
+// }
+//
+// impl Recorder {
+//     pub fn new() -> Self {
+//         Recorder {
+//             raw: Arc::new(RwLock::new(RecorderRaw::new())),
+//         }
+//     }
+//
+//     pub fn register_counter(&mut self, name: &str, tags: Vec<Tag>) -> Arc<UnSafeValue> {
+//         let mut guard = self.raw.write().unwrap();
+//         guard.register_counter(name, tags)
+//     }
+//
+//     pub fn register_guava(&mut self, name: &str, tags: Vec<Tag>) -> Arc<UnSafeValue> {
+//         let mut guard = self.raw.write().unwrap();
+//         guard.register_guava(name, tags)
+//     }
+//
+//     pub fn export(&self, mut exporter: Box<dyn Exporter>) {
+//         let guard = self.raw.write().unwrap();
+//         exporter.render_counters(guard.counters());
+//         exporter.render_guavas(guard.guavas());
+//     }
+// }
+//
+// pub struct RecorderRaw {
+//     counter: HashMap<String, Vec<Metric>>,
+//     guava: HashMap<String, Vec<Metric>>,
+// }
+//
+// impl RecorderRaw {
+//     pub fn new() -> Self {
+//         RecorderRaw {
+//             counter: HashMap::new(),
+//             guava: HashMap::new(),
+//         }
+//     }
+//
+//     pub fn register_counter(&mut self, name: &str, tags: Vec<Tag>) -> Arc<UnSafeValue> {
+//         let value = Arc::new(UnSafeValue::new());
+//         let metric = Metric {
+//             name: name.to_string(),
+//             tags,
+//             value: value.clone(),
+//         };
+//
+//         self.counter
+//             .entry(name.to_string())
+//             .or_insert(Vec::new())
+//             .push(metric);
+//
+//         value
+//     }
+//
+//     pub fn register_guava(&mut self, name: &str, tags: Vec<Tag>) -> Arc<UnSafeValue> {
+//         let value = Arc::new(UnSafeValue::new());
+//         let metric = Metric {
+//             name: name.to_string(),
+//             tags,
+//             value: value.clone(),
+//         };
+//
+//         self.guava
+//             .entry(name.to_string())
+//             .or_insert(Vec::new())
+//             .push(metric);
+//
+//         value
+//     }
+//
+//     pub fn counters(&self) -> Iter<String, Vec<Metric>> {
+//         self.counter.iter()
+//     }
+//
+//     pub fn guavas(&self) -> Iter<String, Vec<Metric>> {
+//         self.guava.iter()
+//     }
+// }
+//
+// pub trait Exporter {
+//     fn render_counters(&mut self, counters: Iter<String, Vec<Metric>>);
+//     fn render_guavas(&mut self, guavas: Iter<String, Vec<Metric>>);
+// }
+//
+// #[cfg(test)]
+// mod tests {
+//     use crate::metrics::global_metrics::{SafeValue, UnSafeValue};
+//     use crate::utils::date_time::current_timestamp;
+//     use std::sync::Arc;
+//
+//     #[test]
+//     pub fn value_test() {
+//         let value = Arc::new(UnSafeValue::new());
+//
+//         let value_c = value.clone();
+//         let join_handle = std::thread::spawn(move || {
+//             value_c.incr(1);
+//         });
+//
+//         join_handle.join().unwrap();
+//
+//         assert_eq!(value.load(), 1);
+//     }
+//
+//     #[test]
+//     pub fn value1_test() {
+//         let loops = 10000000;
+//         let value = SafeValue::new();
+//         let begin = current_timestamp();
+//         for n in 0..loops {
+//             value.incr(n);
+//         }
+//         let end = current_timestamp();
+//         println!("{}", end.checked_sub(begin).unwrap().as_nanos());
+//
+//         let value = UnSafeValue::new();
+//         let begin = current_timestamp();
+//         for n in 0..loops {
+//             value.incr(n);
+//         }
+//         let end = current_timestamp();
+//         println!("{}", end.checked_sub(begin).unwrap().as_nanos());
+//
+//         let mut _value = 0;
+//         let begin = current_timestamp();
+//         for n in 0..loops {
+//             _value += n;
+//         }
+//         let end = current_timestamp();
+//         println!("{}", end.checked_sub(begin).unwrap().as_nanos());
+//     }
+// }

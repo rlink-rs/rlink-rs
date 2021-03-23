@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use crate::api::cluster::MetadataStorageType;
-use crate::runtime::{ClusterDescriptor, HeartBeatStatus, TaskManagerStatus};
+use crate::runtime::{ClusterDescriptor, HeartbeatItem, TaskManagerStatus};
 use crate::storage::metadata::mem_metadata_storage::MemoryMetadataStorage;
 
 pub mod mem_metadata_storage;
@@ -19,11 +19,9 @@ pub trait TMetadataStorage: Debug {
     ) -> anyhow::Result<()>;
     fn update_task_manager_status(
         &self,
-        heartbeat_status: HeartBeatStatus,
-        task_manager_id: &str,
-        task_manager_address: &str,
+        task_manager_id: String,
+        heartbeat_items: Vec<HeartbeatItem>,
         task_manager_status: TaskManagerStatus,
-        metrics_address: &str,
     ) -> anyhow::Result<()>;
 }
 
@@ -75,19 +73,15 @@ impl TMetadataStorage for MetadataStorage {
 
     fn update_task_manager_status(
         &self,
-        heartbeat_status: HeartBeatStatus,
-        task_manager_id: &str,
-        task_manager_address: &str,
+        task_manager_id: String,
+        heartbeat_items: Vec<HeartbeatItem>,
         task_manager_status: TaskManagerStatus,
-        metrics_address: &str,
     ) -> anyhow::Result<()> {
         match self {
             MetadataStorage::MemoryMetadataStorage(storage) => storage.update_task_manager_status(
-                heartbeat_status,
                 task_manager_id,
-                task_manager_address,
+                heartbeat_items,
                 task_manager_status,
-                metrics_address,
             ),
         }
     }
