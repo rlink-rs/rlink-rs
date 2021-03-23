@@ -11,12 +11,12 @@ impl CoProcessFunction for MyCoProcessFunction {
         Ok(())
     }
 
-    fn process_left(&self, record: Record) -> Box<dyn Iterator<Item = Record>> {
+    fn process_left(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>> {
         Box::new(vec![record].into_iter())
     }
 
     fn process_right(
-        &self,
+        &mut self,
         stream_seq: usize,
         mut record: Record,
     ) -> Box<dyn Iterator<Item = Record>> {

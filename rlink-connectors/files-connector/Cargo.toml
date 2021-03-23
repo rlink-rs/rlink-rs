@@ -13,9 +13,11 @@ name = "rlink_files_connector"
 
 [dependencies.rlink]
 version = "0.2.3"
+path = "../../rlink"
 
 [dependencies.rlink-derive]
 version = "0.2.3"
+path = "../../rlink-derive"
 
 [dependencies]
 log = "0.4"
