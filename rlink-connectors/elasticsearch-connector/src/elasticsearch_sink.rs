@@ -97,7 +97,7 @@ impl OutputFormat for ElasticsearchOutputFormat {
 
         let convert = self.builder.clone();
         utils::thread::spawn("elastic-sink-block", move || {
-            async_runtime().block_on(async {
+            async_runtime("es_sink").block_on(async {
                 write_thead.run(convert, 5).await;
             });
         });

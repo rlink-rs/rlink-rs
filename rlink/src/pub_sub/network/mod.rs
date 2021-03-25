@@ -23,7 +23,7 @@ pub struct ElementRequest {
 impl Into<BytesMut> for ElementRequest {
     fn into(self) -> BytesMut {
         let mut buffer = BytesMut::with_capacity(4 + BODY_LEN);
-        buffer.put_u32(18); // (4 + 2 + 2) + (4 + 2 + 2) + 2
+        buffer.put_u32(BODY_LEN as u32); // (4 + 2 + 2) + (4 + 2 + 2) + 2
         buffer.put_u32(self.channel_key.source_task_id.job_id.0);
         buffer.put_u16(self.channel_key.source_task_id.task_number);
         buffer.put_u16(self.channel_key.source_task_id.num_tasks);

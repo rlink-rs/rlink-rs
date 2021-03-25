@@ -74,7 +74,7 @@ fn subscribe_post(channel_key: ChannelKey, sender: ElementSender) {
 }
 
 pub(crate) fn run_subscribe(cluster_descriptor: Arc<ClusterDescriptor>) {
-    async_runtime().block_on(subscribe_listen(cluster_descriptor));
+    async_runtime("client").block_on(subscribe_listen(cluster_descriptor));
     info!("network subscribe task stop");
 }
 

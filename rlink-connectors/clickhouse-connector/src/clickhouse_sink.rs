@@ -83,7 +83,7 @@ impl OutputFormat for ClickhouseSink {
         );
         let tasks = self.tasks;
         utils::thread::spawn("clickhouse-sink-block", move || {
-            async_runtime().block_on(async {
+            async_runtime("ck_sink").block_on(async {
                 task.run(tasks).await;
             });
         });

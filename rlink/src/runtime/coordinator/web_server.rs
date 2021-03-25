@@ -35,7 +35,7 @@ pub(crate) fn web_launch(
     std::thread::Builder::new()
         .name("WebUI".to_string())
         .spawn(move || {
-            async_runtime_multi(4).block_on(async move {
+            async_runtime_multi("web", 4).block_on(async move {
                 let ip = context.bind_ip.clone();
                 let web_context = Arc::new(WebContext {
                     context,
