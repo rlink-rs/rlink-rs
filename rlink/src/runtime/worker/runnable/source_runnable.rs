@@ -523,7 +523,7 @@ impl StatusAlignmentManager {
                 StatusAlignment::Watermark(watermark_manager) => watermark_manager
                     .elements()
                     .iter()
-                    .filter(|w| !w.is_min())
+                    // .filter(|w| !w.is_min())
                     .min_by_key(|w| w.timestamp),
             })
             .min_by_key(|w| w.timestamp)
