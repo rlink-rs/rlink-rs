@@ -5,6 +5,7 @@ use crate::api::cluster::StdResponse;
 use crate::channel::{bounded, Receiver, Sender, TryRecvError, TrySendError};
 use crate::utils::date_time;
 use crate::utils::http::client::post;
+use crate::utils::thread::async_sleep;
 
 pub struct CheckpointChannel {
     sender: Sender<Checkpoint>,
@@ -44,7 +45,7 @@ pub(crate) async fn start_report_checkpoint(coordinator_address: String) {
                 report_checkpoint(coordinator_address.as_str(), ck).await;
             }
             Err(TryRecvError::Empty) => {
-                tokio::time::sleep(Duration::from_secs(2)).await;
+                async_sleep(Duration::from_secs(2)).await;
             }
             Err(TryRecvError::Disconnected) => {
                 panic!("the Checkpoint channel is disconnected")

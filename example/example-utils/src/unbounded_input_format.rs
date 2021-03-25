@@ -45,7 +45,7 @@ impl Iterator for RandIterator {
     type Item = Record;
 
     fn next(&mut self) -> Option<Self::Item> {
-        std::thread::sleep(Duration::from_secs(20));
+        std::thread::sleep(Duration::from_millis(10));
 
         let mut thread_rng = rand::thread_rng();
         let v = thread_rng.gen_range(0i32, 100i32) as i64;

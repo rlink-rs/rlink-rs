@@ -4,6 +4,7 @@ use crate::api::cluster::StdResponse;
 use crate::channel::{unbounded, Receiver, Sender, TrySendError};
 use crate::runtime::{HeartBeatStatus, HeartbeatItem, HeartbeatRequest};
 use crate::utils::http::client::post;
+use crate::utils::thread::async_sleep;
 use crate::utils::{date_time, panic};
 
 pub struct HeartbeatChannel {
@@ -55,7 +56,7 @@ pub(crate) async fn start_heartbeat_timer(coordinator_address: String, task_mana
         )
         .await;
 
-        tokio::time::sleep(Duration::from_secs(10)).await;
+        async_sleep(Duration::from_secs(10)).await;
     }
 }
 
