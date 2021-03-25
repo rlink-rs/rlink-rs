@@ -185,16 +185,30 @@ impl Client {
         addr: SocketAddr,
         batch_pull_size: u16,
     ) -> anyhow::Result<Self> {
-        match TcpStream::connect(addr).await {
-            Ok(stream) => Ok(Client {
-                channel_key,
-                sender,
-                addr,
-                batch_pull_size,
-                stream,
-            }),
-            Err(e) => Err(anyhow!(e)),
-        }
+        let std_stream = std::net::TcpStream::connect(addr)?;
+        std_stream.set_nonblocking(true)?;
+        std_stream.set_read_timeout(Some(Duration::from_secs(15)))?;
+        std_stream.set_write_timeout(Some(Duration::from_secs(15)))?;
+
+        let stream = TcpStream::from_std(std_stream)?;
+
+        Ok(Client {
+            channel_key,
+            sender,
+            addr,
+            batch_pull_size,
+            stream,
+        })
+        // match TcpStream::connect(addr).await {
+        //     Ok(stream) => Ok(Client {
+        //         channel_key,
+        //         sender,
+        //         addr,
+        //         batch_pull_size,
+        //         stream,
+        //     }),
+        //     Err(e) => Err(anyhow!(e)),
+        // }
     }
 
     pub async fn send(&mut self) -> anyhow::Result<()> {
@@ -365,5 +379,41 @@ fn frame_parse(mut data: BytesMut) -> (ResponseCode, Option<Element>) {
         (code, Some(Element::deserialize(data.borrow_mut())))
     } else {
         (code, None)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::api::element::Element;
+    use crate::api::runtime::{ChannelKey, JobId, TaskId};
+    use crate::channel::named_channel;
+    use crate::pub_sub::network::client::Client;
+
+    #[tokio::test]
+    pub async fn client_test() {
+        let channel_key = ChannelKey {
+            source_task_id: TaskId {
+                job_id: JobId(0),
+                task_number: 5,
+                num_tasks: 30,
+            },
+            target_task_id: TaskId {
+                job_id: JobId(4),
+                task_number: 14,
+                num_tasks: 30,
+            },
+        };
+        let (sender, receiver) = named_channel::<Element>("test", vec![], 10000);
+        std::thread::spawn(move || {
+            while let Ok(v) = receiver.recv() {
+                println!("{:?}", v);
+            }
+        });
+
+        let addr = "10.100.189.45:28820".parse().unwrap();
+
+        let mut client = Client::new(channel_key, sender, addr, 100).await.unwrap();
+        client.send().await.unwrap();
+        client.close().await.unwrap();
     }
 }
