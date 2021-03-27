@@ -180,8 +180,8 @@ impl Client {
     ) -> anyhow::Result<Self> {
         let std_stream = std::net::TcpStream::connect(addr)?;
         std_stream.set_nonblocking(true)?;
-        std_stream.set_read_timeout(Some(Duration::from_secs(15)))?;
-        std_stream.set_write_timeout(Some(Duration::from_secs(15)))?;
+        std_stream.set_read_timeout(Some(Duration::from_secs(20)))?;
+        std_stream.set_write_timeout(Some(Duration::from_secs(20)))?;
 
         let stream = TcpStream::from_std(std_stream)?;
 
