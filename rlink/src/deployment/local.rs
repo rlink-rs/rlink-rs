@@ -66,7 +66,7 @@ impl TResourceManager for LocalResourceManager {
                     match cluster::run_task(Arc::new(context_clone), stream_env, stream_app_clone) {
                         Ok(_) => {}
                         Err(e) => {
-                            panic!(format!("TaskManager error. {}", e))
+                            panic!("TaskManager error. {}", e)
                         }
                     }
                 })

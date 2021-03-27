@@ -163,7 +163,7 @@ impl YarnCliCommand {
                                 }
                             }
                             Err(e) => {
-                                panic!(format!("stdin recv error. {}", e));
+                                panic!("stdin recv error. {}", e);
                             }
                         }
                     }
