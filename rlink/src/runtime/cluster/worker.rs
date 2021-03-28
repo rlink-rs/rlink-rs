@@ -12,6 +12,7 @@ use crate::runtime::context::Context;
 use crate::runtime::timer::{start_window_timer, WindowTimer};
 use crate::runtime::worker::checkpoint::start_report_checkpoint;
 use crate::runtime::worker::heart_beat::{start_heartbeat_timer, submit_heartbeat};
+use crate::runtime::worker::web_server::web_launch;
 use crate::runtime::{
     worker, ClusterDescriptor, HeartBeatStatus, HeartbeatItem, TaskManagerStatus,
     WorkerManagerDescriptor,
@@ -35,6 +36,9 @@ where
 
     let server_addr = bootstrap_publish_serve(context.bind_ip.to_string());
     info!("bootstrap publish server, listen: {}", server_addr);
+
+    let web_address = web_serve(context.clone());
+    info!("serve worker web ui {}", web_address);
 
     start_timing_task(&cluster_descriptor, context.deref(), server_addr);
     info!("start timing task");
@@ -102,6 +106,12 @@ fn bootstrap_subscribe_client(cluster_descriptor: Arc<ClusterDescriptor>) {
     utils::thread::spawn("subscribe_client", move || {
         network::run_subscribe(cluster_descriptor)
     });
+}
+
+fn web_serve(context: Arc<Context>) -> String {
+    let address = web_launch(context);
+    submit_heartbeat(HeartbeatItem::WorkerManagerWebAddress(address.clone()));
+    address
 }
 
 fn start_timing_task(

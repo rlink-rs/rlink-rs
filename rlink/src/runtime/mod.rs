@@ -140,6 +140,7 @@ pub struct WorkerManagerDescriptor {
     pub task_manager_id: String,
     pub task_manager_address: String,
     pub metrics_address: String,
+    pub web_address: String,
     pub cpu_cores: u32,
     pub physical_memory: u32,
     /// job tasks map: <job_id, Vec<TaskDescriptor>>
@@ -151,7 +152,9 @@ pub struct CoordinatorManagerDescriptor {
     pub application_id: String,
     pub application_name: String,
     pub application_properties: Properties,
+    // todo rename to web_address
     pub coordinator_address: String,
+    pub metrics_address: String,
     pub coordinator_status: TaskManagerStatus,
 }
 
@@ -182,6 +185,7 @@ impl ClusterDescriptor {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum HeartbeatItem {
     WorkerManagerAddress(String),
+    WorkerManagerWebAddress(String),
     MetricsAddress(String),
     HeartBeatStatus(HeartBeatStatus),
     TaskThreadId { task_id: TaskId, thread_id: u64 },

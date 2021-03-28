@@ -48,6 +48,7 @@ pub(crate) fn build_cluster_descriptor(
             task_manager_id: task_manager_instance.worker_manager_id.clone(),
             task_manager_address: "".to_string(),
             metrics_address: "".to_string(),
+            web_address: "".to_string(),
             cpu_cores: 0,
             physical_memory: 0,
             task_descriptors,
@@ -60,6 +61,7 @@ pub(crate) fn build_cluster_descriptor(
         application_name: job_name.to_string(),
         application_properties: application_properties.clone(),
         coordinator_address: "".to_string(),
+        metrics_address: context.metric_addr.clone(),
         coordinator_status: TaskManagerStatus::Pending,
     };
 

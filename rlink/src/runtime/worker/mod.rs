@@ -23,6 +23,7 @@ use crate::runtime::{ClusterDescriptor, HeartbeatItem, TaskDescriptor};
 pub mod checkpoint;
 pub mod heart_beat;
 pub mod runnable;
+pub mod web_server;
 
 pub(crate) type FunctionContext = crate::api::function::Context;
 
