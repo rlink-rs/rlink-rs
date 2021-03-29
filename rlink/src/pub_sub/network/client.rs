@@ -347,6 +347,10 @@ impl Client {
                     return Ok(());
                 }
                 Err(TrySendError::Full(ele)) => {
+                    if is_enable_log() {
+                        error!("net input channel block");
+                    }
+
                     if loops == 60 {
                         error!("net input channel block and try with 60 times");
                         loops = 0;
