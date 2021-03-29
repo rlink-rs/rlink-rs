@@ -1,5 +1,12 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+
+fn gen_thread_name(thread_name: &'static str) -> String {
+    let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+    format!("A-{}-{}", thread_name, id)
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize)]
 pub(crate) struct ThreadInfo {
     thread_id: String,
@@ -51,11 +58,7 @@ where
 pub fn async_runtime(thread_name: &'static str) -> tokio::runtime::Runtime {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
-        .thread_name_fn(move || {
-            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
-            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-            format!("A-{}-{}", thread_name, id)
-        })
+        .thread_name_fn(move || gen_thread_name(thread_name))
         .on_thread_start(|| {
             set_thread_info(ThreadInfo::current());
         })
@@ -66,11 +69,7 @@ pub fn async_runtime(thread_name: &'static str) -> tokio::runtime::Runtime {
 pub fn async_runtime_multi(thread_name: &'static str, threads: usize) -> tokio::runtime::Runtime {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
-        .thread_name_fn(move || {
-            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
-            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-            format!("A-{}-{}", thread_name, id)
-        })
+        .thread_name_fn(move || gen_thread_name(thread_name))
         .on_thread_start(|| {
             set_thread_info(ThreadInfo::current());
         })

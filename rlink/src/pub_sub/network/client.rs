@@ -25,7 +25,7 @@ use crate::channel::{
 use crate::metrics::{register_counter, Tag};
 use crate::pub_sub::network::{ElementRequest, ResponseCode};
 use crate::runtime::ClusterDescriptor;
-use crate::utils::thread::{async_runtime, async_sleep};
+use crate::utils::thread::{async_runtime_multi, async_sleep};
 
 pub(crate) static ENABLE_LOG: AtomicBool = AtomicBool::new(false);
 
@@ -91,7 +91,7 @@ fn subscribe_post(channel_key: ChannelKey, sender: ElementSender) {
 }
 
 pub(crate) fn run_subscribe(cluster_descriptor: Arc<ClusterDescriptor>) {
-    async_runtime("client").block_on(subscribe_listen(cluster_descriptor));
+    async_runtime_multi("client", 4).block_on(subscribe_listen(cluster_descriptor));
     info!("network subscribe task stop");
 }
 
@@ -305,17 +305,23 @@ impl Client {
                 }
                 ResponseCode::BatchFinish => {
                     if n != batch_size {
-                        error!("inconsistent response and request")
+                        error!(
+                            "inconsistent response and request, channel: {:?}",
+                            channel_key
+                        );
                     }
                     if is_enable_log() {
-                        info!("batch finish");
+                        info!("batch finish, channel: {:?}", channel_key);
                     }
                     return Ok(true);
                 }
                 ResponseCode::Empty => {
                     async_sleep(Duration::from_secs(1)).await;
                     if is_enable_log() {
-                        info!("recv `Empty` code from remoting, total recv size {}", n);
+                        info!(
+                            "recv `Empty` code from remoting, total recv size {}, channel: {:?}",
+                            n, channel_key
+                        );
                     }
 
                     return Ok(true);
@@ -348,7 +354,7 @@ impl Client {
                 }
                 Err(TrySendError::Full(ele)) => {
                     if is_enable_log() {
-                        error!("net input channel block");
+                        error!("net input channel block, channel: {:?}", ele);
                     }
 
                     if loops == 60 {
