@@ -254,6 +254,7 @@ impl Client {
                 &counter,
                 &self.sender,
                 self.channel_key,
+                self.batch_pull_size,
             )
             .await?;
             if !can_continue {
@@ -267,8 +268,9 @@ impl Client {
         counter: &Arc<AtomicU64>,
         sender: &ElementSender,
         channel_key: ChannelKey,
+        batch_size: u16,
     ) -> anyhow::Result<bool> {
-        loop {
+        for n in 0..batch_size + 1 {
             let message = codec_framed
                 .next()
                 .await
@@ -302,6 +304,9 @@ impl Client {
                     }
                 }
                 ResponseCode::BatchFinish => {
+                    if n != batch_size {
+                        error!("inconsistent response and request")
+                    }
                     if is_enable_log() {
                         info!("batch finish");
                     }
@@ -310,22 +315,27 @@ impl Client {
                 ResponseCode::Empty => {
                     async_sleep(Duration::from_secs(1)).await;
                     if is_enable_log() {
-                        info!("no rows in remote");
+                        info!("recv `Empty` code from remoting, total recv size {}", n);
                     }
 
                     return Ok(true);
                 }
                 ResponseCode::NoService => {
                     warn!(
-                        "remote no service. unreachable! after an end flag, the client has close"
+                        "remoting no service. unreachable! after an end flag, the client has close"
                     );
                     return Ok(false);
                 }
                 _ => {
-                    return Err(anyhow!("unrecognized remote code {:?}", response_code));
+                    return Err(anyhow!("unrecognized remoting code {:?}", response_code));
                 }
             }
         }
+
+        // Err(anyhow!(
+        //     "unreachable, should be interrupted at `Empty` or `BatchFinish` code"
+        // ))
+        unreachable!()
     }
 
     async fn send_to_channel(element: Element, sender: &ElementSender) -> anyhow::Result<()> {
