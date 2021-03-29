@@ -242,7 +242,7 @@ impl Server {
 
                 match get_network_channel(&channel_key) {
                     Some(receiver) => {
-                        for _ in 0..batch_pull_size {
+                        for n in 0..batch_pull_size {
                             match receiver.try_recv() {
                                 Ok(element) => {
                                     self.send(ResponseCode::Ok, Some(element), framed_read)
@@ -250,7 +250,10 @@ impl Server {
                                 }
                                 Err(TryRecvError::Empty) => {
                                     if is_enable_log() {
-                                        info!("try recv empty, channel_key: {:?}", channel_key);
+                                        info!(
+                                            "try recv empty, total recv size {}, channel_key: {:?}",
+                                            n, channel_key
+                                        );
                                     }
                                     return self.send(ResponseCode::Empty, None, framed_read).await;
                                 }
