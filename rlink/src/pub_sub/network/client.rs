@@ -1,8 +1,8 @@
 use std::borrow::BorrowMut;
 use std::net::SocketAddr;
 use std::str::FromStr;
-use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -26,6 +26,23 @@ use crate::metrics::{register_counter, Tag};
 use crate::pub_sub::network::{ElementRequest, ResponseCode};
 use crate::runtime::ClusterDescriptor;
 use crate::utils::thread::{async_runtime, async_sleep};
+
+pub(crate) static ENABLE_LOG: AtomicBool = AtomicBool::new(false);
+
+#[inline]
+fn is_enable_log() -> bool {
+    ENABLE_LOG.load(Ordering::Relaxed)
+}
+
+#[inline]
+pub(crate) fn enable_log() {
+    ENABLE_LOG.store(true, Ordering::Relaxed)
+}
+
+#[inline]
+pub(crate) fn disable_log() {
+    ENABLE_LOG.store(false, Ordering::Relaxed)
+}
 
 const BATCH_PULL_SIZE: u16 = 6000;
 
@@ -285,12 +302,16 @@ impl Client {
                     }
                 }
                 ResponseCode::BatchFinish => {
-                    // info!("batch finish");
+                    if is_enable_log() {
+                        info!("batch finish");
+                    }
                     return Ok(true);
                 }
                 ResponseCode::Empty => {
                     async_sleep(Duration::from_secs(1)).await;
-                    debug!("no rows in remote");
+                    if is_enable_log() {
+                        info!("no rows in remote");
+                    }
 
                     return Ok(true);
                 }

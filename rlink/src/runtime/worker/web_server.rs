@@ -12,6 +12,7 @@ use rand::Rng;
 
 use crate::api::cluster::StdResponse;
 use crate::channel::{bounded, Sender};
+use crate::pub_sub::network::client::{disable_log, enable_log};
 use crate::utils::fs::read_file;
 use crate::utils::http::server::{as_ok_json, page_not_found};
 use crate::utils::thread::async_runtime_multi;
@@ -96,6 +97,8 @@ async fn route(req: Request<Body>, web_context: Arc<WebContext>) -> anyhow::Resu
         if Method::GET.eq(method) {
             match path {
                 "/api/threads" => get_thread_infos(req, web_context).await,
+                "/api/client/log/enable" => enable_client_log(req, web_context).await,
+                "/api/client/log/disable" => disable_client_log(req, web_context).await,
                 _ => page_not_found().await,
             }
         } else {
@@ -108,6 +111,22 @@ async fn route(req: Request<Body>, web_context: Arc<WebContext>) -> anyhow::Resu
             page_not_found().await
         }
     }
+}
+
+async fn enable_client_log(
+    _req: Request<Body>,
+    _context: Arc<WebContext>,
+) -> anyhow::Result<Response<Body>> {
+    enable_log();
+    as_ok_json(&StdResponse::ok(Some(true)))
+}
+
+async fn disable_client_log(
+    _req: Request<Body>,
+    _context: Arc<WebContext>,
+) -> anyhow::Result<Response<Body>> {
+    disable_log();
+    as_ok_json(&StdResponse::ok(Some(false)))
 }
 
 async fn get_thread_infos(
