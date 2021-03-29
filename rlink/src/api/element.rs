@@ -539,6 +539,21 @@ impl Element {
             _ => panic!("Element is not Barrier"),
         }
     }
+
+    pub(crate) fn set_channel_key(&mut self, channel_key: ChannelKey) {
+        match self {
+            Element::Record(record) => {
+                record.channel_key = channel_key;
+            }
+            Element::Watermark(watermark) => {
+                watermark.channel_key = channel_key;
+            }
+            Element::StreamStatus(stream_status) => {
+                stream_status.channel_key = channel_key;
+            }
+            _ => {}
+        }
+    }
 }
 
 impl Partition for Element {

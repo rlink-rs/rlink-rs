@@ -213,8 +213,10 @@ impl Client {
 
     pub async fn send(&mut self) -> anyhow::Result<()> {
         info!(
-            "Pull remote={}, channel_key={:?}",
-            self.addr, self.channel_key
+            "Pull remote={}, local={}, channel_key={:?}",
+            self.addr,
+            self.stream.local_addr().unwrap(),
+            self.channel_key,
         );
 
         let (r, w) = self.stream.split();
@@ -353,9 +355,9 @@ impl Client {
                     return Ok(());
                 }
                 Err(TrySendError::Full(ele)) => {
-                    if is_enable_log() {
-                        error!("net input channel block, channel: {:?}", ele);
-                    }
+                    // if is_enable_log() {
+                    error!("> net input channel block, channel: {:?}", ele);
+                    // }
 
                     if loops == 60 {
                         error!("net input channel block and try with 60 times");
@@ -364,6 +366,8 @@ impl Client {
                     loops += 1;
 
                     async_sleep(Duration::from_secs(1)).await;
+                    error!("< net input channel block, channel: {:?}", ele);
+
                     ele
                 }
                 Err(TrySendError::Disconnected(_)) => {
