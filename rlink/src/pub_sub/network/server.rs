@@ -2,6 +2,7 @@ use std::borrow::BorrowMut;
 use std::convert::TryFrom;
 use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use bytes::{BufMut, BytesMut};
@@ -20,6 +21,23 @@ use crate::channel::{named_channel_with_base, ElementReceiver, ElementSender, Tr
 use crate::metrics::Tag;
 use crate::pub_sub::network::{ElementRequest, ResponseCode};
 use crate::utils::thread::{async_runtime, async_runtime_single};
+
+pub(crate) static ENABLE_LOG: AtomicBool = AtomicBool::new(false);
+
+#[inline]
+fn is_enable_log() -> bool {
+    ENABLE_LOG.load(Ordering::Relaxed)
+}
+
+#[inline]
+pub(crate) fn enable_log() {
+    ENABLE_LOG.store(true, Ordering::Relaxed)
+}
+
+#[inline]
+pub(crate) fn disable_log() {
+    ENABLE_LOG.store(false, Ordering::Relaxed)
+}
 
 lazy_static! {
     static ref NETWORK_CHANNELS: DashMap<ChannelKey, ElementReceiver> = DashMap::new();
@@ -218,6 +236,10 @@ impl Server {
                     batch_pull_size,
                 } = request;
 
+                if is_enable_log() {
+                    info!("recv request, channel_key: {:?}", channel_key);
+                }
+
                 match get_network_channel(&channel_key) {
                     Some(receiver) => {
                         for _ in 0..batch_pull_size {
@@ -227,7 +249,9 @@ impl Server {
                                         .await?
                                 }
                                 Err(TryRecvError::Empty) => {
-                                    debug!("try recv channel_key({:?}) empty", channel_key);
+                                    if is_enable_log() {
+                                        info!("try recv empty, channel_key: {:?}", channel_key);
+                                    }
                                     return self.send(ResponseCode::Empty, None, framed_read).await;
                                 }
                                 Err(TryRecvError::Disconnected) => {
@@ -238,6 +262,9 @@ impl Server {
                                         .await;
                                 }
                             }
+                        }
+                        if is_enable_log() {
+                            info!("send `BatchFinish` code, channel_key: {:?}", channel_key);
                         }
                         self.send(ResponseCode::BatchFinish, None, framed_read)
                             .await
