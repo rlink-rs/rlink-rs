@@ -1,5 +1,6 @@
 use std::borrow::BorrowMut;
 use std::collections::LinkedList;
+use std::convert::TryFrom;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::atomic::Ordering;
@@ -7,7 +8,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
 use std::time::Duration;
 
-use bytes::{Buf, BytesMut};
+use bytes::BytesMut;
 use futures::{SinkExt, StreamExt};
 use tokio::io::AsyncWriteExt;
 use tokio::net::tcp::ReadHalf;
@@ -16,7 +17,7 @@ use tokio_util::codec::FramedRead;
 use tokio_util::codec::LengthDelimitedCodec;
 use tokio_util::codec::{BytesCodec, FramedWrite};
 
-use crate::api::element::{Element, Serde};
+use crate::api::element::Element;
 use crate::api::properties::ChannelBaseOn;
 use crate::api::runtime::{ChannelKey, TaskId};
 use crate::channel::{
@@ -24,7 +25,7 @@ use crate::channel::{
     TryRecvError, TrySendError,
 };
 use crate::metrics::{register_counter, Tag};
-use crate::pub_sub::network::{ElementRequest, ResponseCode};
+use crate::pub_sub::network::{ElementRequest, ElementResponse, ResponseCode};
 use crate::runtime::ClusterDescriptor;
 use crate::utils::thread::{async_runtime_multi, async_sleep};
 
@@ -187,6 +188,7 @@ pub(crate) struct Client {
     pub(crate) addr: SocketAddr,
     batch_pull_size: u16,
     stream: TcpStream,
+    tcp_frame_max_size: u32,
 }
 
 impl Client {
@@ -209,6 +211,7 @@ impl Client {
             addr,
             batch_pull_size,
             stream,
+            tcp_frame_max_size: 1024 * 1024,
         })
     }
 
@@ -225,7 +228,12 @@ impl Client {
 
         let mut codec_framed: FramedRead<ReadHalf, LengthDelimitedCodec> =
             LengthDelimitedCodec::builder()
+                .length_field_offset(0)
                 .length_field_length(4)
+                .length_adjustment(4) // 数据体截取位置，应和num_skip配置使用，保证frame要全部被读取
+                .num_skip(0)
+                .max_frame_length(self.tcp_frame_max_size as usize)
+                .big_endian()
                 .new_read(read_half);
 
         let tags = vec![
@@ -296,10 +304,12 @@ impl Client {
                 .next()
                 .await
                 .ok_or(anyhow!("framed read nothing"))?;
+
             let bytes = message.map_err(|e| anyhow!("framed read error {}", e))?;
 
-            let (response_code, element) = frame_parse(bytes);
-            match response_code {
+            let ElementResponse { code, element } = ElementResponse::try_from(bytes)?;
+
+            match code {
                 ResponseCode::Ok => {
                     let mut element = element.unwrap();
 
@@ -334,7 +344,7 @@ impl Client {
                     ));
                 }
                 _ => {
-                    return Err(anyhow!("unrecognized remoting code {:?}", response_code));
+                    return Err(anyhow!("unrecognized remoting code {:?}", code));
                 }
             }
         }
@@ -392,17 +402,17 @@ impl Client {
         }
     }
 }
-
-fn frame_parse(mut data: BytesMut) -> (ResponseCode, Option<Element>) {
-    data.advance(4); // skip header length
-    let code = data.get_u8();
-    let code = ResponseCode::from(code);
-    if code == ResponseCode::Ok {
-        (code, Some(Element::deserialize(data.borrow_mut())))
-    } else {
-        (code, None)
-    }
-}
+//
+// fn frame_parse(mut data: BytesMut) -> (ResponseCode, Option<Element>) {
+//     data.advance(4); // skip header length
+//     let code = data.get_u8();
+//     let code = ResponseCode::from(code);
+//     if code == ResponseCode::Ok {
+//         (code, Some(Element::deserialize(data.borrow_mut())))
+//     } else {
+//         (code, None)
+//     }
+// }
 
 #[cfg(test)]
 mod tests {

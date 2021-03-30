@@ -1,7 +1,9 @@
+use std::borrow::BorrowMut;
 use std::convert::TryFrom;
 
 use bytes::{Buf, BufMut, BytesMut};
 
+use crate::api::element::{Element, Serde};
 use crate::api::runtime::{ChannelKey, JobId, TaskId};
 
 pub(crate) mod client;
@@ -118,6 +120,20 @@ impl From<u8> for ResponseCode {
     }
 }
 
+// impl TryFrom<u8> for ResponseCode {
+//     type Error = anyhow::Error;
+//
+//     fn try_from(v: u8) -> Result<Self, Self::Error> {
+//         match v {
+//             1 => Ok(ResponseCode::Ok),
+//             2 => Ok(ResponseCode::BatchFinish),
+//             3 => Ok(ResponseCode::Empty),
+//             4 => Ok(ResponseCode::NoService),
+//             _ => Err(anyhow!("unknown code {}", v)),
+//         }
+//     }
+// }
+
 impl std::fmt::Display for ResponseCode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -127,5 +143,71 @@ impl std::fmt::Display for ResponseCode {
             ResponseCode::NoService => write!(f, "NoService"),
             ResponseCode::Unknown => write!(f, "Unknown"),
         }
+    }
+}
+
+pub struct ElementResponse {
+    code: ResponseCode,
+    element: Option<Element>,
+}
+
+impl ElementResponse {
+    pub fn ok(element: Element) -> Self {
+        ElementResponse {
+            code: ResponseCode::Ok,
+            element: Some(element),
+        }
+    }
+
+    pub fn err(code: ResponseCode) -> Self {
+        ElementResponse {
+            code,
+            element: None,
+        }
+    }
+}
+
+impl Into<BytesMut> for ElementResponse {
+    fn into(self) -> BytesMut {
+        let ElementResponse { code, element } = self;
+        match code {
+            ResponseCode::Ok => {
+                let element = element.unwrap();
+                let element_len = element.capacity();
+                let mut buffer = bytes::BytesMut::with_capacity(4 + 1 + element_len);
+                buffer.put_u32(element_len as u32 + 1); // (code + body).length
+                buffer.put_u8(code as u8);
+
+                element.serialize(buffer.borrow_mut());
+                buffer
+            }
+            _ => {
+                let mut buffer = bytes::BytesMut::with_capacity(4 + 1);
+                buffer.put_u32(1); // (code + body).length
+                buffer.put_u8(code as u8);
+                buffer
+            }
+        }
+    }
+}
+
+impl TryFrom<BytesMut> for ElementResponse {
+    type Error = anyhow::Error;
+
+    fn try_from(mut buffer: BytesMut) -> Result<Self, Self::Error> {
+        let _len = buffer.get_u32();
+
+        let code_value = buffer.get_u8();
+        let code = ResponseCode::from(code_value);
+        if let ResponseCode::Unknown = code {
+            return Err(anyhow!("found unknown code {}", code_value));
+        }
+
+        let element = match code {
+            ResponseCode::Ok => Some(Element::deserialize(buffer.borrow_mut())),
+            _ => None,
+        };
+
+        Ok(ElementResponse { code, element })
     }
 }

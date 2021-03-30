@@ -5,7 +5,7 @@ use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use bytes::BufMut;
+use bytes::BytesMut;
 use dashmap::DashMap;
 use futures::{SinkExt, StreamExt};
 use rand::prelude::*;
@@ -13,14 +13,13 @@ use tokio::net::tcp::WriteHalf;
 use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 use tokio::sync::RwLock;
-use tokio_util::codec::{FramedWrite, LengthDelimitedCodec};
+use tokio_util::codec::{BytesCodec, FramedWrite, LengthDelimitedCodec};
 
-use crate::api::element::{Element, Serde};
 use crate::api::properties::ChannelBaseOn;
 use crate::api::runtime::{ChannelKey, TaskId};
 use crate::channel::{named_channel_with_base, ElementReceiver, ElementSender, TryRecvError};
 use crate::metrics::Tag;
-use crate::pub_sub::network::{ElementRequest, ResponseCode};
+use crate::pub_sub::network::{ElementRequest, ElementResponse, ResponseCode};
 use crate::utils::thread::{async_runtime, async_runtime_single};
 
 pub(crate) static ENABLE_LOG: AtomicBool = AtomicBool::new(true);
@@ -203,9 +202,7 @@ impl Server {
             .max_frame_length(self.tcp_frame_max_size as usize)
             .big_endian()
             .new_read(read_half);
-        let mut framed_write = LengthDelimitedCodec::builder()
-            .length_field_length(4)
-            .new_write(write_half);
+        let mut framed_write = FramedWrite::new(write_half, BytesCodec::new());
 
         while let Some(message) = framed_read.next().await {
             match message {
@@ -228,7 +225,7 @@ impl Server {
     async fn subscribe_handle(
         &self,
         request: ElementRequest,
-        framed_write: &mut FramedWrite<WriteHalf<'_>, LengthDelimitedCodec>,
+        framed_write: &mut FramedWrite<WriteHalf<'_>, BytesCodec>,
     ) -> Result<(), std::io::Error> {
         if is_enable_log() {
             info!("recv request: {:?}", request);
@@ -244,7 +241,7 @@ impl Server {
                 for n in 0..batch_pull_size {
                     match receiver.try_recv() {
                         Ok(element) => {
-                            self.send(ResponseCode::Ok, Some(element), framed_write)
+                            self.send(ElementResponse::ok(element), framed_write)
                                 .await?
                         }
                         Err(TryRecvError::Empty) => {
@@ -254,55 +251,45 @@ impl Server {
                                     n, channel_key
                                 );
                             }
-                            return self.send(ResponseCode::Empty, None, framed_write).await;
+                            return self
+                                .send(ElementResponse::err(ResponseCode::Empty), framed_write)
+                                .await;
                         }
                         Err(TryRecvError::Disconnected) => {
                             // panic!(format!("channel_key({:?}) close", channel_key))
                             info!("channel_key({:?}) close", channel_key);
-                            return self.send(ResponseCode::NoService, None, framed_write).await;
+                            return self
+                                .send(ElementResponse::err(ResponseCode::NoService), framed_write)
+                                .await;
                         }
                     }
                 }
                 if is_enable_log() {
                     info!("send `BatchFinish` code, channel_key: {:?}", channel_key);
                 }
-                self.send(ResponseCode::BatchFinish, None, framed_write)
-                    .await
+                self.send(
+                    ElementResponse::err(ResponseCode::BatchFinish),
+                    framed_write,
+                )
+                .await
             }
             None => {
                 warn!(
                     "channel_key({:?}) not found, maybe the job haven't initialized yet",
                     channel_key
                 );
-                self.send(ResponseCode::Empty, None, framed_write).await
+                self.send(ElementResponse::err(ResponseCode::Empty), framed_write)
+                    .await
             }
         }
     }
 
     async fn send(
         &self,
-        code: ResponseCode,
-        element: Option<Element>,
-        framed_write: &mut FramedWrite<WriteHalf<'_>, LengthDelimitedCodec>,
+        response: ElementResponse,
+        framed_write: &mut FramedWrite<WriteHalf<'_>, BytesCodec>,
     ) -> Result<(), std::io::Error> {
-        let req = match element {
-            Some(element) => {
-                let element_len = element.capacity();
-                let mut req = bytes::BytesMut::with_capacity(4 + 1 + element_len);
-                req.put_u32(element_len as u32 + 1); // (code + body).length
-                req.put_u8(code as u8);
-
-                element.serialize(req.borrow_mut());
-                req
-            }
-            None => {
-                let mut req = bytes::BytesMut::with_capacity(4 + 1);
-                req.put_u32(1); // (code + body).length
-                req.put_u8(code as u8);
-                req
-            }
-        };
-
+        let req: BytesMut = response.into();
         framed_write.send(req.freeze()).await
     }
 
