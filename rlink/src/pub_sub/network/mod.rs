@@ -159,7 +159,7 @@ impl ElementResponse {
         }
     }
 
-    pub fn err(code: ResponseCode) -> Self {
+    pub fn end(code: ResponseCode) -> Self {
         ElementResponse {
             code,
             element: None,

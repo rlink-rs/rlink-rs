@@ -252,14 +252,14 @@ impl Server {
                                 );
                             }
                             return self
-                                .send(ElementResponse::err(ResponseCode::Empty), framed_write)
+                                .send(ElementResponse::end(ResponseCode::Empty), framed_write)
                                 .await;
                         }
                         Err(TryRecvError::Disconnected) => {
                             // panic!(format!("channel_key({:?}) close", channel_key))
                             info!("channel_key({:?}) close", channel_key);
                             return self
-                                .send(ElementResponse::err(ResponseCode::NoService), framed_write)
+                                .send(ElementResponse::end(ResponseCode::NoService), framed_write)
                                 .await;
                         }
                     }
@@ -268,7 +268,7 @@ impl Server {
                     info!("send `BatchFinish` code, channel_key: {:?}", channel_key);
                 }
                 self.send(
-                    ElementResponse::err(ResponseCode::BatchFinish),
+                    ElementResponse::end(ResponseCode::BatchFinish),
                     framed_write,
                 )
                 .await
@@ -278,7 +278,7 @@ impl Server {
                     "channel_key({:?}) not found, maybe the job haven't initialized yet",
                     channel_key
                 );
-                self.send(ElementResponse::err(ResponseCode::Empty), framed_write)
+                self.send(ElementResponse::end(ResponseCode::Empty), framed_write)
                     .await
             }
         }
