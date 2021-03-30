@@ -1,4 +1,5 @@
 use std::borrow::BorrowMut;
+use std::collections::LinkedList;
 use std::convert::TryFrom;
 use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
@@ -15,6 +16,7 @@ use tokio::net::TcpStream;
 use tokio::sync::RwLock;
 use tokio_util::codec::{BytesCodec, FramedWrite, LengthDelimitedCodec};
 
+use crate::api::element::Element;
 use crate::api::properties::ChannelBaseOn;
 use crate::api::runtime::{ChannelKey, TaskId};
 use crate::channel::{named_channel_with_base, ElementReceiver, ElementSender, TryRecvError};
@@ -236,52 +238,57 @@ impl Server {
             batch_id: _,
         } = request;
 
+        let element_list = self.batch_get(&channel_key, batch_pull_size);
+        let len = element_list.len();
+        for element in element_list {
+            self.send(ElementResponse::ok(element), framed_write)
+                .await?
+        }
+
+        let end_response = if len == batch_pull_size as usize {
+            ElementResponse::end(ResponseCode::BatchFinish)
+        } else {
+            ElementResponse::end(ResponseCode::Empty)
+        };
+
+        if is_enable_log() {
+            info!(
+                "try recv empty, total recv size {}, channel_key: {:?}, response: {:?}",
+                len, channel_key, end_response
+            );
+        }
+        self.send(end_response, framed_write).await
+    }
+
+    fn batch_get(&self, channel_key: &ChannelKey, batch_pull_size: u16) -> LinkedList<Element> {
+        let mut element_list = LinkedList::new();
         match get_network_channel(&channel_key) {
             Some(receiver) => {
-                for n in 0..batch_pull_size {
+                for _ in 0..batch_pull_size {
                     match receiver.try_recv() {
                         Ok(element) => {
-                            self.send(ElementResponse::ok(element), framed_write)
-                                .await?
+                            element_list.push_back(element);
                         }
                         Err(TryRecvError::Empty) => {
-                            if is_enable_log() {
-                                info!(
-                                    "try recv empty, total recv size {}, channel_key: {:?}",
-                                    n, channel_key
-                                );
-                            }
-                            return self
-                                .send(ElementResponse::end(ResponseCode::Empty), framed_write)
-                                .await;
+                            break;
                         }
                         Err(TryRecvError::Disconnected) => {
                             // panic!(format!("channel_key({:?}) close", channel_key))
                             info!("channel_key({:?}) close", channel_key);
-                            return self
-                                .send(ElementResponse::end(ResponseCode::NoService), framed_write)
-                                .await;
+                            break;
                         }
                     }
                 }
-                if is_enable_log() {
-                    info!("send `BatchFinish` code, channel_key: {:?}", channel_key);
-                }
-                self.send(
-                    ElementResponse::end(ResponseCode::BatchFinish),
-                    framed_write,
-                )
-                .await
             }
             None => {
                 warn!(
                     "channel_key({:?}) not found, maybe the job haven't initialized yet",
                     channel_key
                 );
-                self.send(ElementResponse::end(ResponseCode::Empty), framed_write)
-                    .await
             }
         }
+
+        element_list
     }
 
     async fn send(

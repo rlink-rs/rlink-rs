@@ -27,7 +27,6 @@ lazy_static! {
 }
 
 pub(crate) fn set_thread_info(thread_info: ThreadInfo) {
-    info!("create thread: {:?}", thread_info);
     let thread_infos: &dashmap::DashSet<ThreadInfo> = &*THREAD_INFOS;
     thread_infos.insert(thread_info);
 }

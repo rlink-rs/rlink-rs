@@ -146,6 +146,7 @@ impl std::fmt::Display for ResponseCode {
     }
 }
 
+#[derive(Debug)]
 pub struct ElementResponse {
     code: ResponseCode,
     element: Option<Element>,
