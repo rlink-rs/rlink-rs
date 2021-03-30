@@ -252,6 +252,7 @@ impl Client {
         register_counter("NetWorkClient", tags, counter.clone());
 
         let mut batch_id = 0u16;
+        let timeout = Duration::from_secs(6);
         loop {
             let request = ElementRequest {
                 channel_key: self.channel_key.clone(),
@@ -269,18 +270,21 @@ impl Client {
             let buffer: BytesMut = request.into();
             framed_write.send(buffer.freeze()).await?;
 
-            let element_list = Self::recv_element(
-                codec_framed.borrow_mut(),
-                self.channel_key,
-                self.batch_pull_size,
+            let element_list = tokio::time::timeout(
+                timeout,
+                Self::recv_element(
+                    codec_framed.borrow_mut(),
+                    self.channel_key,
+                    self.batch_pull_size,
+                ),
             )
-            .await?;
+            .await??;
 
             let len = element_list.len();
             if len > 0 {
                 for element in element_list {
                     match self.sender.try_send_opt(element) {
-                        Some(t) => Self::send_to_channel(t, &self.sender).await?,
+                        Some(t) => send_to_channel(&self.sender, t).await?,
                         None => {}
                     }
                 }
@@ -313,7 +317,6 @@ impl Client {
             match code {
                 ResponseCode::Ok => {
                     let mut element = element.unwrap();
-
                     element.set_channel_key(channel_key);
                     element_list.push_back(element);
                 }
@@ -356,37 +359,6 @@ impl Client {
         unreachable!()
     }
 
-    async fn send_to_channel(element: Element, sender: &ElementSender) -> anyhow::Result<()> {
-        let mut ele = element;
-        let mut loops = 0;
-        loop {
-            ele = match sender.try_send(ele) {
-                Ok(_) => {
-                    return Ok(());
-                }
-                Err(TrySendError::Full(ele)) => {
-                    // if is_enable_log() {
-                    error!("> net input channel block, channel: {:?}", ele);
-                    // }
-
-                    if loops == 60 {
-                        error!("net input channel block and try with 60 times");
-                        loops = 0;
-                    }
-                    loops += 1;
-
-                    async_sleep(Duration::from_secs(1)).await;
-                    error!("< net input channel block, channel: {:?}", ele);
-
-                    ele
-                }
-                Err(TrySendError::Disconnected(_)) => {
-                    return Err(anyhow!("client network send to input channel Disconnected. unreachable! the next job channel must live longer than the client"));
-                }
-            }
-        }
-    }
-
     // maybe lost data in send/recv buffer
     #[allow(dead_code)]
     pub async fn close(mut self) -> std::io::Result<()> {
@@ -403,17 +375,37 @@ impl Client {
         }
     }
 }
-//
-// fn frame_parse(mut data: BytesMut) -> (ResponseCode, Option<Element>) {
-//     data.advance(4); // skip header length
-//     let code = data.get_u8();
-//     let code = ResponseCode::from(code);
-//     if code == ResponseCode::Ok {
-//         (code, Some(Element::deserialize(data.borrow_mut())))
-//     } else {
-//         (code, None)
-//     }
-// }
+
+async fn send_to_channel(sender: &ElementSender, element: Element) -> anyhow::Result<()> {
+    let mut ele = element;
+    let mut loops = 0;
+    loop {
+        ele = match sender.try_send(ele) {
+            Ok(_) => {
+                return Ok(());
+            }
+            Err(TrySendError::Full(ele)) => {
+                // if is_enable_log() {
+                error!("> net input channel block, channel: {:?}", ele);
+                // }
+
+                if loops == 60 {
+                    error!("net input channel block and try with 60 times");
+                    loops = 0;
+                }
+                loops += 1;
+
+                async_sleep(Duration::from_secs(1)).await;
+                error!("< net input channel block, channel: {:?}", ele);
+
+                ele
+            }
+            Err(TrySendError::Disconnected(_)) => {
+                return Err(anyhow!("client network send to input channel Disconnected. unreachable! the next job channel must live longer than the client"));
+            }
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {

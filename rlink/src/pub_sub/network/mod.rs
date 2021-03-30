@@ -171,24 +171,18 @@ impl ElementResponse {
 impl Into<BytesMut> for ElementResponse {
     fn into(self) -> BytesMut {
         let ElementResponse { code, element } = self;
-        match code {
-            ResponseCode::Ok => {
-                let element = element.unwrap();
-                let element_len = element.capacity();
-                let mut buffer = bytes::BytesMut::with_capacity(4 + 1 + element_len);
-                buffer.put_u32(element_len as u32 + 1); // (code + body).length
-                buffer.put_u8(code as u8);
+        let element = match code {
+            ResponseCode::Ok => element.unwrap(),
+            _ => Element::new_stream_status(1, false),
+        };
 
-                element.serialize(buffer.borrow_mut());
-                buffer
-            }
-            _ => {
-                let mut buffer = bytes::BytesMut::with_capacity(4 + 1);
-                buffer.put_u32(1); // (code + body).length
-                buffer.put_u8(code as u8);
-                buffer
-            }
-        }
+        let element_len = element.capacity();
+        let mut buffer = bytes::BytesMut::with_capacity(4 + 1 + element_len);
+        buffer.put_u32(element_len as u32 + 1); // (code + body).length
+        buffer.put_u8(code as u8);
+
+        element.serialize(buffer.borrow_mut());
+        buffer
     }
 }
 
@@ -204,8 +198,9 @@ impl TryFrom<BytesMut> for ElementResponse {
             return Err(anyhow!("found unknown code {}", code_value));
         }
 
+        let element = Element::deserialize(buffer.borrow_mut());
         let element = match code {
-            ResponseCode::Ok => Some(Element::deserialize(buffer.borrow_mut())),
+            ResponseCode::Ok => Some(element),
             _ => None,
         };
 
