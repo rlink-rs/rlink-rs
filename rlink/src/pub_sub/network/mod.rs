@@ -12,18 +12,19 @@ pub(crate) use client::subscribe;
 pub(crate) use server::publish;
 pub(crate) use server::Server;
 
-const BODY_LEN: usize = 18;
+const BODY_LEN: usize = 20;
 
 #[derive(Clone, Debug)]
 pub struct ElementRequest {
     channel_key: ChannelKey,
     batch_pull_size: u16,
+    batch_id: u16,
 }
 
 impl Into<BytesMut> for ElementRequest {
     fn into(self) -> BytesMut {
         let mut buffer = BytesMut::with_capacity(4 + BODY_LEN);
-        buffer.put_u32(BODY_LEN as u32); // (4 + 2 + 2) + (4 + 2 + 2) + 2
+        buffer.put_u32(BODY_LEN as u32); // (4 + 2 + 2) + (4 + 2 + 2) + 2 + 2
         buffer.put_u32(self.channel_key.source_task_id.job_id.0);
         buffer.put_u16(self.channel_key.source_task_id.task_number);
         buffer.put_u16(self.channel_key.source_task_id.num_tasks);
@@ -31,6 +32,7 @@ impl Into<BytesMut> for ElementRequest {
         buffer.put_u16(self.channel_key.target_task_id.task_number);
         buffer.put_u16(self.channel_key.target_task_id.num_tasks);
         buffer.put_u16(self.batch_pull_size);
+        buffer.put_u16(self.batch_id);
 
         buffer
     }
@@ -72,6 +74,7 @@ impl TryFrom<BytesMut> for ElementRequest {
         };
 
         let batch_pull_size = buffer.get_u16();
+        let batch_id = buffer.get_u16();
 
         Ok(ElementRequest {
             channel_key: ChannelKey {
@@ -79,6 +82,7 @@ impl TryFrom<BytesMut> for ElementRequest {
                 target_task_id,
             },
             batch_pull_size,
+            batch_id,
         })
     }
 }
@@ -96,10 +100,10 @@ pub enum ResponseCode {
     Empty = 3,
     /// the target channel is closed, then send a package with the `Empty` code
     NoService = 4,
-    /// parse the Request error, then send a package with the `ParseErr` code
-    ParseErr = 5,
-    /// read the Request error, then send a package with the `ReadErr` code
-    ReadErr = 6,
+    // /// parse the Request error, then send a package with the `ParseErr` code
+    // ParseErr = 5,
+    // /// read the Request error, then send a package with the `ReadErr` code
+    // ReadErr = 6,
 }
 
 impl From<u8> for ResponseCode {
@@ -109,8 +113,6 @@ impl From<u8> for ResponseCode {
             2 => ResponseCode::BatchFinish,
             3 => ResponseCode::Empty,
             4 => ResponseCode::NoService,
-            5 => ResponseCode::ParseErr,
-            6 => ResponseCode::ReadErr,
             _ => ResponseCode::Unknown,
         }
     }
@@ -123,8 +125,6 @@ impl std::fmt::Display for ResponseCode {
             ResponseCode::BatchFinish => write!(f, "BatchFinish"),
             ResponseCode::Empty => write!(f, "Empty"),
             ResponseCode::NoService => write!(f, "NoService"),
-            ResponseCode::ParseErr => write!(f, "ParseErr"),
-            ResponseCode::ReadErr => write!(f, "ReadErr"),
             ResponseCode::Unknown => write!(f, "Unknown"),
         }
     }

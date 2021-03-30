@@ -5,14 +5,15 @@ use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use bytes::{BufMut, BytesMut};
+use bytes::BufMut;
 use dashmap::DashMap;
 use futures::{SinkExt, StreamExt};
 use rand::prelude::*;
+use tokio::net::tcp::WriteHalf;
 use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 use tokio::sync::RwLock;
-use tokio_util::codec::LengthDelimitedCodec;
+use tokio_util::codec::{FramedWrite, LengthDelimitedCodec};
 
 use crate::api::element::{Element, Serde};
 use crate::api::properties::ChannelBaseOn;
@@ -22,7 +23,7 @@ use crate::metrics::Tag;
 use crate::pub_sub::network::{ElementRequest, ResponseCode};
 use crate::utils::thread::{async_runtime, async_runtime_single};
 
-pub(crate) static ENABLE_LOG: AtomicBool = AtomicBool::new(false);
+pub(crate) static ENABLE_LOG: AtomicBool = AtomicBool::new(true);
 
 #[inline]
 fn is_enable_log() -> bool {
@@ -180,110 +181,100 @@ impl Server {
     }
 
     async fn session_process(self, socket: TcpStream, remote_addr: SocketAddr) {
-        let mut codec_framed = LengthDelimitedCodec::builder()
+        match self.session_process0(socket).await {
+            Ok(_) => {}
+            Err(e) => {
+                error!(
+                    "session process error, remote address: {}. {}",
+                    self.sock_addr_to_str(&remote_addr),
+                    e
+                );
+            }
+        }
+    }
+
+    async fn session_process0(&self, mut socket: TcpStream) -> anyhow::Result<()> {
+        let (read_half, write_half) = socket.split();
+        let mut framed_read = LengthDelimitedCodec::builder()
             .length_field_offset(0)
             .length_field_length(4)
             .length_adjustment(4) // 数据体截取位置，应和num_skip配置使用，保证frame要全部被读取
             .num_skip(0)
             .max_frame_length(self.tcp_frame_max_size as usize)
             .big_endian()
-            .new_read(socket);
+            .new_read(read_half);
+        let mut framed_write = LengthDelimitedCodec::builder()
+            .length_field_length(4)
+            .new_write(write_half);
 
-        while let Some(message) = codec_framed.next().await {
+        while let Some(message) = framed_read.next().await {
             match message {
                 Ok(bytes) => {
                     if log_enabled!(log::Level::Debug) {
                         debug!("tcp bytes: {:?}", bytes);
                     }
-
-                    match self.subscribe_handle(bytes, codec_framed.get_mut()).await {
-                        Ok(_) => {}
-                        Err(err) => {
-                            error!(
-                                "Socket response with error. remote addr: {}, error: {:?}",
-                                self.sock_addr_to_str(&remote_addr),
-                                err
-                            );
-                            return;
-                        }
-                    }
+                    let request = ElementRequest::try_from(bytes)?;
+                    self.subscribe_handle(request, framed_write.borrow_mut())
+                        .await?;
                 }
-                Err(err) => {
-                    warn!(
-                        "Socket closed with error. remote addr: {}, error: {:?}",
-                        self.sock_addr_to_str(&remote_addr),
-                        err
-                    );
-                    return;
+                Err(e) => {
+                    return Err(anyhow!("Socket closed with error. {}", e));
                 }
             }
         }
-        info!(
-            "Socket received FIN packet and closed connection. remote addr: {}",
-            self.sock_addr_to_str(&remote_addr)
-        );
+        Err(anyhow!("Socket received FIN packet and closed connection",))
     }
 
     async fn subscribe_handle(
         &self,
-        bytes: BytesMut,
-        framed_read: &mut tokio::net::TcpStream,
+        request: ElementRequest,
+        framed_write: &mut FramedWrite<WriteHalf<'_>, LengthDelimitedCodec>,
     ) -> Result<(), std::io::Error> {
-        match ElementRequest::try_from(bytes) {
-            Ok(request) => {
-                let ElementRequest {
-                    channel_key,
-                    batch_pull_size,
-                } = request;
+        if is_enable_log() {
+            info!("recv request: {:?}", request);
+        }
+        let ElementRequest {
+            channel_key,
+            batch_pull_size,
+            batch_id: _,
+        } = request;
 
-                if is_enable_log() {
-                    info!("recv request, channel_key: {:?}", channel_key);
-                }
-
-                match get_network_channel(&channel_key) {
-                    Some(receiver) => {
-                        for n in 0..batch_pull_size {
-                            match receiver.try_recv() {
-                                Ok(element) => {
-                                    self.send(ResponseCode::Ok, Some(element), framed_read)
-                                        .await?
-                                }
-                                Err(TryRecvError::Empty) => {
-                                    if is_enable_log() {
-                                        info!(
-                                            "try recv empty, total recv size {}, channel_key: {:?}",
-                                            n, channel_key
-                                        );
-                                    }
-                                    return self.send(ResponseCode::Empty, None, framed_read).await;
-                                }
-                                Err(TryRecvError::Disconnected) => {
-                                    // panic!(format!("channel_key({:?}) close", channel_key))
-                                    info!("channel_key({:?}) close", channel_key);
-                                    return self
-                                        .send(ResponseCode::NoService, None, framed_read)
-                                        .await;
-                                }
+        match get_network_channel(&channel_key) {
+            Some(receiver) => {
+                for n in 0..batch_pull_size {
+                    match receiver.try_recv() {
+                        Ok(element) => {
+                            self.send(ResponseCode::Ok, Some(element), framed_write)
+                                .await?
+                        }
+                        Err(TryRecvError::Empty) => {
+                            if is_enable_log() {
+                                info!(
+                                    "try recv empty, total recv size {}, channel_key: {:?}",
+                                    n, channel_key
+                                );
                             }
+                            return self.send(ResponseCode::Empty, None, framed_write).await;
                         }
-                        if is_enable_log() {
-                            info!("send `BatchFinish` code, channel_key: {:?}", channel_key);
+                        Err(TryRecvError::Disconnected) => {
+                            // panic!(format!("channel_key({:?}) close", channel_key))
+                            info!("channel_key({:?}) close", channel_key);
+                            return self.send(ResponseCode::NoService, None, framed_write).await;
                         }
-                        self.send(ResponseCode::BatchFinish, None, framed_read)
-                            .await
-                    }
-                    None => {
-                        warn!(
-                            "channel_key({:?}) not found, maybe the job haven't initialized yet",
-                            channel_key
-                        );
-                        self.send(ResponseCode::Empty, None, framed_read).await
                     }
                 }
+                if is_enable_log() {
+                    info!("send `BatchFinish` code, channel_key: {:?}", channel_key);
+                }
+                self.send(ResponseCode::BatchFinish, None, framed_write)
+                    .await
             }
-            Err(e) => {
-                error!("parse request error. {}", e);
-                self.send(ResponseCode::ParseErr, None, framed_read).await
+            None => {
+                warn!(
+                    "channel_key({:?}) not found, maybe the job haven't initialized yet",
+                    channel_key
+                );
+                self.send(ResponseCode::Empty, None, framed_write).await
             }
         }
     }
@@ -292,7 +283,7 @@ impl Server {
         &self,
         code: ResponseCode,
         element: Option<Element>,
-        framed_read: &mut tokio::net::TcpStream,
+        framed_write: &mut FramedWrite<WriteHalf<'_>, LengthDelimitedCodec>,
     ) -> Result<(), std::io::Error> {
         let req = match element {
             Some(element) => {
@@ -312,11 +303,7 @@ impl Server {
             }
         };
 
-        let mut codec_framed0 = LengthDelimitedCodec::builder()
-            .length_field_length(4)
-            .new_framed(framed_read);
-
-        codec_framed0.send(req.freeze()).await
+        framed_write.send(req.freeze()).await
     }
 
     fn sock_addr_to_str(&self, addr: &std::net::SocketAddr) -> String {

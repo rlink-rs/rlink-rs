@@ -1,4 +1,5 @@
 use std::borrow::BorrowMut;
+use std::collections::LinkedList;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::atomic::Ordering;
@@ -27,7 +28,7 @@ use crate::pub_sub::network::{ElementRequest, ResponseCode};
 use crate::runtime::ClusterDescriptor;
 use crate::utils::thread::{async_runtime_multi, async_sleep};
 
-pub(crate) static ENABLE_LOG: AtomicBool = AtomicBool::new(false);
+pub(crate) static ENABLE_LOG: AtomicBool = AtomicBool::new(true);
 
 #[inline]
 fn is_enable_log() -> bool {
@@ -219,13 +220,13 @@ impl Client {
             self.channel_key,
         );
 
-        let (r, w) = self.stream.split();
-        let mut sink = FramedWrite::new(w, BytesCodec::new());
+        let (read_half, write_half) = self.stream.split();
+        let mut framed_write = FramedWrite::new(write_half, BytesCodec::new());
 
         let mut codec_framed: FramedRead<ReadHalf, LengthDelimitedCodec> =
             LengthDelimitedCodec::builder()
                 .length_field_length(4)
-                .new_read(r);
+                .new_read(read_half);
 
         let tags = vec![
             Tag::from(("source_job_id", self.channel_key.source_task_id.job_id.0)),
@@ -242,38 +243,56 @@ impl Client {
         let counter = Arc::new(AtomicU64::new(0));
         register_counter("NetWorkClient", tags, counter.clone());
 
+        let mut batch_id = 0u16;
         loop {
             let request = ElementRequest {
                 channel_key: self.channel_key.clone(),
                 batch_pull_size: self.batch_pull_size,
+                batch_id,
             };
 
-            let buffer: BytesMut = request.into();
-            sink.send(buffer.freeze()).await?;
+            let (n, _) = batch_id.overflowing_add(1);
+            batch_id = n;
 
-            let can_continue = Self::recv_element(
+            if is_enable_log() {
+                info!("send request: {:?}", request);
+            }
+
+            let buffer: BytesMut = request.into();
+            framed_write.send(buffer.freeze()).await?;
+
+            let element_list = Self::recv_element(
                 codec_framed.borrow_mut(),
-                &counter,
-                &self.sender,
                 self.channel_key,
                 self.batch_pull_size,
             )
             .await?;
-            if !can_continue {
-                return Ok(());
+
+            let len = element_list.len();
+            if len > 0 {
+                for element in element_list {
+                    match self.sender.try_send_opt(element) {
+                        Some(t) => Self::send_to_channel(t, &self.sender).await?,
+                        None => {}
+                    }
+                }
+
+                counter.fetch_add(len as u64, Ordering::Relaxed);
+            }
+            if len < 100 {
+                async_sleep(Duration::from_secs(3)).await;
             }
         }
     }
 
     async fn recv_element(
-        codec_framed: &mut FramedRead<ReadHalf<'_>, LengthDelimitedCodec>,
-        counter: &Arc<AtomicU64>,
-        sender: &ElementSender,
+        framed_read: &mut FramedRead<ReadHalf<'_>, LengthDelimitedCodec>,
         channel_key: ChannelKey,
         batch_size: u16,
-    ) -> anyhow::Result<bool> {
+    ) -> anyhow::Result<LinkedList<Element>> {
+        let mut element_list = LinkedList::new();
         for n in 0..batch_size + 1 {
-            let message = codec_framed
+            let message = framed_read
                 .next()
                 .await
                 .ok_or(anyhow!("framed read nothing"))?;
@@ -282,28 +301,10 @@ impl Client {
             let (response_code, element) = frame_parse(bytes);
             match response_code {
                 ResponseCode::Ok => {
-                    let mut end = false;
                     let mut element = element.unwrap();
-                    match element.borrow_mut() {
-                        Element::Record(record) => record.channel_key = channel_key,
-                        Element::Watermark(watermark) => {
-                            watermark.channel_key = channel_key;
-                            debug!("client recv Watermark {}", watermark.timestamp);
-                        }
-                        Element::StreamStatus(stream_status) => {
-                            stream_status.channel_key = channel_key;
-                            end = stream_status.end;
-                        }
-                        _ => {}
-                    }
 
-                    Self::send_to_channel(element, sender).await?;
-                    counter.fetch_add(1, Ordering::Relaxed);
-
-                    if end {
-                        info!("client recv an end flag and unsubscribe");
-                        return Ok(false);
-                    }
+                    element.set_channel_key(channel_key);
+                    element_list.push_back(element);
                 }
                 ResponseCode::BatchFinish => {
                     if n != batch_size {
@@ -315,10 +316,9 @@ impl Client {
                     if is_enable_log() {
                         info!("batch finish, channel: {:?}", channel_key);
                     }
-                    return Ok(true);
+                    return Ok(element_list);
                 }
                 ResponseCode::Empty => {
-                    async_sleep(Duration::from_secs(1)).await;
                     if is_enable_log() {
                         info!(
                             "recv `Empty` code from remoting, total recv size {}, channel: {:?}",
@@ -326,13 +326,12 @@ impl Client {
                         );
                     }
 
-                    return Ok(true);
+                    return Ok(element_list);
                 }
                 ResponseCode::NoService => {
-                    warn!(
+                    return Err(anyhow!(
                         "remoting no service. unreachable! after an end flag, the client has close"
-                    );
-                    return Ok(false);
+                    ));
                 }
                 _ => {
                     return Err(anyhow!("unrecognized remoting code {:?}", response_code));
