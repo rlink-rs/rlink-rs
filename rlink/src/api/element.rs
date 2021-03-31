@@ -181,7 +181,12 @@ impl Serde for Record {
         bytes.put_u64(self.timestamp);
 
         bytes.put_u32(value_len as u32);
-        bytes.put_slice(self.values.as_slice());
+
+        let data_slice = self.values.as_slice();
+        if data_slice.len() != value_len {
+            unreachable!()
+        }
+        bytes.put_slice(data_slice);
     }
 
     fn deserialize(bytes: &mut BytesMut) -> Self {

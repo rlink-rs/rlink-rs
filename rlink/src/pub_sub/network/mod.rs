@@ -25,7 +25,10 @@ pub struct ElementRequest {
 
 impl Into<BytesMut> for ElementRequest {
     fn into(self) -> BytesMut {
-        let mut buffer = BytesMut::with_capacity(4 + BODY_LEN);
+        static HEADER_LEN: usize = 4usize;
+        static PACKAGE_LEN: usize = HEADER_LEN + BODY_LEN;
+
+        let mut buffer = BytesMut::with_capacity(PACKAGE_LEN);
         buffer.put_u32(BODY_LEN as u32); // (4 + 2 + 2) + (4 + 2 + 2) + 2 + 2
         buffer.put_u32(self.channel_key.source_task_id.job_id.0);
         buffer.put_u16(self.channel_key.source_task_id.task_number);
@@ -35,6 +38,10 @@ impl Into<BytesMut> for ElementRequest {
         buffer.put_u16(self.channel_key.target_task_id.num_tasks);
         buffer.put_u16(self.batch_pull_size);
         buffer.put_u16(self.batch_id);
+
+        if buffer.len() != PACKAGE_LEN {
+            unreachable!();
+        }
 
         buffer
     }
@@ -176,12 +183,20 @@ impl Into<BytesMut> for ElementResponse {
             _ => Element::new_stream_status(1, false),
         };
 
+        static HEADER_LEN: usize = (4 + 1) as usize;
         let element_len = element.capacity();
-        let mut buffer = bytes::BytesMut::with_capacity(4 + 1 + element_len);
+        let package_len = HEADER_LEN + element_len;
+
+        let mut buffer = bytes::BytesMut::with_capacity(package_len);
         buffer.put_u32(element_len as u32 + 1); // (code + body).length
         buffer.put_u8(code as u8);
 
         element.serialize(buffer.borrow_mut());
+
+        if buffer.len() != package_len {
+            unreachable!();
+        }
+
         buffer
     }
 }
