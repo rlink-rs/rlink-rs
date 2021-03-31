@@ -29,7 +29,7 @@ use crate::pub_sub::network::{ElementRequest, ElementResponse, ResponseCode};
 use crate::runtime::ClusterDescriptor;
 use crate::utils::thread::{async_runtime_multi, async_sleep};
 
-pub(crate) static ENABLE_LOG: AtomicBool = AtomicBool::new(true);
+pub(crate) static ENABLE_LOG: AtomicBool = AtomicBool::new(false);
 
 #[inline]
 fn is_enable_log() -> bool {
@@ -302,7 +302,9 @@ impl Client {
         channel_key: ChannelKey,
         batch_size: u16,
     ) -> anyhow::Result<LinkedList<Element>> {
-        info!("begin loop recv elements. channel: {:?}", channel_key);
+        if is_enable_log() {
+            info!("begin loop recv elements. channel: {:?}", channel_key);
+        }
         let mut element_list = LinkedList::new();
         for n in 0..batch_size + 1 {
             let message = framed_read

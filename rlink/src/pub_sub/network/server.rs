@@ -24,7 +24,7 @@ use crate::metrics::Tag;
 use crate::pub_sub::network::{ElementRequest, ElementResponse, ResponseCode};
 use crate::utils::thread::{async_runtime, async_runtime_single};
 
-pub(crate) static ENABLE_LOG: AtomicBool = AtomicBool::new(true);
+pub(crate) static ENABLE_LOG: AtomicBool = AtomicBool::new(false);
 
 #[inline]
 fn is_enable_log() -> bool {
