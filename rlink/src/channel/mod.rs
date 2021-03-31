@@ -86,7 +86,10 @@ pub fn named_channel_with_base<T>(
 where
     T: Clone,
 {
-    info!("Create channel named with {}, capacity: {}", name, cap);
+    info!(
+        "Create channel named with {}, capacity: {}, base on: {}",
+        name, cap, base_on
+    );
 
     let size = Arc::new(AtomicI64::new(0));
     let accepted_counter = Arc::new(AtomicU64::new(0));
