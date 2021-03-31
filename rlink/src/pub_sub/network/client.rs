@@ -370,7 +370,7 @@ impl Client {
         match self.close().await {
             Ok(_) => {}
             Err(e) => {
-                error!("close client error {}", e);
+                error!("close client error. {}", e);
             }
         }
     }
