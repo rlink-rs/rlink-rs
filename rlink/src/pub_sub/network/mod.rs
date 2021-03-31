@@ -4,7 +4,7 @@ use std::convert::TryFrom;
 use bytes::{Buf, BufMut, BytesMut};
 
 use crate::api::element::{Element, Serde};
-use crate::api::runtime::{ChannelKey, JobId, TaskId};
+use crate::api::runtime::ChannelKey;
 
 pub(crate) mod client;
 pub(crate) mod server;
@@ -29,20 +29,12 @@ impl Into<BytesMut> for ElementRequest {
         static PACKAGE_LEN: usize = HEADER_LEN + BODY_LEN;
 
         let mut buffer = BytesMut::with_capacity(PACKAGE_LEN);
-        buffer.put_u32(BODY_LEN as u32); // (4 + 2 + 2) + (4 + 2 + 2) + 2 + 2
-        buffer.put_u32(self.channel_key.source_task_id.job_id.0);
-        buffer.put_u16(self.channel_key.source_task_id.task_number);
-        buffer.put_u16(self.channel_key.source_task_id.num_tasks);
-        buffer.put_u32(self.channel_key.target_task_id.job_id.0);
-        buffer.put_u16(self.channel_key.target_task_id.task_number);
-        buffer.put_u16(self.channel_key.target_task_id.num_tasks);
+        buffer.put_u32(BODY_LEN as u32);
+        self.channel_key.serialize(buffer.borrow_mut());
         buffer.put_u16(self.batch_pull_size);
         buffer.put_u16(self.batch_id);
 
-        if buffer.len() != PACKAGE_LEN {
-            unreachable!();
-        }
-
+        assert_eq!(buffer.len(), PACKAGE_LEN);
         buffer
     }
 }
@@ -51,45 +43,23 @@ impl TryFrom<BytesMut> for ElementRequest {
     type Error = anyhow::Error;
 
     fn try_from(mut buffer: BytesMut) -> Result<Self, Self::Error> {
-        let len = buffer.get_u32(); // skip header length
-        if len as usize != BODY_LEN {
+        let body_len = buffer.get_u32();
+        assert_eq!(buffer.remaining(), body_len as usize);
+
+        if body_len as usize != BODY_LEN {
             return Err(anyhow!(
                 "Illegal request body length, expect {}, found {}",
                 BODY_LEN,
-                len
+                body_len
             ));
         }
 
-        let source_task_id = {
-            let job_id = buffer.get_u32();
-            let task_number = buffer.get_u16();
-            let num_tasks = buffer.get_u16();
-            TaskId {
-                job_id: JobId(job_id),
-                task_number,
-                num_tasks,
-            }
-        };
-
-        let target_task_id = {
-            let job_id = buffer.get_u32();
-            let task_number = buffer.get_u16();
-            let num_tasks = buffer.get_u16();
-            TaskId {
-                job_id: JobId(job_id),
-                task_number,
-                num_tasks,
-            }
-        };
-
+        let channel_key = ChannelKey::deserialize(buffer.borrow_mut());
         let batch_pull_size = buffer.get_u16();
         let batch_id = buffer.get_u16();
 
         Ok(ElementRequest {
-            channel_key: ChannelKey {
-                source_task_id,
-                target_task_id,
-            },
+            channel_key,
             batch_pull_size,
             batch_id,
         })
@@ -109,10 +79,6 @@ pub enum ResponseCode {
     Empty = 3,
     /// the target channel is closed, then send a package with the `Empty` code
     NoService = 4,
-    // /// parse the Request error, then send a package with the `ParseErr` code
-    // ParseErr = 5,
-    // /// read the Request error, then send a package with the `ReadErr` code
-    // ReadErr = 6,
 }
 
 impl From<u8> for ResponseCode {
@@ -126,20 +92,6 @@ impl From<u8> for ResponseCode {
         }
     }
 }
-
-// impl TryFrom<u8> for ResponseCode {
-//     type Error = anyhow::Error;
-//
-//     fn try_from(v: u8) -> Result<Self, Self::Error> {
-//         match v {
-//             1 => Ok(ResponseCode::Ok),
-//             2 => Ok(ResponseCode::BatchFinish),
-//             3 => Ok(ResponseCode::Empty),
-//             4 => Ok(ResponseCode::NoService),
-//             _ => Err(anyhow!("unknown code {}", v)),
-//         }
-//     }
-// }
 
 impl std::fmt::Display for ResponseCode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -178,26 +130,35 @@ impl ElementResponse {
 impl Into<BytesMut> for ElementResponse {
     fn into(self) -> BytesMut {
         let ElementResponse { code, element } = self;
-        let element = match code {
-            ResponseCode::Ok => element.unwrap(),
-            _ => Element::new_stream_status(1, false),
-        };
 
-        static HEADER_LEN: usize = (4 + 1) as usize;
-        let element_len = element.capacity();
-        let package_len = HEADER_LEN + element_len;
+        static HEADER_LEN: usize = 4usize;
+        match code {
+            ResponseCode::Ok => {
+                let element = element.unwrap();
 
-        let mut buffer = bytes::BytesMut::with_capacity(package_len);
-        buffer.put_u32(element_len as u32 + 1); // (code + body).length
-        buffer.put_u8(code as u8);
+                let body_len = 1usize + element.capacity();
+                let package_len = HEADER_LEN + body_len;
 
-        element.serialize(buffer.borrow_mut());
+                let mut buffer = bytes::BytesMut::with_capacity(package_len);
+                buffer.put_u32(body_len as u32); // (code + body).length
+                buffer.put_u8(code as u8);
+                element.serialize(buffer.borrow_mut());
 
-        if buffer.len() != package_len {
-            unreachable!();
+                assert_eq!(buffer.len(), package_len);
+                buffer
+            }
+            _ => {
+                let body_len = 1usize;
+                let package_len = HEADER_LEN + body_len;
+
+                let mut buffer = bytes::BytesMut::with_capacity(package_len);
+                buffer.put_u32(body_len as u32); // (code + body).length
+                buffer.put_u8(code as u8);
+
+                assert_eq!(buffer.len(), package_len);
+                buffer
+            }
         }
-
-        buffer
     }
 }
 
@@ -205,7 +166,8 @@ impl TryFrom<BytesMut> for ElementResponse {
     type Error = anyhow::Error;
 
     fn try_from(mut buffer: BytesMut) -> Result<Self, Self::Error> {
-        let _len = buffer.get_u32();
+        let body_len = buffer.get_u32();
+        assert_eq!(buffer.remaining(), body_len as usize);
 
         let code_value = buffer.get_u8();
         let code = ResponseCode::from(code_value);
@@ -213,9 +175,8 @@ impl TryFrom<BytesMut> for ElementResponse {
             return Err(anyhow!("found unknown code {}", code_value));
         }
 
-        let element = Element::deserialize(buffer.borrow_mut());
         let element = match code {
-            ResponseCode::Ok => Some(element),
+            ResponseCode::Ok => Some(Element::deserialize(buffer.borrow_mut())),
             _ => None,
         };
 

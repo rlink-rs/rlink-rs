@@ -1,3 +1,7 @@
+use bytes::{Buf, BufMut, BytesMut};
+
+use crate::api::element::Serde;
+
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, Default)]
 pub struct OperatorId(pub u32);
 
@@ -34,10 +38,54 @@ impl TaskId {
     }
 }
 
+impl Serde for TaskId {
+    fn capacity(&self) -> usize {
+        4 + 2 + 2
+    }
+
+    fn serialize(&self, bytes: &mut BytesMut) {
+        bytes.put_u32(self.job_id.0);
+        bytes.put_u16(self.task_number);
+        bytes.put_u16(self.num_tasks);
+    }
+
+    fn deserialize(bytes: &mut BytesMut) -> Self {
+        let job_id = bytes.get_u32();
+        let task_number = bytes.get_u16();
+        let num_tasks = bytes.get_u16();
+        TaskId {
+            job_id: JobId(job_id),
+            task_number,
+            num_tasks,
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash, Default)]
 pub(crate) struct ChannelKey {
     pub(crate) source_task_id: TaskId,
     pub(crate) target_task_id: TaskId,
+}
+
+impl Serde for ChannelKey {
+    fn capacity(&self) -> usize {
+        8 + 8
+    }
+
+    fn serialize(&self, bytes: &mut BytesMut) {
+        self.source_task_id.serialize(bytes);
+        self.target_task_id.serialize(bytes);
+    }
+
+    fn deserialize(bytes: &mut BytesMut) -> Self {
+        let source_task_id = TaskId::deserialize(bytes);
+        let target_task_id = TaskId::deserialize(bytes);
+
+        ChannelKey {
+            source_task_id,
+            target_task_id,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, Default)]
