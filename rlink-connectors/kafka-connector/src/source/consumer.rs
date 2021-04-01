@@ -57,7 +57,7 @@ pub(crate) fn create_kafka_consumer(
 
     let handover_clone = handover.clone();
     utils::thread::spawn("kafka-source-block", move || {
-        async_runtime().block_on(async {
+        async_runtime("kafka_source").block_on(async {
             let mut kafka_consumer = KafkaConsumerThread::new(
                 client_config,
                 partition_offsets,

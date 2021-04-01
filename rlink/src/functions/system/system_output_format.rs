@@ -1,4 +1,3 @@
-use std::borrow::BorrowMut;
 use std::collections::HashMap;
 
 use crate::api::checkpoint::CheckpointFunction;
@@ -14,6 +13,7 @@ use crate::pub_sub::{memory, network, ChannelType, DEFAULT_CHANNEL_SIZE};
 pub(crate) struct SystemOutputFormat {
     task_id: TaskId,
     channel_type: ChannelType,
+    // Vec<JobId(self), Vec<(TaskId(child), ElementSender)>)>
     job_senders: Vec<(JobId, Vec<(TaskId, ElementSender)>)>,
 }
 
@@ -156,52 +156,20 @@ impl OutputFormat for SystemOutputFormat {
                 if self.job_senders.len() == 1 {
                     let (_job_id, task_senders) = &self.job_senders[0];
                     let (task_id, sender) = &task_senders[0];
-                    match element.borrow_mut() {
-                        Element::Record(record) => {
-                            record.channel_key = ChannelKey {
-                                source_task_id: self.task_id,
-                                target_task_id: *task_id,
-                            };
-                        }
-                        Element::Watermark(watermark) => {
-                            watermark.channel_key = ChannelKey {
-                                source_task_id: self.task_id,
-                                target_task_id: *task_id,
-                            };
-                        }
-                        Element::StreamStatus(stream_status) => {
-                            stream_status.channel_key = ChannelKey {
-                                source_task_id: self.task_id,
-                                target_task_id: *task_id,
-                            };
-                        }
-                        _ => {}
-                    }
+
+                    element.set_channel_key(ChannelKey {
+                        source_task_id: self.task_id,
+                        target_task_id: *task_id,
+                    });
                     sender.send(element).unwrap()
                 } else {
                     for (_job, task_senders) in &self.job_senders {
                         let (task_id, sender) = &task_senders[0];
-                        match element.borrow_mut() {
-                            Element::Record(record) => {
-                                record.channel_key = ChannelKey {
-                                    source_task_id: self.task_id,
-                                    target_task_id: *task_id,
-                                };
-                            }
-                            Element::Watermark(watermark) => {
-                                watermark.channel_key = ChannelKey {
-                                    source_task_id: self.task_id,
-                                    target_task_id: *task_id,
-                                };
-                            }
-                            Element::StreamStatus(stream_status) => {
-                                stream_status.channel_key = ChannelKey {
-                                    source_task_id: self.task_id,
-                                    target_task_id: *task_id,
-                                };
-                            }
-                            _ => {}
-                        }
+
+                        element.set_channel_key(ChannelKey {
+                            source_task_id: self.task_id,
+                            target_task_id: *task_id,
+                        });
                         sender.send(element.clone()).unwrap()
                     }
                 }

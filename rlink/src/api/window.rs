@@ -42,10 +42,10 @@ impl TimeWindow {
 
     // pub fn mergeWindows(windows: Vec<TimeWindow>, )
 
-    pub fn get_window_start_with_offset(timestamp: u64, offset: i64, window_size: u64) -> u64 {
+    pub fn get_window_start_with_offset(timestamp: u64, offset: i64, window_size: u64) -> i64 {
         let timestamp = timestamp as i64;
         let window_size = window_size as i64;
-        (timestamp - (timestamp - offset + window_size) % window_size) as u64
+        timestamp - (timestamp - offset + window_size) % window_size
     }
 }
 
@@ -134,11 +134,13 @@ impl WindowAssigner for SlidingEventTimeWindows {
 
         let mut start = last_start;
         loop {
-            if start > timestamp - self.size {
-                let window = TimeWindow::new(start, start + self.size);
-                // info!("Create window: {}", window);
-                windows.push(Window::TimeWindow(window));
-                start -= self.slide;
+            if start > timestamp as i64 - self.size as i64 {
+                if start >= 0 {
+                    let window = TimeWindow::new(start as u64, start as u64 + self.size);
+                    // info!("Create window: {}", window);
+                    windows.push(Window::TimeWindow(window));
+                }
+                start -= self.slide as i64;
             } else {
                 break;
             }

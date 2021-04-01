@@ -88,6 +88,9 @@ impl TMetadataStorage for MemoryMetadataStorage {
                         HeartbeatItem::WorkerManagerAddress(addr) => {
                             task_manager_descriptor.task_manager_address = addr;
                         }
+                        HeartbeatItem::WorkerManagerWebAddress(addr) => {
+                            task_manager_descriptor.web_address = addr;
+                        }
                         HeartbeatItem::HeartBeatStatus(status) => {
                             task_manager_descriptor.latest_heart_beat_status = status;
                         }

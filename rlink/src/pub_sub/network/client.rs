@@ -1,12 +1,14 @@
 use std::borrow::BorrowMut;
+use std::collections::LinkedList;
+use std::convert::TryFrom;
 use std::net::SocketAddr;
 use std::str::FromStr;
-use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
 use std::time::Duration;
 
-use bytes::{Buf, BytesMut};
+use bytes::BytesMut;
 use futures::{SinkExt, StreamExt};
 use tokio::io::AsyncWriteExt;
 use tokio::net::tcp::ReadHalf;
@@ -15,7 +17,7 @@ use tokio_util::codec::FramedRead;
 use tokio_util::codec::LengthDelimitedCodec;
 use tokio_util::codec::{BytesCodec, FramedWrite};
 
-use crate::api::element::{Element, Serde};
+use crate::api::element::Element;
 use crate::api::properties::ChannelBaseOn;
 use crate::api::runtime::{ChannelKey, TaskId};
 use crate::channel::{
@@ -23,9 +25,26 @@ use crate::channel::{
     TryRecvError, TrySendError,
 };
 use crate::metrics::{register_counter, Tag};
-use crate::pub_sub::network::{ElementRequest, ResponseCode};
+use crate::pub_sub::network::{ElementRequest, ElementResponse, ResponseCode};
 use crate::runtime::ClusterDescriptor;
-use crate::utils::thread::async_runtime;
+use crate::utils::thread::{async_runtime_multi, async_sleep};
+
+pub(crate) static ENABLE_LOG: AtomicBool = AtomicBool::new(false);
+
+#[inline]
+fn is_enable_log() -> bool {
+    ENABLE_LOG.load(Ordering::Relaxed)
+}
+
+#[inline]
+pub(crate) fn enable_log() {
+    ENABLE_LOG.store(true, Ordering::Relaxed)
+}
+
+#[inline]
+pub(crate) fn disable_log() {
+    ENABLE_LOG.store(false, Ordering::Relaxed)
+}
 
 const BATCH_PULL_SIZE: u16 = 6000;
 
@@ -74,7 +93,7 @@ fn subscribe_post(channel_key: ChannelKey, sender: ElementSender) {
 }
 
 pub(crate) fn run_subscribe(cluster_descriptor: Arc<ClusterDescriptor>) {
-    async_runtime().block_on(subscribe_listen(cluster_descriptor));
+    async_runtime_multi("client", 4).block_on(subscribe_listen(cluster_descriptor));
     info!("network subscribe task stop");
 }
 
@@ -106,10 +125,10 @@ async fn subscribe_listen(cluster_descriptor: Arc<ClusterDescriptor>) {
             }
             Err(TryRecvError::Empty) => {
                 idle_counter += 1;
-                if idle_counter < 20 * 120 {
-                    tokio::time::sleep(delay).await;
+                if idle_counter < 20 * 10 {
+                    async_sleep(delay).await;
                 } else {
-                    // all task registration must be completed within 2 minute
+                    // all task registration must be completed within 10 seconds
                     info!("subscribe listen task finish");
                     break;
                 }
@@ -128,27 +147,6 @@ async fn subscribe_listen(cluster_descriptor: Arc<ClusterDescriptor>) {
     }
 }
 
-async fn client_task(
-    channel_key: ChannelKey,
-    sender: ElementSender,
-    addr: SocketAddr,
-    batch_pull_size: u16,
-) -> anyhow::Result<()> {
-    let mut client =
-        Client::new(channel_key.clone(), sender.clone(), addr, batch_pull_size).await?;
-    match client.send().await {
-        Ok(()) => {
-            client.close_rough().await;
-            info!("client close({:?})", channel_key);
-            Ok(())
-        }
-        Err(e) => {
-            client.close_rough().await;
-            Err(e)
-        }
-    }
-}
-
 async fn loop_client_task(
     channel_key: ChannelKey,
     sender: ElementSender,
@@ -158,6 +156,7 @@ async fn loop_client_task(
     loop {
         match client_task(channel_key, sender.clone(), addr, batch_pull_size).await {
             Ok(_) => {
+                info!("client close({:?})", channel_key);
                 break;
             }
             Err(e) => {
@@ -165,8 +164,21 @@ async fn loop_client_task(
             }
         }
 
-        tokio::time::sleep(Duration::from_secs(3)).await;
+        async_sleep(Duration::from_secs(3)).await;
     }
+}
+
+async fn client_task(
+    channel_key: ChannelKey,
+    sender: ElementSender,
+    addr: SocketAddr,
+    batch_pull_size: u16,
+) -> anyhow::Result<()> {
+    let mut client = Client::new(channel_key, sender.clone(), addr, batch_pull_size).await?;
+    let rt = client.send().await;
+    client.close_rough().await;
+
+    rt
 }
 
 pub(crate) struct Client {
@@ -176,6 +188,7 @@ pub(crate) struct Client {
     pub(crate) addr: SocketAddr,
     batch_pull_size: u16,
     stream: TcpStream,
+    tcp_frame_max_size: u32,
 }
 
 impl Client {
@@ -185,31 +198,43 @@ impl Client {
         addr: SocketAddr,
         batch_pull_size: u16,
     ) -> anyhow::Result<Self> {
-        match TcpStream::connect(addr).await {
-            Ok(stream) => Ok(Client {
-                channel_key,
-                sender,
-                addr,
-                batch_pull_size,
-                stream,
-            }),
-            Err(e) => Err(anyhow!(e)),
-        }
+        let std_stream = std::net::TcpStream::connect(addr)?;
+        std_stream.set_nonblocking(true)?;
+        std_stream.set_read_timeout(Some(Duration::from_secs(20)))?;
+        std_stream.set_write_timeout(Some(Duration::from_secs(20)))?;
+
+        let stream = TcpStream::from_std(std_stream)?;
+
+        Ok(Client {
+            channel_key,
+            sender,
+            addr,
+            batch_pull_size,
+            stream,
+            tcp_frame_max_size: 1024 * 1024,
+        })
     }
 
     pub async fn send(&mut self) -> anyhow::Result<()> {
         info!(
-            "Pull remote={}, channel_key={:?}",
-            self.addr, self.channel_key
+            "Pull remote={}, local={}, channel_key={:?}",
+            self.addr,
+            self.stream.local_addr().unwrap(),
+            self.channel_key,
         );
 
-        let (r, w) = self.stream.split();
-        let mut sink = FramedWrite::new(w, BytesCodec::new());
+        let (read_half, write_half) = self.stream.split();
+        let mut framed_write = FramedWrite::new(write_half, BytesCodec::new());
 
         let mut codec_framed: FramedRead<ReadHalf, LengthDelimitedCodec> =
             LengthDelimitedCodec::builder()
+                .length_field_offset(0)
                 .length_field_length(4)
-                .new_read(r);
+                .length_adjustment(4) // 数据体截取位置，应和num_skip配置使用，保证frame要全部被读取
+                .num_skip(0)
+                .max_frame_length(self.tcp_frame_max_size as usize)
+                .big_endian()
+                .new_read(read_half);
 
         let tags = vec![
             Tag::from(("source_job_id", self.channel_key.source_task_id.job_id.0)),
@@ -226,117 +251,114 @@ impl Client {
         let counter = Arc::new(AtomicU64::new(0));
         register_counter("NetWorkClient", tags, counter.clone());
 
+        let mut batch_id = 0u16;
+        let timeout = Duration::from_secs(6);
         loop {
             let request = ElementRequest {
                 channel_key: self.channel_key.clone(),
                 batch_pull_size: self.batch_pull_size,
+                batch_id,
             };
 
+            let (n, _) = batch_id.overflowing_add(1);
+            batch_id = n;
+
+            if is_enable_log() {
+                info!("send request: {:?}", request);
+            }
+
             let buffer: BytesMut = request.into();
-            sink.send(buffer.freeze()).await?;
+            framed_write.send(buffer.freeze()).await?;
 
-            loop {
-                match codec_framed.next().await {
-                    Some(message) => match message {
-                        Ok(bytes) => {
-                            let (code, element) = frame_parse(bytes);
-                            match code {
-                                ResponseCode::Ok => {
-                                    let mut end = false;
-                                    let mut element = element.unwrap();
-                                    match element.borrow_mut() {
-                                        Element::Record(record) => {
-                                            record.channel_key = self.channel_key
-                                        }
-                                        Element::Watermark(watermark) => {
-                                            watermark.channel_key = self.channel_key;
-                                            debug!("client recv Watermark {}", watermark.timestamp);
-                                        }
-                                        Element::StreamStatus(stream_status) => {
-                                            stream_status.channel_key = self.channel_key;
-                                            end = stream_status.end;
-                                        }
-                                        _ => {}
-                                    }
+            let element_list = tokio::time::timeout(
+                timeout,
+                Self::recv_element(
+                    codec_framed.borrow_mut(),
+                    self.channel_key,
+                    self.batch_pull_size,
+                ),
+            )
+            .await??;
 
-                                    let channel_opened =
-                                        Client::send_to_channel(element, &self.sender, &counter)
-                                            .await;
-                                    if !channel_opened {
-                                        warn!("channel has closed. unreachable! the next job channel must live longer than the client");
-                                        return Ok(());
-                                    }
-                                    if end {
-                                        info!("client recv an end flag and unsubscribe");
-                                        return Ok(());
-                                    }
-                                }
-                                ResponseCode::BatchFinish => {
-                                    // info!("batch finish");
-                                    break;
-                                }
-                                ResponseCode::Empty => {
-                                    tokio::time::sleep(Duration::from_millis(1000)).await;
-                                    debug!("no rows in remote");
-
-                                    break;
-                                }
-                                ResponseCode::NoService => {
-                                    warn!("remote no service. unreachable! after an end flag, the client has close");
-                                    return Ok(());
-                                }
-                                _ => {
-                                    return Err(anyhow::Error::msg(format!(
-                                        "unrecognized remote code {:?}",
-                                        code
-                                    )));
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            return Err(anyhow::Error::msg(format!("framed read error {}", e)));
-                        }
-                    },
-                    None => {
-                        return Err(anyhow::Error::msg("framed read nothing"));
+            let len = element_list.len();
+            if len > 0 {
+                for element in element_list {
+                    match self.sender.try_send_opt(element) {
+                        Some(t) => send_to_channel(&self.sender, t).await?,
+                        None => {}
                     }
                 }
+
+                counter.fetch_add(len as u64, Ordering::Relaxed);
+            }
+            if len < 100 {
+                async_sleep(Duration::from_secs(3)).await;
             }
         }
     }
 
-    async fn send_to_channel(
-        element: Element,
-        sender: &ElementSender,
-        counter: &Arc<AtomicU64>,
-    ) -> bool {
-        let mut ele = element;
-        let mut loops = 0;
-        loop {
-            ele = match sender.try_send(ele) {
-                Ok(_) => {
-                    counter.fetch_add(1, Ordering::Relaxed);
-                    return true;
-                }
-                Err(TrySendError::Full(ele)) => {
-                    // if loops == 0 {
-                    //     warn!("net input channel block");
-                    // } else
-                    if loops == 60 {
-                        error!("net input channel block and try with 60 times");
-                        loops = 0;
-                    }
-                    loops += 1;
+    async fn recv_element(
+        framed_read: &mut FramedRead<ReadHalf<'_>, LengthDelimitedCodec>,
+        channel_key: ChannelKey,
+        batch_size: u16,
+    ) -> anyhow::Result<LinkedList<Element>> {
+        if is_enable_log() {
+            info!("begin loop recv elements. channel: {:?}", channel_key);
+        }
+        let mut element_list = LinkedList::new();
+        for n in 0..batch_size + 1 {
+            let message = framed_read
+                .next()
+                .await
+                .ok_or(anyhow!("framed read nothing"))?;
 
-                    tokio::time::sleep(Duration::from_secs(1)).await;
-                    ele
+            let bytes = message.map_err(|e| anyhow!("framed read error {}", e))?;
+
+            let ElementResponse { code, element } = ElementResponse::try_from(bytes)?;
+
+            match code {
+                ResponseCode::Ok => {
+                    let mut element = element.unwrap();
+                    element.set_channel_key(channel_key);
+                    element_list.push_back(element);
                 }
-                Err(TrySendError::Disconnected(_)) => {
-                    info!("client network send to input channel Disconnected");
-                    return false;
+                ResponseCode::BatchFinish => {
+                    if n != batch_size {
+                        error!(
+                            "inconsistent response and request, channel: {:?}",
+                            channel_key
+                        );
+                    }
+                    if is_enable_log() {
+                        info!("batch finish, channel: {:?}", channel_key);
+                    }
+                    return Ok(element_list);
+                }
+                ResponseCode::Empty => {
+                    if is_enable_log() {
+                        info!(
+                            "recv `Empty` code from remoting, total recv size {}, channel: {:?}",
+                            n, channel_key
+                        );
+                    }
+
+                    return Ok(element_list);
+                }
+                ResponseCode::NoService => {
+                    return Err(anyhow!(
+                        "remoting no service. unreachable! after an end flag, the client has close"
+                    ));
+                }
+                _ => {
+                    return Err(anyhow!("unrecognized remoting code {:?}", code));
                 }
             }
         }
+
+        // Err(anyhow!(
+        //     "unreachable, should be interrupted at `Empty` or `BatchFinish` code"
+        // ))
+        unreachable!()
     }
 
     // maybe lost data in send/recv buffer
@@ -350,20 +372,75 @@ impl Client {
         match self.close().await {
             Ok(_) => {}
             Err(e) => {
-                error!("close client error {}", e);
+                error!("close client error. {}", e);
             }
         }
     }
 }
 
-/// Return the `partition_num`
-fn frame_parse(mut data: BytesMut) -> (ResponseCode, Option<Element>) {
-    data.advance(4); // skip header length
-    let code = data.get_u8();
-    let code = ResponseCode::from(code);
-    if code == ResponseCode::Ok {
-        (code, Some(Element::deserialize(data.borrow_mut())))
-    } else {
-        (code, None)
+async fn send_to_channel(sender: &ElementSender, element: Element) -> anyhow::Result<()> {
+    let mut ele = element;
+    let mut loops = 0;
+    loop {
+        ele = match sender.try_send(ele) {
+            Ok(_) => {
+                return Ok(());
+            }
+            Err(TrySendError::Full(ele)) => {
+                // if is_enable_log() {
+                error!("> net input channel block, channel: {:?}", ele);
+                // }
+
+                if loops == 60 {
+                    error!("net input channel block and try with 60 times");
+                    loops = 0;
+                }
+                loops += 1;
+
+                async_sleep(Duration::from_secs(1)).await;
+                error!("< net input channel block, channel: {:?}", ele);
+
+                ele
+            }
+            Err(TrySendError::Disconnected(_)) => {
+                return Err(anyhow!("client network send to input channel Disconnected. unreachable! the next job channel must live longer than the client"));
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::api::element::Element;
+    use crate::api::runtime::{ChannelKey, JobId, TaskId};
+    use crate::channel::named_channel;
+    use crate::pub_sub::network::client::Client;
+
+    #[tokio::test]
+    pub async fn client_test() {
+        let channel_key = ChannelKey {
+            source_task_id: TaskId {
+                job_id: JobId(0),
+                task_number: 5,
+                num_tasks: 30,
+            },
+            target_task_id: TaskId {
+                job_id: JobId(4),
+                task_number: 14,
+                num_tasks: 30,
+            },
+        };
+        let (sender, receiver) = named_channel::<Element>("test", vec![], 10000);
+        std::thread::spawn(move || {
+            while let Ok(v) = receiver.recv() {
+                println!("{:?}", v);
+            }
+        });
+
+        let addr = "10.100.189.45:28820".parse().unwrap();
+
+        let mut client = Client::new(channel_key, sender, addr, 100).await.unwrap();
+        client.send().await.unwrap();
+        client.close().await.unwrap();
     }
 }
