@@ -183,9 +183,8 @@ impl Serde for Record {
         bytes.put_u32(value_len as u32);
 
         let data_slice = self.values.as_slice();
-        if data_slice.len() != value_len {
-            unreachable!()
-        }
+        assert_eq!(data_slice.len(), value_len);
+
         bytes.put_slice(data_slice);
     }
 
@@ -197,6 +196,8 @@ impl Serde for Record {
         let timestamp = bytes.get_u64();
 
         let value_len = bytes.get_u32() as usize;
+        assert_eq!(bytes.remaining(), value_len);
+
         let values = bytes.split_to(value_len);
 
         Record {
