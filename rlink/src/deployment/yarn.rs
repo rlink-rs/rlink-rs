@@ -121,24 +121,21 @@ struct YarnCliCommand {
 }
 
 impl YarnCliCommand {
-    pub fn new(context: &Context, job_descriptor: &ClusterDescriptor) -> Self {
+    pub fn new(context: &Context, cluster_descriptor: &ClusterDescriptor) -> Self {
+        let coordinator_manager = &cluster_descriptor.coordinator_manager;
+
         let child = std::process::Command::new("java")
             .arg("-Xmx256M")
             // .arg("rlink.yarn.manager.ResourceManagerCli")
             .arg(context.yarn_manager_main_class.as_str())
             .arg("--coordinator_address")
-            .arg(
-                job_descriptor
-                    .coordinator_manager
-                    .coordinator_address
-                    .as_str(),
-            )
+            .arg(coordinator_manager.coordinator_address.as_str())
             .arg("--worker_process_path")
             .arg(context.worker_process_path.as_str())
             .arg("--memory_mb")
-            .arg(context.memory_mb.to_string())
+            .arg(coordinator_manager.memory_mb.to_string())
             .arg("--v_cores")
-            .arg(context.v_cores.to_string())
+            .arg(coordinator_manager.v_cores.to_string())
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())

@@ -38,8 +38,8 @@ impl TResourceManager for LocalResourceManager {
         let cluster_descriptor = self.cluster_descriptor.as_ref().unwrap();
         for task_manager_descriptor in &cluster_descriptor.worker_managers {
             let resource = Resource::new(
-                task_manager_descriptor.physical_memory,
-                task_manager_descriptor.cpu_cores,
+                cluster_descriptor.coordinator_manager.memory_mb,
+                cluster_descriptor.coordinator_manager.v_cores,
             );
             info!(
                 "TaskManager(id={}) allocate resource cpu:{}, memory:{}",

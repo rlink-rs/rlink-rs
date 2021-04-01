@@ -42,7 +42,6 @@ where
     resource_manager: R,
     stream_env: StreamExecutionEnvironment,
 
-    startup_time: Arc<AtomicI64>,
     startup_number: Arc<AtomicI64>,
 }
 
@@ -59,9 +58,6 @@ where
     ) -> Self {
         let metadata_storage_mode = context.cluster_config.metadata_storage.clone();
 
-        let startup_time = Arc::new(AtomicI64::default());
-        register_gauge("startup_time", vec![], startup_time.clone());
-
         let startup_number = Arc::new(AtomicI64::default());
         register_gauge("startup_number", vec![], startup_number.clone());
 
@@ -71,7 +67,6 @@ where
             metadata_storage_mode,
             resource_manager,
             stream_env,
-            startup_time,
             startup_number,
         }
     }
@@ -111,7 +106,7 @@ where
             .prepare(&self.context, &cluster_descriptor);
         info!("ResourceManager prepared");
 
-        self.gauge_startup_time(&cluster_descriptor);
+        self.gauge_startup(&cluster_descriptor);
 
         // loop restart all tasks when some task is failure
         loop {
@@ -301,11 +296,21 @@ where
         }
     }
 
-    fn gauge_startup_time(&self, cluster_descriptor: &ClusterDescriptor) {
-        self.startup_time.store(
-            cluster_descriptor.coordinator_manager.startup_time as i64,
-            Ordering::Relaxed,
-        );
+    fn gauge_startup(&self, cluster_descriptor: &ClusterDescriptor) {
+        let coordinator_manager = &cluster_descriptor.coordinator_manager;
+
+        let uptime = Arc::new(AtomicI64::new(coordinator_manager.uptime as i64));
+        register_gauge("uptime", vec![], uptime);
+
+        let v_cores = Arc::new(AtomicI64::new(coordinator_manager.v_cores as i64));
+        register_gauge("v_cores", vec![], v_cores);
+
+        let memory_mb = Arc::new(AtomicI64::new(coordinator_manager.memory_mb as i64));
+        register_gauge("memory_mb", vec![], memory_mb);
+
+        let num_task_managers =
+            Arc::new(AtomicI64::new(coordinator_manager.num_task_managers as i64));
+        register_gauge("num_task_managers", vec![], num_task_managers);
     }
 
     fn gauge_startup_number(&self, cluster_descriptor: &mut ClusterDescriptor) {

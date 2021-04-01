@@ -141,8 +141,6 @@ pub struct WorkerManagerDescriptor {
     pub task_manager_address: String,
     pub metrics_address: String,
     pub web_address: String,
-    pub cpu_cores: u32,
-    pub physical_memory: u32,
     /// job tasks map: <job_id, Vec<TaskDescriptor>>
     pub task_descriptors: Vec<TaskDescriptor>,
 }
@@ -156,7 +154,10 @@ pub struct CoordinatorManagerDescriptor {
     pub coordinator_address: String,
     pub metrics_address: String,
     pub coordinator_status: TaskManagerStatus,
-    pub startup_time: u64,
+    pub v_cores: u32,
+    pub memory_mb: u32,
+    pub num_task_managers: u32,
+    pub uptime: u64,
     pub startup_number: u64,
 }
 
