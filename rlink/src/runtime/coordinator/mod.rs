@@ -63,7 +63,7 @@ where
         register_gauge("startup_time", vec![], startup_time.clone());
 
         let startup_number = Arc::new(AtomicI64::default());
-        register_gauge("startup_time", vec![], startup_number.clone());
+        register_gauge("startup_number", vec![], startup_number.clone());
 
         CoordinatorTask {
             context,
