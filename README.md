@@ -142,3 +142,35 @@ hadoop jar rlink-yarn-client-{version}.jar rlink.yarn.client.Client \
   --num_task_managers 80 \
   --application_process_arg xxx
 ```
+
+## On Kubernetes
+
+### Preparation
+
+- Kubernetes
+- KubeConfig, configurable via ~/.kube/config. You can verify permissions by running kubectl auth can-i <list|create|edit|delete> pods
+
+take a look at how to [setup a Kubernetes cluster](https://kubernetes.io/docs/setup/).
+
+### Starting a rlink application on Kubernetes
+
+```shell
+# start 
+./target/release/rlink-kubernetes \
+  name=my_first_rlink_application \
+  image_path=name:tag \
+  job_v_cores=1 \
+  job_memory_mb=100 \
+  task_v_cores=1 \
+  task_memory_mb=100 \
+  num_task_managers=1  \
+
+# stop
+kubectl delete deployment/my_first_rlink_application
+```
+
+### Build image example-simple
+
+```shell
+sudo docker build -t xxx:xx -f ./docker/Dockerfile_example_simple .
+```

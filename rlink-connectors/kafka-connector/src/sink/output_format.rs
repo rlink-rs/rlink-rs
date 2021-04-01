@@ -45,7 +45,7 @@ impl OutputFormat for KafkaOutputFormat {
         let client_config = self.client_config.clone();
         let handover = self.handover.as_ref().unwrap().clone();
         utils::thread::spawn("kafka-sink-block", move || {
-            async_runtime().block_on(async {
+            async_runtime("kafka_sink").block_on(async {
                 let mut kafka_consumer = KafkaProducerThread::new(topic, client_config, handover);
                 kafka_consumer.run().await;
             });

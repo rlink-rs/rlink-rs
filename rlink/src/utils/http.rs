@@ -37,7 +37,7 @@ pub mod client {
     where
         T: Serialize + serde::de::DeserializeOwned + 'static,
     {
-        async_runtime().block_on(post(url, body))
+        async_runtime("http").block_on(post(url, body))
     }
 
     pub async fn post<T>(

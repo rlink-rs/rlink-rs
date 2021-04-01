@@ -11,21 +11,21 @@ use crate::utils::http;
 #[derive(Clone, Debug)]
 pub(crate) struct StandaloneResourceManager {
     context: Arc<Context>,
-    job_descriptor: Option<ClusterDescriptor>,
+    cluster_descriptor: Option<ClusterDescriptor>,
 }
 
 impl StandaloneResourceManager {
     pub fn new(context: Arc<Context>) -> Self {
         StandaloneResourceManager {
             context,
-            job_descriptor: None,
+            cluster_descriptor: None,
         }
     }
 }
 
 impl TResourceManager for StandaloneResourceManager {
-    fn prepare(&mut self, _context: &Context, job_descriptor: &ClusterDescriptor) {
-        self.job_descriptor = Some(job_descriptor.clone());
+    fn prepare(&mut self, _context: &Context, cluster_descriptor: &ClusterDescriptor) {
+        self.cluster_descriptor = Some(cluster_descriptor.clone());
     }
 
     fn worker_allocate<S>(
@@ -36,7 +36,7 @@ impl TResourceManager for StandaloneResourceManager {
     where
         S: StreamApp + 'static,
     {
-        let job_descriptor = self.job_descriptor.as_ref().unwrap();
+        let cluster_descriptor = self.cluster_descriptor.as_ref().unwrap();
 
         let cluster_client = StandaloneClusterClient::new(
             self.context
@@ -47,10 +47,10 @@ impl TResourceManager for StandaloneResourceManager {
 
         let application_id = self.context.application_id.as_str();
         let mut task_args = Vec::new();
-        for task_manager_descriptor in &job_descriptor.worker_managers {
+        for task_manager_descriptor in &cluster_descriptor.worker_managers {
             let resource = Resource::new(
-                task_manager_descriptor.physical_memory,
-                task_manager_descriptor.cpu_cores,
+                cluster_descriptor.coordinator_manager.memory_mb,
+                cluster_descriptor.coordinator_manager.v_cores,
             );
 
             info!(
@@ -74,7 +74,7 @@ impl TResourceManager for StandaloneResourceManager {
             );
             args.insert(
                 "coordinator_address".to_string(),
-                job_descriptor
+                cluster_descriptor
                     .coordinator_manager
                     .coordinator_address
                     .clone(),

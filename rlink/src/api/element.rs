@@ -181,7 +181,11 @@ impl Serde for Record {
         bytes.put_u64(self.timestamp);
 
         bytes.put_u32(value_len as u32);
-        bytes.put_slice(self.values.as_slice());
+
+        let data_slice = self.values.as_slice();
+        assert_eq!(data_slice.len(), value_len);
+
+        bytes.put_slice(data_slice);
     }
 
     fn deserialize(bytes: &mut BytesMut) -> Self {
@@ -192,6 +196,8 @@ impl Serde for Record {
         let timestamp = bytes.get_u64();
 
         let value_len = bytes.get_u32() as usize;
+        assert_eq!(bytes.remaining(), value_len);
+
         let values = bytes.split_to(value_len);
 
         Record {
@@ -537,6 +543,21 @@ impl Element {
         match self {
             Element::Barrier(barrier) => barrier,
             _ => panic!("Element is not Barrier"),
+        }
+    }
+
+    pub(crate) fn set_channel_key(&mut self, channel_key: ChannelKey) {
+        match self {
+            Element::Record(record) => {
+                record.channel_key = channel_key;
+            }
+            Element::Watermark(watermark) => {
+                watermark.channel_key = channel_key;
+            }
+            Element::StreamStatus(stream_status) => {
+                stream_status.channel_key = channel_key;
+            }
+            _ => {}
         }
     }
 }

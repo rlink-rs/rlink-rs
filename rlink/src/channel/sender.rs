@@ -101,4 +101,13 @@ where
             r
         })
     }
+
+    #[inline]
+    pub fn try_send_opt(&self, event: T) -> Option<T> {
+        match self.try_send(event) {
+            Ok(_) => None,
+            Err(TrySendError::Full(t)) => Some(t),
+            Err(TrySendError::Disconnected(t)) => Some(t),
+        }
+    }
 }

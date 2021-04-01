@@ -28,9 +28,7 @@ impl MetadataLoader {
                         serde_json::from_str(resp.as_str()).unwrap();
                     let StdResponse { code, data } = resp_model;
                     if code != ResponseCode::OK || data.is_none() {
-                        panic!(
-                            "get remote JobDescriptor with error code: ".to_owned() + resp.as_str()
-                        );
+                        panic!("get remote JobDescriptor with error code: {}", resp);
                     }
 
                     let cluster_descriptor = data.unwrap();
@@ -55,9 +53,7 @@ impl MetadataLoader {
                         serde_json::from_str(resp.as_str()).unwrap();
                     let StdResponse { code, data } = resp_model;
                     if code != ResponseCode::OK || data.is_none() {
-                        panic!(
-                            "get remote JobDescriptor with error code: ".to_owned() + resp.as_str()
-                        );
+                        panic!("get remote JobDescriptor with error code: {}", resp);
                     }
 
                     let dag_metadata = data.unwrap();

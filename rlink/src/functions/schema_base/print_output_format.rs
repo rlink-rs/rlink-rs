@@ -72,10 +72,10 @@ impl OutputFormat for PrintOutputFormat {
             .unwrap_or_default();
 
         println!(
-            "task: {}, row: [{}], window: {}",
+            "task_number: {}, window: {}, row: [{}]",
             self.task_id.task_number,
+            window_str,
             field_str_vec.join(","),
-            window_str
         );
     }
 

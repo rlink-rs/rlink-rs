@@ -65,6 +65,9 @@ pub(crate) struct Context {
     pub worker_process_path: String,
     pub memory_mb: usize,
     pub v_cores: usize,
+
+    //on k8s
+    pub image_path: String,
 }
 
 impl Context {
@@ -84,6 +87,7 @@ impl Context {
         worker_process_path: String,
         memory_mb: usize,
         v_cores: usize,
+        image_path: String,
     ) -> Self {
         Context {
             application_name,
@@ -101,6 +105,7 @@ impl Context {
             worker_process_path,
             memory_mb,
             v_cores,
+            image_path,
         }
     }
 
@@ -119,7 +124,9 @@ impl Context {
 
         let application_id = match cluster_mode {
             ClusterMode::Local => utils::generator::gen_with_ts(),
-            ClusterMode::Standalone | ClusterMode::YARN => parse_arg("application_id")?,
+            ClusterMode::Standalone | ClusterMode::YARN | ClusterMode::Kubernetes => {
+                parse_arg("application_id")?
+            }
         };
 
         let task_manager_id = match manager_type {
@@ -131,7 +138,7 @@ impl Context {
         let num_task_managers = match manager_type {
             ManagerType::Coordinator => match cluster_mode {
                 ClusterMode::Local => 1,
-                ClusterMode::Standalone | ClusterMode::YARN => {
+                ClusterMode::Standalone | ClusterMode::YARN | ClusterMode::Kubernetes => {
                     let num_task_managers = parse_arg("num_task_managers")?;
                     let num_task_managers =
                         u32::from_str(num_task_managers.as_str()).map_err(|_e| {
@@ -158,7 +165,7 @@ impl Context {
                 let cluster_config = parse_arg("cluster_config")?;
                 load_config(PathBuf::from(cluster_config))?
             }
-            ClusterMode::YARN => ClusterConfig::new_local(),
+            ClusterMode::YARN | ClusterMode::Kubernetes => ClusterConfig::new_local(),
         };
 
         let (yarn_manager_main_class, worker_process_path, memory_mb, v_cores) = match cluster_mode
@@ -169,12 +176,12 @@ impl Context {
                     let worker_process_path = parse_arg("worker_process_path")?;
 
                     let memory_mb = parse_arg("memory_mb")?;
-                    let memory_mb = usize::from_str(memory_mb.as_str()).map_err(|_e| {
+                    let memory_mb = u32::from_str(memory_mb.as_str()).map_err(|_e| {
                         anyhow!("parse `memory_mb`=`{}` to usize error", memory_mb)
                     })?;
 
                     let v_cores = parse_arg("v_cores")?;
-                    let v_cores = usize::from_str(v_cores.as_str())
+                    let v_cores = u32::from_str(v_cores.as_str())
                         .map_err(|_e| anyhow!("parse `v_cores`=`{}` to usize error", v_cores))?;
 
                     (
@@ -183,6 +190,21 @@ impl Context {
                         memory_mb,
                         v_cores,
                     )
+                }
+                _ => ("".to_string(), "".to_string(), 0, 0),
+            },
+            ClusterMode::Kubernetes => match manager_type {
+                ManagerType::Coordinator => {
+                    let memory_mb = parse_arg("memory_mb")?;
+                    let memory_mb = usize::from_str(memory_mb.as_str()).map_err(|_e| {
+                        anyhow!("parse `memory_mb`=`{}` to usize error", memory_mb)
+                    })?;
+
+                    let v_cores = parse_arg("v_cores")?;
+                    let v_cores = usize::from_str(v_cores.as_str())
+                        .map_err(|_e| anyhow!("parse `v_cores`=`{}` to usize error", v_cores))?;
+
+                    ("".to_string(), "".to_string(), memory_mb, v_cores)
                 }
                 _ => ("".to_string(), "".to_string(), 0, 0),
             },
@@ -211,6 +233,14 @@ impl Context {
             _ => parse_arg("coordinator_address")?,
         };
 
+        let image_path = match cluster_mode {
+            ClusterMode::Kubernetes => match manager_type {
+                ManagerType::Coordinator => parse_arg("image_path")?,
+                _ => String::new(),
+            },
+            _ => String::new(),
+        };
+
         Ok(Context::new(
             application_name.to_string(),
             application_id,
@@ -227,6 +257,7 @@ impl Context {
             worker_process_path,
             memory_mb,
             v_cores,
+            image_path,
         ))
     }
 }
