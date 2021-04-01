@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 
 import static rlink.yarn.client.Client.APPLICATION_ID_KEY;
+import static rlink.yarn.client.Client.APPLICATION_NAME_KEY;
 import static rlink.yarn.client.Client.MEMORY_MB_KEY;
 import static rlink.yarn.client.Client.RUST_STREAMING_PATH_KEY;
 import static rlink.yarn.client.Client.VIRTUAL_CORES_KEY;
@@ -100,6 +101,7 @@ public class ClientExecutor {
         pathList.add(javaManagerPath);
         pathList.add(dashboardPath);
         Map<String, String> paramMap = submitParam.getParamMap();
+        paramMap.put(APPLICATION_NAME_KEY, submitParam.getApplicationName());
         paramMap.put(MEMORY_MB_KEY, String.valueOf(memoryMb));
         paramMap.put(VIRTUAL_CORES_KEY, String.valueOf(vCores));
         paramMap.put(RUST_STREAMING_PATH_KEY, rustStreamingPath.toString());

@@ -247,9 +247,11 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
         LOGGER.info("onContainersAllocated,size=" + containers.size());
         Iterator<AMRMClient.ContainerRequest> requestIterator = getPendingRequest().iterator();
         for (Container container : containers) {
-            AMRMClient.ContainerRequest containerRequest = requestIterator.next();
-            resourceManagerClient.removeContainerRequest(containerRequest);
-            LOGGER.info("removeContainerRequest,{}", containerRequest);
+            if (requestIterator.hasNext()) {
+                AMRMClient.ContainerRequest containerRequest = requestIterator.next();
+                resourceManagerClient.removeContainerRequest(containerRequest);
+                LOGGER.info("removeContainerRequest,{}", containerRequest);
+            }
 
             if (allocateTaskList.size() == allocateParams.size()) {
                 resourceManagerClient.releaseAssignedContainer(container.getId());
