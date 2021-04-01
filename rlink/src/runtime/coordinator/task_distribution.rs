@@ -63,6 +63,8 @@ pub(crate) fn build_cluster_descriptor(
         coordinator_address: "".to_string(),
         metrics_address: context.metric_addr.clone(),
         coordinator_status: TaskManagerStatus::Pending,
+        startup_time: crate::utils::date_time::current_timestamp_millis(),
+        startup_number: 0,
     };
 
     ClusterDescriptor {

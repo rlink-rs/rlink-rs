@@ -156,6 +156,8 @@ pub struct CoordinatorManagerDescriptor {
     pub coordinator_address: String,
     pub metrics_address: String,
     pub coordinator_status: TaskManagerStatus,
+    pub startup_time: u64,
+    pub startup_number: u64,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

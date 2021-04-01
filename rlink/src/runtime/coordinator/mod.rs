@@ -1,6 +1,7 @@
 use std::borrow::BorrowMut;
 use std::convert::TryFrom;
 use std::ops::Deref;
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -12,6 +13,7 @@ use crate::api::properties::{Properties, SYSTEM_CLUSTER_MODE};
 use crate::dag::metadata::DagMetadata;
 use crate::dag::DagManager;
 use crate::deployment::TResourceManager;
+use crate::metrics::register_gauge;
 use crate::runtime::context::Context;
 use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
 use crate::runtime::coordinator::heart_beat_manager::HeartbeatResult;
@@ -39,6 +41,9 @@ where
     metadata_storage_mode: MetadataStorageType,
     resource_manager: R,
     stream_env: StreamExecutionEnvironment,
+
+    startup_time: Arc<AtomicI64>,
+    startup_number: Arc<AtomicI64>,
 }
 
 impl<S, R> CoordinatorTask<S, R>
@@ -54,12 +59,20 @@ where
     ) -> Self {
         let metadata_storage_mode = context.cluster_config.metadata_storage.clone();
 
+        let startup_time = Arc::new(AtomicI64::default());
+        register_gauge("startup_time", vec![], startup_time.clone());
+
+        let startup_number = Arc::new(AtomicI64::default());
+        register_gauge("startup_time", vec![], startup_number.clone());
+
         CoordinatorTask {
             context,
             stream_app,
             metadata_storage_mode,
             resource_manager,
             stream_env,
+            startup_time,
+            startup_number,
         }
     }
 
@@ -98,10 +111,14 @@ where
             .prepare(&self.context, &cluster_descriptor);
         info!("ResourceManager prepared");
 
+        self.gauge_startup_time(&cluster_descriptor);
+
         // loop restart all tasks when some task is failure
         loop {
+            self.gauge_startup_number(cluster_descriptor.borrow_mut());
+
             // save metadata to storage
-            self.save_metadata(cluster_descriptor.clone());
+            self.save_metadata(&cluster_descriptor);
             info!("save metadata to storage");
 
             // allocate all worker's resources
@@ -164,7 +181,7 @@ where
         cluster_descriptor
     }
 
-    fn save_metadata(&self, cluster_descriptor: ClusterDescriptor) {
+    fn save_metadata(&self, cluster_descriptor: &ClusterDescriptor) {
         let mut metadata_storage = MetadataStorage::new(&self.metadata_storage_mode);
         loop_save_cluster_descriptor(metadata_storage.borrow_mut(), cluster_descriptor.clone());
     }
@@ -282,5 +299,20 @@ where
                 }
             }
         }
+    }
+
+    fn gauge_startup_time(&self, cluster_descriptor: &ClusterDescriptor) {
+        self.startup_time.store(
+            cluster_descriptor.coordinator_manager.startup_time as i64,
+            Ordering::Relaxed,
+        );
+    }
+
+    fn gauge_startup_number(&self, cluster_descriptor: &mut ClusterDescriptor) {
+        cluster_descriptor.coordinator_manager.startup_number += 1;
+        self.startup_number.store(
+            cluster_descriptor.coordinator_manager.startup_number as i64,
+            Ordering::Relaxed,
+        );
     }
 }
