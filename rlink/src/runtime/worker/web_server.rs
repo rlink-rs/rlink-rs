@@ -1,48 +1,30 @@
 use std::convert::Infallible;
 use std::net::SocketAddr;
-use std::ops::Deref;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use bytes::Buf;
 use hyper::http::header;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response};
 use hyper::{Server, StatusCode};
 use rand::Rng;
 
-use crate::api::checkpoint::Checkpoint;
-use crate::api::cluster::{MetadataStorageType, StdResponse};
+use crate::api::cluster::StdResponse;
 use crate::channel::{bounded, Sender};
-use crate::dag::metadata::DagMetadata;
-use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
-use crate::runtime::HeartbeatRequest;
-use crate::runtime::TaskManagerStatus;
-use crate::storage::metadata::{MetadataStorage, TMetadataStorage};
 use crate::utils::fs::read_file;
 use crate::utils::http::server::{as_ok_json, page_not_found};
 use crate::utils::thread::async_runtime_multi;
 
-pub(crate) fn web_launch(
-    context: Arc<crate::runtime::context::Context>,
-    metadata_mode: MetadataStorageType,
-    checkpoint_manager: CheckpointManager,
-    dag_metadata: DagMetadata,
-) -> String {
+pub(crate) fn web_launch(context: Arc<crate::runtime::context::Context>) -> String {
     let (tx, rx) = bounded(1);
 
     std::thread::Builder::new()
         .name("WebUI".to_string())
         .spawn(move || {
-            async_runtime_multi("web", 4).block_on(async move {
+            async_runtime_multi("web", 2).block_on(async move {
                 let ip = context.bind_ip.clone();
-                let web_context = Arc::new(WebContext {
-                    context,
-                    metadata_mode,
-                    checkpoint_manager,
-                    dag_metadata,
-                });
+                let web_context = Arc::new(WebContext { context });
                 serve_with_rand_port(web_context, ip, tx).await;
             });
         })
@@ -54,9 +36,6 @@ pub(crate) fn web_launch(
 
 struct WebContext {
     context: Arc<crate::runtime::context::Context>,
-    metadata_mode: MetadataStorageType,
-    checkpoint_manager: CheckpointManager,
-    dag_metadata: DagMetadata,
 }
 
 async fn serve_with_rand_port(
@@ -116,20 +95,11 @@ async fn route(req: Request<Body>, web_context: Arc<WebContext>) -> anyhow::Resu
     if path.starts_with("/api/") {
         if Method::GET.eq(method) {
             match path {
-                "/api/context" => get_context(req, web_context).await,
-                "/api/cluster_metadata" => get_cluster_metadata(req, web_context).await,
-                "/api/checkpoints" => get_checkpoint(req, web_context).await,
-                "/api/dag_metadata" => get_dag_metadata(req, web_context).await,
-                "/api/dag/stream_graph" => get_stream_graph(req, web_context).await,
-                "/api/dag/job_graph" => get_job_graph(req, web_context).await,
-                "/api/dag/execution_graph" => get_execution_graph(req, web_context).await,
                 "/api/threads" => get_thread_infos(req, web_context).await,
-                _ => page_not_found().await,
-            }
-        } else if Method::POST.eq(method) {
-            match path {
-                "/api/heartbeat" => heartbeat(req, web_context).await,
-                "/api/checkpoint" => checkpoint(req, web_context).await,
+                "/api/client/log/enable" => enable_client_log(req, web_context).await,
+                "/api/client/log/disable" => disable_client_log(req, web_context).await,
+                "/api/server/log/enable" => enable_server_log(req, web_context).await,
+                "/api/server/log/disable" => disable_server_log(req, web_context).await,
                 _ => page_not_found().await,
             }
         } else {
@@ -144,61 +114,36 @@ async fn route(req: Request<Body>, web_context: Arc<WebContext>) -> anyhow::Resu
     }
 }
 
-async fn get_context(
+async fn enable_client_log(
     _req: Request<Body>,
-    context: Arc<WebContext>,
+    _context: Arc<WebContext>,
 ) -> anyhow::Result<Response<Body>> {
-    let c = context.context.deref().clone();
-    as_ok_json(&StdResponse::ok(Some(c)))
+    crate::pub_sub::network::client::enable_log();
+    as_ok_json(&StdResponse::ok(Some(true)))
 }
 
-async fn get_cluster_metadata(
+async fn disable_client_log(
     _req: Request<Body>,
-    context: Arc<WebContext>,
+    _context: Arc<WebContext>,
 ) -> anyhow::Result<Response<Body>> {
-    let metadata_storage = MetadataStorage::new(&context.metadata_mode);
-    let cluster_descriptor = metadata_storage.load().unwrap();
-    as_ok_json(&StdResponse::ok(Some(cluster_descriptor)))
+    crate::pub_sub::network::client::disable_log();
+    as_ok_json(&StdResponse::ok(Some(false)))
 }
 
-async fn get_checkpoint(
+async fn enable_server_log(
     _req: Request<Body>,
-    context: Arc<WebContext>,
+    _context: Arc<WebContext>,
 ) -> anyhow::Result<Response<Body>> {
-    let cks = context.checkpoint_manager.get();
-    as_ok_json(&StdResponse::ok(Some(cks)))
+    crate::pub_sub::network::server::enable_log();
+    as_ok_json(&StdResponse::ok(Some(true)))
 }
 
-async fn get_dag_metadata(
+async fn disable_server_log(
     _req: Request<Body>,
-    context: Arc<WebContext>,
+    _context: Arc<WebContext>,
 ) -> anyhow::Result<Response<Body>> {
-    let json_dag = context.dag_metadata.clone();
-    as_ok_json(&StdResponse::ok(Some(json_dag)))
-}
-
-async fn get_stream_graph(
-    _req: Request<Body>,
-    context: Arc<WebContext>,
-) -> anyhow::Result<Response<Body>> {
-    let json_dag = context.dag_metadata.stream_graph().clone();
-    as_ok_json(&StdResponse::ok(Some(json_dag)))
-}
-
-async fn get_job_graph(
-    _req: Request<Body>,
-    context: Arc<WebContext>,
-) -> anyhow::Result<Response<Body>> {
-    let json_dag = context.dag_metadata.job_graph().clone();
-    as_ok_json(&StdResponse::ok(Some(json_dag)))
-}
-
-async fn get_execution_graph(
-    _req: Request<Body>,
-    context: Arc<WebContext>,
-) -> anyhow::Result<Response<Body>> {
-    let json_dag = context.dag_metadata.execution_graph().clone();
-    as_ok_json(&StdResponse::ok(Some(json_dag)))
+    crate::pub_sub::network::server::disable_log();
+    as_ok_json(&StdResponse::ok(Some(false)))
 }
 
 async fn get_thread_infos(
@@ -207,41 +152,6 @@ async fn get_thread_infos(
 ) -> anyhow::Result<Response<Body>> {
     let c = crate::utils::thread::get_thread_infos();
     as_ok_json(&StdResponse::ok(Some(c)))
-}
-
-async fn heartbeat(req: Request<Body>, context: Arc<WebContext>) -> anyhow::Result<Response<Body>> {
-    let whole_body = hyper::body::aggregate(req).await?;
-    let HeartbeatRequest {
-        task_manager_id,
-        change_items,
-    } = serde_json::from_reader(whole_body.reader())?;
-
-    let metadata_storage = MetadataStorage::new(&context.metadata_mode);
-    metadata_storage
-        .update_task_manager_status(task_manager_id, change_items, TaskManagerStatus::Registered)
-        .unwrap();
-
-    as_ok_json(&StdResponse::ok(Some(true)))
-}
-
-async fn checkpoint(
-    req: Request<Body>,
-    context: Arc<WebContext>,
-) -> anyhow::Result<Response<Body>> {
-    let whole_body = hyper::body::aggregate(req).await?;
-    let ck_model: Checkpoint = serde_json::from_reader(whole_body.reader())?;
-
-    let ck_manager = &context.checkpoint_manager;
-    debug!("submit checkpoint to coordinator. {:?}", &ck_model);
-    let resp = match ck_manager.apply(ck_model) {
-        Ok(_) => "ok",
-        Err(e) => {
-            error!("submit checkpoint error. {}", e);
-            "error"
-        }
-    };
-
-    as_ok_json(&StdResponse::ok(Some(resp.to_string())))
 }
 
 async fn static_file(

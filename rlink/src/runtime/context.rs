@@ -176,12 +176,12 @@ impl Context {
                     let worker_process_path = parse_arg("worker_process_path")?;
 
                     let memory_mb = parse_arg("memory_mb")?;
-                    let memory_mb = usize::from_str(memory_mb.as_str()).map_err(|_e| {
+                    let memory_mb = u32::from_str(memory_mb.as_str()).map_err(|_e| {
                         anyhow!("parse `memory_mb`=`{}` to usize error", memory_mb)
                     })?;
 
                     let v_cores = parse_arg("v_cores")?;
-                    let v_cores = usize::from_str(v_cores.as_str())
+                    let v_cores = u32::from_str(v_cores.as_str())
                         .map_err(|_e| anyhow!("parse `v_cores`=`{}` to usize error", v_cores))?;
 
                     (
@@ -271,6 +271,6 @@ fn metrics_serve(bind_ip: &str, cluster_mode: &ClusterMode, manager_type: &Manag
         false
     };
 
-    let addr = crate::metrics::init_metrics2(bind_ip, with_proxy).unwrap();
+    let addr = crate::metrics::init_metrics(bind_ip, with_proxy).unwrap();
     format!("http://{}:{}", bind_ip, addr.port())
 }

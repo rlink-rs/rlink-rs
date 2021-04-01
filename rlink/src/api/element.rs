@@ -7,6 +7,7 @@ use std::fmt::Debug;
 use bytes::{Buf, BufMut, BytesMut};
 
 use crate::api::runtime::{ChannelKey, CheckpointId};
+use crate::api::watermark::MIN_WATERMARK;
 use crate::api::window::Window;
 
 lazy_static! {
@@ -180,7 +181,11 @@ impl Serde for Record {
         bytes.put_u64(self.timestamp);
 
         bytes.put_u32(value_len as u32);
-        bytes.put_slice(self.values.as_slice());
+
+        let data_slice = self.values.as_slice();
+        assert_eq!(data_slice.len(), value_len);
+
+        bytes.put_slice(data_slice);
     }
 
     fn deserialize(bytes: &mut BytesMut) -> Self {
@@ -191,6 +196,8 @@ impl Serde for Record {
         let timestamp = bytes.get_u64();
 
         let value_len = bytes.get_u32() as usize;
+        assert_eq!(bytes.remaining(), value_len);
+
         let values = bytes.split_to(value_len);
 
         Record {
@@ -217,6 +224,8 @@ pub struct Watermark {
     // current watermark timestamp
     pub(crate) timestamp: u64,
 
+    pub(crate) channel_key: ChannelKey,
+
     // watermark timestamp location windows based on assign function
     pub(crate) location_windows: Option<Vec<Window>>,
     pub(crate) downstream: bool,
@@ -236,6 +245,7 @@ impl Watermark {
             num_tasks,
             status_timestamp: stream_status.timestamp,
             timestamp,
+            channel_key: ChannelKey::default(),
             location_windows: None,
             downstream: false,
             drop_windows: None,
@@ -251,6 +261,10 @@ impl Watermark {
             Some(windows) => windows.get(0),
             None => None,
         }
+    }
+
+    pub(crate) fn is_min(&self) -> bool {
+        self.timestamp == MIN_WATERMARK.timestamp
     }
 }
 
@@ -294,6 +308,7 @@ impl Serde for Watermark {
             num_tasks,
             status_timestamp,
             timestamp,
+            channel_key: ChannelKey::default(),
             location_windows: None,
             downstream: false,
             drop_windows: None,
@@ -306,6 +321,8 @@ pub struct StreamStatus {
     partition_num: u16,
     pub(crate) timestamp: u64,
 
+    pub(crate) channel_key: ChannelKey,
+
     pub(crate) end: bool,
 }
 
@@ -314,6 +331,7 @@ impl StreamStatus {
         StreamStatus {
             partition_num: 0,
             timestamp,
+            channel_key: ChannelKey::default(),
             end,
         }
     }
@@ -351,6 +369,7 @@ impl Serde for StreamStatus {
         StreamStatus {
             partition_num: 0,
             timestamp,
+            channel_key: ChannelKey::default(),
             end: end == 1,
         }
     }
@@ -524,6 +543,21 @@ impl Element {
         match self {
             Element::Barrier(barrier) => barrier,
             _ => panic!("Element is not Barrier"),
+        }
+    }
+
+    pub(crate) fn set_channel_key(&mut self, channel_key: ChannelKey) {
+        match self {
+            Element::Record(record) => {
+                record.channel_key = channel_key;
+            }
+            Element::Watermark(watermark) => {
+                watermark.channel_key = channel_key;
+            }
+            Element::StreamStatus(stream_status) => {
+                stream_status.channel_key = channel_key;
+            }
+            _ => {}
         }
     }
 }

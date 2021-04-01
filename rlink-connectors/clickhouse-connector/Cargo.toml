@@ -1,10 +1,10 @@
 [package]
 name = "rlink-clickhouse-connector"
-version = "0.2.2"
+version = "0.2.5"
 authors = ["yorkart <wangyue11.4@163.com>"]
 edition = "2018"
 description = "High performance Stream Processing Framework"
-keywords = ["stream", "window", "flink", "spark", "clickhouse"]
+keywords = ["stream", "window", "flink", "clickhouse"]
 repository = "https://github.com/rlink-rs/rlink-rs.git"
 license = "MIT/Apache-2.0"
 
@@ -12,18 +12,18 @@ license = "MIT/Apache-2.0"
 name = "rlink_clickhouse_connector"
 
 [dependencies.rlink]
-version = "0.2.2"
+version = "0.2.5"
 path = "../../rlink"
 
 [dependencies.rlink-derive]
-version = "0.2.2"
+version = "0.2.3"
 path = "../../rlink-derive"
 
 [dependencies]
 log = "0.4"
 anyhow = "1.0.31"
 
-chrono="0.4"
+chrono = "0.4"
 chrono-tz = "0.5"
 
 clickhouse-rs = "1.0.0-alpha.1"

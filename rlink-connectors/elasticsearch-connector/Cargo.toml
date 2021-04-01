@@ -1,10 +1,10 @@
 [package]
 name = "rlink-elasticsearch-connector"
-version = "0.2.2"
+version = "0.2.5"
 authors = ["yorkart <wangyue11.4@163.com>"]
 edition = "2018"
 description = "High performance Stream Processing Framework"
-keywords = ["stream", "window", "flink", "spark", "elasticsearch"]
+keywords = ["stream", "window", "flink", "elasticsearch"]
 repository = "https://github.com/rlink-rs/rlink-rs.git"
 license = "MIT/Apache-2.0"
 
@@ -12,11 +12,11 @@ license = "MIT/Apache-2.0"
 name = "rlink_elasticsearch_connector"
 
 [dependencies.rlink]
-version = "0.2.2"
+version = "0.2.5"
 path = "../../rlink"
 
 [dependencies.rlink-derive]
-version = "0.2.2"
+version = "0.2.3"
 path = "../../rlink-derive"
 
 [dependencies]

@@ -28,6 +28,7 @@ impl StreamApp for ConnectStreamApp0 {
     fn prepare_properties(&self, properties: &mut Properties) {
         properties.set_keyed_state_backend(KeyedStateBackend::Memory);
         properties.set_pub_sub_channel_size(100000);
+        properties.set_pub_sub_channel_base(ChannelBaseOn::UnBounded);
     }
 
     fn build_stream(&self, _properties: &Properties, env: &mut StreamExecutionEnvironment) {
@@ -83,7 +84,7 @@ impl StreamApp for ConnectStreamApp1 {
     fn prepare_properties(&self, properties: &mut Properties) {
         properties.set_keyed_state_backend(KeyedStateBackend::Memory);
         properties.set_pub_sub_channel_size(100000);
-        properties.set_pub_sub_channel_base(ChannelBaseOn::Bounded);
+        properties.set_pub_sub_channel_base(ChannelBaseOn::UnBounded);
     }
 
     fn build_stream(&self, _properties: &Properties, env: &mut StreamExecutionEnvironment) {

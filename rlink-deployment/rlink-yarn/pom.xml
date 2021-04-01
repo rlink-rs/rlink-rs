@@ -7,7 +7,7 @@
     <groupId>rlink-rs</groupId>
     <artifactId>rlink-yarn</artifactId>
     <packaging>pom</packaging>
-    <version>0.2.2</version>
+    <version>0.2.3</version>
 
     <modules>
         <module>rlink-yarn-client</module>

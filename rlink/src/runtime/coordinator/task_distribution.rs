@@ -36,6 +36,7 @@ pub(crate) fn build_cluster_descriptor(
                 task_id: task_instance.task_id.clone(),
                 operators,
                 input_split: task_instance.input_split.clone(),
+                thread_id: "".to_string(),
             };
             task_descriptors.push(task_descriptor);
         }
@@ -47,8 +48,7 @@ pub(crate) fn build_cluster_descriptor(
             task_manager_id: task_manager_instance.worker_manager_id.clone(),
             task_manager_address: "".to_string(),
             metrics_address: "".to_string(),
-            cpu_cores: 0,
-            physical_memory: 0,
+            web_address: "".to_string(),
             task_descriptors,
         };
         worker_managers.push(task_manager_descriptor);
@@ -59,7 +59,13 @@ pub(crate) fn build_cluster_descriptor(
         application_name: job_name.to_string(),
         application_properties: application_properties.clone(),
         coordinator_address: "".to_string(),
+        metrics_address: context.metric_addr.clone(),
         coordinator_status: TaskManagerStatus::Pending,
+        v_cores: context.v_cores,
+        memory_mb: context.memory_mb,
+        num_task_managers: context.num_task_managers,
+        uptime: crate::utils::date_time::current_timestamp_millis(),
+        startup_number: 0,
     };
 
     ClusterDescriptor {

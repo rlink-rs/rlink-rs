@@ -16,6 +16,7 @@ pub(crate) fn run_task<S>(
 where
     S: StreamApp + 'static,
 {
+    info!("num of cpu cores: {}", num_cpus::get());
     match context.manager_type {
         ManagerType::Coordinator => {
             let resource_manager = ResourceManager::new(context.clone());

@@ -57,7 +57,7 @@ pub(crate) fn create_kafka_consumer(
 
     let handover_clone = handover.clone();
     utils::thread::spawn("kafka-source-block", move || {
-        async_runtime().block_on(async {
+        async_runtime("kafka_source").block_on(async {
             let mut kafka_consumer = KafkaConsumerThread::new(
                 client_config,
                 partition_offsets,
@@ -65,7 +65,12 @@ pub(crate) fn create_kafka_consumer(
                 deserializer,
                 state_cache,
             );
-            kafka_consumer.run().await;
+            match kafka_consumer.run().await {
+                Ok(()) => {}
+                Err(e) => {
+                    error!("run consumer error. {}", e);
+                }
+            }
         });
     });
 
@@ -123,7 +128,7 @@ impl KafkaConsumerThread {
         }
     }
 
-    pub async fn run(&mut self) {
+    pub async fn run(&mut self) -> anyhow::Result<()> {
         let mut assignment = TopicPartitionList::new();
         for (partition_metadata, offset_metadata) in &self.partition_offsets {
             assignment
@@ -136,15 +141,12 @@ impl KafkaConsumerThread {
         }
 
         // let group_id = format!("rlink{}", Uuid::new_v4());
+        self.client_config
+            .get("group.id")
+            .ok_or(anyhow!("`group.id` not found in kafka consumer config"))?;
 
-        let consumer: StreamConsumer<DefaultConsumerContext> = self
-            .client_config
-            // .set("group.id", group_id.as_str())
-            .create()
-            .expect("Consumer creation failed");
-        consumer
-            .assign(&assignment)
-            .expect("Can't subscribe to specified topics");
+        let consumer: StreamConsumer<DefaultConsumerContext> = self.client_config.create()?;
+        consumer.assign(&assignment)?;
 
         info!(
             "create consumer success. config: {:?}, apply checkpoint offset: {:?}",
@@ -189,5 +191,7 @@ impl KafkaConsumerThread {
                 Err(e) => warn!("Kafka error: {}", e),
             }
         }
+
+        Ok(())
     }
 }

@@ -24,12 +24,9 @@ impl SystemInputFormat {
             task_id: TaskId::default(),
         }
     }
-}
 
-impl InputFormat for SystemInputFormat {
-    fn open(&mut self, _input_split: InputSplit, context: &Context) -> api::Result<()> {
-        self.task_id = context.task_id.clone();
-        let parents: Vec<String> = context
+    fn subscribe_log(&self, context: &Context) {
+        let mut parents: Vec<String> = context
             .parents
             .iter()
             .map(|(node, edge)| {
@@ -39,7 +36,16 @@ impl InputFormat for SystemInputFormat {
                 )
             })
             .collect();
+        parents.sort();
         info!("subscribe\n  {}", parents.join("\n  "));
+    }
+}
+
+impl InputFormat for SystemInputFormat {
+    fn open(&mut self, _input_split: InputSplit, context: &Context) -> api::Result<()> {
+        self.subscribe_log(context);
+
+        self.task_id = context.task_id.clone();
 
         let channel_size = context
             .application_properties

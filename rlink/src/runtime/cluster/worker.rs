@@ -11,12 +11,15 @@ use crate::pub_sub::network;
 use crate::runtime::context::Context;
 use crate::runtime::timer::{start_window_timer, WindowTimer};
 use crate::runtime::worker::checkpoint::start_report_checkpoint;
-use crate::runtime::worker::heart_beat::{start_heart_beat_timer, status_heartbeat};
+use crate::runtime::worker::heart_beat::{start_heartbeat_timer, submit_heartbeat};
+use crate::runtime::worker::web_server::web_launch;
 use crate::runtime::{
-    worker, ClusterDescriptor, HeartBeatStatus, TaskManagerStatus, WorkerManagerDescriptor,
+    worker, ClusterDescriptor, HeartBeatStatus, HeartbeatItem, TaskManagerStatus,
+    WorkerManagerDescriptor,
 };
 use crate::storage::metadata::MetadataLoader;
 use crate::utils;
+use crate::utils::thread::async_runtime_single;
 
 pub(crate) fn run<S>(
     context: Arc<Context>,
@@ -34,11 +37,11 @@ where
     let server_addr = bootstrap_publish_serve(context.bind_ip.to_string());
     info!("bootstrap publish server, listen: {}", server_addr);
 
-    start_heartbeat_timer(&cluster_descriptor, context.deref(), server_addr);
-    info!("start heartbeat timer");
+    let web_address = web_serve(context.clone());
+    info!("serve worker web ui {}", web_address);
 
-    start_checkpoint_timer(&cluster_descriptor);
-    info!("start checkpoint timer");
+    start_timing_task(&cluster_descriptor, context.deref(), server_addr);
+    info!("start timing task");
 
     let window_timer = start_window_timer();
     info!("bootstrap window timer");
@@ -66,13 +69,13 @@ where
         join_handle.join().unwrap();
     });
 
-    stop_heartbeat_timer(cluster_descriptor.as_ref(), context.deref(), server_addr);
+    stop_heartbeat_timer();
     info!("work end");
 
     Ok(())
 }
 
-fn get_task_manager_descriptor(
+fn get_worker_manager_descriptor(
     task_manager_id: &str,
     cluster_descriptor: &ClusterDescriptor,
 ) -> Option<WorkerManagerDescriptor> {
@@ -105,58 +108,40 @@ fn bootstrap_subscribe_client(cluster_descriptor: Arc<ClusterDescriptor>) {
     });
 }
 
-fn start_heartbeat_timer(
+fn web_serve(context: Arc<Context>) -> String {
+    let address = web_launch(context);
+    submit_heartbeat(HeartbeatItem::WorkerManagerWebAddress(address.clone()));
+    address
+}
+
+fn start_timing_task(
     cluster_descriptor: &ClusterDescriptor,
     context: &Context,
     bind_addr: SocketAddr,
 ) {
+    submit_heartbeat(HeartbeatItem::WorkerManagerAddress(bind_addr.to_string()));
+    submit_heartbeat(HeartbeatItem::MetricsAddress(context.metric_addr.clone()));
+
     let coordinator_address = cluster_descriptor
         .coordinator_manager
         .coordinator_address
-        .as_str();
+        .clone();
+    let task_manager_id = context.task_manager_id.clone();
 
-    status_heartbeat(
-        coordinator_address,
-        context.task_manager_id.as_str(),
-        bind_addr.to_string().as_str(),
-        context.metric_addr.as_str(),
-        Some(HeartBeatStatus::Ok),
-    );
-
-    // heat beat timer
-    start_heart_beat_timer(
-        coordinator_address,
-        context.task_manager_id.as_str(),
-        bind_addr.to_string().as_str(),
-        context.metric_addr.as_str(),
-    );
+    crate::utils::thread::spawn("timer", move || {
+        async_runtime_single().block_on(async move {
+            let j1 = tokio::spawn(start_heartbeat_timer(
+                coordinator_address.clone(),
+                task_manager_id.clone(),
+            ));
+            let j2 = tokio::spawn(start_report_checkpoint(coordinator_address.clone()));
+            let _ = tokio::join!(j1, j2);
+        });
+    });
 }
 
-fn stop_heartbeat_timer(
-    cluster_descriptor: &ClusterDescriptor,
-    context: &Context,
-    bind_addr: SocketAddr,
-) {
-    let coordinator_address = cluster_descriptor
-        .coordinator_manager
-        .coordinator_address
-        .as_str();
-
-    status_heartbeat(
-        coordinator_address,
-        context.task_manager_id.as_str(),
-        bind_addr.to_string().as_str(),
-        context.metric_addr.as_str(),
-        Some(HeartBeatStatus::End),
-    );
-}
-
-fn start_checkpoint_timer(cluster_descriptor: &ClusterDescriptor) {
-    let coordinator_address = cluster_descriptor
-        .coordinator_manager
-        .coordinator_address
-        .as_str();
-    start_report_checkpoint(coordinator_address);
+fn stop_heartbeat_timer() {
+    submit_heartbeat(HeartbeatItem::HeartBeatStatus(HeartBeatStatus::End));
 }
 
 fn waiting_all_task_manager_fine(metadata_loader: &mut MetadataLoader) -> Arc<ClusterDescriptor> {
@@ -193,7 +178,7 @@ where
     let task_manager_id = context.task_manager_id.as_str();
     // todo error check
     let task_manager_descriptors =
-        get_task_manager_descriptor(task_manager_id, cluster_descriptor.borrow()).unwrap();
+        get_worker_manager_descriptor(task_manager_id, cluster_descriptor.borrow()).unwrap();
 
     task_manager_descriptors
         .task_descriptors
