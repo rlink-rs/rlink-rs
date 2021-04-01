@@ -60,13 +60,13 @@ pub(crate) struct Context {
     pub coordinator_address: String,
     pub dashboard_path: String,
 
-    /// on yarn arg
+    /// on yarn args
     pub yarn_manager_main_class: String,
     pub worker_process_path: String,
-    pub memory_mb: usize,
-    pub v_cores: usize,
+    pub memory_mb: u32,
+    pub v_cores: u32,
 
-    //on k8s
+    /// on k8s args
     pub image_path: String,
 }
 
@@ -85,8 +85,8 @@ impl Context {
         dashboard_path: String,
         yarn_manager_main_class: String,
         worker_process_path: String,
-        memory_mb: usize,
-        v_cores: usize,
+        memory_mb: u32,
+        v_cores: u32,
         image_path: String,
     ) -> Self {
         Context {
@@ -196,12 +196,12 @@ impl Context {
             ClusterMode::Kubernetes => match manager_type {
                 ManagerType::Coordinator => {
                     let memory_mb = parse_arg("memory_mb")?;
-                    let memory_mb = usize::from_str(memory_mb.as_str()).map_err(|_e| {
+                    let memory_mb = u32::from_str(memory_mb.as_str()).map_err(|_e| {
                         anyhow!("parse `memory_mb`=`{}` to usize error", memory_mb)
                     })?;
 
                     let v_cores = parse_arg("v_cores")?;
-                    let v_cores = usize::from_str(v_cores.as_str())
+                    let v_cores = u32::from_str(v_cores.as_str())
                         .map_err(|_e| anyhow!("parse `v_cores`=`{}` to usize error", v_cores))?;
 
                     ("".to_string(), "".to_string(), memory_mb, v_cores)
