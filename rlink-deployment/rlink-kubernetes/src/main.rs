@@ -12,7 +12,7 @@ async fn main() {
             println!(" cluster start successful");
         }
         Err(e) => {
-            println!(" cluster start faild :{}", e);
+            eprintln!(" cluster start failed. {}", e);
         }
     }
 }

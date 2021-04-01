@@ -1,3 +1,12 @@
+use std::sync::Arc;
+
+use k8s_openapi::api::{apps::v1::Deployment, core::v1::Pod};
+use kube::{
+    api::{Api, DeleteParams, ListParams, PostParams},
+    Client,
+};
+use serde_json::json;
+
 use crate::api::{
     cluster::TaskResourceInfo,
     env::{StreamApp, StreamExecutionEnvironment},
@@ -5,32 +14,26 @@ use crate::api::{
 use crate::deployment::TResourceManager;
 use crate::runtime::context::Context;
 use crate::runtime::ClusterDescriptor;
-use k8s_openapi::api::{apps::v1::Deployment, core::v1::Pod};
-use kube::{
-    api::{Api, DeleteParams, ListParams, Meta, PostParams},
-    Client,
-};
-use serde_json::json;
-use std::sync::Arc;
+use crate::utils::thread::async_runtime_single;
 
 #[derive(Clone, Debug)]
 pub(crate) struct KubernetesResourceManager {
     context: Arc<Context>,
-    job_descriptor: Option<ClusterDescriptor>,
+    cluster_descriptor: Option<ClusterDescriptor>,
 }
 
 impl KubernetesResourceManager {
     pub fn new(context: Arc<Context>) -> Self {
         KubernetesResourceManager {
             context,
-            job_descriptor: None,
+            cluster_descriptor: None,
         }
     }
 }
 
 impl TResourceManager for KubernetesResourceManager {
     fn prepare(&mut self, _context: &Context, job_descriptor: &ClusterDescriptor) {
-        self.job_descriptor = Some(job_descriptor.clone());
+        self.cluster_descriptor = Some(job_descriptor.clone());
     }
 
     fn worker_allocate<S>(
@@ -41,26 +44,25 @@ impl TResourceManager for KubernetesResourceManager {
     where
         S: StreamApp + 'static,
     {
-        let job_descriptor = self.job_descriptor.as_ref().unwrap();
+        let cluster_descriptor = self.cluster_descriptor.as_ref().unwrap();
+        let coordinator_manager = &cluster_descriptor.coordinator_manager;
+
         let mut task_infos = Vec::new();
         let namespace = "default";
         let image_path = &self.context.image_path;
         let limits = &ContainerLimits {
-            cpu: self.context.v_cores,
-            memory: format!("{}Mi", self.context.memory_mb),
+            cpu: coordinator_manager.v_cores as usize,
+            memory: format!("{}Mi", coordinator_manager.memory_mb),
         };
 
-        let application_id = job_descriptor.coordinator_manager.application_id.as_str();
+        let application_id = coordinator_manager.application_id.as_str();
         let rt = tokio::runtime::Runtime::new()?;
         let job_deploy_id =
             rt.block_on(async { get_job_deploy_id(namespace, application_id).await.unwrap() });
 
-        let coordinator_address = job_descriptor
-            .coordinator_manager
-            .coordinator_address
-            .as_str();
+        let coordinator_address = coordinator_manager.coordinator_address.as_str();
 
-        for task_manager_descriptor in &job_descriptor.worker_managers {
+        for task_manager_descriptor in &cluster_descriptor.worker_managers {
             let task_manager_id = task_manager_descriptor.task_manager_id.clone();
             let task_manager_name = format!(
                 "{}-{}",
@@ -111,9 +113,9 @@ impl TResourceManager for KubernetesResourceManager {
             }
             tasks.push(format!("name={}", task.resource_info["task_manager_name"]));
         }
+
         let namespace = "default";
-        let rt = tokio::runtime::Runtime::new()?;
-        return rt.block_on(async { stop_worker(namespace, tasks).await });
+        return async_runtime_single().block_on(async { stop_worker(namespace, tasks).await });
     }
 }
 
@@ -177,12 +179,14 @@ async fn allocate_worker(
             }
         }
     ))?;
+
     let pp = PostParams::default();
     let mut uid = String::new();
     match pods.create(&pp, &p).await {
-        Ok(o) => {
+        Ok(pod) => {
             info!("create worker({})pod success", task_manager_name);
-            uid = Meta::meta(&o).uid.clone().expect("kind has metadata.uid");
+            // uid = Meta::meta(&pod).uid.clone().expect("kind has metadata.uid");
+            uid = pod.metadata.uid.expect("kind has metadata.uid").to_string();
             // wait for it..
         }
         Err(kube::Error::Api(ae)) => {
@@ -204,7 +208,7 @@ async fn stop_worker(namespace: &str, task_ids: Vec<String>) -> anyhow::Result<(
     }
     match pods.delete_collection(&dp, &lp).await {
         Ok(_o) => info!("stop worker success"),
-        Err(e) => error!("stop worker faild:{}", e),
+        Err(e) => error!("stop worker failed. {:?}", e),
     };
     Ok(())
 }

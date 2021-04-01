@@ -1,10 +1,11 @@
-use crate::config::k8s_config::Config;
 use k8s_openapi::api::apps::v1::Deployment;
 use kube::{
-    api::{Api,  PostParams},
+    api::{Api, PostParams},
     Client,
 };
 use serde_json::json;
+
+use crate::config::k8s_config::Config;
 
 pub async fn run(cfg: Config) -> anyhow::Result<()> {
     let client = Client::try_default().await?;
