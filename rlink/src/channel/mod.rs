@@ -1,11 +1,10 @@
 use std::convert::TryFrom;
-use std::sync::atomic::{AtomicI64, AtomicU64};
-use std::sync::Arc;
 
 use crate::api::element::Element;
 use crate::channel::receiver::ChannelReceiver;
 use crate::channel::sender::ChannelSender;
-use crate::metrics::global_metrics::Tag;
+use crate::metrics::metric::Tag;
+use crate::metrics::{register_counter, register_gauge};
 
 pub const CHANNEL_CAPACITY_PREFIX: &str = "Channel.Capacity.";
 pub const CHANNEL_SIZE_PREFIX: &str = "Channel.Size.";
@@ -91,31 +90,16 @@ where
         name, cap, base_on
     );
 
-    let size = Arc::new(AtomicI64::new(0));
-    let accepted_counter = Arc::new(AtomicU64::new(0));
-    let drain_counter = Arc::new(AtomicU64::new(0));
-
     let (sender, receiver) = match base_on {
         BaseOn::Bounded => bounded(cap),
         BaseOn::UnBounded => unbounded(),
     };
 
     // add_channel_metric(name.to_string(), size.clone(), capacity.clone());
-    crate::metrics::global_metrics::register_gauge(
-        (CHANNEL_SIZE_PREFIX.to_owned() + name).as_str(),
-        tags.clone(),
-        size.clone(),
-    );
-    crate::metrics::global_metrics::register_counter(
-        (CHANNEL_ACCEPTED_PREFIX.to_owned() + name).as_str(),
-        tags.clone(),
-        accepted_counter.clone(),
-    );
-    crate::metrics::global_metrics::register_counter(
-        (CHANNEL_DRAIN_PREFIX.to_owned() + name).as_str(),
-        tags,
-        drain_counter.clone(),
-    );
+    let size = register_gauge(CHANNEL_SIZE_PREFIX.to_owned() + name, tags.clone());
+    let accepted_counter =
+        register_counter(CHANNEL_ACCEPTED_PREFIX.to_owned() + name, tags.clone());
+    let drain_counter = register_counter(CHANNEL_DRAIN_PREFIX.to_owned() + name, tags);
 
     (
         ChannelSender::new(name, sender, base_on, cap, size.clone(), accepted_counter),

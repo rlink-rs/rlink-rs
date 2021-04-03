@@ -14,7 +14,6 @@ use rlink::api::checkpoint::CheckpointFunction;
 use rlink::api::element::Record;
 use rlink::api::function::{Context, NamedFunction, OutputFormat};
 use rlink::channel::utils::handover::Handover;
-use rlink::metrics::Tag;
 use rlink::utils::thread::{async_runtime, async_sleep, async_spawn};
 use rlink::{api, utils};
 use serde_json::Value;
@@ -81,11 +80,7 @@ impl ElasticsearchOutputFormat {
 
 impl OutputFormat for ElasticsearchOutputFormat {
     fn open(&mut self, context: &Context) -> api::Result<()> {
-        let tags = vec![
-            Tag::from(("job_id", context.task_id.job_id().0)),
-            Tag::from(("task_number", context.task_id.task_number())),
-        ];
-        self.handover = Some(Handover::new(self.name(), tags, 10000));
+        self.handover = Some(Handover::new(self.name(), context.task_id.to_tags(), 10000));
 
         let mut write_thead = ElasticsearchWriteThread::new(
             self.address.as_str(),

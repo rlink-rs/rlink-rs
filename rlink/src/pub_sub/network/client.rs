@@ -3,8 +3,8 @@ use std::collections::LinkedList;
 use std::convert::TryFrom;
 use std::net::SocketAddr;
 use std::str::FromStr;
+use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
-use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -64,9 +64,9 @@ pub(crate) fn subscribe(
     let (sender, receiver) = named_channel_with_base(
         "NetworkSubscribe",
         vec![
-            Tag::from(("source_job_id", source_task_ids[0].job_id.0)),
-            Tag::from(("target_job_id", target_task_id.job_id.0)),
-            Tag::from(("target_task_number", target_task_id.task_number)),
+            Tag::new("source_job_id", source_task_ids[0].job_id.0),
+            Tag::new("target_job_id", target_task_id.job_id.0),
+            Tag::new("target_task_number", target_task_id.task_number),
         ],
         channel_size,
         channel_base_on,
@@ -236,8 +236,7 @@ impl Client {
                 .big_endian()
                 .new_read(read_half);
 
-        let counter = Arc::new(AtomicU64::new(0));
-        register_counter("NetWorkClient", self.channel_key.to_tags(), counter.clone());
+        let counter = register_counter("NetWorkClient", self.channel_key.to_tags());
 
         let mut batch_id = 0u16;
         let timeout = Duration::from_secs(6);
@@ -277,7 +276,7 @@ impl Client {
                     }
                 }
 
-                counter.fetch_add(len as u64, Ordering::Relaxed);
+                counter.fetch_add(len as u64);
             }
             if len < 100 {
                 async_sleep(Duration::from_secs(3)).await;

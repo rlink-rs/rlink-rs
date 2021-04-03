@@ -1,7 +1,6 @@
 use std::borrow::BorrowMut;
 use std::convert::TryFrom;
 use std::ops::Deref;
-use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -13,6 +12,7 @@ use crate::api::properties::{Properties, SYSTEM_CLUSTER_MODE};
 use crate::dag::metadata::DagMetadata;
 use crate::dag::DagManager;
 use crate::deployment::TResourceManager;
+use crate::metrics::metric::Gauge;
 use crate::metrics::register_gauge;
 use crate::runtime::context::Context;
 use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
@@ -42,7 +42,7 @@ where
     resource_manager: R,
     stream_env: StreamExecutionEnvironment,
 
-    startup_number: Arc<AtomicI64>,
+    startup_number: Gauge,
 }
 
 impl<S, R> CoordinatorTask<S, R>
@@ -58,8 +58,7 @@ where
     ) -> Self {
         let metadata_storage_mode = context.cluster_config.metadata_storage.clone();
 
-        let startup_number = Arc::new(AtomicI64::default());
-        register_gauge("startup_number", vec![], startup_number.clone());
+        let startup_number = register_gauge("startup_number", vec![]);
 
         CoordinatorTask {
             context,
@@ -299,25 +298,22 @@ where
     fn gauge_startup(&self, cluster_descriptor: &ClusterDescriptor) {
         let coordinator_manager = &cluster_descriptor.coordinator_manager;
 
-        let uptime = Arc::new(AtomicI64::new(coordinator_manager.uptime as i64));
-        register_gauge("uptime", vec![], uptime);
+        let uptime = register_gauge("uptime", vec![]);
+        uptime.store(coordinator_manager.uptime as i64);
 
-        let v_cores = Arc::new(AtomicI64::new(coordinator_manager.v_cores as i64));
-        register_gauge("v_cores", vec![], v_cores);
+        let v_cores = register_gauge("v_cores", vec![]);
+        v_cores.store(coordinator_manager.v_cores as i64);
 
-        let memory_mb = Arc::new(AtomicI64::new(coordinator_manager.memory_mb as i64));
-        register_gauge("memory_mb", vec![], memory_mb);
+        let memory_mb = register_gauge("memory_mb", vec![]);
+        memory_mb.store(coordinator_manager.memory_mb as i64);
 
-        let num_task_managers =
-            Arc::new(AtomicI64::new(coordinator_manager.num_task_managers as i64));
-        register_gauge("num_task_managers", vec![], num_task_managers);
+        let num_task_managers = register_gauge("num_task_managers", vec![]);
+        num_task_managers.store(coordinator_manager.num_task_managers as i64);
     }
 
     fn gauge_startup_number(&self, cluster_descriptor: &mut ClusterDescriptor) {
         cluster_descriptor.coordinator_manager.startup_number += 1;
-        self.startup_number.store(
-            cluster_descriptor.coordinator_manager.startup_number as i64,
-            Ordering::Relaxed,
-        );
+        self.startup_number
+            .store(cluster_descriptor.coordinator_manager.startup_number as i64);
     }
 }

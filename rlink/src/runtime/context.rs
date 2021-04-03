@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use crate::api::cluster::{load_config, ClusterConfig};
-use crate::metrics::global_metrics::set_manager_id;
+use crate::metrics::metric::set_manager_id;
 use crate::runtime::{logger, ClusterMode, ManagerType};
 use crate::utils;
 use crate::utils::process::{parse_arg, work_space};

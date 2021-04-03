@@ -252,7 +252,7 @@ impl PrometheusBuilder {
                         let handle = handle.clone();
 
                         async move {
-                            crate::metrics::global_metrics::compute();
+                            crate::metrics::metric::compute();
 
                             let output = handle.render();
 

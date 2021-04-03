@@ -40,8 +40,8 @@ impl TaskId {
 
     pub fn to_tags(&self) -> Vec<Tag> {
         vec![
-            Tag::from(("job_id", self.job_id.0)),
-            Tag::from(("task_number", self.task_number)),
+            Tag::new("job_id", self.job_id.0),
+            Tag::new("task_number", self.task_number),
         ]
     }
 }
@@ -78,10 +78,10 @@ pub(crate) struct ChannelKey {
 impl ChannelKey {
     pub fn to_tags(&self) -> Vec<Tag> {
         vec![
-            Tag::from(("source_job_id", self.source_task_id.job_id.0)),
-            Tag::from(("source_task_number", self.source_task_id.task_number)),
-            Tag::from(("target_job_id", self.target_task_id.job_id.0)),
-            Tag::from(("target_task_number", self.target_task_id.task_number)),
+            Tag::new("source_job_id", self.source_task_id.job_id.0),
+            Tag::new("source_task_number", self.source_task_id.task_number),
+            Tag::new("target_job_id", self.target_task_id.job_id.0),
+            Tag::new("target_task_number", self.target_task_id.task_number),
         ]
     }
 }
