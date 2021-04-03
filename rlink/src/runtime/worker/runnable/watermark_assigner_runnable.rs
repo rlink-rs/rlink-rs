@@ -7,7 +7,7 @@ use crate::api::element::Element;
 use crate::api::operator::DefaultStreamOperator;
 use crate::api::runtime::{OperatorId, TaskId};
 use crate::api::watermark::{Watermark, WatermarkAssigner, MIN_WATERMARK};
-use crate::metrics::{register_counter, register_gauge, Tag};
+use crate::metrics::{register_counter, register_gauge};
 use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
@@ -55,21 +55,19 @@ impl Runnable for WatermarkAssignerRunnable {
 
         self.task_id = context.task_descriptor.task_id;
 
-        let tags = vec![
-            Tag::from(("job_id", self.task_id.job_id.0)),
-            Tag::from(("task_number", self.task_id.task_number)),
-        ];
         let fn_name = self.stream_watermark.operator_fn.as_ref().name();
 
-        let metric_name = format!("Watermark_{}", fn_name);
         register_gauge(
-            metric_name.as_str(),
-            tags.clone(),
+            format!("Watermark_{}", fn_name).as_str(),
+            self.task_id.to_tags(),
             self.watermark_gauge.clone(),
         );
 
-        let metric_name = format!("Watermark_Expire_{}", fn_name);
-        register_counter(metric_name.as_str(), tags, self.expire_counter.clone());
+        register_counter(
+            format!("Watermark_Expire_{}", fn_name).as_str(),
+            self.task_id.to_tags(),
+            self.expire_counter.clone(),
+        );
 
         Ok(())
     }

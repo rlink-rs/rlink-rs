@@ -8,7 +8,7 @@ use crate::api::function::OutputFormat;
 use crate::api::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
 use crate::api::runtime::{OperatorId, TaskId};
 use crate::dag::job_graph::JobEdge;
-use crate::metrics::{register_counter, Tag};
+use crate::metrics::register_counter;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
@@ -69,12 +69,11 @@ impl Runnable for SinkRunnable {
         let fun_context = context.to_fun_context(self.operator_id);
         self.stream_sink.operator_fn.open(&fun_context)?;
 
-        let tags = vec![
-            Tag::from(("job_id", self.task_id.job_id.0)),
-            Tag::from(("task_number", self.task_id.task_number)),
-        ];
-        let metric_name = format!("Sink_{}", self.stream_sink.operator_fn.as_ref().name());
-        register_counter(metric_name.as_str(), tags, self.counter.clone());
+        register_counter(
+            format!("Sink_{}", self.stream_sink.operator_fn.as_ref().name()).as_str(),
+            self.task_id.to_tags(),
+            self.counter.clone(),
+        );
 
         Ok(())
     }

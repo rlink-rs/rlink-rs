@@ -13,7 +13,6 @@ use crate::api::runtime::{CheckpointId, JobId, OperatorId, TaskId};
 use crate::channel::named_channel;
 use crate::channel::sender::ChannelSender;
 use crate::channel::utils::iter::ChannelIterator;
-use crate::metrics::Tag;
 use crate::runtime::timer::TimerChannel;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
@@ -199,13 +198,11 @@ impl Runnable for SourceRunnable {
 
         let mut element_iter = match self.stream_source.fn_creator() {
             FunctionCreator::User => {
-                let tags = vec![
-                    Tag::from(("job_id", self.task_id.job_id.0)),
-                    Tag::from(("task_number", self.task_id.task_number)),
-                ];
-                let metric_name =
-                    format!("Source_{}", self.stream_source.operator_fn.as_ref().name());
-                let (sender, receiver) = named_channel(metric_name.as_str(), tags, 10240);
+                let (sender, receiver) = named_channel(
+                    format!("Source_{}", self.stream_source.operator_fn.as_ref().name()).as_str(),
+                    self.task_id.to_tags(),
+                    10240,
+                );
                 let running = Arc::new(AtomicBool::new(true));
 
                 self.poll_input_element(sender.clone(), running.clone());

@@ -236,20 +236,8 @@ impl Client {
                 .big_endian()
                 .new_read(read_half);
 
-        let tags = vec![
-            Tag::from(("source_job_id", self.channel_key.source_task_id.job_id.0)),
-            Tag::from((
-                "source_task_number",
-                self.channel_key.source_task_id.task_number,
-            )),
-            Tag::from(("target_job_id", self.channel_key.target_task_id.job_id.0)),
-            Tag::from((
-                "target_task_number",
-                self.channel_key.target_task_id.task_number,
-            )),
-        ];
         let counter = Arc::new(AtomicU64::new(0));
-        register_counter("NetWorkClient", tags, counter.clone());
+        register_counter("NetWorkClient", self.channel_key.to_tags(), counter.clone());
 
         let mut batch_id = 0u16;
         let timeout = Duration::from_secs(6);

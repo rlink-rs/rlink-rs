@@ -8,7 +8,7 @@ use crate::api::element::{Element, Partition};
 use crate::api::function::KeySelectorFunction;
 use crate::api::operator::DefaultStreamOperator;
 use crate::api::runtime::{OperatorId, TaskId};
-use crate::metrics::{register_counter, Tag};
+use crate::metrics::register_counter;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 use crate::utils;
@@ -59,12 +59,11 @@ impl Runnable for KeyByRunnable {
         // todo set self.partition_size = Reduce.partition
         self.partition_size = context.child_parallelism() as u16;
 
-        let tags = vec![
-            Tag::from(("job_id", self.task_id.job_id.0)),
-            Tag::from(("task_number", self.task_id.task_number)),
-        ];
-        let metric_name = format!("KeyBy_{}", self.stream_key_by.operator_fn.as_ref().name());
-        register_counter(metric_name.as_str(), tags, self.counter.clone());
+        register_counter(
+            format!("KeyBy_{}", self.stream_key_by.operator_fn.as_ref().name()).as_str(),
+            self.task_id.to_tags(),
+            self.counter.clone(),
+        );
 
         Ok(())
     }
