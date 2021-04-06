@@ -133,7 +133,7 @@ impl Context {
             ManagerType::Coordinator => "coordinator".to_string(),
             ManagerType::Worker => parse_arg("task_manager_id")?,
         };
-        set_manager_id(task_manager_id.as_str(), bind_ip.as_str());
+        set_manager_id(format!("{}-{}", task_manager_id, bind_ip));
 
         let num_task_managers = match manager_type {
             ManagerType::Coordinator => match cluster_mode {
