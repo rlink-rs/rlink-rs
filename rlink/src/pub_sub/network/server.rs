@@ -20,7 +20,6 @@ use crate::api::element::Element;
 use crate::api::properties::ChannelBaseOn;
 use crate::api::runtime::{ChannelKey, TaskId};
 use crate::channel::{named_channel_with_base, ElementReceiver, ElementSender, TryRecvError};
-use crate::metrics::Tag;
 use crate::pub_sub::network::{ElementRequest, ElementResponse, ResponseCode};
 use crate::utils::thread::{async_runtime, async_runtime_single};
 
@@ -60,12 +59,7 @@ pub(crate) fn publish(
 
         let (sender, receiver) = named_channel_with_base(
             "NetworkPublish",
-            vec![
-                Tag::from(("source_job_id", source_task_id.job_id.0)),
-                Tag::from(("source_task_number", source_task_id.task_number)),
-                Tag::from(("target_job_id", target_task_id.job_id.0)),
-                Tag::from(("target_task_number", target_task_id.task_number)),
-            ],
+            channel_key.to_tags(),
             channel_size,
             channel_base_on,
         );

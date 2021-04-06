@@ -1,6 +1,6 @@
 [package]
-name = "rlink-files-connector"
-version = "0.2.3"
+name = "rlink-connector-files"
+version = "0.3.0"
 authors = ["yorkart <wangyue11.4@163.com>"]
 edition = "2018"
 description = "High performance Stream Processing Framework"
@@ -9,10 +9,10 @@ repository = "https://github.com/rlink-rs/rlink-rs.git"
 license = "MIT/Apache-2.0"
 
 [lib]
-name = "rlink_files_connector"
+name = "rlink_connector_files"
 
 [dependencies.rlink]
-version = "0.2.3"
+version = "0.3.0"
 path = "../../rlink"
 
 [dependencies.rlink-derive]

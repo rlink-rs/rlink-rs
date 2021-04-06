@@ -1,13 +1,12 @@
 use std::borrow::BorrowMut;
-use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
-use std::sync::Arc;
 
 use crate::api::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
 use crate::api::element::Element;
 use crate::api::operator::DefaultStreamOperator;
 use crate::api::runtime::{OperatorId, TaskId};
 use crate::api::watermark::{Watermark, WatermarkAssigner, MIN_WATERMARK};
-use crate::metrics::{register_counter, register_gauge, Tag};
+use crate::metrics::metric::{Counter, Gauge};
+use crate::metrics::{register_counter, register_gauge};
 use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
@@ -22,8 +21,8 @@ pub(crate) struct WatermarkAssignerRunnable {
 
     context: Option<RunnableContext>,
 
-    watermark_gauge: Arc<AtomicI64>,
-    expire_counter: Arc<AtomicU64>,
+    watermark_gauge: Gauge,
+    expire_counter: Counter,
 }
 
 impl WatermarkAssignerRunnable {
@@ -41,8 +40,8 @@ impl WatermarkAssignerRunnable {
             next_runnable,
             watermark: MIN_WATERMARK,
             context: None,
-            watermark_gauge: Arc::new(AtomicI64::new(0)),
-            expire_counter: Arc::new(AtomicU64::new(0)),
+            watermark_gauge: Gauge::default(),
+            expire_counter: Counter::default(),
         }
     }
 }
@@ -55,21 +54,15 @@ impl Runnable for WatermarkAssignerRunnable {
 
         self.task_id = context.task_descriptor.task_id;
 
-        let tags = vec![
-            Tag::from(("job_id", self.task_id.job_id.0)),
-            Tag::from(("task_number", self.task_id.task_number)),
-        ];
         let fn_name = self.stream_watermark.operator_fn.as_ref().name();
 
-        let metric_name = format!("Watermark_{}", fn_name);
-        register_gauge(
-            metric_name.as_str(),
-            tags.clone(),
-            self.watermark_gauge.clone(),
-        );
+        self.watermark_gauge =
+            register_gauge(format!("Watermark_{}", fn_name), self.task_id.to_tags());
 
-        let metric_name = format!("Watermark_Expire_{}", fn_name);
-        register_counter(metric_name.as_str(), tags, self.expire_counter.clone());
+        self.expire_counter = register_counter(
+            format!("Watermark_Expire_{}", fn_name),
+            self.task_id.to_tags(),
+        );
 
         Ok(())
     }
@@ -82,7 +75,7 @@ impl Runnable for WatermarkAssignerRunnable {
                 record.timestamp = watermark_assigner.extract_timestamp(record, 0);
 
                 if record.timestamp < self.watermark.timestamp {
-                    let n = self.expire_counter.fetch_add(1, Ordering::Relaxed);
+                    let n = self.expire_counter.fetch_add(1);
                     // 8388605 = 8 * 1024 * 1024 -1
                     if n & 8388605 == 1 {
                         warn!(
@@ -106,8 +99,7 @@ impl Runnable for WatermarkAssignerRunnable {
                     };
 
                     self.watermark = watermark;
-                    self.watermark_gauge
-                        .store(self.watermark.timestamp as i64, Ordering::Relaxed);
+                    self.watermark_gauge.store(self.watermark.timestamp as i64);
                     let watermark_ele = Element::new_watermark(
                         self.task_id.task_number,
                         self.task_id.num_tasks,

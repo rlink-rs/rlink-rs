@@ -1,9 +1,7 @@
-use std::sync::atomic::Ordering;
-use std::sync::atomic::{AtomicI64, AtomicU64};
-use std::sync::Arc;
 use std::time::Duration;
 
 use crate::channel::{BaseOn, SendError, Sender, TrySendError, CHANNEL_SIZE_PREFIX};
+use crate::metrics::metric::{Counter, Gauge};
 
 #[derive(Clone, Debug)]
 pub struct ChannelSender<T>
@@ -17,8 +15,8 @@ where
     base_on: BaseOn,
     cap: usize,
 
-    size: Arc<AtomicI64>,
-    counter: Arc<AtomicU64>,
+    size: Gauge,
+    counter: Counter,
 }
 
 impl<T> ChannelSender<T>
@@ -30,8 +28,8 @@ where
         sender: Sender<T>,
         base_on: BaseOn,
         cap: usize,
-        size: Arc<AtomicI64>,
-        counter: Arc<AtomicU64>,
+        size: Gauge,
+        counter: Counter,
     ) -> Self {
         ChannelSender {
             name: name.to_string(),
@@ -46,8 +44,8 @@ where
 
     #[inline]
     fn on_success(&self) {
-        self.size.fetch_add(1 as i64, Ordering::Relaxed);
-        self.counter.fetch_add(1 as u64, Ordering::Relaxed);
+        self.size.fetch_add(1 as i64);
+        self.counter.fetch_add(1 as u64);
 
         // gauge!(
         //     self.guava_capacity_name.clone(),
@@ -61,7 +59,7 @@ where
 
     pub fn send(&self, event: T) -> Result<(), SendError<T>> {
         if self.base_on == BaseOn::UnBounded {
-            if self.size.load(Ordering::Relaxed) > self.cap as i64 {
+            if self.size.load() > self.cap as i64 {
                 let mut times = 0;
                 loop {
                     if times < 100 {
@@ -74,7 +72,7 @@ where
                         }
                     }
 
-                    if self.size.load(Ordering::Relaxed) < self.cap as i64 {
+                    if self.size.load() < self.cap as i64 {
                         break;
                     }
 
@@ -91,7 +89,7 @@ where
 
     pub fn try_send(&self, event: T) -> Result<(), TrySendError<T>> {
         if self.base_on == BaseOn::UnBounded {
-            if self.size.load(Ordering::Relaxed) > self.cap as i64 {
+            if self.size.load() > self.cap as i64 {
                 return Err(TrySendError::Full(event));
             }
         }

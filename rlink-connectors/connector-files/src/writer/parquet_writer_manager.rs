@@ -7,12 +7,12 @@ use std::time::Duration;
 use parquet::file::properties::WriterPropertiesPtr;
 use parquet::schema::types::TypePtr;
 use rlink::api::element::Record;
+use rlink::api::runtime::TaskId;
 use rlink::channel::{bounded, Receiver, Sender};
 use rlink::utils::date_time::current_timestamp;
 
 use crate::writer::parquet_writer::{BlocksBuilder, ParquetBlockWriter};
 use crate::writer::{BlockWriter, BlockWriterManager, FileSystem, FileSystemBuilder, PathLocation};
-use rlink::api::runtime::TaskId;
 
 enum FlushData {
     Bytes((String, Vec<u8>)),

@@ -1,13 +1,10 @@
-use std::sync::atomic::AtomicU64;
-use std::sync::atomic::Ordering;
-use std::sync::Arc;
-
 use crate::api::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
 use crate::api::element::Element;
 use crate::api::function::FlatMapFunction;
 use crate::api::operator::DefaultStreamOperator;
 use crate::api::runtime::{OperatorId, TaskId};
-use crate::metrics::{register_counter, Tag};
+use crate::metrics::metric::Counter;
+use crate::metrics::register_counter;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 use std::borrow::BorrowMut;
@@ -22,7 +19,7 @@ pub(crate) struct FlatMapRunnable {
 
     context: Option<RunnableContext>,
 
-    counter: Arc<AtomicU64>,
+    counter: Counter,
 }
 
 impl FlatMapRunnable {
@@ -39,7 +36,7 @@ impl FlatMapRunnable {
             stream_map,
             next_runnable,
             context: None,
-            counter: Arc::new(AtomicU64::new(0)),
+            counter: Counter::default(),
         }
     }
 }
@@ -54,12 +51,10 @@ impl Runnable for FlatMapRunnable {
         let fun_context = context.to_fun_context(self.operator_id);
         self.stream_map.operator_fn.open(&fun_context)?;
 
-        let tags = vec![
-            Tag::from(("job_id", self.task_id.job_id.0)),
-            Tag::from(("task_number", self.task_id.task_number)),
-        ];
-        let metric_name = format!("FlatMap_{}", self.stream_map.operator_fn.as_ref().name());
-        register_counter(metric_name.as_str(), tags, self.counter.clone());
+        self.counter = register_counter(
+            format!("FlatMap_{}", self.stream_map.operator_fn.as_ref().name()),
+            self.task_id.to_tags(),
+        );
 
         Ok(())
     }
@@ -79,7 +74,7 @@ impl Runnable for FlatMapRunnable {
                     len += 1;
                 }
 
-                self.counter.fetch_add(len, Ordering::Relaxed);
+                self.counter.fetch_add(len);
             }
             Element::Barrier(barrier) => {
                 let checkpoint_id = barrier.checkpoint_id;

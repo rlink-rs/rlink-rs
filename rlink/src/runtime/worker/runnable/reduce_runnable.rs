@@ -1,7 +1,4 @@
 use std::borrow::BorrowMut;
-use std::sync::atomic::AtomicU64;
-use std::sync::atomic::Ordering;
-use std::sync::Arc;
 
 use crate::api::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
 use crate::api::element::{Element, Record, StreamStatus};
@@ -10,7 +7,8 @@ use crate::api::operator::DefaultStreamOperator;
 use crate::api::runtime::{OperatorId, TaskId};
 use crate::api::watermark::MAX_WATERMARK;
 use crate::api::window::{TWindow, Window};
-use crate::metrics::{register_counter, Tag};
+use crate::metrics::metric::Counter;
+use crate::metrics::register_counter;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
@@ -28,8 +26,8 @@ pub(crate) struct ReduceRunnable {
     // the Record can be operate after this window(include this window's time)
     limited_watermark_window: Window,
 
-    counter: Arc<AtomicU64>,
-    expire_counter: Arc<AtomicU64>,
+    counter: Counter,
+    expire_counter: Counter,
 }
 
 impl ReduceRunnable {
@@ -47,8 +45,8 @@ impl ReduceRunnable {
             stream_reduce,
             next_runnable,
             limited_watermark_window: Window::default(),
-            counter: Arc::new(AtomicU64::new(0)),
-            expire_counter: Arc::new(AtomicU64::new(0)),
+            counter: Counter::default(),
+            expire_counter: Counter::default(),
         }
     }
 }
@@ -67,17 +65,12 @@ impl Runnable for ReduceRunnable {
             .as_mut()
             .map(|s| s.operator_fn.open(&fun_context));
 
-        let tags = vec![
-            Tag::from(("job_id", self.task_id.job_id.0)),
-            Tag::from(("task_number", self.task_id.task_number)),
-        ];
         let fn_name = self.stream_reduce.operator_fn.as_ref().name();
 
-        let metric_name = format!("Reduce_{}", fn_name);
-        register_counter(metric_name.as_str(), tags.clone(), self.counter.clone());
+        self.counter = register_counter(format!("Reduce_{}", fn_name), self.task_id.to_tags());
 
-        let metric_name = format!("Reduce_Expire_{}", fn_name);
-        register_counter(metric_name.as_str(), tags, self.expire_counter.clone());
+        self.expire_counter =
+            register_counter(format!("Reduce_Expire_{}", fn_name), self.task_id.to_tags());
 
         info!("ReduceRunnable Opened. task_id={:?}", self.task_id);
         Ok(())
@@ -93,7 +86,7 @@ impl Runnable for ReduceRunnable {
                     .map(|window| window.min_timestamp() >= min_window_timestamp)
                     .unwrap_or(true);
                 if !acceptable {
-                    let n = self.expire_counter.fetch_add(1, Ordering::Relaxed);
+                    let n = self.expire_counter.fetch_add(1);
                     if n & 1048575 == 1 {
                         error!(
                             "expire data. record window={:?}, limit window={:?}",
@@ -111,7 +104,7 @@ impl Runnable for ReduceRunnable {
 
                 self.stream_reduce.operator_fn.as_mut().reduce(key, record);
 
-                self.counter.fetch_add(1, Ordering::Relaxed);
+                self.counter.fetch_add(1);
             }
             Element::Watermark(watermark) => {
                 match watermark.min_location_windows() {
