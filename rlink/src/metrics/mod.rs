@@ -6,7 +6,6 @@ use rand::prelude::*;
 
 use crate::metrics::prometheus_exporter::PrometheusBuilder;
 
-// pub mod global_metrics;
 pub mod metric;
 mod prometheus_exporter;
 mod worker_proxy;

@@ -1,9 +1,9 @@
 use rlink::api::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
 use rlink::api::element::Record;
 use rlink::api::function::{Context, OutputFormat};
+use rlink::api::runtime::TaskId;
 
 use crate::writer::BlockWriterManager;
-use rlink::api::runtime::TaskId;
 
 #[derive(NamedFunction)]
 pub struct HdfsOutputFormat {

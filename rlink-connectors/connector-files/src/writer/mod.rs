@@ -1,10 +1,10 @@
 use std::io::Write;
+use std::sync::Arc;
 
 use parquet::schema::parser::parse_message_type;
 use parquet::schema::types::TypePtr;
 use rlink::api::element::Record;
 use rlink::api::runtime::TaskId;
-use std::sync::Arc;
 
 pub mod file_system;
 pub mod parquet_writer;

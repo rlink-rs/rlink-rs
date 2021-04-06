@@ -1,4 +1,5 @@
 use rdkafka::ClientConfig;
+use rlink::api::checkpoint::CheckpointFunction;
 use rlink::api::element::Record;
 use rlink::api::function::{Context, NamedFunction, OutputFormat};
 use rlink::channel::utils::handover::Handover;
@@ -7,7 +8,6 @@ use rlink::utils::thread::async_runtime;
 use rlink::{api, utils};
 
 use crate::sink::producer::KafkaProducerThread;
-use rlink::api::checkpoint::CheckpointFunction;
 
 #[derive(NamedFunction)]
 pub struct KafkaOutputFormat {
