@@ -61,8 +61,7 @@ pub(crate) fn sys_info_metric_task(global_tag: Tag) {
             .map(|p| p.cpu_usage())
             .unwrap_or_default();
         {
-            let mut labels = labels.clone();
-            labels.push(("type".to_owned(), "used_memory".to_owned()));
+            let labels = labels.clone();
             gauge!("sys_cpu_usage", cpu_usage as f64, &labels,);
         }
 
