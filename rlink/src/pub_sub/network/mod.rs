@@ -2,6 +2,8 @@ use std::borrow::BorrowMut;
 use std::convert::TryFrom;
 
 use bytes::{Buf, BufMut, BytesMut};
+use tokio::net::tcp::{ReadHalf, WriteHalf};
+use tokio_util::codec::{BytesCodec, FramedRead, FramedWrite, LengthDelimitedCodec};
 
 use crate::api::element::{Element, Serde};
 use crate::api::runtime::ChannelKey;
@@ -182,4 +184,19 @@ impl TryFrom<BytesMut> for ElementResponse {
 
         Ok(ElementResponse { code, element })
     }
+}
+
+pub fn new_framed_read(read_half: ReadHalf<'_>) -> FramedRead<ReadHalf<'_>, LengthDelimitedCodec> {
+    LengthDelimitedCodec::builder()
+        .length_field_offset(0)
+        .length_field_length(4)
+        .length_adjustment(4) // 数据体截取位置，应和num_skip配置使用，保证frame要全部被读取
+        .num_skip(0)
+        .max_frame_length(1024 * 1024 * 3)
+        .big_endian()
+        .new_read(read_half)
+}
+
+pub fn new_framed_write(write_half: WriteHalf<'_>) -> FramedWrite<WriteHalf<'_>, BytesCodec> {
+    FramedWrite::new(write_half, BytesCodec::new())
 }
