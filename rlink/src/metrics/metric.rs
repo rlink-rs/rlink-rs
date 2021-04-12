@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Once, RwLock};
 
 use metrics::{counter, gauge};
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
-pub struct Tag(String, String);
+pub struct Tag(pub(crate) String, pub(crate) String);
 
 impl Tag {
     pub fn new<F, C>(field: F, context: C) -> Self
@@ -271,6 +271,13 @@ impl Exporter for MetricsExporter {
 }
 
 pub(crate) fn export() {
+    static N: Once = Once::new();
+    N.call_once(|| {
+        crate::utils::thread::spawn("sysinfo", || {
+            crate::utils::process::sys_info_metric_task(Tag::new("manager_id", get_manager_id()));
+        });
+    });
+
     let recorder: &Recorder = &*RECORDER;
     recorder.export(MetricsExporter {});
 }

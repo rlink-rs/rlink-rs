@@ -6,7 +6,7 @@ use crate::build_kafka_record;
 
 pub trait KafkaRecordDeserializer: Sync + Send {
     fn deserialize(
-        &self,
+        &mut self,
         timestamp: i64,
         key: &[u8],
         payload: &[u8],
@@ -25,7 +25,7 @@ pub struct DefaultKafkaRecordDeserializer {}
 
 impl KafkaRecordDeserializer for DefaultKafkaRecordDeserializer {
     fn deserialize(
-        &self,
+        &mut self,
         timestamp: i64,
         key: &[u8],
         payload: &[u8],

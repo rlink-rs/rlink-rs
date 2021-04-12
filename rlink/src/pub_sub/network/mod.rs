@@ -2,6 +2,8 @@ use std::borrow::BorrowMut;
 use std::convert::TryFrom;
 
 use bytes::{Buf, BufMut, BytesMut};
+use tokio::net::tcp::{ReadHalf, WriteHalf};
+use tokio_util::codec::{BytesCodec, FramedRead, FramedWrite, LengthDelimitedCodec};
 
 use crate::api::element::{Element, Serde};
 use crate::api::runtime::ChannelKey;
@@ -14,7 +16,8 @@ pub(crate) use client::subscribe;
 pub(crate) use server::publish;
 pub(crate) use server::Server;
 
-const BODY_LEN: usize = 20;
+const HEADER_LEN: usize = 4usize;
+const REQUEST_BODY_LEN: usize = 20;
 
 #[derive(Clone, Debug)]
 pub struct ElementRequest {
@@ -25,11 +28,10 @@ pub struct ElementRequest {
 
 impl Into<BytesMut> for ElementRequest {
     fn into(self) -> BytesMut {
-        static HEADER_LEN: usize = 4usize;
-        static PACKAGE_LEN: usize = HEADER_LEN + BODY_LEN;
+        static PACKAGE_LEN: usize = HEADER_LEN + REQUEST_BODY_LEN;
 
         let mut buffer = BytesMut::with_capacity(PACKAGE_LEN);
-        buffer.put_u32(BODY_LEN as u32);
+        buffer.put_u32(REQUEST_BODY_LEN as u32);
         self.channel_key.serialize(buffer.borrow_mut());
         buffer.put_u16(self.batch_pull_size);
         buffer.put_u16(self.batch_id);
@@ -46,10 +48,10 @@ impl TryFrom<BytesMut> for ElementRequest {
         let body_len = buffer.get_u32();
         assert_eq!(buffer.remaining(), body_len as usize);
 
-        if body_len as usize != BODY_LEN {
+        if body_len as usize != REQUEST_BODY_LEN {
             return Err(anyhow!(
                 "Illegal request body length, expect {}, found {}",
-                BODY_LEN,
+                REQUEST_BODY_LEN,
                 body_len
             ));
         }
@@ -131,7 +133,6 @@ impl Into<BytesMut> for ElementResponse {
     fn into(self) -> BytesMut {
         let ElementResponse { code, element } = self;
 
-        static HEADER_LEN: usize = 4usize;
         match code {
             ResponseCode::Ok => {
                 let element = element.unwrap();
@@ -182,4 +183,19 @@ impl TryFrom<BytesMut> for ElementResponse {
 
         Ok(ElementResponse { code, element })
     }
+}
+
+pub fn new_framed_read(read_half: ReadHalf<'_>) -> FramedRead<ReadHalf<'_>, LengthDelimitedCodec> {
+    LengthDelimitedCodec::builder()
+        .length_field_offset(0)
+        .length_field_length(4)
+        .length_adjustment(4) // 数据体截取位置，应和num_skip配置使用，保证frame要全部被读取
+        .num_skip(0)
+        .max_frame_length(1024 * 1024 * 3)
+        .big_endian()
+        .new_read(read_half)
+}
+
+pub fn new_framed_write(write_half: WriteHalf<'_>) -> FramedWrite<WriteHalf<'_>, BytesCodec> {
+    FramedWrite::new(write_half, BytesCodec::new())
 }
