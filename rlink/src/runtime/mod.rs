@@ -150,6 +150,8 @@ pub struct WorkerManagerDescriptor {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct CoordinatorManagerDescriptor {
+    /// `rlink` compile version
+    pub version: String,
     pub application_id: String,
     pub application_name: String,
     pub application_properties: Properties,
