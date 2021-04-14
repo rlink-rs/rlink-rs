@@ -1,6 +1,6 @@
 [package]
 name = "rlink"
-version = "0.2.5"
+version = "0.3.2"
 authors = ["yorkart <wangyue11.4@163.com>"]
 edition = "2018"
 description = "High performance Stream Processing Framework"
@@ -18,7 +18,8 @@ log = "0.4"
 log4rs = "1.0"
 
 num_cpus = "1.13"
-thread-id = "3"
+thread-id = "4"
+sysinfo = "0.16"
 chrono = "0.4"
 lazy_static = "1.4.0"
 backtrace = "0.3"

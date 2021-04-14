@@ -1,3 +1,5 @@
+use std::borrow::BorrowMut;
+
 use crate::api::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
 use crate::api::element::Element;
 use crate::api::function::FilterFunction;
@@ -5,7 +7,6 @@ use crate::api::operator::DefaultStreamOperator;
 use crate::api::runtime::OperatorId;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
-use std::borrow::BorrowMut;
 
 #[derive(Debug)]
 pub(crate) struct FilterRunnable {

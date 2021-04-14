@@ -1,9 +1,7 @@
-use std::sync::atomic::Ordering;
-use std::sync::atomic::{AtomicI64, AtomicU64};
-use std::sync::Arc;
 use std::time::Duration;
 
 use crate::channel::{Receiver, RecvError, RecvTimeoutError, TryRecvError, CHANNEL_SIZE_PREFIX};
+use crate::metrics::metric::{Counter, Gauge};
 
 #[derive(Clone, Debug)]
 pub struct ChannelReceiver<T>
@@ -15,20 +13,15 @@ where
 
     pub(crate) receiver: Receiver<T>,
 
-    size: Arc<AtomicI64>,
-    drain_counter: Arc<AtomicU64>,
+    size: Gauge,
+    drain_counter: Counter,
 }
 
 impl<T> ChannelReceiver<T>
 where
     T: Clone,
 {
-    pub fn new(
-        name: &str,
-        receiver: Receiver<T>,
-        size: Arc<AtomicI64>,
-        drain_counter: Arc<AtomicU64>,
-    ) -> Self {
+    pub fn new(name: &str, receiver: Receiver<T>, size: Gauge, drain_counter: Counter) -> Self {
         ChannelReceiver {
             name: name.to_string(),
             guava_size_name: CHANNEL_SIZE_PREFIX.to_owned() + name,
@@ -40,8 +33,8 @@ where
 
     #[inline]
     fn on_success(&self) {
-        self.size.fetch_sub(1 as i64, Ordering::Relaxed);
-        self.drain_counter.fetch_add(1 as u64, Ordering::Relaxed);
+        self.size.fetch_sub(1 as i64);
+        self.drain_counter.fetch_add(1 as u64);
     }
 
     pub fn try_recv(&self) -> Result<T, TryRecvError> {

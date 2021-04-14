@@ -6,13 +6,13 @@ use rand::prelude::*;
 
 use crate::metrics::prometheus_exporter::PrometheusBuilder;
 
-pub mod global_metrics;
+pub mod metric;
 mod prometheus_exporter;
 mod worker_proxy;
 
-pub use global_metrics::register_counter;
-pub use global_metrics::register_gauge;
-pub use global_metrics::Tag;
+pub use metric::register_counter;
+pub use metric::register_gauge;
+pub use metric::Tag;
 
 pub(crate) fn install(addr: SocketAddr, with_proxy: bool) -> anyhow::Result<()> {
     PrometheusBuilder::new()

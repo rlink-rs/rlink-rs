@@ -1,6 +1,7 @@
 use bytes::{Buf, BufMut, BytesMut};
 
 use crate::api::element::Serde;
+use crate::metrics::Tag;
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, Default)]
 pub struct OperatorId(pub u32);
@@ -36,6 +37,13 @@ impl TaskId {
     pub fn is_default(&self) -> bool {
         self.job_id.0 == 0 && self.task_number == 0 && self.num_tasks == 0
     }
+
+    pub fn to_tags(&self) -> Vec<Tag> {
+        vec![
+            Tag::new("job_id", self.job_id.0),
+            Tag::new("task_number", self.task_number),
+        ]
+    }
 }
 
 impl Serde for TaskId {
@@ -65,6 +73,17 @@ impl Serde for TaskId {
 pub(crate) struct ChannelKey {
     pub(crate) source_task_id: TaskId,
     pub(crate) target_task_id: TaskId,
+}
+
+impl ChannelKey {
+    pub fn to_tags(&self) -> Vec<Tag> {
+        vec![
+            Tag::new("source_job_id", self.source_task_id.job_id.0),
+            Tag::new("source_task_number", self.source_task_id.task_number),
+            Tag::new("target_job_id", self.target_task_id.job_id.0),
+            Tag::new("target_task_number", self.target_task_id.task_number),
+        ]
+    }
 }
 
 impl Serde for ChannelKey {

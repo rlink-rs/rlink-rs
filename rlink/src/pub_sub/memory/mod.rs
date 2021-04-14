@@ -54,8 +54,8 @@ pub(crate) fn get(
         named_channel_with_base(
             "Memory_PubSub",
             vec![
-                Tag::from(("target_job_id", target_task_id.job_id.0)),
-                Tag::from(("target_task_number", target_task_id.task_number)),
+                Tag::new("target_job_id", target_task_id.job_id.0),
+                Tag::new("target_task_number", target_task_id.task_number),
             ],
             channel_size,
             channel_base_on,

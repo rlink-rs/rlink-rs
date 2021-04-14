@@ -3,10 +3,10 @@ members = [
     "rlink",
     "rlink-derive",
 
-    "rlink-connectors/clickhouse-connector",
-    "rlink-connectors/kafka-connector",
-    "rlink-connectors/elasticsearch-connector",
-    "rlink-connectors/files-connector",
+    "rlink-connectors/connector-clickhouse",
+    "rlink-connectors/connector-kafka",
+    "rlink-connectors/connector-elasticsearch",
+    "rlink-connectors/connector-files",
 
     "rlink-deployment/rlink-standalone",
     "rlink-deployment/rlink-kubernetes",

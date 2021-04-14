@@ -3,8 +3,8 @@ use std::collections::LinkedList;
 use std::convert::TryFrom;
 use std::net::SocketAddr;
 use std::str::FromStr;
+use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
-use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -15,7 +15,6 @@ use tokio::net::tcp::ReadHalf;
 use tokio::net::TcpStream;
 use tokio_util::codec::FramedRead;
 use tokio_util::codec::LengthDelimitedCodec;
-use tokio_util::codec::{BytesCodec, FramedWrite};
 
 use crate::api::element::Element;
 use crate::api::properties::ChannelBaseOn;
@@ -25,7 +24,9 @@ use crate::channel::{
     TryRecvError, TrySendError,
 };
 use crate::metrics::{register_counter, Tag};
-use crate::pub_sub::network::{ElementRequest, ElementResponse, ResponseCode};
+use crate::pub_sub::network::{
+    new_framed_read, new_framed_write, ElementRequest, ElementResponse, ResponseCode,
+};
 use crate::runtime::ClusterDescriptor;
 use crate::utils::thread::{async_runtime_multi, async_sleep};
 
@@ -64,9 +65,9 @@ pub(crate) fn subscribe(
     let (sender, receiver) = named_channel_with_base(
         "NetworkSubscribe",
         vec![
-            Tag::from(("source_job_id", source_task_ids[0].job_id.0)),
-            Tag::from(("target_job_id", target_task_id.job_id.0)),
-            Tag::from(("target_task_number", target_task_id.task_number)),
+            Tag::new("source_job_id", source_task_ids[0].job_id.0),
+            Tag::new("target_job_id", target_task_id.job_id.0),
+            Tag::new("target_task_number", target_task_id.task_number),
         ],
         channel_size,
         channel_base_on,
@@ -188,7 +189,6 @@ pub(crate) struct Client {
     pub(crate) addr: SocketAddr,
     batch_pull_size: u16,
     stream: TcpStream,
-    tcp_frame_max_size: u32,
 }
 
 impl Client {
@@ -211,7 +211,6 @@ impl Client {
             addr,
             batch_pull_size,
             stream,
-            tcp_frame_max_size: 1024 * 1024,
         })
     }
 
@@ -224,32 +223,10 @@ impl Client {
         );
 
         let (read_half, write_half) = self.stream.split();
-        let mut framed_write = FramedWrite::new(write_half, BytesCodec::new());
+        let mut framed_write = new_framed_write(write_half);
+        let mut framed_read = new_framed_read(read_half);
 
-        let mut codec_framed: FramedRead<ReadHalf, LengthDelimitedCodec> =
-            LengthDelimitedCodec::builder()
-                .length_field_offset(0)
-                .length_field_length(4)
-                .length_adjustment(4) // 数据体截取位置，应和num_skip配置使用，保证frame要全部被读取
-                .num_skip(0)
-                .max_frame_length(self.tcp_frame_max_size as usize)
-                .big_endian()
-                .new_read(read_half);
-
-        let tags = vec![
-            Tag::from(("source_job_id", self.channel_key.source_task_id.job_id.0)),
-            Tag::from((
-                "source_task_number",
-                self.channel_key.source_task_id.task_number,
-            )),
-            Tag::from(("target_job_id", self.channel_key.target_task_id.job_id.0)),
-            Tag::from((
-                "target_task_number",
-                self.channel_key.target_task_id.task_number,
-            )),
-        ];
-        let counter = Arc::new(AtomicU64::new(0));
-        register_counter("NetWorkClient", tags, counter.clone());
+        let counter = register_counter("NetWorkClient", self.channel_key.to_tags());
 
         let mut batch_id = 0u16;
         let timeout = Duration::from_secs(6);
@@ -273,7 +250,7 @@ impl Client {
             let element_list = tokio::time::timeout(
                 timeout,
                 Self::recv_element(
-                    codec_framed.borrow_mut(),
+                    framed_read.borrow_mut(),
                     self.channel_key,
                     self.batch_pull_size,
                 ),
@@ -289,7 +266,7 @@ impl Client {
                     }
                 }
 
-                counter.fetch_add(len as u64, Ordering::Relaxed);
+                counter.fetch_add(len as u64);
             }
             if len < 100 {
                 async_sleep(Duration::from_secs(3)).await;
@@ -387,9 +364,9 @@ async fn send_to_channel(sender: &ElementSender, element: Element) -> anyhow::Re
                 return Ok(());
             }
             Err(TrySendError::Full(ele)) => {
-                // if is_enable_log() {
-                error!("> net input channel block, channel: {:?}", ele);
-                // }
+                if is_enable_log() {
+                    error!("> net input channel block, channel: {:?}", ele);
+                }
 
                 if loops == 60 {
                     error!("net input channel block and try with 60 times");

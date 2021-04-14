@@ -14,14 +14,15 @@ use tokio::net::tcp::WriteHalf;
 use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 use tokio::sync::RwLock;
-use tokio_util::codec::{BytesCodec, FramedWrite, LengthDelimitedCodec};
+use tokio_util::codec::{BytesCodec, FramedWrite};
 
 use crate::api::element::Element;
 use crate::api::properties::ChannelBaseOn;
 use crate::api::runtime::{ChannelKey, TaskId};
 use crate::channel::{named_channel_with_base, ElementReceiver, ElementSender, TryRecvError};
-use crate::metrics::Tag;
-use crate::pub_sub::network::{ElementRequest, ElementResponse, ResponseCode};
+use crate::pub_sub::network::{
+    new_framed_read, new_framed_write, ElementRequest, ElementResponse, ResponseCode,
+};
 use crate::utils::thread::{async_runtime, async_runtime_single};
 
 pub(crate) static ENABLE_LOG: AtomicBool = AtomicBool::new(false);
@@ -60,12 +61,7 @@ pub(crate) fn publish(
 
         let (sender, receiver) = named_channel_with_base(
             "NetworkPublish",
-            vec![
-                Tag::from(("source_job_id", source_task_id.job_id.0)),
-                Tag::from(("source_task_number", source_task_id.task_number)),
-                Tag::from(("target_job_id", target_task_id.job_id.0)),
-                Tag::from(("target_task_number", target_task_id.task_number)),
-            ],
+            channel_key.to_tags(),
             channel_size,
             channel_base_on,
         );
@@ -95,7 +91,6 @@ fn get_network_channel(key: &ChannelKey) -> Option<ElementReceiver> {
 pub(crate) struct Server {
     ip: String,
     bind_addr: Arc<RwLock<Option<SocketAddr>>>,
-    tcp_frame_max_size: u32,
 }
 
 impl Server {
@@ -103,7 +98,6 @@ impl Server {
         Server {
             ip,
             bind_addr: Arc::new(RwLock::new(None)),
-            tcp_frame_max_size: 1024 * 1024,
         }
     }
 
@@ -196,15 +190,8 @@ impl Server {
 
     async fn session_process0(&self, mut socket: TcpStream) -> anyhow::Result<()> {
         let (read_half, write_half) = socket.split();
-        let mut framed_read = LengthDelimitedCodec::builder()
-            .length_field_offset(0)
-            .length_field_length(4)
-            .length_adjustment(4) // 数据体截取位置，应和num_skip配置使用，保证frame要全部被读取
-            .num_skip(0)
-            .max_frame_length(self.tcp_frame_max_size as usize)
-            .big_endian()
-            .new_read(read_half);
-        let mut framed_write = FramedWrite::new(write_half, BytesCodec::new());
+        let mut framed_write = new_framed_write(write_half);
+        let mut framed_read = new_framed_read(read_half);
 
         while let Some(message) = framed_read.next().await {
             match message {

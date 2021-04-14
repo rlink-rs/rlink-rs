@@ -1,6 +1,6 @@
 [package]
 name = "rlink-example-utils"
-version = "0.2.3"
+version = "0.3.0"
 authors = ["yorkart <wangyue11.4@163.com>"]
 edition = "2018"
 description = "High performance Stream Processing Framework"
@@ -12,7 +12,7 @@ license = "MIT/Apache-2.0"
 name = "rlink_example_utils"
 
 [dependencies.rlink]
-version = "0.2.3"
+version = "0.3.0"
 path = "../../rlink"
 
 [dependencies.rlink-derive]

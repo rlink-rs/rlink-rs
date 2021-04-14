@@ -1,14 +1,12 @@
 use std::borrow::BorrowMut;
-use std::sync::atomic::AtomicU64;
-use std::sync::atomic::Ordering;
-use std::sync::Arc;
 
 use crate::api::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
 use crate::api::element::{Element, Partition};
 use crate::api::function::KeySelectorFunction;
 use crate::api::operator::DefaultStreamOperator;
 use crate::api::runtime::{OperatorId, TaskId};
-use crate::metrics::{register_counter, Tag};
+use crate::metrics::metric::Counter;
+use crate::metrics::register_counter;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 use crate::utils;
@@ -24,7 +22,7 @@ pub(crate) struct KeyByRunnable {
 
     context: Option<RunnableContext>,
 
-    counter: Arc<AtomicU64>,
+    counter: Counter,
 }
 
 impl KeyByRunnable {
@@ -40,7 +38,7 @@ impl KeyByRunnable {
             next_runnable,
             partition_size: 0,
             context: None,
-            counter: Arc::new(AtomicU64::new(0)),
+            counter: Counter::default(),
         }
     }
 }
@@ -59,12 +57,10 @@ impl Runnable for KeyByRunnable {
         // todo set self.partition_size = Reduce.partition
         self.partition_size = context.child_parallelism() as u16;
 
-        let tags = vec![
-            Tag::from(("job_id", self.task_id.job_id.0)),
-            Tag::from(("task_number", self.task_id.task_number)),
-        ];
-        let metric_name = format!("KeyBy_{}", self.stream_key_by.operator_fn.as_ref().name());
-        register_counter(metric_name.as_str(), tags, self.counter.clone());
+        self.counter = register_counter(
+            format!("KeyBy_{}", self.stream_key_by.operator_fn.as_ref().name()),
+            self.task_id.to_tags(),
+        );
 
         Ok(())
     }
@@ -90,7 +86,7 @@ impl Runnable for KeyByRunnable {
 
                 self.next_runnable.as_mut().unwrap().run(element);
 
-                self.counter.fetch_add(1, Ordering::Relaxed);
+                self.counter.fetch_add(1);
             }
             Element::Barrier(barrier) => {
                 let checkpoint_id = barrier.checkpoint_id;

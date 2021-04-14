@@ -1,4 +1,7 @@
+use crate::metrics::Tag;
+use metrics::gauge;
 use std::path::PathBuf;
+use sysinfo::{ProcessExt, SystemExt};
 
 pub fn work_space() -> PathBuf {
     std::env::current_dir().expect("Get current dir error")
@@ -25,4 +28,57 @@ pub fn parse_arg(arg_key: &str) -> anyhow::Result<String> {
     }
 
     return Err(anyhow!("`{}` argument is not found", arg_key));
+}
+
+pub(crate) fn sys_info_metric_task(global_tag: Tag) {
+    let mut labels = Vec::new();
+    let Tag(field_name, field_value) = global_tag.clone();
+    labels.push((field_name, field_value));
+
+    let mut system = sysinfo::System::new();
+    loop {
+        system.refresh_cpu();
+        let load_avg = system.get_load_average();
+        {
+            let mut labels = labels.clone();
+            labels.push(("minute".to_owned(), "one".to_owned()));
+            gauge!("sys_load_average", load_avg.one, &labels,);
+        }
+        {
+            let mut labels = labels.clone();
+            labels.push(("minute".to_owned(), "five".to_owned()));
+            gauge!("sys_load_average", load_avg.five, &labels,);
+        }
+        {
+            let mut labels = labels.clone();
+            labels.push(("minute".to_owned(), "fifteen".to_owned()));
+            gauge!("sys_load_average", load_avg.fifteen, &labels,);
+        }
+
+        system.refresh_process(std::process::id() as i32);
+        let cpu_usage = system
+            .get_process(std::process::id() as i32)
+            .map(|p| p.cpu_usage())
+            .unwrap_or_default();
+        {
+            let labels = labels.clone();
+            gauge!("sys_cpu_usage", cpu_usage as f64, &labels,);
+        }
+
+        system.refresh_memory();
+        let used_memory = system.get_used_memory();
+        {
+            let mut labels = labels.clone();
+            labels.push(("type".to_owned(), "used_memory".to_owned()));
+            gauge!("sys_memory", used_memory as f64, &labels,);
+        }
+        let used_swap = system.get_used_swap();
+        {
+            let mut labels = labels.clone();
+            labels.push(("type".to_owned(), "used_swap".to_owned()));
+            gauge!("sys_memory", used_swap as f64, &labels,);
+        }
+
+        std::thread::sleep(std::time::Duration::from_secs(5));
+    }
 }

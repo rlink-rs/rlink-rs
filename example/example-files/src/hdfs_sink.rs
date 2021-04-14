@@ -8,14 +8,14 @@ use parquet::schema::parser::parse_message_type;
 use rlink::api::element::Record;
 use rlink::api::runtime::TaskId;
 use rlink::utils::date_time::fmt_date_time;
-use rlink_example_utils::buffer_gen::model;
-use rlink_files_connector::sink::output_format::HdfsOutputFormat;
-use rlink_files_connector::writer::file_system::LocalFileSystemBuilder;
-use rlink_files_connector::writer::parquet_writer::{
+use rlink_connector_files::sink::output_format::HdfsOutputFormat;
+use rlink_connector_files::writer::file_system::LocalFileSystemBuilder;
+use rlink_connector_files::writer::parquet_writer::{
     Blocks, BlocksBuilder, ColumnValues, RecordBlocksBuilder,
 };
-use rlink_files_connector::writer::parquet_writer_manager::ParquetBlockWriterManager;
-use rlink_files_connector::writer::PathLocation;
+use rlink_connector_files::writer::parquet_writer_manager::ParquetBlockWriterManager;
+use rlink_connector_files::writer::PathLocation;
+use rlink_example_utils::buffer_gen::model;
 
 pub fn create_hdfs_sink(field_types: &[u8]) -> HdfsOutputFormat {
     let fs_builder = LocalFileSystemBuilder {};
