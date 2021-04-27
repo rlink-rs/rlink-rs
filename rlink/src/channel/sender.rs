@@ -58,7 +58,7 @@ where
     }
 
     pub fn send(&self, event: T) -> Result<(), SendError<T>> {
-        if self.base_on == BaseOn::UnBounded {
+        if self.base_on == BaseOn::Unbounded {
             if self.size.load() > self.cap as i64 {
                 let mut times = 0;
                 loop {
@@ -88,7 +88,7 @@ where
     }
 
     pub fn try_send(&self, event: T) -> Result<(), TrySendError<T>> {
-        if self.base_on == BaseOn::UnBounded {
+        if self.base_on == BaseOn::Unbounded {
             if self.size.load() > self.cap as i64 {
                 return Err(TrySendError::Full(event));
             }

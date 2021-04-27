@@ -40,7 +40,7 @@ pub type ElementSender = ChannelSender<Element>;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum BaseOn {
-    UnBounded,
+    Unbounded,
     Bounded,
 }
 
@@ -48,9 +48,10 @@ impl<'a> TryFrom<&'a str> for BaseOn {
     type Error = anyhow::Error;
 
     fn try_from(mode_str: &'a str) -> Result<Self, Self::Error> {
-        match mode_str {
-            "Bounded" => Ok(BaseOn::Bounded),
-            "UnBounded" => Ok(BaseOn::UnBounded),
+        let mode_str = mode_str.to_lowercase();
+        match mode_str.as_str() {
+            "bounded" => Ok(Self::Bounded),
+            "unbounded" => Ok(Self::Unbounded),
             _ => Err(anyhow!("Unsupported mode {}", mode_str)),
         }
     }
@@ -60,7 +61,7 @@ impl std::fmt::Display for BaseOn {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             BaseOn::Bounded => write!(f, "Bounded"),
-            BaseOn::UnBounded => write!(f, "UnBounded"),
+            BaseOn::Unbounded => write!(f, "Unbounded"),
         }
     }
 }
@@ -73,7 +74,7 @@ pub fn named_channel<T>(
 where
     T: Clone,
 {
-    named_channel_with_base(name, tags, cap, BaseOn::UnBounded)
+    named_channel_with_base(name, tags, cap, BaseOn::Unbounded)
 }
 
 pub fn named_channel_with_base<T>(
@@ -92,7 +93,7 @@ where
 
     let (sender, receiver) = match base_on {
         BaseOn::Bounded => bounded(cap),
-        BaseOn::UnBounded => unbounded(),
+        BaseOn::Unbounded => unbounded(),
     };
 
     // add_channel_metric(name.to_string(), size.clone(), capacity.clone());
