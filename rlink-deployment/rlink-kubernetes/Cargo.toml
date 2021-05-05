@@ -1,6 +1,6 @@
 [package]
 name = "rlink-kubernetes"
-version = "0.1.0"
+version = "0.4.0"
 authors = ["rlink-rs <rlink-rs@163.com>"]
 edition = "2018"
 description = "High performance Stream Processing Framework"
@@ -9,7 +9,7 @@ repository = "https://github.com/rlink-rs/rlink-rs.git"
 license = "MIT/Apache-2.0"
 
 [dependencies.rlink]
-version = "0.3.0"
+version = "0.4"
 path = "../../rlink"
 
 [dependencies]

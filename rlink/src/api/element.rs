@@ -677,13 +677,13 @@ mod tests {
         writer.set_bytes("abc".as_bytes()).unwrap();
 
         let record_clone = record.clone();
-        let mut reader = record.as_reader(&data_types);
+        let reader = record.as_reader(&data_types);
 
         let element_record = Element::Record(record_clone);
         let mut data = element_record.to_bytes();
         let mut element_record_de = Element::deserialize(data.borrow_mut());
 
-        let mut de_reader = element_record_de.as_record_mut().as_reader(&data_types);
+        let de_reader = element_record_de.as_record_mut().as_reader(&data_types);
         assert_eq!(reader.get_u32(0).unwrap(), de_reader.get_u32(0).unwrap());
         assert_eq!(reader.get_u64(1).unwrap(), de_reader.get_u64(1).unwrap());
         assert_eq!(reader.get_i32(2).unwrap(), de_reader.get_i32(2).unwrap());
