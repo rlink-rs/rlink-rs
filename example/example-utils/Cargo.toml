@@ -20,7 +20,7 @@ version = "0.2.3"
 path = "../../rlink-derive"
 
 [dependencies]
-serbuffer = "1.1"
+serbuffer = "1.2"
 
 log = "0.4.8"
 anyhow = "1.0"
@@ -28,4 +28,4 @@ rand = "0.7"
 chrono = "0.4"
 
 [build-dependencies]
-serbuffer-gen = "1.0"
+serbuffer-gen = "1.2"

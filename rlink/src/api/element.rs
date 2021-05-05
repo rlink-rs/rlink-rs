@@ -16,6 +16,7 @@ lazy_static! {
 
 pub type Buffer = serbuffer::Buffer;
 pub type BufferReader<'a, 'b> = serbuffer::BufferReader<'a, 'b>;
+pub type BufferMutReader<'a, 'b> = serbuffer::BufferMutReader<'a, 'b>;
 pub type BufferWriter<'a, 'b> = serbuffer::BufferWriter<'a, 'b>;
 pub mod types {
     pub use serbuffer::types::*;
@@ -147,6 +148,10 @@ impl Record {
 
     pub fn as_reader<'a, 'b>(&'a mut self, data_types: &'b [u8]) -> BufferReader<'a, 'b> {
         self.values.as_reader(data_types)
+    }
+
+    pub fn as_reader_mut<'a, 'b>(&'a mut self, data_types: &'b [u8]) -> BufferMutReader<'a, 'b> {
+        self.values.as_reader_mut(data_types)
     }
 
     pub fn as_writer<'a, 'b>(&'a mut self, data_types: &'b [u8]) -> BufferWriter<'a, 'b> {

@@ -50,9 +50,10 @@ impl Iterator for RandIterator {
         let mut thread_rng = rand::thread_rng();
         let v = thread_rng.gen_range(0i32, 100i32) as i64;
 
+        let name = format!("name-{}", v);
         let model = model::Entity {
             timestamp: current_timestamp_millis(),
-            name: format!("name-{}", v),
+            name: name.as_str(),
             value: v,
         };
 
