@@ -1,6 +1,6 @@
 [package]
 name = "rlink-connector-kafka"
-version = "0.3.1"
+version = "0.4.0"
 authors = ["yorkart <wangyue11.4@163.com>"]
 edition = "2018"
 description = "High performance Stream Processing Framework"
@@ -12,7 +12,7 @@ license = "MIT/Apache-2.0"
 name = "rlink_connector_kafka"
 
 [dependencies.rlink]
-version = "0.3.0"
+version = "0.4"
 path = "../../rlink"
 
 [dependencies.rlink-derive]

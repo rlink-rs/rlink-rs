@@ -48,7 +48,7 @@ impl KafkaProducerThread {
             for _n in 0..batch {
                 match self.handover.try_poll_next() {
                     Ok(mut record) => {
-                        let mut reader = KafkaRecord::new(record.borrow_mut());
+                        let reader = KafkaRecord::new(record.borrow_mut());
 
                         let topic = reader.get_kafka_topic().unwrap();
                         let topic = match self.topic.as_ref() {
@@ -57,7 +57,7 @@ impl KafkaProducerThread {
                                 if topic.is_empty() {
                                     panic!("topic not found in `KafkaRecord`");
                                 }
-                                topic.as_str()
+                                topic
                             }
                         };
 

@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::channel::{BaseOn, SendError, Sender, TrySendError, CHANNEL_SIZE_PREFIX};
+use crate::channel::{ChannelBaseOn, SendError, Sender, TrySendError, CHANNEL_SIZE_PREFIX};
 use crate::metrics::metric::{Counter, Gauge};
 
 #[derive(Clone, Debug)]
@@ -12,7 +12,7 @@ where
     guava_size_name: String,
 
     sender: Sender<T>,
-    base_on: BaseOn,
+    base_on: ChannelBaseOn,
     cap: usize,
 
     size: Gauge,
@@ -26,7 +26,7 @@ where
     pub fn new(
         name: &str,
         sender: Sender<T>,
-        base_on: BaseOn,
+        base_on: ChannelBaseOn,
         cap: usize,
         size: Gauge,
         counter: Counter,
@@ -58,7 +58,7 @@ where
     }
 
     pub fn send(&self, event: T) -> Result<(), SendError<T>> {
-        if self.base_on == BaseOn::UnBounded {
+        if self.base_on == ChannelBaseOn::Unbounded {
             if self.size.load() > self.cap as i64 {
                 let mut times = 0;
                 loop {
@@ -88,7 +88,7 @@ where
     }
 
     pub fn try_send(&self, event: T) -> Result<(), TrySendError<T>> {
-        if self.base_on == BaseOn::UnBounded {
+        if self.base_on == ChannelBaseOn::Unbounded {
             if self.size.load() > self.cap as i64 {
                 return Err(TrySendError::Full(event));
             }

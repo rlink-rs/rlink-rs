@@ -1,6 +1,6 @@
 [package]
 name = "rlink-example-simple"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["yorkart <wangyue11.4@163.com>"]
 edition = "2018"
 description = "High performance Stream Processing Framework"
@@ -9,7 +9,7 @@ repository = "https://github.com/rlink-rs/rlink-rs.git"
 license = "MIT/Apache-2.0"
 
 [dependencies.rlink]
-version = "0.3.0"
+version = "0.4"
 path = "../../rlink"
 
 [dependencies.rlink-derive]
@@ -17,11 +17,11 @@ version = "0.2.3"
 path = "../../rlink-derive"
 
 [dependencies.rlink-example-utils]
-version = "0.3.0"
+version = "0.4"
 path = "../example-utils"
 
 [dependencies]
-serbuffer = "1.1"
+serbuffer = "1.2"
 
 log = "0.4.8"
 anyhow = "1.0"
@@ -29,4 +29,4 @@ rand = "0.7"
 chrono = "0.4"
 
 [build-dependencies]
-serbuffer-gen = "1.0"
+serbuffer-gen = "1.2"

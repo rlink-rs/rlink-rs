@@ -7,7 +7,7 @@ use crate::api::backend::{CheckpointBackend, KeyedStateBackend};
 use crate::api::cluster::MetadataStorageType;
 
 pub type ClusterMode = crate::runtime::ClusterMode;
-pub type ChannelBaseOn = crate::channel::BaseOn;
+pub type ChannelBaseOn = crate::channel::ChannelBaseOn;
 
 pub trait SystemProperties {
     fn set_metadata_mode(&mut self, metadata_storage_mode: MetadataStorageType);

@@ -16,6 +16,7 @@ lazy_static! {
 
 pub type Buffer = serbuffer::Buffer;
 pub type BufferReader<'a, 'b> = serbuffer::BufferReader<'a, 'b>;
+pub type BufferMutReader<'a, 'b> = serbuffer::BufferMutReader<'a, 'b>;
 pub type BufferWriter<'a, 'b> = serbuffer::BufferWriter<'a, 'b>;
 pub mod types {
     pub use serbuffer::types::*;
@@ -147,6 +148,10 @@ impl Record {
 
     pub fn as_reader<'a, 'b>(&'a mut self, data_types: &'b [u8]) -> BufferReader<'a, 'b> {
         self.values.as_reader(data_types)
+    }
+
+    pub fn as_reader_mut<'a, 'b>(&'a mut self, data_types: &'b [u8]) -> BufferMutReader<'a, 'b> {
+        self.values.as_reader_mut(data_types)
     }
 
     pub fn as_writer<'a, 'b>(&'a mut self, data_types: &'b [u8]) -> BufferWriter<'a, 'b> {
@@ -672,13 +677,13 @@ mod tests {
         writer.set_bytes("abc".as_bytes()).unwrap();
 
         let record_clone = record.clone();
-        let mut reader = record.as_reader(&data_types);
+        let reader = record.as_reader(&data_types);
 
         let element_record = Element::Record(record_clone);
         let mut data = element_record.to_bytes();
         let mut element_record_de = Element::deserialize(data.borrow_mut());
 
-        let mut de_reader = element_record_de.as_record_mut().as_reader(&data_types);
+        let de_reader = element_record_de.as_record_mut().as_reader(&data_types);
         assert_eq!(reader.get_u32(0).unwrap(), de_reader.get_u32(0).unwrap());
         assert_eq!(reader.get_u64(1).unwrap(), de_reader.get_u64(1).unwrap());
         assert_eq!(reader.get_i32(2).unwrap(), de_reader.get_i32(2).unwrap());
