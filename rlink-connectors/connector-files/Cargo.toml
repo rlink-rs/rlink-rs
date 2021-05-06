@@ -24,4 +24,4 @@ log = "0.4"
 anyhow = "1.0"
 
 #webhdfs="0.3"
-parquet = "3.0"
+parquet = "4.0"

@@ -32,7 +32,7 @@ anyhow = "1.0"
 rand = "0.7"
 chrono = "0.4"
 
-parquet = "3.0"
+parquet = "4.0"
 
 [build-dependencies]
 serbuffer-gen = "1.2"
