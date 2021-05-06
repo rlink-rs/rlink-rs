@@ -54,7 +54,7 @@ impl InputFormat for SystemInputFormat {
         let channel_base_on = context
             .application_properties
             .get_pub_sub_channel_base()
-            .unwrap_or(ChannelBaseOn::UnBounded);
+            .unwrap_or(ChannelBaseOn::Unbounded);
 
         let mut memory_jobs = Vec::new();
         let mut network_jobs = Vec::new();

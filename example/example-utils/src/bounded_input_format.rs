@@ -80,7 +80,7 @@ impl VecInputFormat {
 
         let model = model::Entity {
             timestamp,
-            name: key.to_string(),
+            name: key,
             value: value as i64,
         };
         let mut record = Record::new();

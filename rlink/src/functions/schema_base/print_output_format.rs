@@ -48,7 +48,7 @@ impl OutputFormat for PrintOutputFormat {
                 types::F32 => reader.get_f32(i).unwrap().to_string(),
                 types::F64 => reader.get_f64(i).unwrap().to_string(),
                 types::BYTES => match reader.get_str(i) {
-                    Ok(s) => s,
+                    Ok(s) => s.to_owned(),
                     Err(_e) => format!("{:?}", reader.get_bytes(i).unwrap()),
                 },
                 // types::STRING => reader.get_bool(i).unwrap().to_string(),

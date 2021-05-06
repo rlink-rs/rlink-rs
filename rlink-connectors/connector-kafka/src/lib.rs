@@ -84,27 +84,27 @@ impl<'a, 'b> KafkaRecord<'a, 'b> {
         KafkaRecord { reader }
     }
 
-    pub fn get_kafka_timestamp(&mut self) -> Result<i64, std::io::Error> {
+    pub fn get_kafka_timestamp(&self) -> Result<i64, std::io::Error> {
         self.reader.get_i64(0)
     }
 
-    pub fn get_kafka_key(&mut self) -> Result<&[u8], std::io::Error> {
+    pub fn get_kafka_key(&self) -> Result<&[u8], std::io::Error> {
         self.reader.get_bytes(1)
     }
 
-    pub fn get_kafka_payload(&mut self) -> Result<&[u8], std::io::Error> {
+    pub fn get_kafka_payload(&self) -> Result<&[u8], std::io::Error> {
         self.reader.get_bytes(2)
     }
 
-    pub fn get_kafka_topic(&mut self) -> Result<String, std::io::Error> {
+    pub fn get_kafka_topic(&self) -> Result<&str, std::io::Error> {
         self.reader.get_str(3)
     }
 
-    pub fn get_kafka_partition(&mut self) -> Result<i32, std::io::Error> {
+    pub fn get_kafka_partition(&self) -> Result<i32, std::io::Error> {
         self.reader.get_i32(4)
     }
 
-    pub fn get_kafka_offset(&mut self) -> Result<i64, std::io::Error> {
+    pub fn get_kafka_offset(&self) -> Result<i64, std::io::Error> {
         self.reader.get_i64(5)
     }
 }

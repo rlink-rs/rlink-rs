@@ -85,7 +85,7 @@ impl Blocks for DemoBlocks {
     fn append(&mut self, mut record: Record) -> usize {
         let entity = model::Entity::parse(record.as_buffer()).unwrap();
 
-        self.name.push(ByteArray::from(entity.name.as_str()));
+        self.name.push(ByteArray::from(entity.name));
         self.sum.push(entity.value);
 
         self.name.len()

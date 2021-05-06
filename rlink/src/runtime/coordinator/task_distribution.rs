@@ -54,7 +54,8 @@ pub(crate) fn build_cluster_descriptor(
         worker_managers.push(task_manager_descriptor);
     }
 
-    let job_manager = CoordinatorManagerDescriptor {
+    let coordinator_manager = CoordinatorManagerDescriptor {
+        version: crate::utils::VERSION.to_owned(),
         application_id: context.application_id.clone(),
         application_name: job_name.to_string(),
         application_properties: application_properties.clone(),
@@ -69,7 +70,7 @@ pub(crate) fn build_cluster_descriptor(
     };
 
     ClusterDescriptor {
-        coordinator_manager: job_manager,
+        coordinator_manager,
         worker_managers,
     }
 }

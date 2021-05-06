@@ -2,7 +2,7 @@ use std::borrow::BorrowMut;
 use std::fmt::Debug;
 
 use crate::api::element::Record;
-use crate::api::element::{types, BufferReader, BufferWriter};
+use crate::api::element::{types, BufferMutReader, BufferReader, BufferWriter};
 use crate::api::function::{Context, NamedFunction, ReduceFunction};
 use crate::functions::percentile::{get_percentile_capacity, Percentile};
 use crate::functions::schema_base::FunctionSchema;
@@ -76,7 +76,7 @@ pub trait Aggregation: Debug {
     fn reduce(
         &self,
         writer: &mut BufferWriter,
-        value_reader: Option<&mut BufferReader>,
+        value_reader: Option<&mut BufferMutReader>,
         value_index: usize,
         record_reader: &mut BufferReader,
     );
@@ -104,7 +104,7 @@ impl Aggregation for SumI64 {
     fn reduce(
         &self,
         writer: &mut BufferWriter,
-        value_reader: Option<&mut BufferReader>,
+        value_reader: Option<&mut BufferMutReader>,
         value_index: usize,
         record_reader: &mut BufferReader,
     ) {
@@ -142,7 +142,7 @@ impl Aggregation for SumF64 {
     fn reduce(
         &self,
         writer: &mut BufferWriter,
-        value_reader: Option<&mut BufferReader>,
+        value_reader: Option<&mut BufferMutReader>,
         value_index: usize,
         record_reader: &mut BufferReader,
     ) {
@@ -181,7 +181,7 @@ impl Aggregation for MaxI64 {
     fn reduce(
         &self,
         writer: &mut BufferWriter,
-        value_reader: Option<&mut BufferReader>,
+        value_reader: Option<&mut BufferMutReader>,
         value_index: usize,
         record_reader: &mut BufferReader,
     ) {
@@ -221,7 +221,7 @@ impl Aggregation for MaxF64 {
     fn reduce(
         &self,
         writer: &mut BufferWriter,
-        value_reader: Option<&mut BufferReader>,
+        value_reader: Option<&mut BufferMutReader>,
         value_index: usize,
         record_reader: &mut BufferReader,
     ) {
@@ -265,7 +265,7 @@ impl Aggregation for MinI64 {
     fn reduce(
         &self,
         writer: &mut BufferWriter,
-        value_reader: Option<&mut BufferReader>,
+        value_reader: Option<&mut BufferMutReader>,
         value_index: usize,
         record_reader: &mut BufferReader,
     ) {
@@ -305,7 +305,7 @@ impl Aggregation for MinF64 {
     fn reduce(
         &self,
         writer: &mut BufferWriter,
-        value_reader: Option<&mut BufferReader>,
+        value_reader: Option<&mut BufferMutReader>,
         value_index: usize,
         record_reader: &mut BufferReader,
     ) {
@@ -351,7 +351,7 @@ impl Aggregation for PctU64 {
     fn reduce(
         &self,
         writer: &mut BufferWriter,
-        value_reader: Option<&mut BufferReader>,
+        value_reader: Option<&mut BufferMutReader>,
         value_index: usize,
         record_reader: &mut BufferReader,
     ) {
@@ -430,7 +430,7 @@ impl ReduceFunction for SchemaBaseReduceFunction {
 
         match value {
             Some(state_value) => {
-                let mut stat_reader = state_value.as_reader(self.val_field_types.as_slice());
+                let mut stat_reader = state_value.as_reader_mut(self.val_field_types.as_slice());
 
                 for index in 0..self.agg_operators.len() {
                     self.agg_operators[index].reduce(

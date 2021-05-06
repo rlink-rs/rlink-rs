@@ -29,9 +29,10 @@ impl ConfigInputFormat {
     }
 
     fn create_record(&self, value: &str) -> Record {
+        let field = format!("{}-{}", self.name, value);
         let model = config::Entity {
-            field: format!("{}-{}", self.name, value),
-            value: value.to_string(),
+            field: field.as_str(),
+            value: value,
         };
         let mut record = Record::new();
         model.to_buffer(record.as_buffer()).unwrap();

@@ -36,7 +36,7 @@ impl KeySelectorFunction for SchemaBaseKeySelector {
         let mut record_key = Record::with_capacity(record.len());
         let mut writer = record_key.as_writer(self.key_field_types.as_slice());
 
-        let mut reader = record.as_reader(self.field_types.as_slice());
+        let reader = record.as_reader(self.field_types.as_slice());
 
         for index in 0..self.columns.len() {
             writer
