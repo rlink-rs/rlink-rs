@@ -1,8 +1,8 @@
 use std::convert::TryFrom;
 
-use crate::api::element::Element;
 use crate::channel::receiver::ChannelReceiver;
 use crate::channel::sender::ChannelSender;
+use crate::core::element::Element;
 use crate::metrics::metric::Tag;
 use crate::metrics::{register_counter, register_gauge};
 

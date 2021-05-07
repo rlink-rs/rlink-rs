@@ -1,9 +1,9 @@
 use std::borrow::BorrowMut;
 use std::fmt::Debug;
 
-use crate::api::element::Record;
-use crate::api::element::{types, BufferMutReader, BufferReader, BufferWriter};
-use crate::api::function::{Context, NamedFunction, ReduceFunction};
+use crate::core::element::Record;
+use crate::core::element::{types, BufferMutReader, BufferReader, BufferWriter};
+use crate::core::function::{Context, NamedFunction, ReduceFunction};
 use crate::functions::percentile::{get_percentile_capacity, Percentile};
 use crate::functions::schema_base::FunctionSchema;
 
@@ -418,7 +418,7 @@ impl FunctionSchema for SchemaBaseReduceFunction {
 }
 
 impl ReduceFunction for SchemaBaseReduceFunction {
-    fn open(&mut self, _context: &Context) -> crate::api::Result<()> {
+    fn open(&mut self, _context: &Context) -> crate::core::Result<()> {
         Ok(())
     }
 
@@ -455,7 +455,7 @@ impl ReduceFunction for SchemaBaseReduceFunction {
         record_rt
     }
 
-    fn close(&mut self) -> crate::api::Result<()> {
+    fn close(&mut self) -> crate::core::Result<()> {
         Ok(())
     }
 }

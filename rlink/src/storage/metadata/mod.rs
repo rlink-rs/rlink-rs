@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use crate::api::cluster::MetadataStorageType;
+use crate::core::cluster::MetadataStorageType;
 use crate::runtime::{ClusterDescriptor, HeartbeatItem, TaskManagerStatus};
 use crate::storage::metadata::mem_metadata_storage::MemoryMetadataStorage;
 

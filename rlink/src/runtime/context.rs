@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use crate::api::cluster::{load_config, ClusterConfig};
+use crate::core::cluster::{load_config, ClusterConfig};
 use crate::metrics::metric::set_manager_id;
 use crate::runtime::{logger, ClusterMode, ManagerType};
 use crate::utils;

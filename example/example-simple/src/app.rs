@@ -1,11 +1,11 @@
 use std::time::Duration;
 
-use rlink::api::backend::{CheckpointBackend, KeyedStateBackend};
-use rlink::api::data_stream::{TDataStream, TKeyedStream, TWindowedStream};
-use rlink::api::env::{StreamApp, StreamExecutionEnvironment};
-use rlink::api::properties::{Properties, SystemProperties};
-use rlink::api::watermark::BoundedOutOfOrdernessTimestampExtractor;
-use rlink::api::window::SlidingEventTimeWindows;
+use rlink::core::backend::{CheckpointBackend, KeyedStateBackend};
+use rlink::core::data_stream::{TDataStream, TKeyedStream, TWindowedStream};
+use rlink::core::env::{StreamApp, StreamExecutionEnvironment};
+use rlink::core::properties::{Properties, SystemProperties};
+use rlink::core::watermark::BoundedOutOfOrdernessTimestampExtractor;
+use rlink::core::window::SlidingEventTimeWindows;
 use rlink::functions::schema_base::key_selector::SchemaBaseKeySelector;
 use rlink::functions::schema_base::print_output_format::PrintOutputFormat;
 use rlink::functions::schema_base::reduce::{sum_i64, SchemaBaseReduceFunction};

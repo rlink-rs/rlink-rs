@@ -1,11 +1,11 @@
-use crate::api;
-use crate::api::checkpoint::CheckpointFunction;
-use crate::api::element::{Element, Record};
-use crate::api::function::{Context, InputFormat, InputSplit, InputSplitSource, NamedFunction};
-use crate::api::properties::{ChannelBaseOn, SystemProperties};
-use crate::api::runtime::TaskId;
 use crate::channel::select::ChannelSelect;
 use crate::channel::{ElementReceiver, TryRecvError};
+use crate::core;
+use crate::core::checkpoint::CheckpointFunction;
+use crate::core::element::{Element, Record};
+use crate::core::function::{Context, InputFormat, InputSplit, InputSplitSource, NamedFunction};
+use crate::core::properties::{ChannelBaseOn, SystemProperties};
+use crate::core::runtime::TaskId;
 use crate::dag::execution_graph::ExecutionEdge;
 use crate::pub_sub::{memory, network, DEFAULT_CHANNEL_SIZE};
 
@@ -42,7 +42,7 @@ impl SystemInputFormat {
 }
 
 impl InputFormat for SystemInputFormat {
-    fn open(&mut self, _input_split: InputSplit, context: &Context) -> api::Result<()> {
+    fn open(&mut self, _input_split: InputSplit, context: &Context) -> core::Result<()> {
         self.subscribe_log(context);
 
         self.task_id = context.task_id.clone();
@@ -108,7 +108,7 @@ impl InputFormat for SystemInputFormat {
         }
     }
 
-    fn close(&mut self) -> crate::api::Result<()> {
+    fn close(&mut self) -> crate::core::Result<()> {
         Ok(())
     }
 }

@@ -15,8 +15,8 @@ mod pub_sub;
 mod runtime;
 mod storage;
 
-pub mod api;
 pub mod channel;
+pub mod core;
 pub mod functions;
 pub mod metrics;
 pub mod utils;

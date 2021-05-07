@@ -1,7 +1,7 @@
-use crate::api::checkpoint::CheckpointFunction;
-use crate::api::element::Record;
-use crate::api::function::NamedFunction;
-use crate::api::watermark::TimestampAssigner;
+use crate::core::checkpoint::CheckpointFunction;
+use crate::core::element::Record;
+use crate::core::function::NamedFunction;
+use crate::core::watermark::TimestampAssigner;
 
 #[derive(Debug)]
 pub struct SchemaBaseTimestampAssigner {

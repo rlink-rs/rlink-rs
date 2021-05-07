@@ -3,8 +3,8 @@ use std::convert::TryFrom;
 use std::str::FromStr;
 use std::time::Duration;
 
-use crate::api::backend::{CheckpointBackend, KeyedStateBackend};
-use crate::api::cluster::MetadataStorageType;
+use crate::core::backend::{CheckpointBackend, KeyedStateBackend};
+use crate::core::cluster::MetadataStorageType;
 
 pub type ClusterMode = crate::runtime::ClusterMode;
 pub type ChannelBaseOn = crate::channel::ChannelBaseOn;
@@ -186,7 +186,7 @@ impl SystemProperties for Properties {
 
 #[cfg(test)]
 mod tests {
-    use crate::api::properties::Properties;
+    use crate::core::properties::Properties;
 
     #[test]
     pub fn row_properties() {

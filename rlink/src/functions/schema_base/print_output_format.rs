@@ -2,11 +2,11 @@ use std::time::Duration;
 
 use serbuffer::types;
 
-use crate::api::checkpoint::CheckpointFunction;
-use crate::api::element::Record;
-use crate::api::function::{Context, NamedFunction, OutputFormat};
-use crate::api::runtime::TaskId;
-use crate::api::window::TWindow;
+use crate::core::checkpoint::CheckpointFunction;
+use crate::core::element::Record;
+use crate::core::function::{Context, NamedFunction, OutputFormat};
+use crate::core::runtime::TaskId;
+use crate::core::window::TWindow;
 use crate::utils::date_time::fmt_date_time;
 
 pub struct PrintOutputFormat {
@@ -24,7 +24,7 @@ impl PrintOutputFormat {
 }
 
 impl OutputFormat for PrintOutputFormat {
-    fn open(&mut self, context: &Context) -> crate::api::Result<()> {
+    fn open(&mut self, context: &Context) -> crate::core::Result<()> {
         self.task_id = context.task_id;
 
         Ok(())
@@ -79,7 +79,7 @@ impl OutputFormat for PrintOutputFormat {
         );
     }
 
-    fn close(&mut self) -> crate::api::Result<()> {
+    fn close(&mut self) -> crate::core::Result<()> {
         Ok(())
     }
 }

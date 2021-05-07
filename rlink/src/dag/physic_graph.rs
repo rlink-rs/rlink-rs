@@ -4,7 +4,7 @@ use std::ops::Index;
 
 use daggy::{Dag, EdgeIndex, NodeIndex, Walker};
 
-use crate::api::runtime::JobId;
+use crate::core::runtime::JobId;
 use crate::dag::execution_graph::{ExecutionEdge, ExecutionGraph, ExecutionNode};
 use crate::dag::{TaskId, TaskInstance, WorkerManagerInstance};
 

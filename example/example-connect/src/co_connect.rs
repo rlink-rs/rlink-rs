@@ -1,13 +1,13 @@
-use rlink::api;
-use rlink::api::element::Record;
-use rlink::api::function::{CoProcessFunction, Context};
+use rlink::core;
+use rlink::core::element::Record;
+use rlink::core::function::{CoProcessFunction, Context};
 use rlink_example_utils::buffer_gen::config;
 
 #[derive(Debug, Function)]
 pub struct MyCoProcessFunction {}
 
 impl CoProcessFunction for MyCoProcessFunction {
-    fn open(&mut self, _context: &Context) -> api::Result<()> {
+    fn open(&mut self, _context: &Context) -> core::Result<()> {
         Ok(())
     }
 
@@ -29,7 +29,7 @@ impl CoProcessFunction for MyCoProcessFunction {
         Box::new(vec![].into_iter())
     }
 
-    fn close(&mut self) -> api::Result<()> {
+    fn close(&mut self) -> core::Result<()> {
         Ok(())
     }
 }

@@ -20,8 +20,8 @@ pub use source::input_format::KafkaInputFormat;
 use std::collections::HashMap;
 
 use rdkafka::ClientConfig;
-use rlink::api::element::BufferReader;
-use rlink::api::element::Record;
+use rlink::core::element::BufferReader;
+use rlink::core::element::Record;
 
 use crate::source::deserializer::{
     DefaultKafkaRecordDeserializer, DefaultKafkaRecordDeserializerBuilder,
@@ -37,17 +37,17 @@ pub const SINK_CHANNEL_SIZE: usize = 50000;
 
 pub static KAFKA_DATA_TYPES: [u8; 6] = [
     // timestamp
-    rlink::api::element::types::I64,
+    rlink::core::element::types::I64,
     // key
-    rlink::api::element::types::BYTES,
+    rlink::core::element::types::BYTES,
     // payload
-    rlink::api::element::types::BYTES,
+    rlink::core::element::types::BYTES,
     // topic
-    rlink::api::element::types::BYTES,
+    rlink::core::element::types::BYTES,
     // partition
-    rlink::api::element::types::I32,
+    rlink::core::element::types::I32,
     // offset
-    rlink::api::element::types::I64,
+    rlink::core::element::types::I64,
 ];
 
 pub fn build_kafka_record(

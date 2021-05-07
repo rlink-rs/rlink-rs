@@ -1,5 +1,5 @@
-use crate::api::properties::Properties;
-use crate::api::runtime::CheckpointId;
+use crate::core::properties::Properties;
+use crate::core::runtime::CheckpointId;
 use crate::dag::DagManager;
 use crate::runtime::context::Context;
 use crate::runtime::HeartBeatStatus;

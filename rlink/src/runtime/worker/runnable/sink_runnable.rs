@@ -1,8 +1,8 @@
-use crate::api::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
-use crate::api::element::{Element, Partition};
-use crate::api::function::OutputFormat;
-use crate::api::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
-use crate::api::runtime::{OperatorId, TaskId};
+use crate::core::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
+use crate::core::element::{Element, Partition};
+use crate::core::function::OutputFormat;
+use crate::core::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
+use crate::core::runtime::{OperatorId, TaskId};
 use crate::dag::job_graph::JobEdge;
 use crate::metrics::metric::Counter;
 use crate::metrics::register_counter;

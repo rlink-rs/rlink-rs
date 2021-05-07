@@ -2,10 +2,10 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
-use crate::api::checkpoint::Checkpoint;
-use crate::api::properties::SystemProperties;
-use crate::api::runtime::{CheckpointId, JobId, OperatorId};
 use crate::channel::{bounded, Receiver, Sender};
+use crate::core::checkpoint::Checkpoint;
+use crate::core::properties::SystemProperties;
+use crate::core::runtime::{CheckpointId, JobId, OperatorId};
 use crate::dag::metadata::DagMetadata;
 use crate::runtime::context::Context;
 use crate::runtime::ClusterDescriptor;

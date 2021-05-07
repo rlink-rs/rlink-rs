@@ -7,7 +7,7 @@ use kube::{
 };
 use serde_json::json;
 
-use crate::api::{
+use crate::core::{
     cluster::TaskResourceInfo,
     env::{StreamApp, StreamExecutionEnvironment},
 };

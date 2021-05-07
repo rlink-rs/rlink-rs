@@ -1,8 +1,8 @@
 use std::fmt::Debug;
 use std::sync::Arc;
 
-use crate::api::cluster::TaskResourceInfo;
-use crate::api::env::{StreamApp, StreamExecutionEnvironment};
+use crate::core::cluster::TaskResourceInfo;
+use crate::core::env::{StreamApp, StreamExecutionEnvironment};
 #[cfg(feature = "k8s")]
 use crate::deployment::kubernetes::KubernetesResourceManager;
 use crate::deployment::local::LocalResourceManager;

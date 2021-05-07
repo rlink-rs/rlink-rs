@@ -1,6 +1,6 @@
 use bytes::{Buf, BufMut, BytesMut};
 
-use crate::api::element::Serde;
+use crate::core::element::Serde;
 use crate::metrics::Tag;
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, Default)]

@@ -1,9 +1,9 @@
 use std::time::Duration;
 
-use rlink::api::backend::{CheckpointBackend, KeyedStateBackend};
-use rlink::api::data_stream::TDataStream;
-use rlink::api::env::{StreamApp, StreamExecutionEnvironment};
-use rlink::api::properties::{Properties, SystemProperties};
+use rlink::core::backend::{CheckpointBackend, KeyedStateBackend};
+use rlink::core::data_stream::TDataStream;
+use rlink::core::env::{StreamApp, StreamExecutionEnvironment};
+use rlink::core::properties::{Properties, SystemProperties};
 use rlink_example_utils::buffer_gen::model::FIELD_TYPE;
 use rlink_example_utils::unbounded_input_format::RandInputFormat;
 

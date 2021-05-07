@@ -6,9 +6,9 @@ use std::fmt::Debug;
 
 use bytes::{Buf, BufMut, BytesMut};
 
-use crate::api::runtime::{ChannelKey, CheckpointId};
-use crate::api::watermark::MIN_WATERMARK;
-use crate::api::window::Window;
+use crate::core::runtime::{ChannelKey, CheckpointId};
+use crate::core::watermark::MIN_WATERMARK;
+use crate::core::window::Window;
 
 lazy_static! {
     static ref EMPTY_VEC: Vec<Window> = Vec::with_capacity(0);
@@ -658,8 +658,8 @@ impl From<Barrier> for Element {
 mod tests {
     use std::borrow::BorrowMut;
 
-    use crate::api::element::types;
-    use crate::api::element::{Element, Record, Serde, StreamStatus, Watermark};
+    use crate::core::element::types;
+    use crate::core::element::{Element, Record, Serde, StreamStatus, Watermark};
 
     #[test]
     pub fn serde_element_record_test() {

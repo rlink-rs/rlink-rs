@@ -16,7 +16,7 @@ pub fn derive_named_function(input: TokenStream) -> TokenStream {
     let name = &input.ident;
     let (im, ty, wh) = input.generics.split_for_impl();
     let expanded = quote! {
-        impl #im rlink::api::function::NamedFunction for #name #ty #wh {
+        impl #im rlink::core::function::NamedFunction for #name #ty #wh {
             fn name(&self) -> &str {
                 stringify!(#name)
             }
@@ -36,7 +36,7 @@ pub fn derive_checkpoint_function(input: TokenStream) -> TokenStream {
     let name = &input.ident;
     let (im, ty, wh) = input.generics.split_for_impl();
     let expanded = quote! {
-        impl #im rlink::api::checkpoint::CheckpointFunction for #name #ty #wh {}
+        impl #im rlink::core::checkpoint::CheckpointFunction for #name #ty #wh {}
     };
 
     // Hand the output tokens back to the compiler
@@ -52,13 +52,13 @@ pub fn derive_function(input: TokenStream) -> TokenStream {
     let name = &input.ident;
     let (im, ty, wh) = input.generics.split_for_impl();
     let expanded = quote! {
-        impl #im rlink::api::function::NamedFunction for #name #ty #wh {
+        impl #im rlink::core::function::NamedFunction for #name #ty #wh {
             fn name(&self) -> &str {
                 stringify!(#name)
             }
         }
 
-        impl #im rlink::api::checkpoint::CheckpointFunction for #name #ty #wh {}
+        impl #im rlink::core::checkpoint::CheckpointFunction for #name #ty #wh {}
     };
 
     // Hand the output tokens back to the compiler
@@ -120,7 +120,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
         #[derive(Clone, Debug)]
         pub struct GenStreamJob {}
 
-        impl rlink::api::env::StreamJob for GenStreamJob {
+        impl rlink::core::env::StreamJob for GenStreamJob {
             fn prepare_properties(&self, properties: &mut Properties) {
                 #body
             }
@@ -135,7 +135,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
         }
 
         fn main() {
-            rlink::api::env::execute("job_name", GenStreamJob{});
+            rlink::core::env::execute("job_name", GenStreamJob{});
         }
     };
 

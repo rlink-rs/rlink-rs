@@ -1,11 +1,11 @@
 use std::fmt::Debug;
 
-use crate::api::function::{
+use crate::core::function::{
     BaseReduceFunction, CoProcessFunction, FilterFunction, FlatMapFunction, InputFormat,
     KeySelectorFunction, NamedFunction, OutputFormat,
 };
-use crate::api::watermark::WatermarkAssigner;
-use crate::api::window::WindowAssigner;
+use crate::core::watermark::WatermarkAssigner;
+use crate::core::window::WindowAssigner;
 
 pub const DEFAULT_PARALLELISM: u16 = 0;
 

@@ -1,6 +1,6 @@
-use rlink::api;
-use rlink::api::element::Record;
-use rlink::api::function::{Context, FlatMapFunction};
+use rlink::core;
+use rlink::core::element::Record;
+use rlink::core::function::{Context, FlatMapFunction};
 
 #[derive(Debug, Function)]
 pub struct MyFlatMapFunction {}
@@ -12,7 +12,7 @@ impl MyFlatMapFunction {
 }
 
 impl FlatMapFunction for MyFlatMapFunction {
-    fn open(&mut self, _context: &Context) -> api::Result<()> {
+    fn open(&mut self, _context: &Context) -> core::Result<()> {
         Ok(())
     }
 
@@ -20,7 +20,7 @@ impl FlatMapFunction for MyFlatMapFunction {
         Box::new(vec![record].into_iter())
     }
 
-    fn close(&mut self) -> api::Result<()> {
+    fn close(&mut self) -> core::Result<()> {
         Ok(())
     }
 }

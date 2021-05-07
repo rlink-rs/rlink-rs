@@ -1,9 +1,9 @@
 use std::fmt::Debug;
 
-use crate::api::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
-use crate::api::element::{Element, Record};
-use crate::api::properties::Properties;
-use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
+use crate::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
+use crate::core::element::{Element, Record};
+use crate::core::properties::Properties;
+use crate::core::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::dag::execution_graph::{ExecutionEdge, ExecutionNode};
 
 /// Base class of all operators in the Rust API.
@@ -80,7 +80,7 @@ pub trait InputSplitSource {
     /// Create InputSplits by system parallelism[`min_num_splits`]
     ///
     /// Returns a InputSplit vec
-    fn create_input_splits(&self, min_num_splits: u16) -> crate::api::Result<Vec<InputSplit>> {
+    fn create_input_splits(&self, min_num_splits: u16) -> crate::core::Result<Vec<InputSplit>> {
         let mut input_splits = Vec::with_capacity(min_num_splits as usize);
         for task_number in 0..min_num_splits {
             input_splits.push(InputSplit::new(task_number, Properties::new()));
@@ -103,12 +103,12 @@ where
     Self: InputSplitSource + NamedFunction + CheckpointFunction,
 {
     // fn configure(&mut self, properties: HashMap<String, String>);
-    fn open(&mut self, input_split: InputSplit, context: &Context) -> crate::api::Result<()>;
+    fn open(&mut self, input_split: InputSplit, context: &Context) -> crate::core::Result<()>;
     fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record> + Send>;
     fn element_iter(&mut self) -> Box<dyn Iterator<Item = Element> + Send> {
         Box::new(ElementIterator::new(self.record_iter()))
     }
-    fn close(&mut self) -> crate::api::Result<()>;
+    fn close(&mut self) -> crate::core::Result<()>;
 }
 
 pub trait OutputFormat
@@ -121,7 +121,7 @@ where
     ///
     /// `taskNumber` The number of the parallel instance.
     /// `numTasks` The number of parallel tasks.
-    fn open(&mut self, context: &Context) -> crate::api::Result<()>;
+    fn open(&mut self, context: &Context) -> crate::core::Result<()>;
 
     fn write_record(&mut self, record: Record);
 
@@ -129,7 +129,7 @@ where
         self.write_record(element.into_record())
     }
 
-    fn close(&mut self) -> crate::api::Result<()>;
+    fn close(&mut self) -> crate::core::Result<()>;
 
     // todo unsupported. `TwoPhaseCommitSinkFunction`
     // fn begin_transaction(&mut self) {}
@@ -142,59 +142,59 @@ pub trait FlatMapFunction
 where
     Self: NamedFunction + CheckpointFunction,
 {
-    fn open(&mut self, context: &Context) -> crate::api::Result<()>;
+    fn open(&mut self, context: &Context) -> crate::core::Result<()>;
     fn flat_map(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>>;
     fn flat_map_element(&mut self, element: Element) -> Box<dyn Iterator<Item = Element>> {
         let iterator = self.flat_map(element.into_record());
         Box::new(ElementIterator::new(iterator))
     }
-    fn close(&mut self) -> crate::api::Result<()>;
+    fn close(&mut self) -> crate::core::Result<()>;
 }
 
 pub trait FilterFunction
 where
     Self: NamedFunction + CheckpointFunction,
 {
-    fn open(&mut self, context: &Context) -> crate::api::Result<()>;
+    fn open(&mut self, context: &Context) -> crate::core::Result<()>;
     fn filter(&self, record: &mut Record) -> bool;
-    fn close(&mut self) -> crate::api::Result<()>;
+    fn close(&mut self) -> crate::core::Result<()>;
 }
 
 pub trait KeySelectorFunction
 where
     Self: NamedFunction + CheckpointFunction,
 {
-    fn open(&mut self, context: &Context) -> crate::api::Result<()>;
+    fn open(&mut self, context: &Context) -> crate::core::Result<()>;
     fn get_key(&self, record: &mut Record) -> Record;
-    fn close(&mut self) -> crate::api::Result<()>;
+    fn close(&mut self) -> crate::core::Result<()>;
 }
 
 pub trait ReduceFunction
 where
     Self: NamedFunction,
 {
-    fn open(&mut self, context: &Context) -> crate::api::Result<()>;
+    fn open(&mut self, context: &Context) -> crate::core::Result<()>;
     ///
     fn reduce(&self, value: Option<&mut Record>, record: &mut Record) -> Record;
-    fn close(&mut self) -> crate::api::Result<()>;
+    fn close(&mut self) -> crate::core::Result<()>;
 }
 
 pub(crate) trait BaseReduceFunction
 where
     Self: NamedFunction + CheckpointFunction,
 {
-    fn open(&mut self, context: &Context) -> crate::api::Result<()>;
+    fn open(&mut self, context: &Context) -> crate::core::Result<()>;
     ///
     fn reduce(&mut self, key: Record, record: Record);
     fn drop_state(&mut self, watermark_timestamp: u64) -> Vec<Record>;
-    fn close(&mut self) -> crate::api::Result<()>;
+    fn close(&mut self) -> crate::core::Result<()>;
 }
 
 pub trait CoProcessFunction
 where
     Self: NamedFunction + CheckpointFunction,
 {
-    fn open(&mut self, context: &Context) -> crate::api::Result<()>;
+    fn open(&mut self, context: &Context) -> crate::core::Result<()>;
     /// This method is called for each element in the first of the connected streams.
     ///
     /// `stream_seq` is the `DataStream` index
@@ -204,7 +204,7 @@ where
         stream_seq: usize,
         record: Record,
     ) -> Box<dyn Iterator<Item = Record>>;
-    fn close(&mut self) -> crate::api::Result<()>;
+    fn close(&mut self) -> crate::core::Result<()>;
 }
 
 pub(crate) struct ElementIterator<T>

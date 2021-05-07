@@ -1,8 +1,8 @@
 use mysql::prelude::*;
 use mysql::*;
 
-use crate::api::checkpoint::{Checkpoint, CheckpointHandle};
-use crate::api::runtime::{CheckpointId, JobId, OperatorId, TaskId};
+use crate::core::checkpoint::{Checkpoint, CheckpointHandle};
+use crate::core::runtime::{CheckpointId, JobId, OperatorId, TaskId};
 use crate::storage::checkpoint::TCheckpointStorage;
 use crate::utils::date_time::{current_timestamp, fmt_date_time};
 
@@ -133,8 +133,8 @@ where ck.application_name = :application_name
 
 #[cfg(test)]
 mod tests {
-    use crate::api::checkpoint::{Checkpoint, CheckpointHandle};
-    use crate::api::runtime::{CheckpointId, JobId, OperatorId, TaskId};
+    use crate::core::checkpoint::{Checkpoint, CheckpointHandle};
+    use crate::core::runtime::{CheckpointId, JobId, OperatorId, TaskId};
     use crate::storage::checkpoint::mysql_checkpoint_storage::MySqlCheckpointStorage;
     use crate::storage::checkpoint::TCheckpointStorage;
 

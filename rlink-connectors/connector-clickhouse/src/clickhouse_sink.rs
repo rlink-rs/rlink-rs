@@ -4,12 +4,12 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use clickhouse_rs::{ClientHandle, Options, Pool};
-use rlink::api::checkpoint::CheckpointFunction;
-use rlink::api::element::Record;
-use rlink::api::function::{Context, NamedFunction, OutputFormat};
 use rlink::channel::utils::handover::Handover;
+use rlink::core::checkpoint::CheckpointFunction;
+use rlink::core::element::Record;
+use rlink::core::function::{Context, NamedFunction, OutputFormat};
 use rlink::utils::thread::{async_runtime, async_sleep, async_spawn};
-use rlink::{api, utils};
+use rlink::{core, utils};
 
 pub type CkBlock = clickhouse_rs::Block;
 
@@ -55,7 +55,7 @@ impl ClickhouseSink {
 }
 
 impl OutputFormat for ClickhouseSink {
-    fn open(&mut self, context: &Context) -> api::Result<()> {
+    fn open(&mut self, context: &Context) -> core::Result<()> {
         self.handover = Some(Handover::new(self.name(), context.task_id.to_tags(), 10000));
 
         let urls: Vec<&str> = self.url.split(",").collect();
@@ -90,7 +90,7 @@ impl OutputFormat for ClickhouseSink {
         self.handover.as_ref().unwrap().produce(record).unwrap();
     }
 
-    fn close(&mut self) -> api::Result<()> {
+    fn close(&mut self) -> core::Result<()> {
         Ok(())
     }
 }
