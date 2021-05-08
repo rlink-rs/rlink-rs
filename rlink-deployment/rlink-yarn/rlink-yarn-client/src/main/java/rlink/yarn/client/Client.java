@@ -24,6 +24,10 @@ public class Client {
     public static final String QUEUE_KEY = "queue";
     public static final String APPLICATION_ID_KEY = "application_id";
     public static final String MAX_ATTEMPTS_KEY = "max_attempts";
+    /**
+     * 黑名单节点，逗号分隔
+     */
+    public static final String EXCLUSION_NODES_KEY = "exclusion_nodes";
 
     public static void main(String[] args) {
         try {
@@ -131,6 +135,12 @@ public class Client {
             }
         }
         parameterMap.remove(MAX_ATTEMPTS_KEY);
+
+        String exclusionNodes = parameterMap.get(EXCLUSION_NODES_KEY);
+        if (StringUtils.isNotBlank(exclusionNodes)) {
+            submitParam.setExclusionNodes(Arrays.asList(exclusionNodes.split(",")));
+        }
+        parameterMap.remove(EXCLUSION_NODES_KEY);
 
         submitParam.setParamMap(parameterMap);
 

@@ -1,5 +1,7 @@
 package rlink.yarn.client;
 
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -33,6 +35,7 @@ import java.util.Map;
 
 import static rlink.yarn.client.Client.APPLICATION_ID_KEY;
 import static rlink.yarn.client.Client.APPLICATION_NAME_KEY;
+import static rlink.yarn.client.Client.EXCLUSION_NODES_KEY;
 import static rlink.yarn.client.Client.MEMORY_MB_KEY;
 import static rlink.yarn.client.Client.RUST_STREAMING_PATH_KEY;
 import static rlink.yarn.client.Client.VIRTUAL_CORES_KEY;
@@ -78,6 +81,13 @@ public class ClientExecutor {
         yarnClient.submitApplication(appContext);
 
         ApplicationReport appReport = yarnClient.getApplicationReport(appId);
+        if (CollectionUtils.isNotEmpty(submitParam.getExclusionNodes())) {
+            if (submitParam.getExclusionNodes().contains(appReport.getHost())) {
+                LOGGER.error("application is submitted to exclusion nodes[{}], please resubmit!", appReport.getHost());
+                yarnClient.killApplication(appId);
+            }
+        }
+
         YarnApplicationState appState = appReport.getYarnApplicationState();
         while (appState != YarnApplicationState.FINISHED &&
                 appState != YarnApplicationState.KILLED &&
@@ -106,6 +116,7 @@ public class ClientExecutor {
         paramMap.put(VIRTUAL_CORES_KEY, String.valueOf(vCores));
         paramMap.put(RUST_STREAMING_PATH_KEY, rustStreamingPath.toString());
         paramMap.put(APPLICATION_ID_KEY, appId);
+        paramMap.put(EXCLUSION_NODES_KEY, StringUtils.join(submitParam.getExclusionNodes(), ","));
 
         ContainerLaunchContext context = Records.newRecord(ContainerLaunchContext.class);
 
