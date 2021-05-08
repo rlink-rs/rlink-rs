@@ -2,23 +2,21 @@ pub fn get_percentile_capacity(scale: &'static [f64]) -> usize {
     (scale.len() + 1) << 3
 }
 
-pub struct Percentile<'a> {
-    // accumulate counter
-    // count: u64,
+pub struct PercentileWriter<'a> {
     // scale boundary slice
     scale: &'static [f64],
     // value statistics vec
     count_container: &'a mut [u8],
-
+    // counter field index
     counter_index: usize,
 }
 
-impl<'a> Percentile<'a> {
+impl<'a> PercentileWriter<'a> {
     pub fn new(scale: &'static [f64], count_container: &'a mut [u8]) -> Self {
-        Percentile {
-            // count: 0,
+        PercentileWriter {
             scale,
             count_container,
+            // 8bytes per field, counter field index location at the end
             counter_index: scale.len() << 3,
         }
     }
@@ -51,11 +49,6 @@ impl<'a> Percentile<'a> {
         self.count_container[index + 5] = c[5];
         self.count_container[index + 6] = c[6];
         self.count_container[index + 7] = c[7];
-    }
-
-    #[inline]
-    fn get_counter(&self) -> u64 {
-        self.read(self.counter_index)
     }
 
     fn incr_counter(&mut self) {
@@ -128,6 +121,53 @@ impl<'a> Percentile<'a> {
         return None;
     }
 
+    pub fn merge(&mut self, percentile: &PercentileReader) {
+        for i in 0..self.count_container.len() {
+            self.count_container[i] += percentile.count_container[i];
+        }
+    }
+}
+
+pub struct PercentileReader<'a> {
+    // scale boundary slice
+    scale: &'static [f64],
+    // value statistics vec
+    count_container: &'a [u8],
+    // counter field index
+    counter_index: usize,
+}
+
+impl<'a> PercentileReader<'a> {
+    pub fn new(scale: &'static [f64], count_container: &'a [u8]) -> Self {
+        PercentileReader {
+            scale,
+            count_container,
+            // 8bytes per field, counter field index location at the end
+            counter_index: scale.len() << 3,
+        }
+    }
+
+    #[inline]
+    fn read(&self, index: usize) -> u64 {
+        let c = [
+            self.count_container[index],
+            self.count_container[index + 1],
+            self.count_container[index + 2],
+            self.count_container[index + 3],
+            self.count_container[index + 4],
+            self.count_container[index + 5],
+            self.count_container[index + 6],
+            self.count_container[index + 7],
+        ];
+
+        u64::from_be_bytes(c)
+    }
+
+    #[inline]
+    fn get_counter(&self) -> u64 {
+        self.read(self.counter_index)
+    }
+
     pub fn get_result(&self, water_line: u8) -> f64 {
         if water_line > 100 {
             panic!("waterLine must be less than 100.0 and more than 0.0")
@@ -179,19 +219,15 @@ impl<'a> Percentile<'a> {
             input
         };
     }
-
-    pub fn merge(&mut self, percentile: &Percentile) {
-        for i in 0..self.count_container.len() {
-            self.count_container[i] += percentile.count_container[i];
-        }
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use std::sync::Once;
 
-    use crate::functions::percentile::{get_percentile_capacity, Percentile};
+    use crate::functions::percentile::{
+        get_percentile_capacity, PercentileReader, PercentileWriter,
+    };
 
     fn _get_scale() -> &'static [f64] {
         static mut SCALE: Option<Vec<f64>> = None;
@@ -266,13 +302,16 @@ mod tests {
             count_container.push(0);
         }
 
-        let mut percentile = Percentile::new(scale, count_container.as_mut_slice());
-
-        for i in 0..3 {
-            percentile.accumulate(i as f64);
+        {
+            let mut percentile_writer =
+                PercentileWriter::new(scale, count_container.as_mut_slice());
+            for i in 0..3 {
+                percentile_writer.accumulate(i as f64);
+            }
         }
 
-        let pos = percentile.get_result(95);
-        println!("percentile value: {}", pos);
+        let percentile_reader = PercentileReader::new(scale, count_container.as_slice());
+        let line_95 = percentile_reader.get_result(95);
+        assert_eq!(line_95, 2_f64);
     }
 }
