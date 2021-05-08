@@ -197,7 +197,7 @@ impl Context {
                         exclusion_nodes,
                     )
                 }
-                _ => ("".to_string(), "".to_string(), 0, 0),
+                _ => ("".to_string(), "".to_string(), 0, 0, "".to_string()),
             },
             ClusterMode::Kubernetes => match manager_type {
                 ManagerType::Coordinator => {
@@ -210,11 +210,11 @@ impl Context {
                     let v_cores = u32::from_str(v_cores.as_str())
                         .map_err(|_e| anyhow!("parse `v_cores`=`{}` to usize error", v_cores))?;
 
-                    ("".to_string(), "".to_string(), memory_mb, v_cores)
+                    ("".to_string(), "".to_string(), memory_mb, v_cores, "".to_string())
                 }
-                _ => ("".to_string(), "".to_string(), 0, 0),
+                _ => ("".to_string(), "".to_string(), 0, 0, "".to_string()),
             },
-            _ => ("".to_string(), "".to_string(), 0, 0),
+            _ => ("".to_string(), "".to_string(), 0, 0, "".to_string()),
         };
 
         let dashboard_path = match cluster_mode {
