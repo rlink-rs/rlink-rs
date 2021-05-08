@@ -136,6 +136,8 @@ impl YarnCliCommand {
             .arg(coordinator_manager.memory_mb.to_string())
             .arg("--v_cores")
             .arg(coordinator_manager.v_cores.to_string())
+            .arg("--exclusion_nodes")
+            .arg(context.exclusion_nodes.as_str())
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())

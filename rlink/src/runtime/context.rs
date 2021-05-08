@@ -65,6 +65,7 @@ pub(crate) struct Context {
     pub worker_process_path: String,
     pub memory_mb: u32,
     pub v_cores: u32,
+    pub exclusion_nodes: String,
 
     /// on k8s args
     pub image_path: String,
@@ -87,6 +88,7 @@ impl Context {
         worker_process_path: String,
         memory_mb: u32,
         v_cores: u32,
+        exclusion_nodes: String,
         image_path: String,
     ) -> Self {
         Context {
@@ -105,6 +107,7 @@ impl Context {
             worker_process_path,
             memory_mb,
             v_cores,
+            exclusion_nodes,
             image_path,
         }
     }
@@ -168,7 +171,7 @@ impl Context {
             ClusterMode::YARN | ClusterMode::Kubernetes => ClusterConfig::new_local(),
         };
 
-        let (yarn_manager_main_class, worker_process_path, memory_mb, v_cores) = match cluster_mode
+        let (yarn_manager_main_class, worker_process_path, memory_mb, v_cores, exclusion_nodes) = match cluster_mode
         {
             ClusterMode::YARN => match manager_type {
                 ManagerType::Coordinator => {
@@ -184,11 +187,14 @@ impl Context {
                     let v_cores = u32::from_str(v_cores.as_str())
                         .map_err(|_e| anyhow!("parse `v_cores`=`{}` to usize error", v_cores))?;
 
+                    let exclusion_nodes = parse_arg("exclusion_nodes")?;
+
                     (
                         yarn_manager_main_class,
                         worker_process_path,
                         memory_mb,
                         v_cores,
+                        exclusion_nodes,
                     )
                 }
                 _ => ("".to_string(), "".to_string(), 0, 0),
@@ -257,6 +263,7 @@ impl Context {
             worker_process_path,
             memory_mb,
             v_cores,
+            exclusion_nodes,
             image_path,
         ))
     }
