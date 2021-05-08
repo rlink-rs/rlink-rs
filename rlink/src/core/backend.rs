@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 
-use crate::api::runtime::CheckpointId;
+use crate::core::runtime::CheckpointId;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(tag = "type", content = "param")]

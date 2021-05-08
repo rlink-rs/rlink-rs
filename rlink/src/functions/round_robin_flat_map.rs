@@ -1,6 +1,6 @@
-use crate::api::checkpoint::CheckpointFunction;
-use crate::api::element::Record;
-use crate::api::function::{Context, FlatMapFunction, NamedFunction};
+use crate::core::checkpoint::CheckpointFunction;
+use crate::core::element::Record;
+use crate::core::function::{Context, FlatMapFunction, NamedFunction};
 
 pub struct RoundRobinFlagMapFunction {
     child_job_parallelism: u16,
@@ -17,7 +17,7 @@ impl RoundRobinFlagMapFunction {
 }
 
 impl FlatMapFunction for RoundRobinFlagMapFunction {
-    fn open(&mut self, context: &Context) -> crate::api::Result<()> {
+    fn open(&mut self, context: &Context) -> crate::core::Result<()> {
         self.child_job_parallelism = context.children.len() as u16;
         Ok(())
     }
@@ -33,7 +33,7 @@ impl FlatMapFunction for RoundRobinFlagMapFunction {
         Box::new(vec![record].into_iter())
     }
 
-    fn close(&mut self) -> crate::api::Result<()> {
+    fn close(&mut self) -> crate::core::Result<()> {
         Ok(())
     }
 }

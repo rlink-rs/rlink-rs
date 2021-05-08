@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::api::cluster::{BatchExecuteRequest, ResponseCode, StdResponse, TaskResourceInfo};
-use crate::api::env::{StreamApp, StreamExecutionEnvironment};
+use crate::core::cluster::{BatchExecuteRequest, ResponseCode, StdResponse, TaskResourceInfo};
+use crate::core::env::{StreamApp, StreamExecutionEnvironment};
 use crate::deployment::{Resource, TResourceManager};
 use crate::runtime::context::Context;
 use crate::runtime::{ClusterDescriptor, ManagerType};

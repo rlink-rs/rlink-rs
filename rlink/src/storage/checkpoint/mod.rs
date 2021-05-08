@@ -1,6 +1,6 @@
-use crate::api::backend::CheckpointBackend;
-use crate::api::checkpoint::Checkpoint;
-use crate::api::runtime::{CheckpointId, JobId, OperatorId};
+use crate::core::backend::CheckpointBackend;
+use crate::core::checkpoint::Checkpoint;
+use crate::core::runtime::{CheckpointId, JobId, OperatorId};
 use crate::storage::checkpoint::memory_checkpoint_storage::MemoryCheckpointStorage;
 use crate::storage::checkpoint::mysql_checkpoint_storage::MySqlCheckpointStorage;
 

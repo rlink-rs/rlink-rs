@@ -1,6 +1,6 @@
-use crate::api::checkpoint::CheckpointFunction;
-use crate::api::element::Record;
-use crate::api::function::{Context, FlatMapFunction, NamedFunction};
+use crate::core::checkpoint::CheckpointFunction;
+use crate::core::element::Record;
+use crate::core::function::{Context, FlatMapFunction, NamedFunction};
 
 pub struct BroadcastFlagMapFunction {
     child_job_parallelism: u16,
@@ -15,7 +15,7 @@ impl BroadcastFlagMapFunction {
 }
 
 impl FlatMapFunction for BroadcastFlagMapFunction {
-    fn open(&mut self, context: &Context) -> crate::api::Result<()> {
+    fn open(&mut self, context: &Context) -> crate::core::Result<()> {
         // if context.children.len() != 1{
         //     panic!("BroadcastFlagMapFunction must has only one child job");
         // }
@@ -36,7 +36,7 @@ impl FlatMapFunction for BroadcastFlagMapFunction {
         Box::new(records.into_iter())
     }
 
-    fn close(&mut self) -> crate::api::Result<()> {
+    fn close(&mut self) -> crate::core::Result<()> {
         Ok(())
     }
 }

@@ -7,9 +7,9 @@ use std::fmt::Debug;
 
 use thiserror::Error;
 
-use crate::api::function::InputSplit;
-use crate::api::operator::StreamOperator;
-use crate::api::runtime::{JobId, OperatorId, TaskId};
+use crate::core::function::InputSplit;
+use crate::core::operator::StreamOperator;
+use crate::core::runtime::{JobId, OperatorId, TaskId};
 use crate::dag::execution_graph::ExecutionGraph;
 use crate::dag::job_graph::JobGraph;
 use crate::dag::physic_graph::PhysicGraph;
@@ -22,7 +22,7 @@ pub(crate) mod physic_graph;
 pub(crate) mod stream_graph;
 pub(crate) mod utils;
 
-use crate::api;
+use crate::core;
 pub(crate) use stream_graph::RawStreamGraph;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -116,7 +116,7 @@ pub enum DagError {
     #[error("job parallelism not found")]
     JobParallelismNotFound,
     #[error(transparent)]
-    OtherApiError(#[from] api::Error),
+    OtherApiError(#[from] core::Error),
 }
 
 #[derive(Clone, Debug)]
@@ -178,20 +178,20 @@ mod tests {
     use std::ops::Deref;
     use std::time::Duration;
 
-    use crate::api;
-    use crate::api::checkpoint::CheckpointFunction;
-    use crate::api::data_stream::CoStream;
-    use crate::api::data_stream::{TConnectedStreams, TKeyedStream};
-    use crate::api::data_stream::{TDataStream, TWindowedStream};
-    use crate::api::element::Record;
-    use crate::api::env::StreamExecutionEnvironment;
-    use crate::api::function::{
+    use crate::core;
+    use crate::core::checkpoint::CheckpointFunction;
+    use crate::core::data_stream::CoStream;
+    use crate::core::data_stream::{TConnectedStreams, TKeyedStream};
+    use crate::core::data_stream::{TDataStream, TWindowedStream};
+    use crate::core::element::Record;
+    use crate::core::env::StreamExecutionEnvironment;
+    use crate::core::function::{
         CoProcessFunction, Context, FlatMapFunction, InputFormat, InputSplit, InputSplitSource,
         KeySelectorFunction, NamedFunction, OutputFormat, ReduceFunction,
     };
-    use crate::api::properties::Properties;
-    use crate::api::watermark::{BoundedOutOfOrdernessTimestampExtractor, TimestampAssigner};
-    use crate::api::window::SlidingEventTimeWindows;
+    use crate::core::properties::Properties;
+    use crate::core::watermark::{BoundedOutOfOrdernessTimestampExtractor, TimestampAssigner};
+    use crate::core::window::SlidingEventTimeWindows;
     use crate::dag::utils::JsonDag;
     use crate::dag::DagManager;
 
@@ -288,7 +288,7 @@ mod tests {
     }
 
     impl InputFormat for MyInputFormat {
-        fn open(&mut self, _input_split: InputSplit, _context: &Context) -> api::Result<()> {
+        fn open(&mut self, _input_split: InputSplit, _context: &Context) -> core::Result<()> {
             Ok(())
         }
 
@@ -296,7 +296,7 @@ mod tests {
             unimplemented!()
         }
 
-        fn close(&mut self) -> api::Result<()> {
+        fn close(&mut self) -> core::Result<()> {
             Ok(())
         }
     }
@@ -311,7 +311,7 @@ mod tests {
     }
 
     impl FlatMapFunction for MyFlatMapFunction {
-        fn open(&mut self, _context: &Context) -> api::Result<()> {
+        fn open(&mut self, _context: &Context) -> core::Result<()> {
             Ok(())
         }
 
@@ -319,7 +319,7 @@ mod tests {
             Box::new(vec![record].into_iter())
         }
 
-        fn close(&mut self) -> api::Result<()> {
+        fn close(&mut self) -> core::Result<()> {
             Ok(())
         }
     }
@@ -369,7 +369,7 @@ mod tests {
     }
 
     impl KeySelectorFunction for MyKeySelectorFunction {
-        fn open(&mut self, _context: &Context) -> api::Result<()> {
+        fn open(&mut self, _context: &Context) -> core::Result<()> {
             Ok(())
         }
 
@@ -378,7 +378,7 @@ mod tests {
             record_rt
         }
 
-        fn close(&mut self) -> api::Result<()> {
+        fn close(&mut self) -> core::Result<()> {
             Ok(())
         }
     }
@@ -401,7 +401,7 @@ mod tests {
     }
 
     impl ReduceFunction for MyReduceFunction {
-        fn open(&mut self, _context: &Context) -> api::Result<()> {
+        fn open(&mut self, _context: &Context) -> core::Result<()> {
             Ok(())
         }
 
@@ -409,7 +409,7 @@ mod tests {
             record.clone()
         }
 
-        fn close(&mut self) -> api::Result<()> {
+        fn close(&mut self) -> core::Result<()> {
             Ok(())
         }
     }
@@ -434,13 +434,13 @@ mod tests {
     }
 
     impl OutputFormat for MyOutputFormat {
-        fn open(&mut self, _context: &Context) -> api::Result<()> {
+        fn open(&mut self, _context: &Context) -> core::Result<()> {
             Ok(())
         }
 
         fn write_record(&mut self, _record: Record) {}
 
-        fn close(&mut self) -> api::Result<()> {
+        fn close(&mut self) -> core::Result<()> {
             Ok(())
         }
     }
@@ -456,7 +456,7 @@ mod tests {
     pub struct MyCoProcessFunction {}
 
     impl CoProcessFunction for MyCoProcessFunction {
-        fn open(&mut self, _context: &Context) -> api::Result<()> {
+        fn open(&mut self, _context: &Context) -> core::Result<()> {
             Ok(())
         }
 
@@ -472,7 +472,7 @@ mod tests {
             Box::new(vec![].into_iter())
         }
 
-        fn close(&mut self) -> api::Result<()> {
+        fn close(&mut self) -> core::Result<()> {
             Ok(())
         }
     }

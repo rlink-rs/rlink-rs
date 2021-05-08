@@ -124,7 +124,7 @@ impl<T> StdResponse<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::api::cluster::{ClusterConfig, MetadataStorageType};
+    use crate::core::cluster::{ClusterConfig, MetadataStorageType};
 
     #[test]
     pub fn ser_cluster_config_test() {

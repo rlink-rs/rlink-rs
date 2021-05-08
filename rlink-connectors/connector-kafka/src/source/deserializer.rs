@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use rlink::api::element::Record;
+use rlink::core::element::Record;
 
 use crate::build_kafka_record;
 

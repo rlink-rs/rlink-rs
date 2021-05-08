@@ -2,10 +2,10 @@ use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::api::checkpoint::FunctionSnapshotContext;
-use crate::api::element::Element;
-use crate::api::properties::SystemProperties;
-use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
+use crate::core::checkpoint::FunctionSnapshotContext;
+use crate::core::element::Element;
+use crate::core::properties::SystemProperties;
+use crate::core::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::dag::execution_graph::{ExecutionEdge, ExecutionNode};
 use crate::dag::job_graph::{JobEdge, JobNode};
 use crate::dag::metadata::DagMetadata;

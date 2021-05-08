@@ -1,12 +1,12 @@
 use std::time::Duration;
 
-use rlink::api::backend::KeyedStateBackend;
-use rlink::api::data_stream::CoStream;
-use rlink::api::data_stream::{TConnectedStreams, TDataStream, TKeyedStream, TWindowedStream};
-use rlink::api::env::{StreamApp, StreamExecutionEnvironment};
-use rlink::api::properties::{ChannelBaseOn, Properties, SystemProperties};
-use rlink::api::watermark::BoundedOutOfOrdernessTimestampExtractor;
-use rlink::api::window::SlidingEventTimeWindows;
+use rlink::core::backend::KeyedStateBackend;
+use rlink::core::data_stream::CoStream;
+use rlink::core::data_stream::{TConnectedStreams, TDataStream, TKeyedStream, TWindowedStream};
+use rlink::core::env::{StreamApp, StreamExecutionEnvironment};
+use rlink::core::properties::{ChannelBaseOn, Properties, SystemProperties};
+use rlink::core::watermark::BoundedOutOfOrdernessTimestampExtractor;
+use rlink::core::window::SlidingEventTimeWindows;
 use rlink::functions::broadcast_flat_map::BroadcastFlagMapFunction;
 use rlink::functions::round_robin_flat_map::RoundRobinFlagMapFunction;
 use rlink::functions::schema_base::key_selector::SchemaBaseKeySelector;

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use crate::api::checkpoint::Checkpoint;
-use crate::api::runtime::{CheckpointId, JobId, OperatorId};
+use crate::core::checkpoint::Checkpoint;
+use crate::core::runtime::{CheckpointId, JobId, OperatorId};
 use crate::storage::checkpoint::TCheckpointStorage;
 
 #[derive(Debug)]

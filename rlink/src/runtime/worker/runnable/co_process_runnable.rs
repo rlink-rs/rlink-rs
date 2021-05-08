@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
-use crate::api::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
-use crate::api::element::Element;
-use crate::api::function::CoProcessFunction;
-use crate::api::operator::DefaultStreamOperator;
-use crate::api::runtime::{JobId, OperatorId};
+use crate::core::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
+use crate::core::element::Element;
+use crate::core::function::CoProcessFunction;
+use crate::core::operator::DefaultStreamOperator;
+use crate::core::runtime::{JobId, OperatorId};
 use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 

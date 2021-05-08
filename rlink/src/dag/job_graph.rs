@@ -4,8 +4,8 @@ use std::ops::{Index, IndexMut};
 
 use daggy::{Dag, EdgeIndex, NodeIndex, Walker};
 
-use crate::api::operator::DEFAULT_PARALLELISM;
-use crate::api::runtime::{JobId, OperatorId};
+use crate::core::operator::DEFAULT_PARALLELISM;
+use crate::core::runtime::{JobId, OperatorId};
 use crate::dag::stream_graph::{StreamGraph, StreamNode};
 use crate::dag::{DagError, OperatorType};
 

@@ -2,11 +2,11 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 
-use rlink::api::cluster::load_config;
+use rlink::core::cluster::load_config;
 
 use crate::utils::get_work_space;
 
-pub type ClusterConfig = rlink::api::cluster::ClusterConfig;
+pub type ClusterConfig = rlink::core::cluster::ClusterConfig;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Context {

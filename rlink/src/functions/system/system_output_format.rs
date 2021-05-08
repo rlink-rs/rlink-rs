@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-use crate::api::checkpoint::CheckpointFunction;
-use crate::api::element::{Element, Partition, Record, StreamStatus};
-use crate::api::function::{Context, NamedFunction, OutputFormat};
-use crate::api::properties::{ChannelBaseOn, SystemProperties};
-use crate::api::runtime::{ChannelKey, JobId, TaskId};
 use crate::channel::ElementSender;
+use crate::core::checkpoint::CheckpointFunction;
+use crate::core::element::{Element, Partition, Record, StreamStatus};
+use crate::core::function::{Context, NamedFunction, OutputFormat};
+use crate::core::properties::{ChannelBaseOn, SystemProperties};
+use crate::core::runtime::{ChannelKey, JobId, TaskId};
 use crate::dag::execution_graph::ExecutionEdge;
 use crate::pub_sub::{memory, network, ChannelType, DEFAULT_CHANNEL_SIZE};
 
@@ -28,7 +28,7 @@ impl SystemOutputFormat {
 }
 
 impl OutputFormat for SystemOutputFormat {
-    fn open(&mut self, context: &Context) -> crate::api::Result<()> {
+    fn open(&mut self, context: &Context) -> crate::core::Result<()> {
         self.task_id = context.task_id;
 
         let parents: Vec<String> = context
@@ -191,7 +191,7 @@ impl OutputFormat for SystemOutputFormat {
         }
     }
 
-    fn close(&mut self) -> crate::api::Result<()> {
+    fn close(&mut self) -> crate::core::Result<()> {
         let stream_status = Element::StreamStatus(StreamStatus::new(0, true));
         self.job_senders.iter().for_each(|(_job_id, task_senders)| {
             task_senders.iter().for_each(|(_task_id, sender)| {

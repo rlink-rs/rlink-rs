@@ -1,9 +1,9 @@
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
 
-use crate::api::element::{Barrier, Record};
-use crate::api::runtime::JobId;
-use crate::api::window::Window;
+use crate::core::element::{Barrier, Record};
+use crate::core::runtime::JobId;
+use crate::core::window::Window;
 use crate::storage::keyed_state::mem_reducing_state::MemoryReducingState;
 use crate::storage::keyed_state::mem_storage::{append_drop_window, StorageKey};
 use crate::storage::keyed_state::{StateKey, TReducingState, TWindowState};

@@ -1,10 +1,10 @@
 use std::borrow::BorrowMut;
 
-use crate::api::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
-use crate::api::element::Element;
-use crate::api::function::FilterFunction;
-use crate::api::operator::DefaultStreamOperator;
-use crate::api::runtime::OperatorId;
+use crate::core::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
+use crate::core::element::Element;
+use crate::core::function::FilterFunction;
+use crate::core::operator::DefaultStreamOperator;
+use crate::core::runtime::OperatorId;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 

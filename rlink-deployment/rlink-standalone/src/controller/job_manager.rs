@@ -5,7 +5,7 @@ use actix_web::http::StatusCode;
 use actix_web::web::{Data, Path};
 use actix_web::{web, Error, HttpRequest, HttpResponse};
 use futures::{StreamExt, TryStreamExt};
-use rlink::api::cluster::{
+use rlink::core::cluster::{
     BatchExecuteRequest, ExecuteRequest, ResponseCode, StdResponse, TaskResourceInfo,
 };
 

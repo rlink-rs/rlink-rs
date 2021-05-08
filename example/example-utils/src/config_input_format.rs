@@ -1,8 +1,8 @@
 use std::time::Duration;
 
-use rlink::api;
-use rlink::api::element::Record;
-use rlink::api::function::{Context, InputFormat, InputSplit, InputSplitSource};
+use rlink::core;
+use rlink::core::element::Record;
+use rlink::core::function::{Context, InputFormat, InputSplit, InputSplitSource};
 
 use crate::buffer_gen::config;
 
@@ -44,7 +44,7 @@ impl ConfigInputFormat {
 impl InputSplitSource for ConfigInputFormat {}
 
 impl InputFormat for ConfigInputFormat {
-    fn open(&mut self, _input_split: InputSplit, _context: &Context) -> api::Result<()> {
+    fn open(&mut self, _input_split: InputSplit, _context: &Context) -> core::Result<()> {
         Ok(())
     }
 
@@ -52,7 +52,7 @@ impl InputFormat for ConfigInputFormat {
         Box::new(ConfigIterator::new(self.gen_row()))
     }
 
-    fn close(&mut self) -> api::Result<()> {
+    fn close(&mut self) -> core::Result<()> {
         Ok(())
     }
 }

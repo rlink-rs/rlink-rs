@@ -1,5 +1,5 @@
-use rlink::api::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
-use rlink::api::runtime::TaskId;
+use rlink::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
+use rlink::core::runtime::TaskId;
 
 use crate::state::{KafkaSourceStateCache, OffsetMetadata, PartitionMetadata};
 
