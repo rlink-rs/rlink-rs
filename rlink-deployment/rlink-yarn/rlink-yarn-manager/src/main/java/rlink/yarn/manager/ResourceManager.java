@@ -28,6 +28,7 @@ import rlink.yarn.manager.model.TaskResourceInfo;
 import rlink.yarn.manager.utils.MessageUtil;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -55,7 +56,8 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
 
     private Resource resource;
     private Path resourcePath;
-    List<String> exclusionNodes;
+    private List<String> exclusionNodes;
+    private List<String> inclusionNodes = new ArrayList<>();
 
     private List<Map> allocateParams;
     private CopyOnWriteArrayList<TaskResourceInfo> allocateTaskList = new CopyOnWriteArrayList<>();
@@ -180,17 +182,22 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
             yarnClient.init(yarnConfiguration);
             yarnClient.start();
             List<NodeReport> nodeReports = yarnClient.getNodeReports(NodeState.RUNNING);
-            List<String> nodes = nodeReports.stream()
-                    .map(item -> item.getNodeId().getHost())
-                    .filter(item -> !exclusionNodes.contains(item))
-                    .collect(Collectors.toList());
+            List<String> nodes = new ArrayList<>();
+            for (NodeReport nodeReport : nodeReports) {
+                String hostName = nodeReport.getNodeId().getHost();
+                String ip = InetAddress.getByName(hostName).getHostAddress();
+                if (!exclusionNodes.contains(ip)) {
+                    nodes.add(hostName);
+                }
+            }
+            this.inclusionNodes = nodes;
             inclusionNodes = nodes.isEmpty() ? null : nodes.toArray(new String[0]);
             yarnClient.close();
             LOGGER.info("yarn inclusionNodes={}", (Object) inclusionNodes);
         }
         for (int i = 0; i < numContainers; i++) {
             LOGGER.info("requestYarnContainer {}", i);
-            AMRMClient.ContainerRequest containerRequest = new AMRMClient.ContainerRequest(resource, inclusionNodes, null, RM_REQUEST_PRIORITY);
+            AMRMClient.ContainerRequest containerRequest = new AMRMClient.ContainerRequest(resource, inclusionNodes, null, RM_REQUEST_PRIORITY, false, null);
             resourceManagerClient.addContainerRequest(containerRequest);
         }
     }
@@ -198,7 +205,7 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
     private void startTaskExecutorInContainer(Container container, Map taskParamMap) {
         try {
             ContainerLaunchContext taskExecutorLaunchContext = createTaskExecutorLaunchContext(yarnConfiguration, resourcePath, taskParamMap);
-            LOGGER.info("startTaskExecutor {}, context={}", container.getId(), taskExecutorLaunchContext.toString());
+            LOGGER.info("startTaskExecutor {}, nodeId={}, context={}", container.getId(), container.getNodeId(), taskExecutorLaunchContext.toString());
             nodeManagerClient.startContainerAsync(container, taskExecutorLaunchContext);
         } catch (Throwable t) {
             LOGGER.error("start container error", t);
@@ -241,12 +248,14 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
     }
 
     private List<AMRMClient.ContainerRequest> getPendingRequest() {
-        List<? extends Collection<AMRMClient.ContainerRequest>> matchingRequests =
-                resourceManagerClient.getMatchingRequests(RM_REQUEST_PRIORITY, ResourceRequest.ANY, resource);
-        if (matchingRequests.isEmpty()) {
-            return new ArrayList<>();
+        ArrayList<AMRMClient.ContainerRequest> list = new ArrayList<>();
+        if (inclusionNodes.size() > 0) {
+            List<? extends Collection<AMRMClient.ContainerRequest>> matchingRequests =
+                    resourceManagerClient.getMatchingRequests(RM_REQUEST_PRIORITY, inclusionNodes.get(0), resource);
+            if (CollectionUtils.isNotEmpty(matchingRequests)) {
+                list.addAll(matchingRequests.get(0));
+            }
         }
-        ArrayList<AMRMClient.ContainerRequest> list = new ArrayList<>(matchingRequests.get(0));
         LOGGER.info("getMatchingRequests,size={}", list.size());
         return list;
     }

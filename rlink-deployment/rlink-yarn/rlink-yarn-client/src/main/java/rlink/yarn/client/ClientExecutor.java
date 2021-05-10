@@ -81,13 +81,6 @@ public class ClientExecutor {
         yarnClient.submitApplication(appContext);
 
         ApplicationReport appReport = yarnClient.getApplicationReport(appId);
-        if (CollectionUtils.isNotEmpty(submitParam.getExclusionNodes())) {
-            if (submitParam.getExclusionNodes().contains(appReport.getHost())) {
-                LOGGER.error("application is submitted to exclusion nodes[{}], please resubmit!", appReport.getHost());
-                yarnClient.killApplication(appId);
-            }
-        }
-
         YarnApplicationState appState = appReport.getYarnApplicationState();
         while (appState != YarnApplicationState.FINISHED &&
                 appState != YarnApplicationState.KILLED &&
@@ -95,6 +88,14 @@ public class ClientExecutor {
             Thread.sleep(100);
             appReport = yarnClient.getApplicationReport(appId);
             appState = appReport.getYarnApplicationState();
+
+            if (CollectionUtils.isNotEmpty(submitParam.getExclusionNodes())) {
+                if (submitParam.getExclusionNodes().contains(appReport.getHost())) {
+                    LOGGER.error("Application is submitted to exclusion nodes[{}], please resubmit!", appReport.getHost());
+                    yarnClient.killApplication(appId);
+                }
+            }
+
         }
 
         LOGGER.info("Application {} finished with state {} at {}", appId, appState, appReport.getFinishTime());
@@ -120,8 +121,9 @@ public class ClientExecutor {
 
         ContainerLaunchContext context = Records.newRecord(ContainerLaunchContext.class);
 
+        String paramStr = paramMap.toString();
         String command = "./" + rustStreamingPath.getName() + " " +
-                paramMap.toString().replaceAll("[,{}]", "") +
+                paramStr.substring(1, paramStr.length() - 1).replaceAll(", ", " ") +
                 " 1>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/jobManager.out" +
                 " 2>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/jobManager.err";
         context.setCommands(Collections.singletonList(command));
