@@ -3,6 +3,7 @@ package rlink.yarn.manager;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -11,9 +12,11 @@ import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterResponse;
 import org.apache.hadoop.yarn.api.records.*;
 import org.apache.hadoop.yarn.client.api.AMRMClient;
+import org.apache.hadoop.yarn.client.api.YarnClient;
 import org.apache.hadoop.yarn.client.api.async.AMRMClientAsync;
 import org.apache.hadoop.yarn.client.api.async.NMClientAsync;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.Records;
 import org.slf4j.Logger;
@@ -24,6 +27,8 @@ import rlink.yarn.manager.model.LaunchParam;
 import rlink.yarn.manager.model.TaskResourceInfo;
 import rlink.yarn.manager.utils.MessageUtil;
 
+import java.io.IOException;
+import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -31,6 +36,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClientAsync.CallbackHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(ResourceManager.class);
@@ -48,10 +54,10 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
 
     private YarnConfiguration yarnConfiguration = new YarnConfiguration();
 
-    private int memoryMb;
-    private int vCores;
     private Resource resource;
     private Path resourcePath;
+    private List<String> exclusionNodes;
+    private List<String> inclusionNodes = new ArrayList<>();
 
     private List<Map> allocateParams;
     private CopyOnWriteArrayList<TaskResourceInfo> allocateTaskList = new CopyOnWriteArrayList<>();
@@ -66,8 +72,9 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
     public void launch(LaunchParam launchParam) throws Exception {
         String webUrl = launchParam.getWebUrl();
         resourcePath = launchParam.getResourcePath();
-        memoryMb = launchParam.getMemoryMb();
-        vCores = launchParam.getvCores();
+        int memoryMb = launchParam.getMemoryMb();
+        int vCores = launchParam.getvCores();
+        exclusionNodes = launchParam.getExclusionNodes();
         resource = Resource.newInstance(memoryMb, vCores);
 
         int hostStartIndex = !webUrl.contains("://") ? 0 : webUrl.indexOf("://") + 3;
@@ -168,10 +175,29 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
         return nodeManagerClient;
     }
 
-    private void requestYarnContainer(int numContainers) {
+    private void requestYarnContainer(int numContainers) throws IOException, YarnException {
+        String[] inclusionNodes = null;
+        if (CollectionUtils.isNotEmpty(exclusionNodes)) {
+            YarnClient yarnClient = YarnClient.createYarnClient();
+            yarnClient.init(yarnConfiguration);
+            yarnClient.start();
+            List<NodeReport> nodeReports = yarnClient.getNodeReports(NodeState.RUNNING);
+            List<String> nodes = new ArrayList<>();
+            for (NodeReport nodeReport : nodeReports) {
+                String hostName = nodeReport.getNodeId().getHost();
+                String ip = InetAddress.getByName(hostName).getHostAddress();
+                if (!exclusionNodes.contains(ip)) {
+                    nodes.add(hostName);
+                }
+            }
+            this.inclusionNodes = nodes;
+            inclusionNodes = nodes.isEmpty() ? null : nodes.toArray(new String[0]);
+            yarnClient.close();
+            LOGGER.info("yarn inclusionNodes={}", (Object) inclusionNodes);
+        }
         for (int i = 0; i < numContainers; i++) {
             LOGGER.info("requestYarnContainer {}", i);
-            AMRMClient.ContainerRequest containerRequest = new AMRMClient.ContainerRequest(resource, null, null, RM_REQUEST_PRIORITY);
+            AMRMClient.ContainerRequest containerRequest = new AMRMClient.ContainerRequest(resource, inclusionNodes, null, RM_REQUEST_PRIORITY, false, null);
             resourceManagerClient.addContainerRequest(containerRequest);
         }
     }
@@ -179,7 +205,7 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
     private void startTaskExecutorInContainer(Container container, Map taskParamMap) {
         try {
             ContainerLaunchContext taskExecutorLaunchContext = createTaskExecutorLaunchContext(yarnConfiguration, resourcePath, taskParamMap);
-            LOGGER.info("startTaskExecutor {}, context={}", container.getId(), taskExecutorLaunchContext.toString());
+            LOGGER.info("startTaskExecutor {}, nodeId={}, context={}", container.getId(), container.getNodeId(), taskExecutorLaunchContext.toString());
             nodeManagerClient.startContainerAsync(container, taskExecutorLaunchContext);
         } catch (Throwable t) {
             LOGGER.error("start container error", t);
@@ -222,12 +248,14 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
     }
 
     private List<AMRMClient.ContainerRequest> getPendingRequest() {
-        List<? extends Collection<AMRMClient.ContainerRequest>> matchingRequests =
-                resourceManagerClient.getMatchingRequests(RM_REQUEST_PRIORITY, ResourceRequest.ANY, resource);
-        if (matchingRequests.isEmpty()) {
-            return new ArrayList<>();
+        ArrayList<AMRMClient.ContainerRequest> list = new ArrayList<>();
+        if (inclusionNodes.size() > 0) {
+            List<? extends Collection<AMRMClient.ContainerRequest>> matchingRequests =
+                    resourceManagerClient.getMatchingRequests(RM_REQUEST_PRIORITY, inclusionNodes.get(0), resource);
+            if (CollectionUtils.isNotEmpty(matchingRequests)) {
+                list.addAll(matchingRequests.get(0));
+            }
         }
-        ArrayList<AMRMClient.ContainerRequest> list = new ArrayList<>(matchingRequests.get(0));
         LOGGER.info("getMatchingRequests,size={}", list.size());
         return list;
     }

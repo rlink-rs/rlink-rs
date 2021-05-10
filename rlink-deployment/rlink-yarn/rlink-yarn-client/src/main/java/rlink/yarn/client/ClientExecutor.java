@@ -1,5 +1,7 @@
 package rlink.yarn.client;
 
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -33,6 +35,7 @@ import java.util.Map;
 
 import static rlink.yarn.client.Client.APPLICATION_ID_KEY;
 import static rlink.yarn.client.Client.APPLICATION_NAME_KEY;
+import static rlink.yarn.client.Client.EXCLUSION_NODES_KEY;
 import static rlink.yarn.client.Client.MEMORY_MB_KEY;
 import static rlink.yarn.client.Client.RUST_STREAMING_PATH_KEY;
 import static rlink.yarn.client.Client.VIRTUAL_CORES_KEY;
@@ -85,6 +88,14 @@ public class ClientExecutor {
             Thread.sleep(100);
             appReport = yarnClient.getApplicationReport(appId);
             appState = appReport.getYarnApplicationState();
+
+            if (CollectionUtils.isNotEmpty(submitParam.getExclusionNodes())) {
+                if (submitParam.getExclusionNodes().contains(appReport.getHost())) {
+                    LOGGER.error("Application is submitted to exclusion nodes[{}], please resubmit!", appReport.getHost());
+                    yarnClient.killApplication(appId);
+                }
+            }
+
         }
 
         LOGGER.info("Application {} finished with state {} at {}", appId, appState, appReport.getFinishTime());
@@ -106,11 +117,13 @@ public class ClientExecutor {
         paramMap.put(VIRTUAL_CORES_KEY, String.valueOf(vCores));
         paramMap.put(RUST_STREAMING_PATH_KEY, rustStreamingPath.toString());
         paramMap.put(APPLICATION_ID_KEY, appId);
+        paramMap.put(EXCLUSION_NODES_KEY, StringUtils.join(submitParam.getExclusionNodes(), ","));
 
         ContainerLaunchContext context = Records.newRecord(ContainerLaunchContext.class);
 
+        String paramStr = paramMap.toString();
         String command = "./" + rustStreamingPath.getName() + " " +
-                paramMap.toString().replaceAll("[,{}]", "") +
+                paramStr.substring(1, paramStr.length() - 1).replaceAll(", ", " ") +
                 " 1>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/jobManager.out" +
                 " 2>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/jobManager.err";
         context.setCommands(Collections.singletonList(command));

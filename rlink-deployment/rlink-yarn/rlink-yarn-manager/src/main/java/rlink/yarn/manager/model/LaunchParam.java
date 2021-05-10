@@ -3,6 +3,7 @@ package rlink.yarn.manager.model;
 import org.apache.hadoop.fs.Path;
 
 import java.io.Serializable;
+import java.util.List;
 
 public class LaunchParam implements Serializable {
 
@@ -10,6 +11,7 @@ public class LaunchParam implements Serializable {
     private Path resourcePath;
     private int memoryMb;
     private int vCores;
+    private List<String> exclusionNodes;
 
     public String getWebUrl() {
         return webUrl;
@@ -41,5 +43,13 @@ public class LaunchParam implements Serializable {
 
     public void setvCores(int vCores) {
         this.vCores = vCores;
+    }
+
+    public List<String> getExclusionNodes() {
+        return exclusionNodes;
+    }
+
+    public void setExclusionNodes(List<String> exclusionNodes) {
+        this.exclusionNodes = exclusionNodes;
     }
 }
