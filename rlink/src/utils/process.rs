@@ -36,8 +36,12 @@ pub(crate) fn sys_info_metric_task(global_tag: Tag) {
     labels.push((field_name, field_value));
 
     let mut system = sysinfo::System::new();
+    let pid = std::process::id() as i32;
     loop {
-        system.refresh_cpu();
+        system.refresh_process(pid);
+        // system.refresh_cpu();
+        system.refresh_memory();
+
         let load_avg = system.get_load_average();
         {
             let mut labels = labels.clone();
@@ -55,9 +59,8 @@ pub(crate) fn sys_info_metric_task(global_tag: Tag) {
             gauge!("sys_load_average", load_avg.fifteen, &labels,);
         }
 
-        system.refresh_process(std::process::id() as i32);
         let cpu_usage = system
-            .get_process(std::process::id() as i32)
+            .get_process(pid)
             .map(|p| p.cpu_usage())
             .unwrap_or_default();
         {
@@ -65,7 +68,6 @@ pub(crate) fn sys_info_metric_task(global_tag: Tag) {
             gauge!("sys_cpu_usage", cpu_usage as f64, &labels,);
         }
 
-        system.refresh_memory();
         let used_memory = system.get_used_memory();
         {
             let mut labels = labels.clone();

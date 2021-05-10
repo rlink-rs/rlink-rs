@@ -1,11 +1,11 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::api::data_stream::{DataStream, StreamBuilder};
-use crate::api::function::InputFormat;
-use crate::api::operator::StreamOperator;
-use crate::api::properties::Properties;
-use crate::api::runtime::OperatorId;
+use crate::core::data_stream::{DataStream, StreamBuilder};
+use crate::core::function::InputFormat;
+use crate::core::operator::StreamOperator;
+use crate::core::properties::Properties;
+use crate::core::runtime::OperatorId;
 use crate::dag::RawStreamGraph;
 use crate::runtime;
 

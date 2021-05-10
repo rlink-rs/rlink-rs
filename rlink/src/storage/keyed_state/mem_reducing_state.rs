@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::api::element::Record;
+use crate::core::element::Record;
 use crate::storage::keyed_state::mem_storage::remove_drop_window;
 use crate::storage::keyed_state::{StateIterator, StateKey, TReducingState};
 

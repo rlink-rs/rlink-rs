@@ -16,10 +16,10 @@ use tokio::net::TcpStream;
 use tokio::sync::RwLock;
 use tokio_util::codec::{BytesCodec, FramedWrite};
 
-use crate::api::element::Element;
-use crate::api::properties::ChannelBaseOn;
-use crate::api::runtime::{ChannelKey, TaskId};
 use crate::channel::{named_channel_with_base, ElementReceiver, ElementSender, TryRecvError};
+use crate::core::element::Element;
+use crate::core::properties::ChannelBaseOn;
+use crate::core::runtime::{ChannelKey, TaskId};
 use crate::pub_sub::network::{
     new_framed_read, new_framed_write, ElementRequest, ElementResponse, ResponseCode,
 };

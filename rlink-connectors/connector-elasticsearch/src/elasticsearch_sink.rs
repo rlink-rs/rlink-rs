@@ -10,12 +10,12 @@ use elasticsearch::http::request::JsonBody;
 use elasticsearch::http::transport::{SingleNodeConnectionPool, TransportBuilder};
 use elasticsearch::http::Url;
 use elasticsearch::{BulkParts, Elasticsearch};
-use rlink::api::checkpoint::CheckpointFunction;
-use rlink::api::element::Record;
-use rlink::api::function::{Context, NamedFunction, OutputFormat};
 use rlink::channel::utils::handover::Handover;
+use rlink::core::checkpoint::CheckpointFunction;
+use rlink::core::element::Record;
+use rlink::core::function::{Context, NamedFunction, OutputFormat};
 use rlink::utils::thread::{async_runtime, async_sleep, async_spawn};
-use rlink::{api, utils};
+use rlink::{core, utils};
 use serde_json::Value;
 use thiserror::Error;
 
@@ -79,7 +79,7 @@ impl ElasticsearchOutputFormat {
 }
 
 impl OutputFormat for ElasticsearchOutputFormat {
-    fn open(&mut self, context: &Context) -> api::Result<()> {
+    fn open(&mut self, context: &Context) -> core::Result<()> {
         self.handover = Some(Handover::new(self.name(), context.task_id.to_tags(), 10000));
 
         let mut write_thead = ElasticsearchWriteThread::new(
@@ -104,7 +104,7 @@ impl OutputFormat for ElasticsearchOutputFormat {
         self.handover.as_ref().unwrap().produce(record).unwrap();
     }
 
-    fn close(&mut self) -> api::Result<()> {
+    fn close(&mut self) -> core::Result<()> {
         Ok(())
     }
 }

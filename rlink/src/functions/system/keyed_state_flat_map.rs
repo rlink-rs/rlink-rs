@@ -1,9 +1,9 @@
-use crate::api::backend::KeyedStateBackend;
-use crate::api::checkpoint::CheckpointFunction;
-use crate::api::element::{Element, Record};
-use crate::api::function::{Context, FlatMapFunction, NamedFunction};
-use crate::api::properties::SystemProperties;
-use crate::api::runtime::JobId;
+use crate::core::backend::KeyedStateBackend;
+use crate::core::checkpoint::CheckpointFunction;
+use crate::core::element::{Element, Record};
+use crate::core::function::{Context, FlatMapFunction, NamedFunction};
+use crate::core::properties::SystemProperties;
+use crate::core::runtime::JobId;
 use crate::storage::keyed_state::{ReducingState, StateKey, TReducingState};
 
 pub(crate) struct KeyedStateFlatMapFunction {
@@ -24,7 +24,7 @@ impl KeyedStateFlatMapFunction {
 }
 
 impl FlatMapFunction for KeyedStateFlatMapFunction {
-    fn open(&mut self, context: &Context) -> crate::api::Result<()> {
+    fn open(&mut self, context: &Context) -> crate::core::Result<()> {
         if context.parents.len() != 1 {
             panic!("KeyedStateMap job can only one parent");
         }
@@ -66,7 +66,7 @@ impl FlatMapFunction for KeyedStateFlatMapFunction {
         }
     }
 
-    fn close(&mut self) -> crate::api::Result<()> {
+    fn close(&mut self) -> crate::core::Result<()> {
         Ok(())
     }
 }

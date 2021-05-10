@@ -5,8 +5,8 @@ use bytes::{Buf, BufMut, BytesMut};
 use tokio::net::tcp::{ReadHalf, WriteHalf};
 use tokio_util::codec::{BytesCodec, FramedRead, FramedWrite, LengthDelimitedCodec};
 
-use crate::api::element::{Element, Serde};
-use crate::api::runtime::ChannelKey;
+use crate::core::element::{Element, Serde};
+use crate::core::runtime::ChannelKey;
 
 pub(crate) mod client;
 pub(crate) mod server;

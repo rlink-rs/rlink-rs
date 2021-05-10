@@ -1,10 +1,10 @@
 use std::borrow::BorrowMut;
 use std::fmt::Debug;
 
-use crate::api::element::Record;
-use crate::api::element::{types, BufferMutReader, BufferReader, BufferWriter};
-use crate::api::function::{Context, NamedFunction, ReduceFunction};
-use crate::functions::percentile::{get_percentile_capacity, Percentile};
+use crate::core::element::Record;
+use crate::core::element::{types, BufferMutReader, BufferReader, BufferWriter};
+use crate::core::function::{Context, NamedFunction, ReduceFunction};
+use crate::functions::percentile::{get_percentile_capacity, PercentileWriter};
 use crate::functions::schema_base::FunctionSchema;
 
 pub fn sum_i64(column_index: usize) -> Box<dyn Aggregation> {
@@ -360,14 +360,15 @@ impl Aggregation for PctU64 {
             Some(value_reader) => {
                 let stat_value = value_reader.get_bytes_mut(value_index).unwrap();
 
-                let mut percentile = Percentile::new(self.scale, stat_value);
+                let mut percentile = PercentileWriter::new(self.scale, stat_value);
                 percentile.accumulate(record_value as f64);
 
                 writer.set_bytes(stat_value).unwrap();
             }
             None => {
                 let mut count_container = self.count_container.clone();
-                let mut percentile = Percentile::new(self.scale, count_container.as_mut_slice());
+                let mut percentile =
+                    PercentileWriter::new(self.scale, count_container.as_mut_slice());
                 percentile.accumulate(record_value as f64);
 
                 writer.set_bytes(count_container.as_slice()).unwrap();
@@ -418,7 +419,7 @@ impl FunctionSchema for SchemaBaseReduceFunction {
 }
 
 impl ReduceFunction for SchemaBaseReduceFunction {
-    fn open(&mut self, _context: &Context) -> crate::api::Result<()> {
+    fn open(&mut self, _context: &Context) -> crate::core::Result<()> {
         Ok(())
     }
 
@@ -455,7 +456,7 @@ impl ReduceFunction for SchemaBaseReduceFunction {
         record_rt
     }
 
-    fn close(&mut self) -> crate::api::Result<()> {
+    fn close(&mut self) -> crate::core::Result<()> {
         Ok(())
     }
 }

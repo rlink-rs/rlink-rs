@@ -1,6 +1,6 @@
-use crate::api::checkpoint::CheckpointFunction;
-use crate::api::element::Record;
-use crate::api::function::{Context, KeySelectorFunction, NamedFunction};
+use crate::core::checkpoint::CheckpointFunction;
+use crate::core::element::Record;
+use crate::core::function::{Context, KeySelectorFunction, NamedFunction};
 use crate::functions::schema_base::FunctionSchema;
 
 #[derive(Debug)]
@@ -28,7 +28,7 @@ impl FunctionSchema for SchemaBaseKeySelector {
 }
 
 impl KeySelectorFunction for SchemaBaseKeySelector {
-    fn open(&mut self, _context: &Context) -> crate::api::Result<()> {
+    fn open(&mut self, _context: &Context) -> crate::core::Result<()> {
         Ok(())
     }
 
@@ -47,7 +47,7 @@ impl KeySelectorFunction for SchemaBaseKeySelector {
         record_key
     }
 
-    fn close(&mut self) -> crate::api::Result<()> {
+    fn close(&mut self) -> crate::core::Result<()> {
         Ok(())
     }
 }

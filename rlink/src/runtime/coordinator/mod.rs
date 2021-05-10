@@ -4,11 +4,11 @@ use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::api::checkpoint::CheckpointHandle;
-use crate::api::cluster::MetadataStorageType;
-use crate::api::cluster::TaskResourceInfo;
-use crate::api::env::{StreamApp, StreamExecutionEnvironment};
-use crate::api::properties::{Properties, SYSTEM_CLUSTER_MODE};
+use crate::core::checkpoint::CheckpointHandle;
+use crate::core::cluster::MetadataStorageType;
+use crate::core::cluster::TaskResourceInfo;
+use crate::core::env::{StreamApp, StreamExecutionEnvironment};
+use crate::core::properties::{Properties, SYSTEM_CLUSTER_MODE};
 use crate::dag::metadata::DagMetadata;
 use crate::dag::DagManager;
 use crate::deployment::TResourceManager;

@@ -2,7 +2,7 @@ use std::ops::Deref;
 use std::sync::RwLock;
 use std::time::Duration;
 
-use crate::api::cluster::MetadataStorageType;
+use crate::core::cluster::MetadataStorageType;
 use crate::runtime::{ClusterDescriptor, HeartBeatStatus};
 use crate::storage::metadata::{loop_read_cluster_descriptor, MetadataStorage};
 use crate::utils;

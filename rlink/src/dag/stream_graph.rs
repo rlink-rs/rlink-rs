@@ -4,10 +4,10 @@ use std::ops::Index;
 
 use daggy::{Dag, EdgeIndex, NodeIndex};
 
-use crate::api::operator::{
+use crate::core::operator::{
     DefaultStreamOperator, FunctionCreator, StreamOperator, TStreamOperator, DEFAULT_PARALLELISM,
 };
-use crate::api::runtime::OperatorId;
+use crate::core::runtime::OperatorId;
 use crate::dag::{DagError, OperatorType};
 use crate::functions::system::keyed_state_flat_map::KeyedStateFlatMapFunction;
 use crate::functions::system::system_input_format::SystemInputFormat;

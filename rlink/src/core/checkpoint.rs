@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
+use crate::core::runtime::{CheckpointId, OperatorId, TaskId};
 
 #[derive(Clone, Debug)]
 pub struct FunctionSnapshotContext {

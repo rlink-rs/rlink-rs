@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use parquet::schema::parser::parse_message_type;
 use parquet::schema::types::TypePtr;
-use rlink::api::element::Record;
-use rlink::api::runtime::TaskId;
+use rlink::core::element::Record;
+use rlink::core::runtime::TaskId;
 
 pub mod file_system;
 pub mod parquet_writer;
@@ -59,7 +59,7 @@ mod tests {
     use parquet::data_type::ByteArray;
     use parquet::file::properties::{WriterProperties, WriterVersion};
     use parquet::schema::parser::parse_message_type;
-    use rlink::api::element::Record;
+    use rlink::core::element::Record;
     use rlink::utils::date_time::current_timestamp;
 
     use crate::writer::file_system::LocalFileSystemBuilder;
@@ -68,7 +68,7 @@ mod tests {
     };
     use crate::writer::parquet_writer_manager::ParquetBlockWriterManager;
     use crate::writer::{BlockWriter, BlockWriterManager, PathLocation};
-    use rlink::api::runtime::TaskId;
+    use rlink::core::runtime::TaskId;
 
     const SCHEMA_STR: &'static str = r#"
 message Document {

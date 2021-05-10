@@ -1,9 +1,9 @@
-use crate::api::backend::KeyedStateBackend;
-use crate::api::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
-use crate::api::element::Record;
-use crate::api::function::{BaseReduceFunction, Context, NamedFunction, ReduceFunction};
-use crate::api::properties::SystemProperties;
-use crate::api::window::TWindow;
+use crate::core::backend::KeyedStateBackend;
+use crate::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
+use crate::core::element::Record;
+use crate::core::function::{BaseReduceFunction, Context, NamedFunction, ReduceFunction};
+use crate::core::properties::SystemProperties;
+use crate::core::window::TWindow;
 use crate::storage::keyed_state::{TWindowState, WindowState};
 use crate::utils::date_time::timestamp_str;
 
@@ -23,7 +23,7 @@ impl WindowBaseReduceFunction {
 }
 
 impl BaseReduceFunction for WindowBaseReduceFunction {
-    fn open(&mut self, context: &Context) -> crate::api::Result<()> {
+    fn open(&mut self, context: &Context) -> crate::core::Result<()> {
         let task_id = context.task_id;
         let application_id = context.application_id.clone();
 
@@ -78,7 +78,7 @@ impl BaseReduceFunction for WindowBaseReduceFunction {
         }
     }
 
-    fn close(&mut self) -> crate::api::Result<()> {
+    fn close(&mut self) -> crate::core::Result<()> {
         Ok(())
     }
 }

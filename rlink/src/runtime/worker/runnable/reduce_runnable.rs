@@ -1,12 +1,12 @@
 use std::borrow::BorrowMut;
 
-use crate::api::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
-use crate::api::element::{Element, Record, StreamStatus};
-use crate::api::function::{BaseReduceFunction, KeySelectorFunction};
-use crate::api::operator::DefaultStreamOperator;
-use crate::api::runtime::{OperatorId, TaskId};
-use crate::api::watermark::MAX_WATERMARK;
-use crate::api::window::{TWindow, Window};
+use crate::core::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
+use crate::core::element::{Element, Record, StreamStatus};
+use crate::core::function::{BaseReduceFunction, KeySelectorFunction};
+use crate::core::operator::DefaultStreamOperator;
+use crate::core::runtime::{OperatorId, TaskId};
+use crate::core::watermark::MAX_WATERMARK;
+use crate::core::window::{TWindow, Window};
 use crate::metrics::metric::Counter;
 use crate::metrics::register_counter;
 use crate::runtime::worker::checkpoint::submit_checkpoint;

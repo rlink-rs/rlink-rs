@@ -5,7 +5,9 @@ extern crate log;
 
 mod app;
 mod co_connect;
+mod map_output;
+mod percentile;
 
 pub fn main() {
-    rlink::api::env::execute("rlink-connect", crate::app::ConnectStreamApp1 {});
+    rlink::core::env::execute("rlink-connect", crate::app::ConnectStreamApp1 {});
 }

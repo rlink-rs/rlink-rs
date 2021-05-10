@@ -1,5 +1,5 @@
-use rlink::api::element::Record;
 use rlink::channel::utils::handover::Handover;
+use rlink::core::element::Record;
 
 pub struct KafkaRecordIterator {
     handover: Handover,

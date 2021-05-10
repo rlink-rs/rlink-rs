@@ -1,10 +1,10 @@
 use std::collections::btree_map::IntoIter;
 use std::fmt::Debug;
 
-use crate::api::backend::KeyedStateBackend;
-use crate::api::element::{Barrier, Record};
-use crate::api::runtime::JobId;
-use crate::api::window::Window;
+use crate::core::backend::KeyedStateBackend;
+use crate::core::element::{Barrier, Record};
+use crate::core::runtime::JobId;
+use crate::core::window::Window;
 use crate::storage::keyed_state::mem_reducing_state::MemoryReducingState;
 use crate::storage::keyed_state::mem_window_state::MemoryWindowState;
 

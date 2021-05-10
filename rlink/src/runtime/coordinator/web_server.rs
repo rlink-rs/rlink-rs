@@ -12,9 +12,9 @@ use hyper::{Body, Method, Request, Response};
 use hyper::{Server, StatusCode};
 use rand::Rng;
 
-use crate::api::checkpoint::Checkpoint;
-use crate::api::cluster::{MetadataStorageType, StdResponse};
 use crate::channel::{bounded, Sender};
+use crate::core::checkpoint::Checkpoint;
+use crate::core::cluster::{MetadataStorageType, StdResponse};
 use crate::dag::metadata::DagMetadata;
 use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
 use crate::runtime::HeartbeatRequest;

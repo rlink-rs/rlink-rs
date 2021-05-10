@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use crate::api::properties::ChannelBaseOn;
-use crate::api::runtime::{ChannelKey, TaskId};
 use crate::channel::{named_channel_with_base, ElementReceiver, ElementSender};
+use crate::core::properties::ChannelBaseOn;
+use crate::core::runtime::{ChannelKey, TaskId};
 use crate::metrics::Tag;
 
 lazy_static! {

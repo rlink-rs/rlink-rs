@@ -1,9 +1,9 @@
 use std::time::Duration;
 
 use rand::Rng;
-use rlink::api;
-use rlink::api::element::Record;
-use rlink::api::function::{Context, InputFormat, InputSplit, InputSplitSource};
+use rlink::core;
+use rlink::core::element::Record;
+use rlink::core::function::{Context, InputFormat, InputSplit, InputSplitSource};
 use rlink::utils::date_time::current_timestamp_millis;
 
 use crate::buffer_gen::model;
@@ -20,7 +20,7 @@ impl RandInputFormat {
 impl InputSplitSource for RandInputFormat {}
 
 impl InputFormat for RandInputFormat {
-    fn open(&mut self, _input_split: InputSplit, _context: &Context) -> api::Result<()> {
+    fn open(&mut self, _input_split: InputSplit, _context: &Context) -> core::Result<()> {
         Ok(())
     }
 
@@ -28,7 +28,7 @@ impl InputFormat for RandInputFormat {
         Box::new(RandIterator::new())
     }
 
-    fn close(&mut self) -> api::Result<()> {
+    fn close(&mut self) -> core::Result<()> {
         Ok(())
     }
 }
