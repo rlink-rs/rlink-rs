@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use actix_web::web::{Data, Path};
 use actix_web::{web, Error, HttpResponse};
-use rlink::api::cluster::{ExecuteRequest, ResponseCode, StdResponse};
+use rlink::core::cluster::{ExecuteRequest, ResponseCode, StdResponse};
 
 use crate::config::Context;
 use crate::utils::{current_timestamp_millis, read_file_as_lines};

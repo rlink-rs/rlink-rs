@@ -132,8 +132,8 @@ mod tests {
     use std::sync::atomic::Ordering;
 
     use rdkafka::ClientConfig;
-    use rlink::api::element::Record;
     use rlink::channel::utils::handover::Handover;
+    use rlink::core::element::Record;
     use rlink::utils::date_time::current_timestamp_millis;
 
     use crate::sink::producer::KafkaProducerThread;

@@ -1,8 +1,8 @@
 use chrono::DateTime;
 use chrono::Utc;
-use rlink::api;
-use rlink::api::element::Record;
-use rlink::api::function::{Context, InputFormat, InputSplit, InputSplitSource};
+use rlink::core;
+use rlink::core::element::Record;
+use rlink::core::function::{Context, InputFormat, InputSplit, InputSplitSource};
 
 use crate::buffer_gen::model;
 
@@ -93,7 +93,7 @@ impl VecInputFormat {
 impl InputSplitSource for VecInputFormat {}
 
 impl InputFormat for VecInputFormat {
-    fn open(&mut self, _input_split: InputSplit, context: &Context) -> api::Result<()> {
+    fn open(&mut self, _input_split: InputSplit, context: &Context) -> core::Result<()> {
         let task_number = context.task_id.task_number() as usize;
         let num_tasks = context.task_id.num_tasks() as usize;
 
@@ -111,7 +111,7 @@ impl InputFormat for VecInputFormat {
         Box::new(self.data.clone().into_iter())
     }
 
-    fn close(&mut self) -> api::Result<()> {
+    fn close(&mut self) -> core::Result<()> {
         Ok(())
     }
 }

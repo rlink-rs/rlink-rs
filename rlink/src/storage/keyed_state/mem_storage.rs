@@ -1,7 +1,7 @@
 use dashmap::DashMap;
 
-use crate::api::runtime::JobId;
-use crate::api::window::Window;
+use crate::core::runtime::JobId;
+use crate::core::window::Window;
 use crate::storage::keyed_state::mem_reducing_state::MemoryReducingState;
 
 lazy_static! {

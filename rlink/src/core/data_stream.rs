@@ -1,15 +1,15 @@
 use std::fmt::Debug;
 use std::rc::Rc;
 
-use crate::api::env::StreamManager;
-use crate::api::function::{
+use crate::core::env::StreamManager;
+use crate::core::function::{
     CoProcessFunction, FilterFunction, FlatMapFunction, InputFormat, KeySelectorFunction,
     OutputFormat, ReduceFunction,
 };
-use crate::api::operator::{FunctionCreator, StreamOperator};
-use crate::api::runtime::OperatorId;
-use crate::api::watermark::WatermarkAssigner;
-use crate::api::window::WindowAssigner;
+use crate::core::operator::{FunctionCreator, StreamOperator};
+use crate::core::runtime::OperatorId;
+use crate::core::watermark::WatermarkAssigner;
+use crate::core::window::WindowAssigner;
 use crate::functions::system::window_base_reduce::WindowBaseReduceFunction;
 
 pub trait TDataStream {

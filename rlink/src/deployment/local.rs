@@ -1,8 +1,8 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
-use crate::api::cluster::TaskResourceInfo;
-use crate::api::env::{StreamApp, StreamExecutionEnvironment};
+use crate::core::cluster::TaskResourceInfo;
+use crate::core::env::{StreamApp, StreamExecutionEnvironment};
 use crate::deployment::{Resource, TResourceManager};
 use crate::runtime::context::Context;
 use crate::runtime::{cluster, ClusterDescriptor, ManagerType};

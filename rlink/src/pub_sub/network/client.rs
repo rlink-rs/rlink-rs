@@ -16,13 +16,13 @@ use tokio::net::TcpStream;
 use tokio_util::codec::FramedRead;
 use tokio_util::codec::LengthDelimitedCodec;
 
-use crate::api::element::Element;
-use crate::api::properties::ChannelBaseOn;
-use crate::api::runtime::{ChannelKey, TaskId};
 use crate::channel::{
     bounded, named_channel_with_base, ElementReceiver, ElementSender, Receiver, Sender,
     TryRecvError, TrySendError,
 };
+use crate::core::element::Element;
+use crate::core::properties::ChannelBaseOn;
+use crate::core::runtime::{ChannelKey, TaskId};
 use crate::metrics::{register_counter, Tag};
 use crate::pub_sub::network::{
     new_framed_read, new_framed_write, ElementRequest, ElementResponse, ResponseCode,
@@ -388,9 +388,9 @@ async fn send_to_channel(sender: &ElementSender, element: Element) -> anyhow::Re
 
 #[cfg(test)]
 mod tests {
-    use crate::api::element::Element;
-    use crate::api::runtime::{ChannelKey, JobId, TaskId};
     use crate::channel::named_channel;
+    use crate::core::element::Element;
+    use crate::core::runtime::{ChannelKey, JobId, TaskId};
     use crate::pub_sub::network::client::Client;
 
     #[tokio::test]

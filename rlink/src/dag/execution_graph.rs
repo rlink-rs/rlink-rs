@@ -3,9 +3,9 @@ use std::ops::Index;
 
 use daggy::{Dag, EdgeIndex, NodeIndex, Walker};
 
-use crate::api::function::InputSplit;
-use crate::api::operator::StreamOperator;
-use crate::api::runtime::{JobId, OperatorId};
+use crate::core::function::InputSplit;
+use crate::core::operator::StreamOperator;
+use crate::core::runtime::{JobId, OperatorId};
 use crate::dag::job_graph::{JobEdge, JobGraph};
 use crate::dag::stream_graph::StreamNode;
 use crate::dag::{DagError, TaskId};

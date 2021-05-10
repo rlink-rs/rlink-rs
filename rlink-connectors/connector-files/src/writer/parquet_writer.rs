@@ -6,7 +6,7 @@ use parquet::data_type::{ByteArray, FixedLenByteArray, Int96};
 use parquet::file::properties::WriterPropertiesPtr;
 use parquet::file::writer::{FileWriter, InMemoryWriteableCursor, SerializedFileWriter};
 use parquet::schema::types::TypePtr;
-use rlink::api::element::Record;
+use rlink::core::element::Record;
 
 use crate::writer::BlockWriter;
 

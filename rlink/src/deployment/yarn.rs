@@ -3,9 +3,9 @@ use std::io::{BufRead, Write};
 use std::process::Stdio;
 use std::sync::Arc;
 
-use crate::api::cluster::TaskResourceInfo;
-use crate::api::env::{StreamApp, StreamExecutionEnvironment};
 use crate::channel::{bounded, Receiver, Sender};
+use crate::core::cluster::TaskResourceInfo;
+use crate::core::env::{StreamApp, StreamExecutionEnvironment};
 use crate::deployment::TResourceManager;
 use crate::runtime::context::Context;
 use crate::runtime::{ClusterDescriptor, ManagerType};

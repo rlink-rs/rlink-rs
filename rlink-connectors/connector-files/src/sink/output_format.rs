@@ -1,7 +1,7 @@
-use rlink::api::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
-use rlink::api::element::Record;
-use rlink::api::function::{Context, OutputFormat};
-use rlink::api::runtime::TaskId;
+use rlink::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
+use rlink::core::element::Record;
+use rlink::core::function::{Context, OutputFormat};
+use rlink::core::runtime::TaskId;
 
 use crate::writer::BlockWriterManager;
 
@@ -21,7 +21,7 @@ impl HdfsOutputFormat {
 }
 
 impl OutputFormat for HdfsOutputFormat {
-    fn open(&mut self, context: &Context) -> rlink::api::Result<()> {
+    fn open(&mut self, context: &Context) -> rlink::core::Result<()> {
         self.task_id = Some(context.task_id.clone());
         self.writer_manager.open()?;
         Ok(())
@@ -33,7 +33,7 @@ impl OutputFormat for HdfsOutputFormat {
             .unwrap();
     }
 
-    fn close(&mut self) -> rlink::api::Result<()> {
+    fn close(&mut self) -> rlink::core::Result<()> {
         self.writer_manager.close()?;
         Ok(())
     }

@@ -3,11 +3,11 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread::JoinHandle;
 
-use crate::api::element::{Element, Record};
-use crate::api::env::{StreamApp, StreamExecutionEnvironment};
-use crate::api::function::KeySelectorFunction;
-use crate::api::operator::{DefaultStreamOperator, StreamOperator};
-use crate::api::runtime::{JobId, OperatorId};
+use crate::core::element::{Element, Record};
+use crate::core::env::{StreamApp, StreamExecutionEnvironment};
+use crate::core::function::KeySelectorFunction;
+use crate::core::operator::{DefaultStreamOperator, StreamOperator};
+use crate::core::runtime::{JobId, OperatorId};
 use crate::dag::metadata::DagMetadata;
 use crate::dag::OperatorType;
 use crate::runtime::context::Context;
@@ -25,7 +25,7 @@ pub mod heart_beat;
 pub mod runnable;
 pub mod web_server;
 
-pub(crate) type FunctionContext = crate::api::function::Context;
+pub(crate) type FunctionContext = crate::core::function::Context;
 
 pub(crate) fn run<S>(
     context: Arc<Context>,

@@ -1,11 +1,11 @@
 use std::convert::TryFrom;
 use std::sync::Arc;
 
-use crate::api::checkpoint::CheckpointHandle;
-use crate::api::env::{StreamApp, StreamExecutionEnvironment};
-use crate::api::function::InputSplit;
-use crate::api::properties::Properties;
-use crate::api::runtime::{CheckpointId, OperatorId, TaskId};
+use crate::core::checkpoint::CheckpointHandle;
+use crate::core::env::{StreamApp, StreamExecutionEnvironment};
+use crate::core::function::InputSplit;
+use crate::core::properties::Properties;
+use crate::core::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::utils::panic::panic_notify;
 
 pub mod cluster;

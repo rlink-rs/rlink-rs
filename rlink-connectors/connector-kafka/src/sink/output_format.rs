@@ -1,11 +1,11 @@
 use rdkafka::ClientConfig;
-use rlink::api::checkpoint::CheckpointFunction;
-use rlink::api::element::Record;
-use rlink::api::function::{Context, NamedFunction, OutputFormat};
 use rlink::channel::utils::handover::Handover;
+use rlink::core::checkpoint::CheckpointFunction;
+use rlink::core::element::Record;
+use rlink::core::function::{Context, NamedFunction, OutputFormat};
 use rlink::metrics::Tag;
 use rlink::utils::thread::async_runtime;
-use rlink::{api, utils};
+use rlink::{core, utils};
 
 use crate::sink::producer::KafkaProducerThread;
 
@@ -30,7 +30,7 @@ impl KafkaOutputFormat {
 }
 
 impl OutputFormat for KafkaOutputFormat {
-    fn open(&mut self, context: &Context) -> api::Result<()> {
+    fn open(&mut self, context: &Context) -> core::Result<()> {
         let mut tags = context.task_id.to_tags();
         tags.push(Tag::new(
             "topic",
@@ -55,7 +55,7 @@ impl OutputFormat for KafkaOutputFormat {
         self.handover.as_ref().unwrap().produce(record).unwrap();
     }
 
-    fn close(&mut self) -> api::Result<()> {
+    fn close(&mut self) -> core::Result<()> {
         Ok(())
     }
 }

@@ -9,7 +9,7 @@ pub mod elasticsearch_sink;
 
 pub static ES_DATA_TYPES: [u8; 2] = [
     // topic
-    rlink::api::element::types::BYTES,
+    rlink::core::element::types::BYTES,
     // body
-    rlink::api::element::types::BYTES,
+    rlink::core::element::types::BYTES,
 ];

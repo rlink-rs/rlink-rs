@@ -1,6 +1,6 @@
-use rlink::api;
-use rlink::api::element::Record;
-use rlink::api::function::{Context, FilterFunction};
+use rlink::core;
+use rlink::core::element::Record;
+use rlink::core::function::{Context, FilterFunction};
 
 #[derive(Debug, Function)]
 pub struct MyFilterFunction {}
@@ -12,7 +12,7 @@ impl MyFilterFunction {
 }
 
 impl FilterFunction for MyFilterFunction {
-    fn open(&mut self, _context: &Context) -> api::Result<()> {
+    fn open(&mut self, _context: &Context) -> core::Result<()> {
         Ok(())
     }
 
@@ -20,7 +20,7 @@ impl FilterFunction for MyFilterFunction {
         true
     }
 
-    fn close(&mut self) -> api::Result<()> {
+    fn close(&mut self) -> core::Result<()> {
         Ok(())
     }
 }

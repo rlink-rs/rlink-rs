@@ -1,6 +1,6 @@
 [package]
 name = "rlink-example-files"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["yorkart <wangyue11.4@163.com>"]
 edition = "2018"
 description = "High performance Stream Processing Framework"
@@ -9,19 +9,19 @@ repository = "https://github.com/rlink-rs/rlink-rs.git"
 license = "MIT/Apache-2.0"
 
 [dependencies.rlink]
-version = "0.4"
+version = "0.5"
 path = "../../rlink"
 
 [dependencies.rlink-derive]
-version = "0.2.3"
+version = "0.3"
 path = "../../rlink-derive"
 
 [dependencies.rlink-connector-files]
-version = "0.4"
+version = "0.5"
 path = "../../rlink-connectors/connector-files"
 
 [dependencies.rlink-example-utils]
-version = "0.4"
+version = "0.5"
 path = "../example-utils"
 
 [dependencies]
@@ -32,7 +32,7 @@ anyhow = "1.0"
 rand = "0.7"
 chrono = "0.4"
 
-parquet = "3.0"
+parquet = "4.0"
 
 [build-dependencies]
 serbuffer-gen = "1.2"

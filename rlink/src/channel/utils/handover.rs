@@ -1,7 +1,7 @@
-use crate::api::element::Record;
 use crate::channel::receiver::ChannelReceiver;
 use crate::channel::sender::ChannelSender;
 use crate::channel::{named_channel, RecvError, SendError, TryRecvError, TrySendError};
+use crate::core::element::Record;
 use crate::metrics::Tag;
 
 #[derive(Clone, Debug)]

@@ -2,12 +2,12 @@ use std::time::Duration;
 
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::{ClientConfig, Offset};
-use rlink::api;
-use rlink::api::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
-use rlink::api::element::Record;
-use rlink::api::function::{Context, InputFormat, InputSplit, InputSplitSource};
-use rlink::api::properties::Properties;
 use rlink::channel::utils::handover::Handover;
+use rlink::core;
+use rlink::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
+use rlink::core::element::Record;
+use rlink::core::function::{Context, InputFormat, InputSplit, InputSplitSource};
+use rlink::core::properties::Properties;
 use rlink::metrics::Tag;
 
 use crate::source::checkpoint::KafkaCheckpointFunction;
@@ -49,7 +49,7 @@ impl KafkaInputFormat {
 }
 
 impl InputFormat for KafkaInputFormat {
-    fn open(&mut self, input_split: InputSplit, context: &Context) -> api::Result<()> {
+    fn open(&mut self, input_split: InputSplit, context: &Context) -> core::Result<()> {
         info!("kafka source open");
 
         let can_create_consumer = input_split
@@ -111,7 +111,7 @@ impl InputFormat for KafkaInputFormat {
         ))
     }
 
-    fn close(&mut self) -> api::Result<()> {
+    fn close(&mut self) -> core::Result<()> {
         Ok(())
     }
 }
@@ -134,7 +134,7 @@ impl CheckpointFunction for KafkaInputFormat {
 }
 
 impl InputSplitSource for KafkaInputFormat {
-    fn create_input_splits(&self, min_num_splits: u16) -> api::Result<Vec<InputSplit>> {
+    fn create_input_splits(&self, min_num_splits: u16) -> core::Result<Vec<InputSplit>> {
         let timeout = Duration::from_secs(3);
 
         info!("kafka config {:?}", self.client_config);
@@ -172,7 +172,7 @@ impl InputSplitSource for KafkaInputFormat {
         }
 
         if input_splits.len() > min_num_splits as usize {
-            return Err(rlink::api::Error::from(
+            return Err(rlink::core::Error::from(
                 "kafka `input_splits.len()` != `min_num_splits`",
             ));
         }

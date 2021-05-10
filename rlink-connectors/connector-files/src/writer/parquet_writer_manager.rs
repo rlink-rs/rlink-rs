@@ -6,9 +6,9 @@ use std::time::Duration;
 
 use parquet::file::properties::WriterPropertiesPtr;
 use parquet::schema::types::TypePtr;
-use rlink::api::element::Record;
-use rlink::api::runtime::TaskId;
 use rlink::channel::{bounded, Receiver, Sender};
+use rlink::core::element::Record;
+use rlink::core::runtime::TaskId;
 use rlink::utils::date_time::current_timestamp;
 
 use crate::writer::parquet_writer::{BlocksBuilder, ParquetBlockWriter};

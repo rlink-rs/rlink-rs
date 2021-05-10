@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::api::env::{StreamApp, StreamExecutionEnvironment};
+use crate::core::env::{StreamApp, StreamExecutionEnvironment};
 use crate::deployment::TResourceManager;
 use crate::runtime::context::Context;
 use crate::runtime::coordinator::CoordinatorTask;

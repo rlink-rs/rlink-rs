@@ -2,8 +2,8 @@ use std::cmp::{max, min};
 use std::fmt::Debug;
 use std::time::Duration;
 
-use crate::api::checkpoint::CheckpointFunction;
-use crate::api::function::NamedFunction;
+use crate::core::checkpoint::CheckpointFunction;
+use crate::core::function::NamedFunction;
 use crate::utils;
 
 pub trait TWindow: Debug + Clone {

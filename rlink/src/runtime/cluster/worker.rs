@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-use crate::api::env::{StreamApp, StreamExecutionEnvironment};
+use crate::core::env::{StreamApp, StreamExecutionEnvironment};
 use crate::dag::metadata::DagMetadata;
 use crate::pub_sub::network;
 use crate::runtime::context::Context;

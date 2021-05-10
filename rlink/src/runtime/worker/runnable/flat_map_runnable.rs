@@ -1,8 +1,8 @@
-use crate::api::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
-use crate::api::element::Element;
-use crate::api::function::FlatMapFunction;
-use crate::api::operator::DefaultStreamOperator;
-use crate::api::runtime::{OperatorId, TaskId};
+use crate::core::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
+use crate::core::element::Element;
+use crate::core::function::FlatMapFunction;
+use crate::core::operator::DefaultStreamOperator;
+use crate::core::runtime::{OperatorId, TaskId};
 use crate::metrics::metric::Counter;
 use crate::metrics::register_counter;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
