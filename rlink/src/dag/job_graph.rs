@@ -1,5 +1,5 @@
 use std::cmp::max;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::ops::{Index, IndexMut};
 
 use daggy::{Dag, EdgeIndex, NodeIndex, Walker};
@@ -117,13 +117,14 @@ impl JobGraph {
         let sources = stream_graph.sources.clone();
 
         // build jobs by StreamGraph
-        let mut job_id_map = HashMap::new();
+        // child to parents map must be sorted with `BTreeMap`
+        let mut c2p_job_id_map = BTreeMap::new();
         for source_node_index in sources {
             let job_node = self.build_job_node(source_node_index, stream_graph)?;
 
             // build map: child_job_id -> vec[parent_job_id]
             for child_job_id in &job_node.child_job_ids {
-                let parent_job_ids = job_id_map.entry(*child_job_id).or_insert(Vec::new());
+                let parent_job_ids = c2p_job_id_map.entry(*child_job_id).or_insert(Vec::new());
                 parent_job_ids.push(job_node.job_id);
             }
 
@@ -133,7 +134,7 @@ impl JobGraph {
             self.job_node_indies.insert(job_id, node_index);
         }
 
-        for (child_job_id, parent_job_ids) in job_id_map {
+        for (child_job_id, parent_job_ids) in c2p_job_id_map {
             let node_index = self
                 .job_node_indies
                 .get(&child_job_id)
@@ -157,7 +158,7 @@ impl JobGraph {
                 };
 
                 // update the parallelism with parent left operator's parallelism
-                let parent_parallelism = job_node
+                let parent_job_node = job_node
                     .parent_job_ids
                     .iter()
                     .map(|parent_job_id| {
@@ -165,11 +166,15 @@ impl JobGraph {
                         self.dag.index(*parent_node_index)
                     })
                     .find(|job_node| job_node.stream_node(left_parent_id).is_some())
-                    .map(|job_node| job_node.parallelism);
-                match parent_parallelism {
-                    Some(parallelism) => {
+                    .map(|job_node| job_node.clone());
+                match parent_job_node {
+                    Some(parent_job_node) => {
                         let job_node = self.dag.index_mut(*node_index);
-                        job_node.parallelism = parallelism;
+
+                        if parent_job_node.parallelism == 0 {
+                            return Err(DagError::JobParallelismNotFound);
+                        }
+                        job_node.parallelism = parent_job_node.parallelism;
                     }
                     None => {
                         return Err(DagError::ParentOperatorNotFound);
@@ -239,6 +244,7 @@ impl JobGraph {
 
             stream_nodes.push(stream_node.clone());
             parallelism = max(parallelism, stream_node.parallelism);
+
             if stream_node.operator_type == OperatorType::Source {
                 job_id = JobId::from(stream_node.id);
             }

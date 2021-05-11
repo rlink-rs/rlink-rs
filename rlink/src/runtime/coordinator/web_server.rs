@@ -20,7 +20,7 @@ use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
 use crate::runtime::HeartbeatRequest;
 use crate::runtime::TaskManagerStatus;
 use crate::storage::metadata::{MetadataStorage, TMetadataStorage};
-use crate::utils::fs::read_file;
+use crate::utils::fs::read_binary;
 use crate::utils::http::server::{as_ok_json, page_not_found};
 use crate::utils::thread::async_runtime_multi;
 
@@ -284,7 +284,7 @@ async fn static_file(
         _ => "",
     };
 
-    match read_file(&static_file_path) {
+    match read_binary(&static_file_path) {
         Ok(context) => Response::builder()
             .header(header::CONTENT_TYPE, context_type)
             .status(StatusCode::OK)
