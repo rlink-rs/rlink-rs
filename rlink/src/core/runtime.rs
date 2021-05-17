@@ -3,10 +3,14 @@ use bytes::{Buf, BufMut, BytesMut};
 use crate::core::element::Serde;
 use crate::metrics::Tag;
 
-#[derive(Copy, Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, Default)]
+#[derive(
+    Copy, Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, Default, Ord, PartialOrd,
+)]
 pub struct OperatorId(pub u32);
 
-#[derive(Copy, Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, Default)]
+#[derive(
+    Copy, Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, Default, Ord, PartialOrd,
+)]
 pub struct JobId(pub u32);
 
 impl From<OperatorId> for JobId {

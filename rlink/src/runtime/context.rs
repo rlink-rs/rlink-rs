@@ -171,51 +171,59 @@ impl Context {
             ClusterMode::YARN | ClusterMode::Kubernetes => ClusterConfig::new_local(),
         };
 
-        let (yarn_manager_main_class, worker_process_path, memory_mb, v_cores, exclusion_nodes) = match cluster_mode
-        {
-            ClusterMode::YARN => match manager_type {
-                ManagerType::Coordinator => {
-                    let yarn_manager_main_class = parse_arg("yarn_manager_main_class")?;
-                    let worker_process_path = parse_arg("worker_process_path")?;
+        let (yarn_manager_main_class, worker_process_path, memory_mb, v_cores, exclusion_nodes) =
+            match cluster_mode {
+                ClusterMode::YARN => match manager_type {
+                    ManagerType::Coordinator => {
+                        let yarn_manager_main_class = parse_arg("yarn_manager_main_class")?;
+                        let worker_process_path = parse_arg("worker_process_path")?;
 
-                    let memory_mb = parse_arg("memory_mb")?;
-                    let memory_mb = u32::from_str(memory_mb.as_str()).map_err(|_e| {
-                        anyhow!("parse `memory_mb`=`{}` to usize error", memory_mb)
-                    })?;
+                        let memory_mb = parse_arg("memory_mb")?;
+                        let memory_mb = u32::from_str(memory_mb.as_str()).map_err(|_e| {
+                            anyhow!("parse `memory_mb`=`{}` to usize error", memory_mb)
+                        })?;
 
-                    let v_cores = parse_arg("v_cores")?;
-                    let v_cores = u32::from_str(v_cores.as_str())
-                        .map_err(|_e| anyhow!("parse `v_cores`=`{}` to usize error", v_cores))?;
+                        let v_cores = parse_arg("v_cores")?;
+                        let v_cores = u32::from_str(v_cores.as_str()).map_err(|_e| {
+                            anyhow!("parse `v_cores`=`{}` to usize error", v_cores)
+                        })?;
 
-                    let exclusion_nodes = parse_arg("exclusion_nodes")?;
+                        let exclusion_nodes = parse_arg("exclusion_nodes")?;
 
-                    (
-                        yarn_manager_main_class,
-                        worker_process_path,
-                        memory_mb,
-                        v_cores,
-                        exclusion_nodes,
-                    )
-                }
+                        (
+                            yarn_manager_main_class,
+                            worker_process_path,
+                            memory_mb,
+                            v_cores,
+                            exclusion_nodes,
+                        )
+                    }
+                    _ => ("".to_string(), "".to_string(), 0, 0, "".to_string()),
+                },
+                ClusterMode::Kubernetes => match manager_type {
+                    ManagerType::Coordinator => {
+                        let memory_mb = parse_arg("memory_mb")?;
+                        let memory_mb = u32::from_str(memory_mb.as_str()).map_err(|_e| {
+                            anyhow!("parse `memory_mb`=`{}` to usize error", memory_mb)
+                        })?;
+
+                        let v_cores = parse_arg("v_cores")?;
+                        let v_cores = u32::from_str(v_cores.as_str()).map_err(|_e| {
+                            anyhow!("parse `v_cores`=`{}` to usize error", v_cores)
+                        })?;
+
+                        (
+                            "".to_string(),
+                            "".to_string(),
+                            memory_mb,
+                            v_cores,
+                            "".to_string(),
+                        )
+                    }
+                    _ => ("".to_string(), "".to_string(), 0, 0, "".to_string()),
+                },
                 _ => ("".to_string(), "".to_string(), 0, 0, "".to_string()),
-            },
-            ClusterMode::Kubernetes => match manager_type {
-                ManagerType::Coordinator => {
-                    let memory_mb = parse_arg("memory_mb")?;
-                    let memory_mb = u32::from_str(memory_mb.as_str()).map_err(|_e| {
-                        anyhow!("parse `memory_mb`=`{}` to usize error", memory_mb)
-                    })?;
-
-                    let v_cores = parse_arg("v_cores")?;
-                    let v_cores = u32::from_str(v_cores.as_str())
-                        .map_err(|_e| anyhow!("parse `v_cores`=`{}` to usize error", v_cores))?;
-
-                    ("".to_string(), "".to_string(), memory_mb, v_cores, "".to_string())
-                }
-                _ => ("".to_string(), "".to_string(), 0, 0, "".to_string()),
-            },
-            _ => ("".to_string(), "".to_string(), 0, 0, "".to_string()),
-        };
+            };
 
         let dashboard_path = match cluster_mode {
             ClusterMode::YARN => {
@@ -223,6 +231,10 @@ impl Context {
                 let link_path = dashboard_path.read_link();
                 let p = link_path.unwrap_or(dashboard_path);
                 p.to_str().unwrap().to_string()
+            }
+            ClusterMode::Local => {
+                let dashboard_path = work_space().join("rlink-dashboard");
+                dashboard_path.to_str().unwrap().to_string()
             }
             _ => parse_arg("dashboard_path").unwrap_or_default(),
         };
