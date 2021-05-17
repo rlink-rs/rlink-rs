@@ -36,7 +36,7 @@ pub(crate) fn sys_info_metric_task(global_tag: Tag) {
     labels.push((field_name, field_value));
 
     let mut system = sysinfo::System::new();
-    let pid = std::process::id() as i32;
+    let pid = sysinfo::get_current_pid().unwrap();
     loop {
         system.refresh_process(pid);
         // system.refresh_cpu();
