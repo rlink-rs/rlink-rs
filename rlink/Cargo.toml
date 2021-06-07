@@ -1,6 +1,6 @@
 [package]
 name = "rlink"
-version = "0.5.1"
+version = "0.5.3"
 authors = ["yorkart <wangyue11.4@163.com>"]
 edition = "2018"
 description = "High performance Stream Processing Framework"

@@ -113,7 +113,7 @@ impl StreamApp for ConnectStreamApp1 {
         };
 
         let data_stream_left = env
-            .register_source(RandInputFormat::new(), 2)
+            .register_source(RandInputFormat::new(), 3)
             .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
                 Duration::from_secs(1),
                 SchemaBaseTimestampAssigner::new(model::index::timestamp, &FIELD_TYPE),
@@ -137,7 +137,7 @@ impl StreamApp for ConnectStreamApp1 {
                 Duration::from_secs(60),
                 None,
             ))
-            .reduce(reduce_function, 2)
+            .reduce(reduce_function, 5)
             .flat_map(OutputMapFunction::new(
                 output_schema_types,
                 get_percentile_scale(),

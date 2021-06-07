@@ -3,6 +3,7 @@ package rlink.yarn.client.model;
 import org.apache.hadoop.fs.Path;
 
 import java.io.Serializable;
+import java.util.List;
 import java.util.Map;
 
 public class SubmitParam implements Serializable {
@@ -17,6 +18,7 @@ public class SubmitParam implements Serializable {
     private int masterVCores;
     private String queue;
     private int maxAppAttempts;
+    private List<String> exclusionNodes;
     private Map<String, String> paramMap;
 
     public String getApplicationName() {
@@ -97,6 +99,14 @@ public class SubmitParam implements Serializable {
 
     public void setMaxAppAttempts(int maxAppAttempts) {
         this.maxAppAttempts = maxAppAttempts;
+    }
+
+    public List<String> getExclusionNodes() {
+        return exclusionNodes;
+    }
+
+    public void setExclusionNodes(List<String> exclusionNodes) {
+        this.exclusionNodes = exclusionNodes;
     }
 
     public Map<String, String> getParamMap() {

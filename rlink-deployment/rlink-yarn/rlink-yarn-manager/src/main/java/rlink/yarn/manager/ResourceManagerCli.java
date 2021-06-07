@@ -20,6 +20,10 @@ public class ResourceManagerCli {
     private static final String RESOURCE_PATH_KEY = "worker_process_path";
     private static final String MEMORY_MB_KEY = "memory_mb";
     private static final String VIRTUAL_CORES_KEY = "v_cores";
+    /**
+     * 黑名单节点，逗号分隔
+     */
+    private static final String EXCLUSION_NODES_KEY = "exclusion_nodes";
 
     public static void main(String[] args) {
         try {
@@ -79,6 +83,11 @@ public class ResourceManagerCli {
             launchParam.setvCores(Integer.parseInt(vCores));
         } catch (NumberFormatException e) {
             throw new RuntimeException(VIRTUAL_CORES_KEY + " is not Integer.");
+        }
+
+        String exclusionNodes = parameterMap.get(EXCLUSION_NODES_KEY);
+        if (StringUtils.isNotBlank(exclusionNodes)) {
+            launchParam.setExclusionNodes(Arrays.asList(exclusionNodes.split(",")));
         }
 
         return launchParam;

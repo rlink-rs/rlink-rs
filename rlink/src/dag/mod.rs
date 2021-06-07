@@ -97,8 +97,6 @@ pub enum DagError {
     SinkNotAtEnding,
     #[error("reduce and child output's parallelism is conflict")]
     ReduceOutputParallelismConflict,
-    #[error("connect parent not found")]
-    ConnectParentNotFound,
     #[error("the operator is not combine operator")]
     NotCombineOperator,
     #[error("parent operator not found")]
@@ -218,6 +216,44 @@ mod tests {
     }
 
     #[test]
+    pub fn data_stream_simple_test() {
+        let mut env = StreamExecutionEnvironment::new("job_name".to_string());
+
+        env.register_source(MyInputFormat::new(), 2)
+            .flat_map(MyFlatMapFunction::new())
+            .add_sink(MyOutputFormat::new(Properties::new()));
+
+        let dag_manager =
+            DagManager::try_from(env.stream_manager.stream_graph.borrow().deref()).unwrap();
+        print_dag(&dag_manager);
+    }
+
+    #[test]
+    pub fn data_stream_reduce_test() {
+        let mut env = StreamExecutionEnvironment::new("job_name".to_string());
+
+        env.register_source(MyInputFormat::new(), 2)
+            .flat_map(MyFlatMapFunction::new())
+            .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
+                Duration::from_secs(1),
+                MyTimestampAssigner::new(),
+            ))
+            .key_by(MyKeySelectorFunction::new())
+            .window(SlidingEventTimeWindows::new(
+                Duration::from_secs(60),
+                Duration::from_secs(20),
+                None,
+            ))
+            .reduce(MyReduceFunction::new(), 3)
+            .flat_map(MyFlatMapFunction::new())
+            .add_sink(MyOutputFormat::new(Properties::new()));
+
+        let dag_manager =
+            DagManager::try_from(env.stream_manager.stream_graph.borrow().deref()).unwrap();
+        print_dag(&dag_manager);
+    }
+
+    #[test]
     pub fn data_stream_connect_test() {
         let mut env = StreamExecutionEnvironment::new("job_name".to_string());
 
@@ -248,6 +284,10 @@ mod tests {
 
         let dag_manager =
             DagManager::try_from(env.stream_manager.stream_graph.borrow().deref()).unwrap();
+        print_dag(&dag_manager);
+    }
+
+    fn print_dag(dag_manager: &DagManager) {
         {
             let dag = &dag_manager.stream_graph().dag;
             println!("{:?}", dag);

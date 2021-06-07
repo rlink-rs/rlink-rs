@@ -65,6 +65,7 @@ pub(crate) struct Context {
     pub worker_process_path: String,
     pub memory_mb: u32,
     pub v_cores: u32,
+    pub exclusion_nodes: String,
 
     /// on k8s args
     pub image_path: String,
@@ -87,6 +88,7 @@ impl Context {
         worker_process_path: String,
         memory_mb: u32,
         v_cores: u32,
+        exclusion_nodes: String,
         image_path: String,
     ) -> Self {
         Context {
@@ -105,6 +107,7 @@ impl Context {
             worker_process_path,
             memory_mb,
             v_cores,
+            exclusion_nodes,
             image_path,
         }
     }
@@ -168,48 +171,59 @@ impl Context {
             ClusterMode::YARN | ClusterMode::Kubernetes => ClusterConfig::new_local(),
         };
 
-        let (yarn_manager_main_class, worker_process_path, memory_mb, v_cores) = match cluster_mode
-        {
-            ClusterMode::YARN => match manager_type {
-                ManagerType::Coordinator => {
-                    let yarn_manager_main_class = parse_arg("yarn_manager_main_class")?;
-                    let worker_process_path = parse_arg("worker_process_path")?;
+        let (yarn_manager_main_class, worker_process_path, memory_mb, v_cores, exclusion_nodes) =
+            match cluster_mode {
+                ClusterMode::YARN => match manager_type {
+                    ManagerType::Coordinator => {
+                        let yarn_manager_main_class = parse_arg("yarn_manager_main_class")?;
+                        let worker_process_path = parse_arg("worker_process_path")?;
 
-                    let memory_mb = parse_arg("memory_mb")?;
-                    let memory_mb = u32::from_str(memory_mb.as_str()).map_err(|_e| {
-                        anyhow!("parse `memory_mb`=`{}` to usize error", memory_mb)
-                    })?;
+                        let memory_mb = parse_arg("memory_mb")?;
+                        let memory_mb = u32::from_str(memory_mb.as_str()).map_err(|_e| {
+                            anyhow!("parse `memory_mb`=`{}` to usize error", memory_mb)
+                        })?;
 
-                    let v_cores = parse_arg("v_cores")?;
-                    let v_cores = u32::from_str(v_cores.as_str())
-                        .map_err(|_e| anyhow!("parse `v_cores`=`{}` to usize error", v_cores))?;
+                        let v_cores = parse_arg("v_cores")?;
+                        let v_cores = u32::from_str(v_cores.as_str()).map_err(|_e| {
+                            anyhow!("parse `v_cores`=`{}` to usize error", v_cores)
+                        })?;
 
-                    (
-                        yarn_manager_main_class,
-                        worker_process_path,
-                        memory_mb,
-                        v_cores,
-                    )
-                }
-                _ => ("".to_string(), "".to_string(), 0, 0),
-            },
-            ClusterMode::Kubernetes => match manager_type {
-                ManagerType::Coordinator => {
-                    let memory_mb = parse_arg("memory_mb")?;
-                    let memory_mb = u32::from_str(memory_mb.as_str()).map_err(|_e| {
-                        anyhow!("parse `memory_mb`=`{}` to usize error", memory_mb)
-                    })?;
+                        let exclusion_nodes = parse_arg("exclusion_nodes")?;
 
-                    let v_cores = parse_arg("v_cores")?;
-                    let v_cores = u32::from_str(v_cores.as_str())
-                        .map_err(|_e| anyhow!("parse `v_cores`=`{}` to usize error", v_cores))?;
+                        (
+                            yarn_manager_main_class,
+                            worker_process_path,
+                            memory_mb,
+                            v_cores,
+                            exclusion_nodes,
+                        )
+                    }
+                    _ => ("".to_string(), "".to_string(), 0, 0, "".to_string()),
+                },
+                ClusterMode::Kubernetes => match manager_type {
+                    ManagerType::Coordinator => {
+                        let memory_mb = parse_arg("memory_mb")?;
+                        let memory_mb = u32::from_str(memory_mb.as_str()).map_err(|_e| {
+                            anyhow!("parse `memory_mb`=`{}` to usize error", memory_mb)
+                        })?;
 
-                    ("".to_string(), "".to_string(), memory_mb, v_cores)
-                }
-                _ => ("".to_string(), "".to_string(), 0, 0),
-            },
-            _ => ("".to_string(), "".to_string(), 0, 0),
-        };
+                        let v_cores = parse_arg("v_cores")?;
+                        let v_cores = u32::from_str(v_cores.as_str()).map_err(|_e| {
+                            anyhow!("parse `v_cores`=`{}` to usize error", v_cores)
+                        })?;
+
+                        (
+                            "".to_string(),
+                            "".to_string(),
+                            memory_mb,
+                            v_cores,
+                            "".to_string(),
+                        )
+                    }
+                    _ => ("".to_string(), "".to_string(), 0, 0, "".to_string()),
+                },
+                _ => ("".to_string(), "".to_string(), 0, 0, "".to_string()),
+            };
 
         let dashboard_path = match cluster_mode {
             ClusterMode::YARN => {
@@ -217,6 +231,10 @@ impl Context {
                 let link_path = dashboard_path.read_link();
                 let p = link_path.unwrap_or(dashboard_path);
                 p.to_str().unwrap().to_string()
+            }
+            ClusterMode::Local => {
+                let dashboard_path = work_space().join("rlink-dashboard");
+                dashboard_path.to_str().unwrap().to_string()
             }
             _ => parse_arg("dashboard_path").unwrap_or_default(),
         };
@@ -257,6 +275,7 @@ impl Context {
             worker_process_path,
             memory_mb,
             v_cores,
+            exclusion_nodes,
             image_path,
         ))
     }
