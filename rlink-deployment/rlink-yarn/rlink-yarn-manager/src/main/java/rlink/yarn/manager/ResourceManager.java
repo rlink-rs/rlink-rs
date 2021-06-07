@@ -201,9 +201,10 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
             yarnClient.close();
             LOGGER.info("yarn inclusionNodes={}", (Object) inclusionNodes);
         }
+        boolean relaxLocality = inclusionNodes == null;
         for (int i = 0; i < numContainers; i++) {
             LOGGER.info("requestYarnContainer {}", i);
-            AMRMClient.ContainerRequest containerRequest = new AMRMClient.ContainerRequest(resource, inclusionNodes, null, RM_REQUEST_PRIORITY, false, null);
+            AMRMClient.ContainerRequest containerRequest = new AMRMClient.ContainerRequest(resource, inclusionNodes, null, RM_REQUEST_PRIORITY, relaxLocality, null);
             resourceManagerClient.addContainerRequest(containerRequest);
         }
     }
