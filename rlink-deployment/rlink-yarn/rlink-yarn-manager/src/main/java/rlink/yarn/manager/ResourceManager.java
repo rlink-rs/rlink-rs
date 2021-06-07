@@ -66,8 +66,13 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
     private Command curCommand;
     private boolean commandRunning;
 
+    /**
+     * stop命令超时时间
+     */
+    private static final int STOP_TIME_OUT = 5000;
     private List<TaskResourceInfo> stopTaskList = new ArrayList<>();
     private AtomicInteger stopContainerCount = new AtomicInteger(0);
+    private Long stopCmdTime = null;
 
     public void launch(LaunchParam launchParam) throws Exception {
         String webUrl = launchParam.getWebUrl();
@@ -139,6 +144,7 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
                 List<TaskResourceInfo> taskInfoList = JSONArray.parseArray(JSON.toJSONString(data), TaskResourceInfo.class);
                 stopTaskList = taskInfoList;
                 stopContainerCount = new AtomicInteger(0);
+                stopCmdTime = System.currentTimeMillis();
                 for (TaskResourceInfo taskResourceInfo : taskInfoList) {
                     stopTaskContainer(taskResourceInfo);
                 }
@@ -340,10 +346,12 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
     public void onContainerStopped(ContainerId containerId) {
         int count = stopContainerCount.addAndGet(1);
         LOGGER.info("Succeeded stop container {}. [{}/{}]", containerId, count, stopTaskList.size());
-        if (count == stopTaskList.size()) {
+        boolean isStopTimeout = stopCmdTime != null && (System.currentTimeMillis() - stopCmdTime > STOP_TIME_OUT);
+        if (count == stopTaskList.size() || isStopTimeout) {
             List<Map> data = JSONArray.parseArray(JSON.toJSONString(stopTaskList), Map.class);
             Command commandMsg = new Command(curCommand.getCmd(), curCommand.getCmdId(), data);
             MessageUtil.send(commandMsg);
+            stopCmdTime = null;
         }
     }
 
