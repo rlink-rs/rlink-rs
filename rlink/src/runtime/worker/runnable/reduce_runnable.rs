@@ -4,7 +4,7 @@ use crate::core::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotCont
 use crate::core::element::{Element, Record, StreamStatus};
 use crate::core::function::{BaseReduceFunction, KeySelectorFunction};
 use crate::core::operator::DefaultStreamOperator;
-use crate::core::runtime::{OperatorId, TaskId};
+use crate::core::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::core::watermark::MAX_WATERMARK;
 use crate::core::window::{TWindow, Window};
 use crate::metrics::metric::Counter;
@@ -25,6 +25,7 @@ pub(crate) struct ReduceRunnable {
 
     // the Record can be operate after this window(include this window's time)
     limited_watermark_window: Window,
+    completed_checkpoint_id: Option<CheckpointId>,
 
     counter: Counter,
     expire_counter: Counter,
@@ -45,6 +46,7 @@ impl ReduceRunnable {
             stream_reduce,
             next_runnable,
             limited_watermark_window: Window::default(),
+            completed_checkpoint_id: None,
             counter: Counter::default(),
             expire_counter: Counter::default(),
         }
@@ -135,14 +137,17 @@ impl Runnable for ReduceRunnable {
                     .unwrap()
                     .run(Element::StreamStatus(stream_status));
             }
-            Element::Barrier(barrier) => {
+            Element::Barrier(mut barrier) => {
                 let checkpoint_id = barrier.checkpoint_id;
                 let snapshot_context = {
                     let context = self.context.as_ref().unwrap();
-                    context.checkpoint_context(self.operator_id, checkpoint_id)
+                    context.checkpoint_context(self.operator_id, checkpoint_id, None)
                 };
                 self.checkpoint(snapshot_context);
 
+                if let Some(completed_checkpoint_id) = self.completed_checkpoint_id {
+                    barrier.set_completed_checkpoint_id(completed_checkpoint_id);
+                }
                 self.next_runnable
                     .as_mut()
                     .unwrap()
@@ -191,10 +196,14 @@ impl Runnable for ReduceRunnable {
             .snapshot_state(&snapshot_context)
             .unwrap_or(CheckpointHandle::default());
 
+        let h = ReduceCheckpointHandle::from(handle.handle.as_str());
+        self.completed_checkpoint_id = h.completed_checkpoint_id;
+
         let ck = Checkpoint {
             operator_id: snapshot_context.operator_id,
             task_id: snapshot_context.task_id,
             checkpoint_id: snapshot_context.checkpoint_id,
+            completed_checkpoint_id: snapshot_context.completed_checkpoint_id,
             handle,
         };
         submit_checkpoint(ck).map(|ck| {
@@ -203,5 +212,38 @@ impl Runnable for ReduceRunnable {
                 snapshot_context.operator_id, ck
             )
         });
+    }
+}
+
+pub(crate) struct ReduceCheckpointHandle {
+    completed_checkpoint_id: Option<CheckpointId>,
+}
+
+impl ReduceCheckpointHandle {
+    pub fn new(completed_checkpoint_id: Option<CheckpointId>) -> Self {
+        ReduceCheckpointHandle {
+            completed_checkpoint_id,
+        }
+    }
+}
+
+impl ToString for ReduceCheckpointHandle {
+    fn to_string(&self) -> String {
+        self.completed_checkpoint_id
+            .map(|x| x.0.to_string())
+            .unwrap_or_default()
+    }
+}
+
+impl<'a> From<&'a str> for ReduceCheckpointHandle {
+    fn from(handle: &'a str) -> Self {
+        let completed_checkpoint_id = if handle.is_empty() {
+            None
+        } else {
+            Some(CheckpointId(handle.parse().unwrap()))
+        };
+        ReduceCheckpointHandle {
+            completed_checkpoint_id,
+        }
     }
 }

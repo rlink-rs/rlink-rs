@@ -71,7 +71,7 @@ impl Runnable for WindowAssignerRunnable {
                 let checkpoint_id = barrier.checkpoint_id;
                 let snapshot_context = {
                     let context = self.context.as_ref().unwrap();
-                    context.checkpoint_context(self.operator_id, checkpoint_id)
+                    context.checkpoint_context(self.operator_id, checkpoint_id, None)
                 };
                 self.checkpoint(snapshot_context);
 
@@ -103,6 +103,7 @@ impl Runnable for WindowAssignerRunnable {
             operator_id: snapshot_context.operator_id,
             task_id: snapshot_context.task_id,
             checkpoint_id: snapshot_context.checkpoint_id,
+            completed_checkpoint_id: snapshot_context.completed_checkpoint_id,
             handle,
         };
         submit_checkpoint(ck).map(|ck| {

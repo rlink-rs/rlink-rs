@@ -111,7 +111,9 @@ impl Serde for ChannelKey {
     }
 }
 
-#[derive(Copy, Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, Default)]
+#[derive(
+    Copy, Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, Ord, PartialOrd, Default,
+)]
 pub struct CheckpointId(pub u64);
 
 impl CheckpointId {

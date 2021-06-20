@@ -38,11 +38,12 @@ impl TCheckpointStorage for MySqlCheckpointStorage {
         conn.exec_batch(
             r"
 insert into rlink_ck 
-  (application_name, application_id, job_id, task_number, num_tasks, operator_id, checkpoint_id, handle, create_time)
+  (application_name, application_id, job_id, task_number, num_tasks, operator_id, checkpoint_id, completed_checkpoint_id, handle, create_time)
 values 
-  (:application_name, :application_id, :job_id, :task_number, :num_tasks, :operator_id, :checkpoint_id, :handle, :create_time)"
+  (:application_name, :application_id, :job_id, :task_number, :num_tasks, :operator_id, :checkpoint_id, :completed_checkpoint_id, :handle, :create_time)"
                 .replace("rlink_ck", self.table.as_str()),
             finish_cks.iter().map(|p| {
+                let completed_checkpoint_id = p.completed_checkpoint_id.unwrap_or_default();
                 params! {
                     "application_name" => application_name,
                     "application_id" => application_id,
@@ -51,6 +52,7 @@ values
                     "num_tasks" => p.task_id.num_tasks,
                     "operator_id" => p.operator_id.0,
                     "checkpoint_id" => checkpoint_id.0,
+                    "completed_checkpoint_id" => completed_checkpoint_id.0,
                     "handle" => &p.handle.handle,
                     "create_time" => fmt_date_time(current_timestamp(), "%Y-%m-%d %T"),
                 }
@@ -96,7 +98,7 @@ where application_name = :application_name
 
         let stmt = conn.prep(
             r"
-SELECT ck.job_id, ck.task_number, ck.num_tasks, ck.operator_id, ck.checkpoint_id, ck.handle
+SELECT ck.job_id, ck.task_number, ck.num_tasks, ck.operator_id, ck.checkpoint_id, ck.completed_checkpoint_id, ck.handle
 from rlink_ck as ck
          inner join (
     SELECT max(checkpoint_id) as checkpoint_id
@@ -114,15 +116,24 @@ where ck.application_name = :application_name
         let selected_payments = conn.exec_map(
             &stmt,
             params! { "application_name" => application_name, "job_id" => job_id.0, "operator_id" => operator_id.0 },
-            |(job_id, task_number, num_tasks, operator_id, checkpoint_id, handle)| Checkpoint {
-                operator_id: OperatorId(operator_id),
-                task_id: TaskId {
-                    job_id: JobId(job_id),
-                    task_number,
-                    num_tasks,
-                },
-                checkpoint_id: CheckpointId(checkpoint_id),
-                handle: CheckpointHandle { handle },
+            |(job_id, task_number, num_tasks, operator_id, checkpoint_id, completed_checkpoint_id, handle)| {
+                let completed_checkpoint_id = if completed_checkpoint_id == 0 {
+                    None
+                } else {
+                    Some(CheckpointId(completed_checkpoint_id))
+                };
+
+                Checkpoint {
+                    operator_id: OperatorId(operator_id),
+                    task_id: TaskId {
+                        job_id: JobId(job_id),
+                        task_number,
+                        num_tasks,
+                    },
+                    checkpoint_id: CheckpointId(checkpoint_id),
+                    completed_checkpoint_id,
+                    handle: CheckpointHandle { handle },
+                }
             },
         )?;
 
@@ -170,6 +181,7 @@ mod tests {
                         operator_id,
                         task_id: task_id0,
                         checkpoint_id,
+                        completed_checkpoint_id: None,
                         handle: CheckpointHandle {
                             handle: "h0".to_string(),
                         },
@@ -178,6 +190,7 @@ mod tests {
                         operator_id,
                         task_id: task_id1,
                         checkpoint_id,
+                        completed_checkpoint_id: None,
                         handle: CheckpointHandle {
                             handle: "h1".to_string(),
                         },

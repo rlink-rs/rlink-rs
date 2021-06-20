@@ -1,9 +1,13 @@
+use std::collections::{BTreeMap, HashMap};
+
 use crate::core::backend::KeyedStateBackend;
 use crate::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
 use crate::core::element::Record;
 use crate::core::function::{BaseReduceFunction, Context, NamedFunction, ReduceFunction};
 use crate::core::properties::SystemProperties;
-use crate::core::window::TWindow;
+use crate::core::runtime::CheckpointId;
+use crate::core::window::{TWindow, Window};
+use crate::runtime::worker::runnable::reduce_runnable::ReduceCheckpointHandle;
 use crate::storage::keyed_state::{TWindowState, WindowState};
 use crate::utils::date_time::timestamp_str;
 
@@ -11,6 +15,7 @@ pub(crate) struct WindowBaseReduceFunction {
     reduce: Box<dyn ReduceFunction>,
 
     state: Option<WindowState>,
+    window_checkpoints: BTreeMap<CheckpointId, HashMap<Window, bool>>,
 }
 
 impl WindowBaseReduceFunction {
@@ -18,6 +23,7 @@ impl WindowBaseReduceFunction {
         WindowBaseReduceFunction {
             reduce,
             state: None,
+            window_checkpoints: BTreeMap::new(),
         }
     }
 }
@@ -63,6 +69,14 @@ impl BaseReduceFunction for WindowBaseReduceFunction {
                 drop_windows.len()
             );
 
+            self.window_checkpoints
+                .iter_mut()
+                .for_each(|(_checkpoint_id, windows)| {
+                    drop_windows.iter().for_each(|w| {
+                        windows.get_mut(w).map(|x| *x = true);
+                    });
+                });
+
             drop_windows.sort_by_key(|w| w.max_timestamp());
 
             drop_windows
@@ -97,10 +111,41 @@ impl CheckpointFunction for WindowBaseReduceFunction {
     ) {
     }
 
-    fn snapshot_state(&mut self, _context: &FunctionSnapshotContext) -> Option<CheckpointHandle> {
+    fn snapshot_state(&mut self, context: &FunctionSnapshotContext) -> Option<CheckpointHandle> {
         let windows = self.state.as_ref().unwrap().windows();
-        Some(CheckpointHandle {
-            handle: serde_json::to_string(&windows).unwrap(),
-        })
+        let mut windows_map = HashMap::with_capacity(windows.len());
+        windows.into_iter().for_each(|w| {
+            windows_map.insert(w, false);
+        });
+        self.window_checkpoints
+            .insert(context.checkpoint_id, windows_map);
+
+        let completed_checkpoint_ids: Vec<CheckpointId> = self
+            .window_checkpoints
+            .iter()
+            .filter_map(|(checkpoint_id, windows)| {
+                let c = windows
+                    .iter()
+                    .filter(|(_w, is_completed)| !(**is_completed))
+                    .count();
+                if c == 0 {
+                    Some(*checkpoint_id)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        for checkpoint_id in &completed_checkpoint_ids {
+            self.window_checkpoints.remove(checkpoint_id);
+        }
+
+        let max_checkpoint_id = completed_checkpoint_ids
+            .iter()
+            .max_by_key(|x| x.0)
+            .map(|x| *x);
+        let handle = ReduceCheckpointHandle::new(max_checkpoint_id).to_string();
+
+        Some(CheckpointHandle { handle })
     }
 }

@@ -28,6 +28,7 @@ pub(crate) fn build_cluster_descriptor(
                 .map(|stream_node| OperatorDescriptor {
                     operator_id: stream_node.id,
                     checkpoint_id: CheckpointId::default(),
+                    completed_checkpoint_id: None,
                     checkpoint_handle: None,
                 })
                 .collect();
