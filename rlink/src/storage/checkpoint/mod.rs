@@ -22,6 +22,13 @@ pub trait TCheckpointStorage {
         job_id: JobId,
         operator_id: OperatorId,
     ) -> anyhow::Result<Vec<Checkpoint>>;
+
+    fn load_v2(&mut self, application_name: &str) -> anyhow::Result<Vec<Checkpoint>>;
+    fn load_by_checkpoint_id(
+        &mut self,
+        application_name: &str,
+        checkpoint_id: CheckpointId,
+    ) -> anyhow::Result<Vec<Checkpoint>>;
 }
 
 #[derive(Debug)]
@@ -85,6 +92,30 @@ impl TCheckpointStorage for CheckpointStorage {
             }
             CheckpointStorage::MySqlCheckpointStorage(storage) => {
                 storage.load(application_name, job_id, operator_id)
+            }
+        }
+    }
+
+    fn load_v2(&mut self, application_name: &str) -> anyhow::Result<Vec<Checkpoint>> {
+        match self {
+            CheckpointStorage::MemoryCheckpointStorage(storage) => {
+                storage.load_v2(application_name)
+            }
+            CheckpointStorage::MySqlCheckpointStorage(storage) => storage.load_v2(application_name),
+        }
+    }
+
+    fn load_by_checkpoint_id(
+        &mut self,
+        application_name: &str,
+        checkpoint_id: CheckpointId,
+    ) -> anyhow::Result<Vec<Checkpoint>> {
+        match self {
+            CheckpointStorage::MemoryCheckpointStorage(storage) => {
+                storage.load_by_checkpoint_id(application_name, checkpoint_id)
+            }
+            CheckpointStorage::MySqlCheckpointStorage(storage) => {
+                storage.load_by_checkpoint_id(application_name, checkpoint_id)
             }
         }
     }

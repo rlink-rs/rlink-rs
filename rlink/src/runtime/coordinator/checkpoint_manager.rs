@@ -230,7 +230,30 @@ impl CheckpointAlignManager {
     }
 
     pub fn load(&mut self) -> anyhow::Result<HashMap<OperatorId, Vec<Checkpoint>>> {
-        let operator_checkpoints = HashMap::new();
+        let mut operator_checkpoints = HashMap::new();
+
+        if let Some(storage) = self.storage.as_mut() {
+            let mut checkpoints = storage.load_v2(self.application_name.as_str())?;
+            let completed_checkpoint_id = checkpoints
+                .iter()
+                .min_by_key(|c| c.completed_checkpoint_id.unwrap_or_default())
+                .map(|c| c.completed_checkpoint_id.unwrap_or_default())
+                .unwrap_or_default();
+
+            if !completed_checkpoint_id.is_default() {
+                checkpoints = storage.load_by_checkpoint_id(
+                    self.application_name.as_str(),
+                    completed_checkpoint_id,
+                )?;
+            }
+
+            for checkpoint in checkpoints {
+                operator_checkpoints
+                    .entry(checkpoint.operator_id)
+                    .or_insert(Vec::new())
+                    .push(checkpoint);
+            }
+        }
 
         Ok(operator_checkpoints)
     }
