@@ -73,6 +73,7 @@ impl Clone for OperatorCheckpoint {
 pub(crate) struct CheckpointAlignManager {
     application_name: String,
     application_id: String,
+    checkpoint_ttl: Duration,
 
     current_ck_id: CheckpointId,
     operator_cks: HashMap<OperatorId, OperatorCheckpoint>,
@@ -87,6 +88,7 @@ impl CheckpointAlignManager {
         dag_manager: &DagMetadata,
         context: &Context,
         cluster_descriptor: &ClusterDescriptor,
+        checkpoint_ttl: Duration,
     ) -> Self {
         let checkpoint_backend = cluster_descriptor
             .coordinator_manager
@@ -118,6 +120,7 @@ impl CheckpointAlignManager {
         CheckpointAlignManager {
             application_name: context.application_name.clone(),
             application_id: context.application_id.clone(),
+            checkpoint_ttl,
             current_ck_id: CheckpointId::default(),
             operator_cks,
             finish_operator_cks: HashMap::new(),
@@ -185,7 +188,7 @@ impl CheckpointAlignManager {
                         self.application_id.as_str(),
                         complete_checkpoint_id,
                         cks,
-                        Duration::from_secs(60 * 10).as_millis() as u64,
+                        self.checkpoint_ttl.as_millis() as u64,
                     )?;
                 }
                 None => {}
@@ -264,6 +267,7 @@ impl Clone for CheckpointAlignManager {
         CheckpointAlignManager {
             application_name: self.application_name.clone(),
             application_id: self.application_id.to_string(),
+            checkpoint_ttl: self.checkpoint_ttl,
             current_ck_id: CheckpointId::default(),
             operator_cks: self.operator_cks.clone(),
             finish_operator_cks: self.finish_operator_cks.clone(),
@@ -285,6 +289,7 @@ impl CheckpointManager {
         dag_manager: &DagMetadata,
         context: &Context,
         cluster_descriptor: &ClusterDescriptor,
+        checkpoint_ttl: Duration,
     ) -> Self {
         let (sender, receiver) = bounded(100);
         CheckpointManager {
@@ -292,6 +297,7 @@ impl CheckpointManager {
                 dag_manager,
                 context,
                 cluster_descriptor,
+                checkpoint_ttl,
             ))),
             sender,
             receiver,

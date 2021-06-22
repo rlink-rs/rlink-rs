@@ -22,6 +22,9 @@ pub trait SystemProperties {
     fn set_checkpoint(&mut self, mode: CheckpointBackend);
     fn get_checkpoint(&self) -> anyhow::Result<CheckpointBackend>;
 
+    fn set_checkpoint_ttl(&mut self, internal: Duration);
+    fn get_checkpoint_ttl(&self) -> anyhow::Result<Duration>;
+
     fn get_cluster_mode(&self) -> anyhow::Result<ClusterMode>;
 
     fn set_pub_sub_channel_size(&mut self, channel_size: usize);
@@ -111,6 +114,7 @@ pub(crate) const SYSTEM_METADATA_STORAGE_MODE: &str = "SYSTEM_METADATA_STORAGE_M
 pub(crate) const SYSTEM_KEYED_STATE_BACKEND: &str = "SYSTEM_KEYED_STATE_BACKEND";
 pub(crate) const SYSTEM_CHECKPOINT: &str = "SYSTEM_CHECKPOINT";
 pub(crate) const SYSTEM_CHECKPOINT_INTERNAL: &str = "SYSTEM_CHECKPOINT_INTERNAL";
+pub(crate) const SYSTEM_CHECKPOINT_TTL: &str = "SYSTEM_CHECKPOINT_TTL";
 pub(crate) const SYSTEM_CLUSTER_MODE: &str = "SYSTEM_CLUSTER_MODE";
 pub(crate) const SYSTEM_PUB_SUB_CHANNEL_SIZE: &str = "SYSTEM_PUB_SUB_CHANNEL_SIZE";
 pub(crate) const SYSTEM_PUB_SUB_CHANNEL_BASE_ON: &str = "SYSTEM_PUB_SUB_CHANNEL_BASE_ON";
@@ -156,6 +160,18 @@ impl SystemProperties for Properties {
     fn get_checkpoint(&self) -> anyhow::Result<CheckpointBackend> {
         let value = self.get_string(SYSTEM_CHECKPOINT)?;
         serde_json::from_str(value.as_str()).map_err(|e| anyhow!(e))
+    }
+
+    fn set_checkpoint_ttl(&mut self, internal: Duration) {
+        let value = format!("{}", internal.as_secs());
+        self.set_string(SYSTEM_CHECKPOINT_TTL.to_string(), value)
+    }
+
+    fn get_checkpoint_ttl(&self) -> anyhow::Result<Duration> {
+        let value = self.get_string(SYSTEM_CHECKPOINT_TTL)?;
+        u64::from_str(value.as_str())
+            .map(|v| Duration::from_secs(v))
+            .map_err(|e| anyhow!(e))
     }
 
     fn get_cluster_mode(&self) -> anyhow::Result<ClusterMode> {
