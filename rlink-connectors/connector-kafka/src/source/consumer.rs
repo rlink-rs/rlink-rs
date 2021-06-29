@@ -11,7 +11,7 @@ use rlink::utils;
 use rlink::utils::thread::async_runtime;
 
 use crate::source::deserializer::KafkaRecordDeserializer;
-use crate::state::{KafkaSourceStateCache, OffsetMetadata, PartitionMetadata};
+use crate::state::PartitionOffset;
 
 struct TaskHandover {
     task_number: u16,
@@ -38,10 +38,9 @@ pub(crate) fn create_kafka_consumer(
     job_id: JobId,
     task_number: u16,
     client_config: ClientConfig,
-    partition_offsets: Vec<(PartitionMetadata, OffsetMetadata)>,
+    partition_offsets: Vec<(String, PartitionOffset)>,
     handover: Handover,
     deserializer: Box<dyn KafkaRecordDeserializer>,
-    state_cache: Option<KafkaSourceStateCache>,
 ) {
     let kafka_consumer: &Mutex<HashMap<JobId, Vec<TaskHandover>>> = &*KAFKA_CONSUMERS;
     let mut kafka_consumer = kafka_consumer.lock().unwrap();
@@ -63,7 +62,6 @@ pub(crate) fn create_kafka_consumer(
                 partition_offsets,
                 handover_clone,
                 deserializer,
-                state_cache,
             );
             match kafka_consumer.run().await {
                 Ok(()) => {}
@@ -104,38 +102,35 @@ pub(crate) fn get_kafka_consumer_handover(job_id: JobId) -> Option<Handover> {
 
 pub struct KafkaConsumerThread {
     client_config: ClientConfig,
-    partition_offsets: Vec<(PartitionMetadata, OffsetMetadata)>,
+    partition_offsets: Vec<(String, PartitionOffset)>,
 
     handover: Handover,
     deserializer: Box<dyn KafkaRecordDeserializer>,
-    state_cache: Option<KafkaSourceStateCache>,
 }
 
 impl KafkaConsumerThread {
     pub fn new(
         client_config: ClientConfig,
-        partition_offsets: Vec<(PartitionMetadata, OffsetMetadata)>,
+        partition_offsets: Vec<(String, PartitionOffset)>,
         handover: Handover,
         deserializer: Box<dyn KafkaRecordDeserializer>,
-        state_cache: Option<KafkaSourceStateCache>,
     ) -> Self {
         KafkaConsumerThread {
             client_config,
             partition_offsets,
             handover,
             deserializer,
-            state_cache,
         }
     }
 
     pub async fn run(&mut self) -> anyhow::Result<()> {
         let mut assignment = TopicPartitionList::new();
-        for (partition_metadata, offset_metadata) in &self.partition_offsets {
+        for (topic, partition_offset) in &self.partition_offsets {
             assignment
                 .add_partition_offset(
-                    partition_metadata.topic.as_str(),
-                    partition_metadata.partition,
-                    Offset::from_raw(offset_metadata.offset),
+                    topic.as_str(),
+                    partition_offset.partition,
+                    Offset::from_raw(partition_offset.offset),
                 )
                 .unwrap();
         }
@@ -153,7 +148,6 @@ impl KafkaConsumerThread {
             self.client_config, self.partition_offsets
         );
 
-        let mut counter = 0u64;
         let mut message_stream = consumer.stream();
         while let Some(message) = message_stream.next().await {
             match message {
@@ -176,16 +170,6 @@ impl KafkaConsumerThread {
                                 panic!("handover produce `Disconnected`");
                             }
                         }
-                    }
-
-                    counter += 1;
-                    // same as `self.counter % 4096`
-                    if counter & 4095 == 0 {
-                        self.state_cache.as_ref().unwrap().update(
-                            topic.to_string(),
-                            partition,
-                            offset,
-                        );
                     }
                 }
                 Err(e) => warn!("Kafka error: {}", e),
