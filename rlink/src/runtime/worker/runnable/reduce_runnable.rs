@@ -215,35 +215,36 @@ impl Runnable for ReduceRunnable {
     }
 }
 
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub(crate) struct ReduceCheckpointHandle {
-    completed_checkpoint_id: Option<CheckpointId>,
+    pub(crate) completed_checkpoint_id: Option<CheckpointId>,
+    pub(crate) current_windows: Vec<Window>,
 }
 
 impl ReduceCheckpointHandle {
-    pub fn new(completed_checkpoint_id: Option<CheckpointId>) -> Self {
+    pub fn new(
+        completed_checkpoint_id: Option<CheckpointId>,
+        current_windows: Vec<Window>,
+    ) -> Self {
         ReduceCheckpointHandle {
             completed_checkpoint_id,
+            current_windows,
         }
     }
 }
 
 impl ToString for ReduceCheckpointHandle {
     fn to_string(&self) -> String {
-        self.completed_checkpoint_id
-            .map(|x| x.0.to_string())
-            .unwrap_or_default()
+        serde_json::to_string(self).unwrap()
     }
 }
 
 impl<'a> From<&'a str> for ReduceCheckpointHandle {
     fn from(handle: &'a str) -> Self {
-        let completed_checkpoint_id = if handle.is_empty() {
-            None
+        if handle.is_empty() {
+            ReduceCheckpointHandle::default()
         } else {
-            Some(CheckpointId(handle.parse().unwrap()))
-        };
-        ReduceCheckpointHandle {
-            completed_checkpoint_id,
+            serde_json::from_str(handle).unwrap()
         }
     }
 }

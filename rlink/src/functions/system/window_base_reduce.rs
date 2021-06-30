@@ -1,3 +1,4 @@
+use std::borrow::BorrowMut;
 use std::collections::{BTreeMap, HashMap};
 
 use crate::core::backend::KeyedStateBackend;
@@ -15,7 +16,9 @@ pub(crate) struct WindowBaseReduceFunction {
     reduce: Box<dyn ReduceFunction>,
 
     state: Option<WindowState>,
+
     window_checkpoints: BTreeMap<CheckpointId, HashMap<Window, bool>>,
+    skip_windows: Vec<Window>,
 }
 
 impl WindowBaseReduceFunction {
@@ -24,7 +27,26 @@ impl WindowBaseReduceFunction {
             reduce,
             state: None,
             window_checkpoints: BTreeMap::new(),
+            skip_windows: Vec::new(),
         }
+    }
+
+    fn filter_skip_window(&self, windows: &mut Vec<Window>) -> Vec<Window> {
+        windows
+            .iter()
+            .filter(|w| !self.can_skip_window(w))
+            .map(|w| w.clone())
+            .collect()
+    }
+
+    fn can_skip_window(&self, window: &Window) -> bool {
+        self.skip_windows
+            .iter()
+            .find(|x| {
+                x.max_timestamp() == window.max_timestamp()
+                    && x.min_timestamp() == window.min_timestamp()
+            })
+            .is_some()
     }
 }
 
@@ -46,7 +68,19 @@ impl BaseReduceFunction for WindowBaseReduceFunction {
         Ok(())
     }
 
-    fn reduce(&mut self, key: Record, record: Record) {
+    fn reduce(&mut self, key: Record, mut record: Record) {
+        // check skip window
+        if self.skip_windows.len() > 0 {
+            if let Some(windows) = record.location_windows.borrow_mut() {
+                let filter_windows = self.filter_skip_window(windows);
+                if filter_windows.len() == 0 {
+                    return;
+                }
+
+                record.location_windows = Some(filter_windows);
+            }
+        }
+
         let state = self.state.as_mut().unwrap();
         let reduce_func = &self.reduce;
         state.merge(key, record, |val1, val2| reduce_func.reduce(val1, val2));
@@ -107,15 +141,24 @@ impl CheckpointFunction for WindowBaseReduceFunction {
     fn initialize_state(
         &mut self,
         _context: &FunctionSnapshotContext,
-        _handle: &Option<CheckpointHandle>,
+        handle: &Option<CheckpointHandle>,
     ) {
+        if let Some(handle) = handle {
+            let ReduceCheckpointHandle {
+                completed_checkpoint_id: _,
+                current_windows,
+            } = ReduceCheckpointHandle::from(handle.handle.as_str());
+
+            self.skip_windows = current_windows;
+            info!("skip windows: {:?}", self.skip_windows)
+        }
     }
 
     fn snapshot_state(&mut self, context: &FunctionSnapshotContext) -> Option<CheckpointHandle> {
         let windows = self.state.as_ref().unwrap().windows();
         let mut windows_map = HashMap::with_capacity(windows.len());
-        windows.into_iter().for_each(|w| {
-            windows_map.insert(w, false);
+        windows.iter().for_each(|w| {
+            windows_map.insert(w.clone(), false);
         });
         self.window_checkpoints
             .insert(context.checkpoint_id, windows_map);
@@ -140,11 +183,22 @@ impl CheckpointFunction for WindowBaseReduceFunction {
             self.window_checkpoints.remove(checkpoint_id);
         }
 
+        // memory protected against oom! delete oldest checkpoints in `window_checkpoints`
+        if self.window_checkpoints.len() > 100 {
+            let min_checkpoint_id = self
+                .window_checkpoints
+                .iter()
+                .map(|(ck_id, _m)| *ck_id)
+                .min_by_key(|ck_id| *ck_id)
+                .unwrap();
+            self.window_checkpoints.remove(&min_checkpoint_id);
+        }
+
         let max_checkpoint_id = completed_checkpoint_ids
             .iter()
             .max_by_key(|x| x.0)
             .map(|x| *x);
-        let handle = ReduceCheckpointHandle::new(max_checkpoint_id).to_string();
+        let handle = ReduceCheckpointHandle::new(max_checkpoint_id, windows).to_string();
 
         Some(CheckpointHandle { handle })
     }
