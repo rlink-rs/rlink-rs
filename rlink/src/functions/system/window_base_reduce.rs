@@ -144,10 +144,8 @@ impl CheckpointFunction for WindowBaseReduceFunction {
         handle: &Option<CheckpointHandle>,
     ) {
         if let Some(handle) = handle {
-            let ReduceCheckpointHandle {
-                completed_checkpoint_id: _,
-                current_windows,
-            } = ReduceCheckpointHandle::from(handle.handle.as_str());
+            let handle = ReduceCheckpointHandle::from(handle.handle.as_str());
+            let current_windows = handle.into_windows();
 
             self.skip_windows = current_windows;
             info!("skip windows: {:?}", self.skip_windows)
