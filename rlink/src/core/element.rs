@@ -48,8 +48,11 @@ pub struct Record {
     pub partition_num: u16,
     pub(crate) timestamp: u64,
 
+    /// mark where the data is now and where did it come from
     pub(crate) channel_key: ChannelKey,
+    /// calculate which windows the record is located based on timestamp,
     pub(crate) location_windows: Option<Vec<Window>>,
+    /// if `Record` comes from window drop, use it to mark the window
     pub(crate) trigger_window: Option<Window>,
 
     pub(crate) values: Buffer,
