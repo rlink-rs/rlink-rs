@@ -65,6 +65,7 @@ impl BaseReduceFunction for WindowBaseReduceFunction {
             task_id.task_number(),
             state_mode,
         ));
+        self.initialize_state(&context.checkpoint_context(), &context.checkpoint_handle);
         Ok(())
     }
 
