@@ -219,11 +219,15 @@ impl Serde for Record {
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub struct Watermark {
     // for partition routing
+    /// generate by partition number
     partition_num: u16,
 
-    // for align
+    // the `TaskId` info of `StreamStatus`, for align
+    /// `StreamStatus.channel_key.source_task_id.task_number`
     pub(crate) task_number: u16,
+    /// `StreamStatus.channel_key.source_task_id.num_tasks`
     pub(crate) num_tasks: u16,
+    /// `StreamStatus.timestamp`
     pub(crate) status_timestamp: u64,
 
     // current watermark timestamp
