@@ -84,6 +84,7 @@ impl std::fmt::Display for ManagerType {
 pub struct OperatorDescriptor {
     pub operator_id: OperatorId,
     pub checkpoint_id: CheckpointId,
+    pub completed_checkpoint_id: Option<CheckpointId>,
     pub checkpoint_handle: Option<CheckpointHandle>,
 }
 

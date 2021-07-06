@@ -75,16 +75,15 @@ impl InputFormat for KafkaInputFormat {
                 self.buffer_size,
             ));
 
-            let partition_offset =
-                self.checkpoint
-                    .as_mut()
-                    .unwrap()
-                    .get_state()
-                    .get(topic, partition, Offset::End);
+            let partition_offset = self.checkpoint.as_mut().unwrap().get_state().get(
+                topic.as_str(),
+                partition,
+                Offset::End,
+            );
 
             let client_config = self.client_config.clone();
             let handover = self.handover.as_ref().unwrap().clone();
-            let partition_offsets = vec![partition_offset];
+            let partition_offsets = vec![(topic, partition_offset)];
             create_kafka_consumer(
                 context.task_id.job_id(),
                 context.task_id.task_number(),
@@ -92,7 +91,6 @@ impl InputFormat for KafkaInputFormat {
                 partition_offsets,
                 handover,
                 self.deserializer_builder.build(),
-                self.checkpoint.as_ref().unwrap().state_cache.clone(),
             );
 
             info!("start with consumer and operator mode")
@@ -106,9 +104,9 @@ impl InputFormat for KafkaInputFormat {
     }
 
     fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record> + Send> {
-        Box::new(KafkaRecordIterator::new(
-            self.handover.as_ref().unwrap().clone(),
-        ))
+        let handover = self.handover.as_ref().unwrap().clone();
+        let state_recorder = self.checkpoint.as_mut().unwrap().get_state().clone();
+        Box::new(KafkaRecordIterator::new(handover, state_recorder))
     }
 
     fn close(&mut self) -> core::Result<()> {

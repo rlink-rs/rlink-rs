@@ -70,6 +70,7 @@ impl RunnableContext {
             operator_id,
             task_id: self.task_descriptor.task_id.clone(),
             checkpoint_id: operator.checkpoint_id,
+            completed_checkpoint_id: operator.completed_checkpoint_id,
             checkpoint_handle: operator.checkpoint_handle.clone(),
 
             parents,
@@ -81,8 +82,14 @@ impl RunnableContext {
         &self,
         operator_id: OperatorId,
         checkpoint_id: CheckpointId,
+        completed_checkpoint_id: Option<CheckpointId>,
     ) -> FunctionSnapshotContext {
-        FunctionSnapshotContext::new(operator_id, self.task_descriptor.task_id, checkpoint_id)
+        FunctionSnapshotContext::new(
+            operator_id,
+            self.task_descriptor.task_id,
+            checkpoint_id,
+            completed_checkpoint_id,
+        )
     }
 
     pub(crate) fn checkpoint_internal(&self, default_value: Duration) -> Duration {

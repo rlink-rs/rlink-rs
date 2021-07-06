@@ -1,7 +1,9 @@
-use crate::metrics::Tag;
-use metrics::gauge;
 use std::path::PathBuf;
+
+use metrics::gauge;
 use sysinfo::{ProcessExt, SystemExt};
+
+use crate::metrics::Tag;
 
 pub fn work_space() -> PathBuf {
     std::env::current_dir().expect("Get current dir error")

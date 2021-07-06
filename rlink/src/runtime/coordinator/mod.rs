@@ -8,7 +8,7 @@ use crate::core::checkpoint::CheckpointHandle;
 use crate::core::cluster::MetadataStorageType;
 use crate::core::cluster::TaskResourceInfo;
 use crate::core::env::{StreamApp, StreamExecutionEnvironment};
-use crate::core::properties::{Properties, SYSTEM_CLUSTER_MODE};
+use crate::core::properties::{Properties, SystemProperties, SYSTEM_CLUSTER_MODE};
 use crate::dag::metadata::DagMetadata;
 use crate::dag::DagManager;
 use crate::deployment::TResourceManager;
@@ -90,8 +90,11 @@ where
         let mut cluster_descriptor = self.build_metadata(&dag_manager, &application_properties);
         debug!("ApplicationDescriptor : {}", cluster_descriptor.to_string());
 
-        let ck_manager =
-            self.build_checkpoint_manager(&dag_metadata, cluster_descriptor.borrow_mut());
+        let ck_manager = self.build_checkpoint_manager(
+            &dag_metadata,
+            &application_properties,
+            cluster_descriptor.borrow_mut(),
+        );
         ck_manager.run_align_task();
         info!("start CheckpointManager align task");
 
@@ -188,9 +191,19 @@ where
     fn build_checkpoint_manager(
         &self,
         dag_manager: &DagMetadata,
+        application_properties: &Properties,
         cluster_descriptor: &mut ClusterDescriptor,
     ) -> CheckpointManager {
-        let mut ck_manager = CheckpointManager::new(dag_manager, &self.context, cluster_descriptor);
+        let checkpoint_ttl = application_properties
+            .get_checkpoint_ttl()
+            .unwrap_or_else(|_e| Duration::from_secs(1 * 60 * 60));
+
+        let mut ck_manager = CheckpointManager::new(
+            dag_manager,
+            &self.context,
+            cluster_descriptor,
+            checkpoint_ttl,
+        );
         let operator_checkpoints = ck_manager.load().expect("load checkpoints error");
         if operator_checkpoints.len() == 0 {
             return ck_manager;

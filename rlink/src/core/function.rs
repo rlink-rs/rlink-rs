@@ -19,6 +19,7 @@ pub struct Context {
     pub task_id: TaskId,
 
     pub checkpoint_id: CheckpointId,
+    pub completed_checkpoint_id: Option<CheckpointId>,
     pub checkpoint_handle: Option<CheckpointHandle>,
 
     pub(crate) children: Vec<(ExecutionNode, ExecutionEdge)>,
@@ -27,7 +28,12 @@ pub struct Context {
 
 impl Context {
     pub fn checkpoint_context(&self) -> FunctionSnapshotContext {
-        FunctionSnapshotContext::new(self.operator_id, self.task_id, self.checkpoint_id)
+        FunctionSnapshotContext::new(
+            self.operator_id,
+            self.task_id,
+            self.checkpoint_id,
+            self.completed_checkpoint_id,
+        )
     }
 }
 

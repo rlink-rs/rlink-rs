@@ -1,11 +1,13 @@
+use std::collections::HashMap;
+
 use rlink::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
 use rlink::core::runtime::TaskId;
 
-use crate::state::{KafkaSourceStateCache, OffsetMetadata, PartitionMetadata};
+use crate::state::{KafkaSourceStateRecorder, PartitionOffset, PartitionOffsets};
 
 #[derive(Debug, Clone)]
 pub struct KafkaCheckpointFunction {
-    pub(crate) state_cache: Option<KafkaSourceStateCache>,
+    pub(crate) state_recorder: Option<KafkaSourceStateRecorder>,
     pub(crate) application_id: String,
     pub(crate) task_id: TaskId,
 }
@@ -13,14 +15,14 @@ pub struct KafkaCheckpointFunction {
 impl KafkaCheckpointFunction {
     pub fn new(application_id: String, task_id: TaskId) -> Self {
         KafkaCheckpointFunction {
-            state_cache: None,
+            state_recorder: None,
             application_id,
             task_id,
         }
     }
 
-    pub fn get_state(&mut self) -> &mut KafkaSourceStateCache {
-        self.state_cache.as_mut().unwrap()
+    pub fn get_state(&mut self) -> &mut KafkaSourceStateRecorder {
+        self.state_recorder.as_mut().unwrap()
     }
 }
 
@@ -30,51 +32,42 @@ impl CheckpointFunction for KafkaCheckpointFunction {
         context: &FunctionSnapshotContext,
         handle: &Option<CheckpointHandle>,
     ) {
-        self.state_cache = Some(KafkaSourceStateCache::new());
+        self.state_recorder = Some(KafkaSourceStateRecorder::new());
         info!("Checkpoint initialize, context: {:?}", context);
 
         if context.checkpoint_id.0 > 0 && handle.is_some() {
             let data = handle.as_ref().unwrap();
 
-            let offsets: Vec<PartitionOffset> = serde_json::from_str(data.handle.as_str()).unwrap();
-            for partition_offset in offsets {
-                let PartitionOffset { partition, offset } = partition_offset;
-                let PartitionMetadata { topic, partition } = partition;
-                let OffsetMetadata { offset } = offset;
+            let offsets: HashMap<String, PartitionOffsets> =
+                serde_json::from_str(data.handle.as_str()).unwrap();
 
-                let state_cache = self.state_cache.as_mut().unwrap();
-                state_cache.update(topic, partition, offset);
+            for (topic, partition_offsets) in offsets {
+                for partition_offset in partition_offsets.partition_offsets {
+                    if let Some(partition_offset) = partition_offset {
+                        let PartitionOffset { partition, offset } = partition_offset;
 
-                info!(
-                    "load state value from checkpoint({:?}): {:?}",
-                    context.checkpoint_id, data
-                );
+                        let state_cache = self.state_recorder.as_mut().unwrap();
+                        state_cache.update(topic.as_str(), partition, offset);
+
+                        info!(
+                            "load state value from checkpoint({:?}): {:?}",
+                            context.checkpoint_id, data
+                        );
+                    }
+                }
             }
         }
     }
 
     fn snapshot_state(&mut self, context: &FunctionSnapshotContext) -> Option<CheckpointHandle> {
-        let offset_snapshot = self.state_cache.as_ref().unwrap().snapshot();
+        let offset_snapshot = self.state_recorder.as_ref().unwrap().snapshot();
         debug!(
             "Checkpoint snapshot: {:?}, context: {:?}",
             offset_snapshot, context
         );
-        let snapshot_serial: Vec<PartitionOffset> = offset_snapshot
-            .into_iter()
-            .map(|kv_ref| PartitionOffset {
-                partition: kv_ref.0,
-                offset: kv_ref.1,
-            })
-            .collect();
 
-        let json = serde_json::to_string(&snapshot_serial).unwrap();
+        let json = serde_json::to_string(&offset_snapshot).unwrap();
 
         Some(CheckpointHandle { handle: json })
     }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct PartitionOffset {
-    partition: PartitionMetadata,
-    offset: OffsetMetadata,
 }

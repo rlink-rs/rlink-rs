@@ -4,7 +4,7 @@ use crate::core::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotCont
 use crate::core::element::{Element, Record, StreamStatus};
 use crate::core::function::{BaseReduceFunction, KeySelectorFunction};
 use crate::core::operator::DefaultStreamOperator;
-use crate::core::runtime::{OperatorId, TaskId};
+use crate::core::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::core::watermark::MAX_WATERMARK;
 use crate::core::window::{TWindow, Window};
 use crate::metrics::metric::Counter;
@@ -25,6 +25,7 @@ pub(crate) struct ReduceRunnable {
 
     // the Record can be operate after this window(include this window's time)
     limited_watermark_window: Window,
+    completed_checkpoint_id: Option<CheckpointId>,
 
     counter: Counter,
     expire_counter: Counter,
@@ -45,6 +46,7 @@ impl ReduceRunnable {
             stream_reduce,
             next_runnable,
             limited_watermark_window: Window::default(),
+            completed_checkpoint_id: None,
             counter: Counter::default(),
             expire_counter: Counter::default(),
         }
@@ -135,14 +137,17 @@ impl Runnable for ReduceRunnable {
                     .unwrap()
                     .run(Element::StreamStatus(stream_status));
             }
-            Element::Barrier(barrier) => {
+            Element::Barrier(mut barrier) => {
                 let checkpoint_id = barrier.checkpoint_id;
                 let snapshot_context = {
                     let context = self.context.as_ref().unwrap();
-                    context.checkpoint_context(self.operator_id, checkpoint_id)
+                    context.checkpoint_context(self.operator_id, checkpoint_id, None)
                 };
                 self.checkpoint(snapshot_context);
 
+                if let Some(completed_checkpoint_id) = self.completed_checkpoint_id {
+                    barrier.set_completed_checkpoint_id(completed_checkpoint_id);
+                }
                 self.next_runnable
                     .as_mut()
                     .unwrap()
@@ -191,11 +196,17 @@ impl Runnable for ReduceRunnable {
             .snapshot_state(&snapshot_context)
             .unwrap_or(CheckpointHandle::default());
 
+        let fn_handle = ReduceCheckpointHandle::from(handle.handle.as_str());
+        self.completed_checkpoint_id = fn_handle.completed_checkpoint_id;
+
         let ck = Checkpoint {
             operator_id: snapshot_context.operator_id,
             task_id: snapshot_context.task_id,
             checkpoint_id: snapshot_context.checkpoint_id,
-            handle,
+            completed_checkpoint_id: self.completed_checkpoint_id,
+            handle: CheckpointHandle {
+                handle: fn_handle.to_windows_string(),
+            },
         };
         submit_checkpoint(ck).map(|ck| {
             error!(
@@ -203,5 +214,55 @@ impl Runnable for ReduceRunnable {
                 snapshot_context.operator_id, ck
             )
         });
+    }
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub(crate) struct ReduceCheckpointHandle {
+    #[serde(rename = "c_ck")]
+    completed_checkpoint_id: Option<CheckpointId>,
+    #[serde(rename = "windows")]
+    current_windows: Vec<Window>,
+}
+
+impl ReduceCheckpointHandle {
+    pub fn new(
+        completed_checkpoint_id: Option<CheckpointId>,
+        current_windows: Vec<Window>,
+    ) -> Self {
+        ReduceCheckpointHandle {
+            completed_checkpoint_id,
+            current_windows,
+        }
+    }
+
+    pub fn to_windows_string(&self) -> String {
+        serde_json::to_string(&self.current_windows).unwrap()
+    }
+
+    pub fn into_windows(self) -> Vec<Window> {
+        self.current_windows
+    }
+}
+
+impl ToString for ReduceCheckpointHandle {
+    fn to_string(&self) -> String {
+        serde_json::to_string(self).unwrap()
+    }
+}
+
+impl<'a> From<&'a str> for ReduceCheckpointHandle {
+    fn from(handle: &'a str) -> Self {
+        if handle.is_empty() {
+            ReduceCheckpointHandle::default()
+        } else if handle.starts_with("[") {
+            let windows: Vec<Window> = serde_json::from_str(handle).unwrap();
+            ReduceCheckpointHandle {
+                completed_checkpoint_id: None,
+                current_windows: windows,
+            }
+        } else {
+            serde_json::from_str(handle).unwrap()
+        }
     }
 }
