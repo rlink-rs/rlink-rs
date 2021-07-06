@@ -332,6 +332,7 @@ pub struct StreamStatus {
 
     pub(crate) channel_key: ChannelKey,
 
+    /// stream stop flag
     pub(crate) end: bool,
 }
 
