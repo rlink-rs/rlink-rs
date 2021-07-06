@@ -147,8 +147,11 @@ impl SlidingEventTimeWindows {
 impl WindowAssigner for SlidingEventTimeWindows {
     fn assign_windows(&self, timestamp: u64, _context: WindowAssignerContext) -> Vec<Window> {
         let mut windows = Vec::with_capacity((self.size / self.slide) as usize);
-        let last_start =
+        let mut last_start =
             TimeWindow::get_window_start_with_offset(timestamp, self.offset, self.slide);
+        if last_start < 0 {
+            last_start = 0;
+        }
 
         let mut start = last_start;
         loop {
