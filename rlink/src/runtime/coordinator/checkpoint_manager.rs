@@ -239,7 +239,13 @@ impl CheckpointAlignManager {
             let mut checkpoints = storage.load_v2(self.application_name.as_str())?;
             let completed_checkpoint_id = checkpoints
                 .iter()
-                .filter(|c|c.completed_checkpoint_id>0)
+                .filter(|c| {
+                    if let Some(completed_checkpoint_id) = c.completed_checkpoint_id {
+                        completed_checkpoint_id.0 > 0
+                    } else {
+                        false
+                    }
+                })
                 .min_by_key(|c| c.completed_checkpoint_id.unwrap_or_default())
                 .map(|c| c.completed_checkpoint_id.unwrap_or_default())
                 .unwrap_or_default();
