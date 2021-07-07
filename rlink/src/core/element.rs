@@ -48,8 +48,11 @@ pub struct Record {
     pub partition_num: u16,
     pub(crate) timestamp: u64,
 
+    /// mark where the data is now and where did it come from
     pub(crate) channel_key: ChannelKey,
+    /// calculate which windows the record is located based on timestamp,
     pub(crate) location_windows: Option<Vec<Window>>,
+    /// if `Record` comes from window drop, use it to mark the window
     pub(crate) trigger_window: Option<Window>,
 
     pub(crate) values: Buffer,
@@ -219,11 +222,15 @@ impl Serde for Record {
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub struct Watermark {
     // for partition routing
+    /// generate by partition number
     partition_num: u16,
 
-    // for align
+    // the `TaskId` info of `StreamStatus`, for align
+    /// `StreamStatus.channel_key.source_task_id.task_number`
     pub(crate) task_number: u16,
+    /// `StreamStatus.channel_key.source_task_id.num_tasks`
     pub(crate) num_tasks: u16,
+    /// `StreamStatus.timestamp`
     pub(crate) status_timestamp: u64,
 
     // current watermark timestamp
@@ -328,6 +335,7 @@ pub struct StreamStatus {
 
     pub(crate) channel_key: ChannelKey,
 
+    /// stream stop flag
     pub(crate) end: bool,
 }
 

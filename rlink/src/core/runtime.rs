@@ -73,6 +73,12 @@ impl Serde for TaskId {
     }
 }
 
+/// mark where the data is now and where did it come from
+///
+///                  ┌──────────────────┐
+/// Source Task ────►│     channel      ├────► Target Task
+///                  └──────────────────┘
+///
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash, Default)]
 pub(crate) struct ChannelKey {
     pub(crate) source_task_id: TaskId,
