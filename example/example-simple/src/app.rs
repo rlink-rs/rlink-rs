@@ -11,9 +11,9 @@ use rlink::functions::schema_base::print_output_format::PrintOutputFormat;
 use rlink::functions::schema_base::reduce::{sum_i64, SchemaBaseReduceFunction};
 use rlink::functions::schema_base::timestamp_assigner::SchemaBaseTimestampAssigner;
 use rlink::functions::schema_base::FunctionSchema;
-use rlink_example_utils::bounded_input_format::VecInputFormat;
 use rlink_example_utils::buffer_gen::model;
 use rlink_example_utils::buffer_gen::model::FIELD_TYPE;
+use rlink_example_utils::unbounded_input_format::RandInputFormat;
 
 use crate::filter::MyFlatMapFunction;
 use crate::mapper::MyFilterFunction;
@@ -41,9 +41,9 @@ impl StreamApp for SimpleStreamApp {
             key_types
         };
 
-        env.register_source(VecInputFormat::new(), 3)
-            .flat_map(MyFlatMapFunction::new())
-            .filter(MyFilterFunction::new())
+        env.register_source(RandInputFormat::new(), 3)
+            // .flat_map(MyFlatMapFunction::new())
+            // .filter(MyFilterFunction::new())
             .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
                 Duration::from_secs(1),
                 SchemaBaseTimestampAssigner::new(model::index::timestamp, &FIELD_TYPE),
