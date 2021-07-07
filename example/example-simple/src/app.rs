@@ -42,8 +42,8 @@ impl StreamApp for SimpleStreamApp {
         };
 
         env.register_source(RandInputFormat::new(), 3)
-            // .flat_map(MyFlatMapFunction::new())
-            // .filter(MyFilterFunction::new())
+            .flat_map(MyFlatMapFunction::new())
+            .filter(MyFilterFunction::new())
             .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
                 Duration::from_secs(1),
                 SchemaBaseTimestampAssigner::new(model::index::timestamp, &FIELD_TYPE),
