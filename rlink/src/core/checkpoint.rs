@@ -7,14 +7,21 @@ pub struct FunctionSnapshotContext {
     pub operator_id: OperatorId,
     pub task_id: TaskId,
     pub checkpoint_id: CheckpointId,
+    pub completed_checkpoint_id: Option<CheckpointId>,
 }
 
 impl FunctionSnapshotContext {
-    pub fn new(operator_id: OperatorId, task_id: TaskId, checkpoint_id: CheckpointId) -> Self {
+    pub fn new(
+        operator_id: OperatorId,
+        task_id: TaskId,
+        checkpoint_id: CheckpointId,
+        completed_checkpoint_id: Option<CheckpointId>,
+    ) -> Self {
         FunctionSnapshotContext {
             operator_id,
             task_id,
             checkpoint_id,
+            completed_checkpoint_id,
         }
     }
 }
@@ -43,6 +50,7 @@ pub struct Checkpoint {
     pub operator_id: OperatorId,
     pub task_id: TaskId,
     pub checkpoint_id: CheckpointId,
+    pub completed_checkpoint_id: Option<CheckpointId>,
     pub handle: CheckpointHandle,
 }
 

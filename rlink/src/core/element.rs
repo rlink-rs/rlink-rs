@@ -48,8 +48,11 @@ pub struct Record {
     pub partition_num: u16,
     pub(crate) timestamp: u64,
 
+    /// mark where the data is now and where did it come from
     pub(crate) channel_key: ChannelKey,
+    /// calculate which windows the record is located based on timestamp,
     pub(crate) location_windows: Option<Vec<Window>>,
+    /// if `Record` comes from window drop, use it to mark the window
     pub(crate) trigger_window: Option<Window>,
 
     pub(crate) values: Buffer,
@@ -219,11 +222,15 @@ impl Serde for Record {
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub struct Watermark {
     // for partition routing
+    /// generate by partition number
     partition_num: u16,
 
-    // for align
+    // the `TaskId` info of `StreamStatus`, for align
+    /// `StreamStatus.channel_key.source_task_id.task_number`
     pub(crate) task_number: u16,
+    /// `StreamStatus.channel_key.source_task_id.num_tasks`
     pub(crate) num_tasks: u16,
+    /// `StreamStatus.timestamp`
     pub(crate) status_timestamp: u64,
 
     // current watermark timestamp
@@ -328,6 +335,7 @@ pub struct StreamStatus {
 
     pub(crate) channel_key: ChannelKey,
 
+    /// stream stop flag
     pub(crate) end: bool,
 }
 
@@ -384,6 +392,7 @@ impl Serde for StreamStatus {
 pub struct Barrier {
     partition_num: u16,
     pub(crate) checkpoint_id: CheckpointId,
+    pub(crate) completed_checkpoint_id: CheckpointId,
 }
 
 impl Barrier {
@@ -391,6 +400,21 @@ impl Barrier {
         Barrier {
             partition_num: 0,
             checkpoint_id,
+            completed_checkpoint_id: CheckpointId::default(),
+        }
+    }
+
+    pub fn set_completed_checkpoint_id(&mut self, completed_checkpoint_id: CheckpointId) {
+        if completed_checkpoint_id.0 > self.completed_checkpoint_id.0 {
+            self.completed_checkpoint_id = completed_checkpoint_id;
+        }
+    }
+
+    pub fn completed_checkpoint_id(&self) -> Option<CheckpointId> {
+        if self.completed_checkpoint_id.is_default() {
+            None
+        } else {
+            Some(self.completed_checkpoint_id)
         }
     }
 }
@@ -407,13 +431,14 @@ impl Partition for Barrier {
 
 impl Serde for Barrier {
     fn capacity(&self) -> usize {
-        11
+        19
     }
 
     fn serialize(&self, bytes: &mut BytesMut) {
         bytes.put_u8(SER_DE_BARRIER);
         bytes.put_u16(self.partition_num);
         bytes.put_u64(self.checkpoint_id.0);
+        bytes.put_u64(self.completed_checkpoint_id.0);
     }
 
     fn deserialize(bytes: &mut BytesMut) -> Self {
@@ -422,10 +447,12 @@ impl Serde for Barrier {
 
         let partition_num = bytes.get_u16();
         let checkpoint_id = bytes.get_u64();
+        let completed_checkpoint_id = bytes.get_u64();
 
         Barrier {
             partition_num,
             checkpoint_id: CheckpointId(checkpoint_id),
+            completed_checkpoint_id: CheckpointId(completed_checkpoint_id),
         }
     }
 }

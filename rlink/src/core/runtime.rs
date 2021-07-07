@@ -73,6 +73,12 @@ impl Serde for TaskId {
     }
 }
 
+/// mark where the data is now and where did it come from
+///
+///                  ┌──────────────────┐
+/// Source Task ────►│     channel      ├────► Target Task
+///                  └──────────────────┘
+///
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash, Default)]
 pub(crate) struct ChannelKey {
     pub(crate) source_task_id: TaskId,
@@ -111,7 +117,9 @@ impl Serde for ChannelKey {
     }
 }
 
-#[derive(Copy, Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, Default)]
+#[derive(
+    Copy, Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, Ord, PartialOrd, Default,
+)]
 pub struct CheckpointId(pub u64);
 
 impl CheckpointId {
