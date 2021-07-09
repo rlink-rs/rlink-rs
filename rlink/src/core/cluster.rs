@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
 
+/// Metadata(`ClusterDescriptor`) storage type
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", content = "param")]
 pub enum MetadataStorageType {
@@ -17,8 +18,10 @@ impl std::fmt::Display for MetadataStorageType {
     }
 }
 
+/// Cluster config, for communication with TaskManager under standalone
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClusterConfig {
+    /// JobManager address, can specify multiple ones
     pub application_manager_address: Vec<String>,
 
     /// metadata storage mode
@@ -40,12 +43,14 @@ impl ClusterConfig {
     }
 }
 
+/// load json config form path
 pub fn load_config(path: PathBuf) -> anyhow::Result<ClusterConfig> {
     let context =
         read_config_from_path(path).map_err(|e| anyhow!("read Cluster config error {}", e))?;
     serde_yaml::from_str(&context).map_err(|e| anyhow!("parse Cluster config error {}", e))
 }
 
+/// load text config form path
 pub fn read_config_from_path(path: PathBuf) -> Result<String, std::io::Error> {
     let mut file = File::open(path)?;
     let mut buffer = String::new();
@@ -53,10 +58,13 @@ pub fn read_config_from_path(path: PathBuf) -> Result<String, std::io::Error> {
     Ok(buffer)
 }
 
+/// Describes a task resource info
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskResourceInfo {
+    /// The TaskManager's id for running the task
     #[serde(default)]
     pub task_manager_id: String,
+    /// task's run arguments
     #[serde(default)]
     pub resource_info: HashMap<String, String>,
 }

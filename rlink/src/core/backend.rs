@@ -1,14 +1,16 @@
-use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 
-use crate::core::runtime::CheckpointId;
-
+/// checkpoint backend storage type
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(tag = "type", content = "param")]
 pub enum CheckpointBackend {
+    /// pure memory storage
     Memory,
+    /// storage in mysql
     MySql {
+        /// mysql endpoint
         endpoint: String,
+        /// storage table's name, if `None` use default table name
         table: Option<String>,
     },
 }
@@ -24,6 +26,7 @@ impl Display for CheckpointBackend {
     }
 }
 
+/// keyed state backend storage type
 #[derive(Copy, Clone, Serialize, Deserialize, Debug)]
 #[serde(tag = "type", content = "param")]
 pub enum KeyedStateBackend {
@@ -42,22 +45,4 @@ impl Display for KeyedStateBackend {
             // }
         }
     }
-}
-
-#[derive(Clone, Debug)]
-pub struct StateValue {
-    pub values: Vec<String>,
-}
-
-impl StateValue {
-    pub fn new(values: Vec<String>) -> Self {
-        StateValue { values }
-    }
-}
-
-pub trait OperatorState: Debug {
-    fn update(&mut self, checkpoint_id: CheckpointId, values: Vec<String>);
-    fn snapshot(&mut self) -> std::io::Result<()>;
-    fn load_latest(&self, checkpoint_id: CheckpointId)
-        -> std::io::Result<HashMap<u16, StateValue>>;
 }
