@@ -69,7 +69,7 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
     /**
      * stop命令超时时间
      */
-    private static final int STOP_TIME_OUT = 5000;
+    private static final int STOP_TIME_OUT = 3000;
     private List<TaskResourceInfo> stopTaskList = new ArrayList<>();
     private AtomicInteger stopContainerCount = new AtomicInteger(0);
     private Long stopCmdTime = null;
@@ -148,6 +148,16 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
                 for (TaskResourceInfo taskResourceInfo : taskInfoList) {
                     stopTaskContainer(taskResourceInfo);
                 }
+                while (true) {
+                    if ((System.currentTimeMillis() - stopCmdTime) > STOP_TIME_OUT) {
+                        List<Map> msgData = JSONArray.parseArray(JSON.toJSONString(stopTaskList), Map.class);
+                        Command commandMsg = new Command(curCommand.getCmd(), curCommand.getCmdId(), msgData);
+                        MessageUtil.send(commandMsg);
+                        stopCmdTime = null;
+                        break;
+                    }
+                    Thread.sleep(1000);
+                }
             } catch (Exception e) {
                 LOGGER.error("executeStop error", e);
             }
@@ -201,9 +211,10 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
             yarnClient.close();
             LOGGER.info("yarn inclusionNodes={}", (Object) inclusionNodes);
         }
+        boolean relaxLocality = inclusionNodes == null;
         for (int i = 0; i < numContainers; i++) {
             LOGGER.info("requestYarnContainer {}", i);
-            AMRMClient.ContainerRequest containerRequest = new AMRMClient.ContainerRequest(resource, inclusionNodes, null, RM_REQUEST_PRIORITY, false, null);
+            AMRMClient.ContainerRequest containerRequest = new AMRMClient.ContainerRequest(resource, inclusionNodes, null, RM_REQUEST_PRIORITY, relaxLocality, null);
             resourceManagerClient.addContainerRequest(containerRequest);
         }
     }
@@ -346,12 +357,10 @@ public class ResourceManager implements AMRMClientAsync.CallbackHandler, NMClien
     public void onContainerStopped(ContainerId containerId) {
         int count = stopContainerCount.addAndGet(1);
         LOGGER.info("Succeeded stop container {}. [{}/{}]", containerId, count, stopTaskList.size());
-        boolean isStopTimeout = stopCmdTime != null && (System.currentTimeMillis() - stopCmdTime > STOP_TIME_OUT);
-        if (count == stopTaskList.size() || isStopTimeout) {
+        if (count == stopTaskList.size()) {
             List<Map> data = JSONArray.parseArray(JSON.toJSONString(stopTaskList), Map.class);
             Command commandMsg = new Command(curCommand.getCmd(), curCommand.getCmdId(), data);
             MessageUtil.send(commandMsg);
-            stopCmdTime = null;
         }
     }
 
