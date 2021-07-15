@@ -108,6 +108,17 @@ impl Properties {
             None => Err(anyhow!("`{}` field not found", key)),
         }
     }
+
+    pub fn set_bool(&mut self, key: &str, value: bool) {
+        self.set_string(key.to_string(), value.to_string());
+    }
+
+    pub fn get_bool(&self, key: &str) -> anyhow::Result<bool> {
+        match self.properties.get(key) {
+            Some(v) => bool::from_str(v).map_err(|e| anyhow!(e)),
+            None => Err(anyhow!("`{}` field not found", key)),
+        }
+    }
 }
 
 pub(crate) const SYSTEM_METADATA_STORAGE_MODE: &str = "SYSTEM_METADATA_STORAGE_MODE";

@@ -11,7 +11,6 @@ use rlink::utils;
 use rlink::utils::thread::async_runtime;
 
 use crate::source::deserializer::KafkaRecordDeserializer;
-use crate::state::PartitionOffset;
 
 struct TaskHandover {
     task_number: u16,
@@ -34,11 +33,19 @@ lazy_static! {
         Mutex::new(HashMap::new());
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct ConsumerRange {
+    pub(crate) topic: String,
+    pub(crate) partition: i32,
+    pub(crate) begin_offset: i64,
+    pub(crate) end_offset: Option<i64>,
+}
+
 pub(crate) fn create_kafka_consumer(
     job_id: JobId,
     task_number: u16,
     client_config: ClientConfig,
-    partition_offsets: Vec<(String, PartitionOffset)>,
+    consumer_ranges: Vec<ConsumerRange>,
     handover: Handover,
     deserializer: Box<dyn KafkaRecordDeserializer>,
 ) {
@@ -59,7 +66,7 @@ pub(crate) fn create_kafka_consumer(
         async_runtime("kafka_source").block_on(async {
             let mut kafka_consumer = KafkaConsumerThread::new(
                 client_config,
-                partition_offsets,
+                consumer_ranges,
                 handover_clone,
                 deserializer,
             );
@@ -100,9 +107,10 @@ pub(crate) fn get_kafka_consumer_handover(job_id: JobId) -> Option<Handover> {
     None
 }
 
-pub struct KafkaConsumerThread {
+pub(crate) struct KafkaConsumerThread {
     client_config: ClientConfig,
-    partition_offsets: Vec<(String, PartitionOffset)>,
+    consumer_ranges: Vec<ConsumerRange>,
+    with_end_consumer_ranges: Vec<ConsumerRange>,
 
     handover: Handover,
     deserializer: Box<dyn KafkaRecordDeserializer>,
@@ -111,26 +119,49 @@ pub struct KafkaConsumerThread {
 impl KafkaConsumerThread {
     pub fn new(
         client_config: ClientConfig,
-        partition_offsets: Vec<(String, PartitionOffset)>,
+        consumer_ranges: Vec<ConsumerRange>,
         handover: Handover,
         deserializer: Box<dyn KafkaRecordDeserializer>,
     ) -> Self {
+        let with_end_consumer_ranges: Vec<ConsumerRange> = consumer_ranges
+            .iter()
+            .filter(|x| x.end_offset.is_some())
+            .map(|x| x.clone())
+            .collect();
         KafkaConsumerThread {
             client_config,
-            partition_offsets,
+            consumer_ranges,
+            with_end_consumer_ranges,
             handover,
             deserializer,
         }
     }
 
+    fn end_check(&self, topic: &str, partition: i32, offset: i64) -> bool {
+        if self.with_end_consumer_ranges.len() == 0 {
+            return false;
+        }
+
+        for consumer_range in &self.with_end_consumer_ranges {
+            if consumer_range.partition == partition
+                && consumer_range.end_offset.unwrap() < offset
+                && consumer_range.topic.eq(topic)
+            {
+                return true;
+            }
+        }
+
+        false
+    }
+
     pub async fn run(&mut self) -> anyhow::Result<()> {
         let mut assignment = TopicPartitionList::new();
-        for (topic, partition_offset) in &self.partition_offsets {
+        for consumer_range in &self.consumer_ranges {
             assignment
                 .add_partition_offset(
-                    topic.as_str(),
-                    partition_offset.partition,
-                    Offset::from_raw(partition_offset.offset),
+                    consumer_range.topic.as_str(),
+                    consumer_range.partition,
+                    Offset::from_raw(consumer_range.begin_offset),
                 )
                 .unwrap();
         }
@@ -145,7 +176,7 @@ impl KafkaConsumerThread {
 
         info!(
             "create consumer success. config: {:?}, apply checkpoint offset: {:?}",
-            self.client_config, self.partition_offsets
+            self.client_config, self.consumer_ranges
         );
 
         let mut message_stream = consumer.stream();
@@ -170,6 +201,11 @@ impl KafkaConsumerThread {
                                 panic!("handover produce `Disconnected`");
                             }
                         }
+                    }
+
+                    if self.end_check(topic, partition, offset) {
+                        info!("kafka end offset reached");
+                        break;
                     }
                 }
                 Err(e) => warn!("Kafka error: {}", e),

@@ -68,21 +68,9 @@ impl KafkaSourceStateRecorder {
         m
     }
 
-    pub fn get(&self, topic: &str, partition: i32, default_offset: Offset) -> PartitionOffset {
-        match self.partition_offsets.get(topic) {
-            Some(kv_ref) => kv_ref
-                .partition_offsets
-                .get(partition as usize)
-                .map(|x| x.clone())
-                .unwrap_or_default()
-                .unwrap_or_else(|| PartitionOffset {
-                    partition,
-                    offset: default_offset.to_raw().unwrap(),
-                }),
-            None => PartitionOffset {
-                partition,
-                offset: default_offset.to_raw().unwrap(),
-            },
-        }
+    pub fn get(&self, topic: &str, partition: i32) -> Option<PartitionOffset> {
+        let kv_ref = self.partition_offsets.get(topic)?;
+        let po = kv_ref.partition_offsets.get(partition as usize)?;
+        po.clone()
     }
 }
