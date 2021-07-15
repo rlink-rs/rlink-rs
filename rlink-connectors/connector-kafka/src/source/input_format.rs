@@ -105,6 +105,8 @@ impl InputFormat for KafkaInputFormat {
     fn open(&mut self, input_split: InputSplit, context: &Context) -> core::Result<()> {
         info!("kafka source open");
 
+        // Whether need to create a Kafka connection
+        // if len(partition) < min_split_num, additional split tasks set `false`
         let can_create_consumer = input_split.properties().get_bool(CREATE_KAFKA_CONNECTION)?;
         if can_create_consumer {
             let kafka_checkpoint =
