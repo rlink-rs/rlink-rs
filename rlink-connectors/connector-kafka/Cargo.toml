@@ -21,7 +21,6 @@ path = "../../rlink-derive"
 
 [dependencies]
 log = "0.4"
-lazy_static = "1.4.0"
 anyhow = "1.0"
 dashmap = "4.0"
 

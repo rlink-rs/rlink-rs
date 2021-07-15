@@ -2,6 +2,7 @@ use bytes::{Buf, BufMut, BytesMut};
 
 use crate::core::element::Serde;
 use crate::metrics::Tag;
+use std::ops::Deref;
 
 #[derive(
     Copy, Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, Default, Ord, PartialOrd,
@@ -16,6 +17,14 @@ pub struct JobId(pub u32);
 impl From<OperatorId> for JobId {
     fn from(operator_id: OperatorId) -> Self {
         JobId(operator_id.0)
+    }
+}
+
+impl Deref for JobId {
+    type Target = u32;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 

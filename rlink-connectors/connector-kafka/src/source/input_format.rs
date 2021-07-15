@@ -12,7 +12,7 @@ use rlink::core::properties::Properties;
 use rlink::metrics::Tag;
 
 use crate::source::checkpoint::KafkaCheckpointFunction;
-use crate::source::consumer::{create_kafka_consumer, get_kafka_consumer_handover, ConsumerRange};
+use crate::source::consumer::{create_kafka_consumer, ConsumerRange};
 use crate::source::deserializer::KafkaRecordDeserializerBuilder;
 use crate::source::iterator::KafkaRecordIterator;
 use crate::state::PartitionOffset;
@@ -105,48 +105,39 @@ impl InputFormat for KafkaInputFormat {
     fn open(&mut self, input_split: InputSplit, context: &Context) -> core::Result<()> {
         info!("kafka source open");
 
-        // Whether need to create a Kafka connection
-        // if len(partition) < min_split_num, additional split tasks set `false`
-        let can_create_consumer = input_split.properties().get_bool(CREATE_KAFKA_CONNECTION)?;
-        if can_create_consumer {
-            let kafka_checkpoint =
-                KafkaCheckpointFunction::new(context.application_id.clone(), context.task_id);
-            self.checkpoint = Some(kafka_checkpoint);
+        let kafka_checkpoint =
+            KafkaCheckpointFunction::new(context.application_id.clone(), context.task_id);
+        self.checkpoint = Some(kafka_checkpoint);
 
-            self.initialize_state(&context.checkpoint_context(), &context.checkpoint_handle);
+        self.initialize_state(&context.checkpoint_context(), &context.checkpoint_handle);
 
-            let topic = input_split.properties().get_string("topic").unwrap();
-            let partition = input_split.properties().get_i32("partition").unwrap();
+        let topic = input_split.properties().get_string("topic").unwrap();
+        let partition = input_split.properties().get_i32("partition").unwrap();
 
-            let tags = vec![
-                Tag::new("topic", topic.as_str()),
-                Tag::new("partition", partition),
-            ];
-            self.handover = Some(Handover::new(
-                "KafkaSource_Handover",
-                tags,
-                self.buffer_size,
-            ));
+        let tags = vec![
+            Tag::new("topic", topic.as_str()),
+            Tag::new("partition", partition),
+        ];
+        self.handover = Some(Handover::new(
+            "KafkaSource_Handover",
+            tags,
+            self.buffer_size,
+        ));
 
-            let client_config = self.client_config.clone();
-            let handover = self.handover.as_ref().unwrap().clone();
+        let client_config = self.client_config.clone();
+        let handover = self.handover.as_ref().unwrap().clone();
 
-            let consumer_ranges = self.consumer_ranges(topic, partition);
-            create_kafka_consumer(
-                context.task_id.job_id(),
-                context.task_id.task_number(),
-                client_config,
-                consumer_ranges,
-                handover,
-                self.deserializer_builder.build(),
-            );
+        let consumer_ranges = self.consumer_ranges(topic, partition);
+        create_kafka_consumer(
+            context.task_id.job_id(),
+            context.task_id.task_number(),
+            client_config,
+            consumer_ranges,
+            handover,
+            self.deserializer_builder.build(),
+        );
 
-            info!("start with consumer and operator mode")
-        } else {
-            self.handover = get_kafka_consumer_handover(context.task_id.job_id());
-
-            info!("start with follower operator mode")
-        }
+        info!("start with consumer and operator mode");
 
         Ok(())
     }
