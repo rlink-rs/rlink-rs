@@ -12,6 +12,8 @@ use crate::core::watermark::WatermarkAssigner;
 use crate::core::window::WindowAssigner;
 use crate::functions::system::window_base_reduce::WindowBaseReduceFunction;
 
+/// A DataStream represents a stream of elements of the same type. A DataStream can be transformed
+/// into another DataStream by applying a transformation
 pub trait TDataStream {
     fn flat_map<F>(self, flat_mapper: F) -> DataStream
     where
