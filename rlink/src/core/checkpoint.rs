@@ -2,6 +2,7 @@ use std::fmt::Debug;
 
 use crate::core::runtime::{CheckpointId, OperatorId, TaskId};
 
+/// This struct provides a context in which user functions that use managed state metadata
 #[derive(Clone, Debug)]
 pub struct FunctionSnapshotContext {
     pub operator_id: OperatorId,
