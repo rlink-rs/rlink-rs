@@ -7,6 +7,7 @@ use rlink::utils;
 use rlink::utils::thread::async_runtime;
 
 use crate::source::deserializer::KafkaRecordDeserializer;
+use crate::source::empty_record;
 
 #[derive(Debug, Clone)]
 pub(crate) struct ConsumerRange {
@@ -145,6 +146,9 @@ impl KafkaConsumerThread {
                     }
 
                     if self.end_check(topic, partition, offset) {
+                        self.handover
+                            .produce(empty_record())
+                            .expect("kafka consumer handover `Disconnected`");
                         info!(
                             "kafka end offset reached. job_id: {}, task_num: {}",
                             *self.job_id, self.task_number
