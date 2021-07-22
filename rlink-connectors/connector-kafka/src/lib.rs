@@ -10,7 +10,7 @@ extern crate anyhow;
 pub mod sink;
 pub mod source;
 
-pub(crate) mod state;
+pub mod state;
 
 pub use sink::output_format::KafkaOutputFormat;
 pub use source::input_format::KafkaInputFormat;
