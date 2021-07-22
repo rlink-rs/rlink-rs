@@ -8,12 +8,10 @@ pub struct RangeFilterFunction {
 
 impl RangeFilterFunction {
     pub fn new(left: u64, right: u64) -> Self {
-        if left<=right{
-            panic!("specified start({}) must gh end({})",left,right)
+        if left <= right {
+            panic!("specified start({}) must gh end({})", left, right)
         }
-        Self{
-            left,right
-        }
+        Self { left, right }
     }
 }
 
@@ -22,9 +20,9 @@ impl FilterFunction for RangeFilterFunction {
         Ok(())
     }
 
-    fn filter(&self, record: &mut rlink::core::element::Record) -> bool {       
+    fn filter(&self, record: &mut rlink::core::element::Record) -> bool {
         if let Some(window) = record.trigger_window() {
-            return window.min_timestamp() >= self.left || window.max_timestamp() <= self.right
+            return window.min_timestamp() >= self.left || window.max_timestamp() <= self.right;
         }
         return false;
     }

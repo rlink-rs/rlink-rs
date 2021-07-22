@@ -1,3 +1,7 @@
+use std::collections::HashMap;
+use std::hash::Hash;
+use std::time::Duration;
+
 use rlink::channel::ChannelBaseOn;
 use rlink::core::backend::{CheckpointBackend, KeyedStateBackend};
 use rlink::core::data_stream::{TDataStream, TKeyedStream, TWindowedStream};
@@ -10,26 +14,18 @@ use rlink::functions::schema_base::print_output_format::PrintOutputFormat;
 use rlink::functions::schema_base::reduce::{sum_i64, SchemaBaseReduceFunction};
 use rlink::functions::schema_base::timestamp_assigner::SchemaBaseTimestampAssigner;
 use rlink::functions::schema_base::FunctionSchema;
-
 use rlink_connector_kafka::state::PartitionOffsets;
-// use rlink_connector_kafka::create_input_format;
 use rlink_connector_kafka::{
     state::PartitionOffset, InputFormatBuilder, BOOTSTRAP_SERVERS, GROUP_ID,
 };
-use std::hash::Hash;
-use std::time::Duration;
 
 use crate::buffer_gen::checkpoint_data::{self, FIELD_TYPE};
 use crate::filter::RangeFilterFunction;
-
 use crate::kafka_input_mapper::KafkaInputMapperFunction;
-
-use std::collections::HashMap;
-
 
 #[derive(Clone, Debug)]
 pub struct ReplayApp {
-    brokers:String,
+    brokers: String,
     topic: String,
     source_parallelism: u16,
     begin_offset: HashMap<String, Vec<PartitionOffset>>,
@@ -38,10 +34,10 @@ pub struct ReplayApp {
 
 impl ReplayApp {
     pub fn new(
-        brokers:String,
+        brokers: String,
         topic: String,
         source_parallelism: u16,
-        
+
         begin_offset: HashMap<String, Vec<PartitionOffset>>,
         end_offset: HashMap<String, Vec<PartitionOffset>>,
     ) -> Self {
@@ -50,7 +46,7 @@ impl ReplayApp {
             topic,
             source_parallelism,
             begin_offset,
-            end_offset
+            end_offset,
         }
     }
 }
@@ -105,7 +101,6 @@ impl StreamApp for ReplayApp {
             key_types.extend_from_slice(reduce_types.as_slice());
             key_types
         };
-
 
         env.register_source(kafka_input_format, self.source_parallelism)
             .flat_map(KafkaInputMapperFunction::new(kafka_topic_source.clone()))

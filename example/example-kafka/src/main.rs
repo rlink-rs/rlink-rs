@@ -7,17 +7,17 @@ extern crate anyhow;
 
 mod app;
 mod buffer_gen;
+mod filter;
 mod kafka_input_mapper;
 mod writer;
-mod filter;
+
+use std::{collections::HashMap, str::FromStr};
 
 use rlink::utils::process::parse_arg;
 use rlink_connector_kafka::state::PartitionOffset;
-use std::{collections::HashMap, str::FromStr};
-
 
 fn main() {
-    let brokers=parse_arg("brokers") 
+    let brokers = parse_arg("brokers")
         .unwrap_or("localhost:9092".to_string())
         .to_string();
     let topic = parse_arg("topic")
@@ -27,7 +27,6 @@ fn main() {
         let n = parse_arg("source_parallelism").unwrap_or("3".to_string());
         u16::from_str(n.as_str()).unwrap()
     };
-
 
     let mut begin_offsets = HashMap::new();
     begin_offsets.insert(
@@ -50,6 +49,6 @@ fn main() {
 
     rlink::core::env::execute(
         "example-kafka",
-        app::ReplayApp::new(brokers,topic, kafka_partitions,begin_offsets,end_offsets),
+        app::ReplayApp::new(brokers, topic, kafka_partitions, begin_offsets, end_offsets),
     );
 }

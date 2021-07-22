@@ -1,9 +1,9 @@
 use std::io::{Result as IoResult, Write};
+
+use rlink_connector_files::writer::{FileSystem, FileSystemBuilder};
 use uuid::Uuid;
 use webhdfs::sync_client::WriteHdfsFile;
 use webhdfs::*;
-
-use rlink_connector_files::writer::{FileSystem, FileSystemBuilder};
 
 pub struct HdfsWriter {
     url: String,
@@ -33,7 +33,7 @@ impl Write for HdfsWriter {
         let cx = SyncHdfsClientBuilder::new(self.url.parse().unwrap())
             .user_name(self.user.to_owned())
             .build()
-            .unwrap();    
+            .unwrap();
         let mut file =
             WriteHdfsFile::create(cx, path.clone(), CreateOptions::new(), AppendOptions::new())?;
         let size = match file.write(buf) {
