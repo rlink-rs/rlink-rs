@@ -7,6 +7,7 @@ pub struct RangeFilterFunction {
 }
 
 impl RangeFilterFunction {
+    #[allow(dead_code)]
     pub fn new(left: u64, right: u64) -> Self {
         if left <= right {
             panic!("specified start({}) must gh end({})", left, right)
@@ -16,7 +17,7 @@ impl RangeFilterFunction {
 }
 
 impl FilterFunction for RangeFilterFunction {
-    fn open(&mut self, context: &rlink::core::function::Context) -> rlink::core::Result<()> {
+    fn open(&mut self, _context: &rlink::core::function::Context) -> rlink::core::Result<()> {
         Ok(())
     }
 

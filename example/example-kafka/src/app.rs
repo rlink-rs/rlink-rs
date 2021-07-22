@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::hash::Hash;
 use std::time::Duration;
 
 use rlink::channel::ChannelBaseOn;
@@ -14,13 +13,11 @@ use rlink::functions::schema_base::print_output_format::PrintOutputFormat;
 use rlink::functions::schema_base::reduce::{sum_i64, SchemaBaseReduceFunction};
 use rlink::functions::schema_base::timestamp_assigner::SchemaBaseTimestampAssigner;
 use rlink::functions::schema_base::FunctionSchema;
-use rlink_connector_kafka::state::PartitionOffsets;
 use rlink_connector_kafka::{
     state::PartitionOffset, InputFormatBuilder, BOOTSTRAP_SERVERS, GROUP_ID,
 };
 
 use crate::buffer_gen::checkpoint_data::{self, FIELD_TYPE};
-use crate::filter::RangeFilterFunction;
 use crate::kafka_input_mapper::KafkaInputMapperFunction;
 
 #[derive(Clone, Debug)]
