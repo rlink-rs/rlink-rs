@@ -46,6 +46,7 @@ lazy_static! {
     static ref NETWORK_CHANNELS: DashMap<ChannelKey, ElementReceiver> = DashMap::new();
 }
 
+/// publish a source `Task`'s channel to all child `Task`s
 pub(crate) fn publish(
     source_task_id: &TaskId,
     target_task_ids: &Vec<TaskId>,
@@ -73,6 +74,7 @@ pub(crate) fn publish(
     senders
 }
 
+/// Publish a channel, the clients can subscribe
 fn set_network_channel(key: ChannelKey, receiver: ElementReceiver) {
     let network_channels: &DashMap<ChannelKey, ElementReceiver> = &*NETWORK_CHANNELS;
     if network_channels.contains_key(&key) {
@@ -82,9 +84,25 @@ fn set_network_channel(key: ChannelKey, receiver: ElementReceiver) {
     network_channels.insert(key, receiver);
 }
 
+/// Get a channel by `ChannelKey`
 fn get_network_channel(key: &ChannelKey) -> Option<ElementReceiver> {
     let network_channels: &DashMap<ChannelKey, ElementReceiver> = &*NETWORK_CHANNELS;
     network_channels.get(key).map(|x| x.value().clone())
+}
+
+/// Remove a channel by `ChannelKey`
+/// When the `StreamStatus` of the `end` state is consumed from the channel,
+/// the channel needs to be removed.
+fn remove_network_channel(key: &ChannelKey) {
+    let network_channels: &DashMap<ChannelKey, ElementReceiver> = &*NETWORK_CHANNELS;
+    network_channels.remove(key);
+}
+
+/// Check whether all channels have been removed.
+/// Used to determine whether the `TaskManager` instance can be closed.
+pub(crate) fn empty_network_channel() -> bool {
+    let network_channels: &DashMap<ChannelKey, ElementReceiver> = &*NETWORK_CHANNELS;
+    network_channels.len() == 0
 }
 
 #[derive(Debug, Clone)]
@@ -211,6 +229,7 @@ impl Server {
         Err(anyhow!("Socket received FIN packet and closed connection",))
     }
 
+    /// handle a subscribe request
     async fn subscribe_handle(
         &self,
         request: ElementRequest,
@@ -225,20 +244,15 @@ impl Server {
             batch_id: _,
         } = request;
 
-        let element_list = self.batch_get(&channel_key, batch_pull_size);
-        let len = element_list.len();
-        for element in element_list {
-            self.send(ElementResponse::ok(element), framed_write)
-                .await?
+        let (element_list, end) = self.batch_get(&channel_key, batch_pull_size);
+        let len = self
+            .batch_send(element_list, batch_pull_size, framed_write)
+            .await?;
+
+        if end {
+            remove_network_channel(&channel_key);
+            info!("remove end channel, channel_key: {:?}", channel_key);
         }
-
-        let end_response = if len == batch_pull_size as usize {
-            ElementResponse::end(ResponseCode::BatchFinish)
-        } else {
-            ElementResponse::end(ResponseCode::Empty)
-        };
-
-        self.send(end_response, framed_write).await?;
 
         if is_enable_log() {
             info!(
@@ -250,35 +264,84 @@ impl Server {
         Ok(())
     }
 
-    fn batch_get(&self, channel_key: &ChannelKey, batch_pull_size: u16) -> LinkedList<Element> {
-        let mut element_list = LinkedList::new();
+    /// batch get elements by `ChannelKey`
+    fn batch_get(
+        &self,
+        channel_key: &ChannelKey,
+        batch_pull_size: u16,
+    ) -> (LinkedList<Element>, bool) {
         match get_network_channel(&channel_key) {
-            Some(receiver) => {
-                for _ in 0..batch_pull_size {
-                    match receiver.try_recv() {
-                        Ok(element) => {
-                            element_list.push_back(element);
-                        }
-                        Err(TryRecvError::Empty) => {
-                            break;
-                        }
-                        Err(TryRecvError::Disconnected) => {
-                            // panic!(format!("channel_key({:?}) close", channel_key))
-                            info!("channel_key({:?}) close", channel_key);
-                            break;
-                        }
-                    }
-                }
-            }
+            Some(receiver) => self.batch_receive(channel_key, batch_pull_size, receiver),
             None => {
+                // The child's job are subscribed to before the channel is initialized.
+                // This is not a mistake, the child's job will retry repeatedly.
                 warn!(
                     "channel_key({:?}) not found, maybe the job haven't initialized yet",
                     channel_key
                 );
+                (LinkedList::new(), false)
             }
         }
+    }
 
-        element_list
+    /// batch receive from `ElementReceiver`
+    fn batch_receive(
+        &self,
+        channel_key: &ChannelKey,
+        batch_pull_size: u16,
+        receiver: ElementReceiver,
+    ) -> (LinkedList<Element>, bool) {
+        let mut element_list = LinkedList::new();
+        let mut end = false;
+        for _ in 0..batch_pull_size {
+            match receiver.try_recv() {
+                Ok(element) => {
+                    if element.is_stream_status() {
+                        if element.as_stream_status().end {
+                            end = true;
+                        }
+                    }
+
+                    element_list.push_back(element);
+                    if end {
+                        break;
+                    }
+                }
+                Err(TryRecvError::Empty) => {
+                    break;
+                }
+                Err(TryRecvError::Disconnected) => {
+                    // panic!(format!("channel_key({:?}) close", channel_key))
+                    info!("channel_key({:?}) close", channel_key);
+                    break;
+                }
+            }
+        }
+        (element_list, end)
+    }
+
+    /// send batch response to client
+    async fn batch_send(
+        &self,
+        element_list: LinkedList<Element>,
+        batch_pull_size: u16,
+        framed_write: &mut FramedWrite<WriteHalf<'_>, BytesCodec>,
+    ) -> Result<usize, std::io::Error> {
+        let len = element_list.len();
+        for element in element_list {
+            self.send(ElementResponse::ok(element), framed_write)
+                .await?;
+        }
+
+        let status_code_response = if len == batch_pull_size as usize {
+            ElementResponse::end(ResponseCode::BatchFinish)
+        } else {
+            ElementResponse::end(ResponseCode::Empty)
+        };
+
+        self.send(status_code_response, framed_write).await?;
+
+        Ok(len)
     }
 
     async fn send(
@@ -290,7 +353,7 @@ impl Server {
         framed_write.send(req.freeze()).await
     }
 
-    fn sock_addr_to_str(&self, addr: &std::net::SocketAddr) -> String {
+    fn sock_addr_to_str(&self, addr: &SocketAddr) -> String {
         format!("{}:{}", addr.ip().to_string(), addr.port())
     }
 }

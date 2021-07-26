@@ -8,6 +8,7 @@ use std::time::Duration;
 use crate::core::env::{StreamApp, StreamExecutionEnvironment};
 use crate::dag::metadata::DagMetadata;
 use crate::pub_sub::network;
+use crate::pub_sub::network::server::empty_network_channel;
 use crate::runtime::context::Context;
 use crate::runtime::timer::{start_window_timer, WindowTimer};
 use crate::runtime::worker::checkpoint::start_report_checkpoint;
@@ -68,6 +69,9 @@ where
     join_handles.into_iter().for_each(|join_handle| {
         join_handle.join().unwrap();
     });
+
+    waiting_pub_sub_finish();
+    info!("pub_sub finish");
 
     stop_heartbeat_timer();
     info!("work end");
@@ -142,6 +146,12 @@ fn start_timing_task(
 
 fn stop_heartbeat_timer() {
     submit_heartbeat(HeartbeatItem::HeartBeatStatus(HeartBeatStatus::End));
+}
+
+fn waiting_pub_sub_finish() {
+    while !empty_network_channel() {
+        std::thread::sleep(std::time::Duration::from_secs(1));
+    }
 }
 
 fn waiting_all_task_manager_fine(metadata_loader: &mut MetadataLoader) -> Arc<ClusterDescriptor> {
