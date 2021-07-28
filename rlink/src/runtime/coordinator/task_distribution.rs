@@ -9,7 +9,6 @@ use crate::runtime::{
 };
 
 pub(crate) fn build_cluster_descriptor(
-    job_name: &str,
     dag_manager: &DagManager,
     application_properties: &Properties,
     context: &Context,
@@ -58,7 +57,6 @@ pub(crate) fn build_cluster_descriptor(
     let coordinator_manager = CoordinatorManagerDescriptor {
         version: crate::utils::VERSION.to_owned(),
         application_id: context.application_id.clone(),
-        application_name: job_name.to_string(),
         application_properties: application_properties.clone(),
         coordinator_address: "".to_string(),
         metrics_address: context.metric_addr.clone(),

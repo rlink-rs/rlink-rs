@@ -6,5 +6,5 @@ mod filter;
 mod mapper;
 
 pub fn main() {
-    rlink::core::env::execute("rlink-simple", crate::app::SimpleStreamApp {});
+    rlink::core::env::execute(crate::app::SimpleStreamApp {});
 }

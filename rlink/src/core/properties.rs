@@ -10,6 +10,9 @@ pub type ClusterMode = crate::runtime::ClusterMode;
 pub type ChannelBaseOn = crate::channel::ChannelBaseOn;
 
 pub trait SystemProperties {
+    fn set_application_name(&mut self, application_name: &str);
+    fn get_application_name(&self) -> String;
+
     fn set_metadata_mode(&mut self, metadata_storage_mode: MetadataStorageType);
     fn get_metadata_mode(&self) -> anyhow::Result<MetadataStorageType>;
 
@@ -121,6 +124,7 @@ impl Properties {
     }
 }
 
+pub(crate) const SYSTEM_APPLICATION_NAME: &str = "SYSTEM_APPLICATION_NAME";
 pub(crate) const SYSTEM_METADATA_STORAGE_MODE: &str = "SYSTEM_METADATA_STORAGE_MODE";
 pub(crate) const SYSTEM_KEYED_STATE_BACKEND: &str = "SYSTEM_KEYED_STATE_BACKEND";
 pub(crate) const SYSTEM_CHECKPOINT: &str = "SYSTEM_CHECKPOINT";
@@ -131,6 +135,22 @@ pub(crate) const SYSTEM_PUB_SUB_CHANNEL_SIZE: &str = "SYSTEM_PUB_SUB_CHANNEL_SIZ
 pub(crate) const SYSTEM_PUB_SUB_CHANNEL_BASE_ON: &str = "SYSTEM_PUB_SUB_CHANNEL_BASE_ON";
 
 impl SystemProperties for Properties {
+    fn set_application_name(&mut self, application_name: &str) {
+        if let Ok(_v) = self.get_string(SYSTEM_APPLICATION_NAME) {
+            panic!("the `application_name` field always exist")
+        }
+
+        self.set_string(
+            SYSTEM_APPLICATION_NAME.to_string(),
+            application_name.to_string(),
+        );
+    }
+
+    fn get_application_name(&self) -> String {
+        self.get_string(SYSTEM_APPLICATION_NAME)
+            .expect("Properties must contain `application_name` field")
+    }
+
     fn set_metadata_mode(&mut self, metadata_storage_mode: MetadataStorageType) {
         let value = serde_json::to_string(&metadata_storage_mode).unwrap();
         self.set_string(SYSTEM_METADATA_STORAGE_MODE.to_string(), value)

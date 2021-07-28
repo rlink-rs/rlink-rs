@@ -1,22 +1,20 @@
 use crate::core::checkpoint::CheckpointFunction;
 use crate::core::element::Record;
 use crate::core::function::{Context, FilterFunction, NamedFunction};
-use crate::core::properties::Properties;
 use crate::core::window::TWindow;
-use crate::utils::process::parse_arg_to_u64;
 
 pub const WINDOW_START_TIMESTAMP: &'static str = "WINDOW_START_TIMESTAMP";
 pub const WINDOW_STOP_TIMESTAMP: &'static str = "WINDOW_STOP_TIMESTAMP";
 
-pub fn init_from_args(properties: &mut Properties) {
-    if let Ok(v) = parse_arg_to_u64(WINDOW_START_TIMESTAMP.to_lowercase().as_str()) {
-        properties.set_u64(WINDOW_START_TIMESTAMP, v);
-    }
-
-    if let Ok(v) = parse_arg_to_u64(WINDOW_STOP_TIMESTAMP.to_lowercase().as_str()) {
-        properties.set_u64(WINDOW_STOP_TIMESTAMP, v);
-    }
-}
+// pub fn init_from_args(properties: &mut Properties) {
+//     if let Ok(v) = parse_arg_to_u64(WINDOW_START_TIMESTAMP.to_lowercase().as_str()) {
+//         properties.set_u64(WINDOW_START_TIMESTAMP, v);
+//     }
+//
+//     if let Ok(v) = parse_arg_to_u64(WINDOW_STOP_TIMESTAMP.to_lowercase().as_str()) {
+//         properties.set_u64(WINDOW_STOP_TIMESTAMP, v);
+//     }
+// }
 
 pub struct RangeWindowFilter {
     window_start_timestamp: u64,

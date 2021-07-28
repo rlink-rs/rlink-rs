@@ -24,16 +24,13 @@ pub trait StreamApp: Send + Sync + Clone {
 
 #[derive(Debug)]
 pub struct StreamExecutionEnvironment {
-    pub(crate) application_name: String,
-
     pub(crate) stream_manager: Rc<StreamManager>,
 }
 
 impl StreamExecutionEnvironment {
-    pub(crate) fn new(application_name: String) -> Self {
+    pub(crate) fn new() -> Self {
         StreamExecutionEnvironment {
-            application_name: application_name.clone(),
-            stream_manager: Rc::new(StreamManager::new(application_name)),
+            stream_manager: Rc::new(StreamManager::new()),
         }
     }
 
@@ -50,11 +47,11 @@ impl StreamExecutionEnvironment {
     }
 }
 
-pub fn execute<S>(application_name: &str, stream_app: S)
+pub fn execute<S>(stream_app: S)
 where
     S: StreamApp + 'static,
 {
-    let stream_env = StreamExecutionEnvironment::new(application_name.to_string());
+    let stream_env = StreamExecutionEnvironment::new();
     match runtime::run(stream_env, stream_app) {
         Ok(_) => {}
         Err(e) => {
@@ -72,9 +69,9 @@ pub(crate) struct StreamManager {
 }
 
 impl StreamManager {
-    pub fn new(application_name: String) -> Self {
+    pub fn new() -> Self {
         StreamManager {
-            stream_graph: RefCell::new(RawStreamGraph::new(application_name)),
+            stream_graph: RefCell::new(RawStreamGraph::new()),
         }
     }
 

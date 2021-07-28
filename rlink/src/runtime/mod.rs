@@ -154,7 +154,6 @@ pub struct CoordinatorManagerDescriptor {
     /// `rlink` compile version
     pub version: String,
     pub application_id: String,
-    pub application_name: String,
     pub application_properties: Properties,
     // todo rename to web_address
     pub coordinator_address: String,
@@ -212,7 +211,7 @@ where
 {
     panic_notify();
 
-    let context = context::Context::parse_node_arg(stream_env.application_name.as_str())?;
+    let context = context::Context::parse_node_arg()?;
     info!("Context: {:?}", context);
 
     cluster::run_task(Arc::new(context), stream_env, stream_app)

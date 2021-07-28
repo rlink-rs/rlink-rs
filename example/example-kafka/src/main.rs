@@ -47,8 +47,11 @@ fn main() {
         ],
     );
 
-    rlink::core::env::execute(
-        "example-kafka",
-        app::ReplayApp::new(brokers, topic, kafka_partitions, begin_offsets, end_offsets),
-    );
+    rlink::core::env::execute(app::ReplayApp::new(
+        brokers,
+        topic,
+        kafka_partitions,
+        begin_offsets,
+        end_offsets,
+    ));
 }

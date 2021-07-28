@@ -167,12 +167,8 @@ where
         dag_manager: &DagManager,
         application_properties: &Properties,
     ) -> ClusterDescriptor {
-        let cluster_descriptor = build_cluster_descriptor(
-            self.stream_env.application_name.as_str(),
-            dag_manager,
-            application_properties,
-            &self.context,
-        );
+        let cluster_descriptor =
+            build_cluster_descriptor(dag_manager, application_properties, &self.context);
         // let mut metadata_storage = MetadataStorage::new(&self.metadata_storage_mode);
         // loop_save_job_descriptor(metadata_storage.borrow_mut(), job_descriptor.clone());
         cluster_descriptor

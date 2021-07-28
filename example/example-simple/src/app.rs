@@ -23,6 +23,9 @@ pub struct SimpleStreamApp {}
 
 impl StreamApp for SimpleStreamApp {
     fn prepare_properties(&self, properties: &mut Properties) {
+        // the `application_name` must be set in `prepare_properties`
+        properties.set_application_name("rlink-simple");
+
         properties.set_keyed_state_backend(KeyedStateBackend::Memory);
         properties.set_checkpoint_internal(Duration::from_secs(15));
         properties.set_checkpoint(CheckpointBackend::Memory);

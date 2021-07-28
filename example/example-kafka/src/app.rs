@@ -50,6 +50,8 @@ impl ReplayApp {
 
 impl StreamApp for ReplayApp {
     fn prepare_properties(&self, properties: &mut Properties) {
+        properties.set_application_name("example-kafka");
+
         properties.set_checkpoint(CheckpointBackend::MySql {
             endpoint: String::from("mysql://root@loaclhost:3306/rlink"),
             table: Some("rlink_ck".to_string()),

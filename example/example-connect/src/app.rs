@@ -89,6 +89,7 @@ pub struct ConnectStreamApp1 {}
 
 impl StreamApp for ConnectStreamApp1 {
     fn prepare_properties(&self, properties: &mut Properties) {
+        properties.set_application_name("rlink-connect");
         properties.set_keyed_state_backend(KeyedStateBackend::Memory);
         properties.set_pub_sub_channel_size(100000);
         properties.set_pub_sub_channel_base(ChannelBaseOn::Unbounded);

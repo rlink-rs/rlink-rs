@@ -9,5 +9,5 @@ mod map_output;
 mod percentile;
 
 pub fn main() {
-    rlink::core::env::execute("rlink-connect", crate::app::ConnectStreamApp1 {});
+    rlink::core::env::execute(crate::app::ConnectStreamApp1 {});
 }

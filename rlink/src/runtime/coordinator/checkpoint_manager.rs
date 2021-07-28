@@ -118,7 +118,11 @@ impl CheckpointAlignManager {
         }
 
         CheckpointAlignManager {
-            application_name: context.application_name.clone(),
+            application_name: cluster_descriptor
+                .coordinator_manager
+                .application_properties
+                .get_application_name()
+                .clone(),
             application_id: context.application_id.clone(),
             checkpoint_ttl,
             current_ck_id: CheckpointId::default(),

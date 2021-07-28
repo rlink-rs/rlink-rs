@@ -50,8 +50,6 @@ impl StreamGraph {
 
 #[derive(Debug)]
 pub(crate) struct RawStreamGraph {
-    application_name: String,
-
     stream_nodes: Vec<NodeIndex>,
     stream_edges: Vec<EdgeIndex>,
 
@@ -67,9 +65,8 @@ pub(crate) struct RawStreamGraph {
 }
 
 impl RawStreamGraph {
-    pub fn new(application_name: String) -> Self {
+    pub fn new() -> Self {
         RawStreamGraph {
-            application_name,
             stream_nodes: Vec::new(),
             stream_edges: Vec::new(),
             id_gen: OperatorId::default(),

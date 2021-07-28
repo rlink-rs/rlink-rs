@@ -33,13 +33,12 @@ pub(crate) fn run<S>(
     cluster_descriptor: Arc<ClusterDescriptor>,
     task_descriptor: TaskDescriptor,
     stream_app: S,
-    stream_env: &StreamExecutionEnvironment,
+    _stream_env: &StreamExecutionEnvironment,
     window_timer: WindowTimer,
 ) -> JoinHandle<()>
 where
     S: StreamApp + 'static,
 {
-    let application_name = stream_env.application_name.clone();
     std::thread::Builder::new()
         .name(format!(
             "RM-Task-{}-{}",
@@ -51,7 +50,7 @@ where
                 thread_id: thread_id::get() as u64,
             });
 
-            let stream_env = StreamExecutionEnvironment::new(application_name);
+            let stream_env = StreamExecutionEnvironment::new();
             let worker_task = WorkerTask::new(
                 context,
                 dag_metadata,
