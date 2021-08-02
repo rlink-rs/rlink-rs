@@ -8,7 +8,7 @@ use crate::core::checkpoint::CheckpointHandle;
 use crate::core::cluster::MetadataStorageType;
 use crate::core::cluster::TaskResourceInfo;
 use crate::core::env::{StreamApp, StreamExecutionEnvironment};
-use crate::core::properties::{Properties, SystemProperties, SYSTEM_CLUSTER_MODE};
+use crate::core::properties::{InnerSystemProperties, Properties, SystemProperties};
 use crate::dag::metadata::DagMetadata;
 use crate::dag::DagManager;
 use crate::deployment::TResourceManager;
@@ -147,10 +147,7 @@ where
 
     fn prepare_properties(&self) -> Properties {
         let mut job_properties = Properties::new();
-        job_properties.set_str(
-            SYSTEM_CLUSTER_MODE,
-            format!("{}", self.context.cluster_mode).as_str(),
-        );
+        job_properties.set_cluster_mode(self.context.cluster_mode);
 
         self.stream_app
             .prepare_properties(job_properties.borrow_mut());

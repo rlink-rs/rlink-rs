@@ -17,7 +17,7 @@ impl StreamApp for FilesStreamApp {
         properties.set_application_name("rlink-files");
 
         properties.set_keyed_state_backend(KeyedStateBackend::Memory);
-        properties.set_checkpoint_internal(Duration::from_secs(15));
+        properties.set_checkpoint_interval(Duration::from_secs(15));
         properties.set_checkpoint(CheckpointBackend::Memory);
     }
 

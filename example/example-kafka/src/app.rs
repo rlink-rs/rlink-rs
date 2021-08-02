@@ -58,7 +58,7 @@ impl StreamApp for ReplayApp {
         });
         properties.set_pub_sub_channel_size(1024 * 1000);
         properties.set_pub_sub_channel_base(ChannelBaseOn::Unbounded);
-        properties.set_checkpoint_internal(Duration::from_secs(2 * 60));
+        properties.set_checkpoint_interval(Duration::from_secs(2 * 60));
         properties.set_keyed_state_backend(KeyedStateBackend::Memory);
 
         properties.set_str("kafka_group_id", "my-consumer-group");

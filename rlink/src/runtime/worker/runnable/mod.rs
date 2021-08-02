@@ -94,11 +94,11 @@ impl RunnableContext {
         )
     }
 
-    pub(crate) fn checkpoint_internal(&self, default_value: Duration) -> Duration {
+    pub(crate) fn checkpoint_interval(&self, default_value: Duration) -> Duration {
         self.cluster_descriptor
             .coordinator_manager
             .application_properties
-            .get_checkpoint_internal()
+            .get_checkpoint_interval()
             .unwrap_or(default_value)
     }
 

@@ -7,10 +7,9 @@ use crate::core::runtime::{OperatorId, TaskId};
 use crate::core::watermark::{Watermark, WatermarkAssigner, MIN_WATERMARK};
 use crate::metrics::metric::{Counter, Gauge};
 use crate::metrics::{register_counter, register_gauge};
-use crate::runtime::worker::backpressure::{Backpressure, EventTimeBackpressure};
+use crate::runtime::worker::backpressure::Backpressure;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
-use std::time::Duration;
 
 #[derive(Debug)]
 pub(crate) struct WatermarkAssignerRunnable {
@@ -56,10 +55,6 @@ impl Runnable for WatermarkAssignerRunnable {
 
         self.context = Some(context.clone());
         self.backpressure = Some(context.backpressure.clone());
-        self.backpressure
-            .as_ref()
-            .unwrap()
-            .register(EventTimeBackpressure::new(Duration::from_secs(10), 2));
 
         self.task_id = context.task_descriptor.task_id;
 

@@ -125,7 +125,7 @@ where
             cluster_descriptor: self.cluster_descriptor.clone(),
             task_descriptor: self.task_descriptor.clone(),
             window_timer: self.window_timer.clone(),
-            backpressure: Backpressure::new(),
+            backpressure: Backpressure::from(application_properties),
         };
 
         info!("open Operator Chain");

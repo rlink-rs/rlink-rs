@@ -183,7 +183,7 @@ impl Runnable for SourceRunnable {
                 .expect("register StreamStatus timer error");
             self.stream_status_timer = Some(stream_status_timer);
 
-            let checkpoint_period = context.checkpoint_internal(Duration::from_secs(30));
+            let checkpoint_period = context.checkpoint_interval(Duration::from_secs(30));
             let checkpoint_timer = context
                 .window_timer
                 .register("Checkpoint Event Timer", checkpoint_period)

@@ -9,6 +9,10 @@ use crate::core::cluster::MetadataStorageType;
 pub type ClusterMode = crate::runtime::ClusterMode;
 pub type ChannelBaseOn = crate::channel::ChannelBaseOn;
 
+pub(crate) trait InnerSystemProperties {
+    fn set_cluster_mode(&mut self, cluster_mode: ClusterMode);
+}
+
 pub trait SystemProperties {
     fn set_application_name(&mut self, application_name: &str);
     fn get_application_name(&self) -> String;
@@ -19,13 +23,13 @@ pub trait SystemProperties {
     fn set_keyed_state_backend(&mut self, state_backend: KeyedStateBackend);
     fn get_keyed_state_backend(&self) -> anyhow::Result<KeyedStateBackend>;
 
-    fn set_checkpoint_internal(&mut self, internal: Duration);
-    fn get_checkpoint_internal(&self) -> anyhow::Result<Duration>;
+    fn set_checkpoint_interval(&mut self, interval: Duration);
+    fn get_checkpoint_interval(&self) -> anyhow::Result<Duration>;
 
     fn set_checkpoint(&mut self, mode: CheckpointBackend);
     fn get_checkpoint(&self) -> anyhow::Result<CheckpointBackend>;
 
-    fn set_checkpoint_ttl(&mut self, internal: Duration);
+    fn set_checkpoint_ttl(&mut self, ttl: Duration);
     fn get_checkpoint_ttl(&self) -> anyhow::Result<Duration>;
 
     fn get_cluster_mode(&self) -> anyhow::Result<ClusterMode>;
@@ -35,6 +39,15 @@ pub trait SystemProperties {
 
     fn set_pub_sub_channel_base(&mut self, base_on: ChannelBaseOn);
     fn get_pub_sub_channel_base(&self) -> anyhow::Result<ChannelBaseOn>;
+
+    fn set_speed_backpressure_interval(&mut self, interval: Duration);
+    fn get_speed_backpressure_interval(&self) -> anyhow::Result<Duration>;
+
+    fn set_speed_backpressure_max_times(&mut self, max_times: usize);
+    fn get_speed_backpressure_max_times(&self) -> anyhow::Result<usize>;
+
+    fn set_speed_backpressure_pause_time(&mut self, interval: Duration);
+    fn get_speed_backpressure_pause_time(&self) -> anyhow::Result<Duration>;
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -90,6 +103,14 @@ impl Properties {
         }
     }
 
+    pub fn set_usize(&mut self, key: &str, value: usize) {
+        self.set_u32(key, value as u32)
+    }
+
+    pub fn get_usize(&self, key: &str) -> anyhow::Result<usize> {
+        self.get_u32(key).map(|x| x as usize)
+    }
+
     pub fn set_i64(&mut self, key: &str, value: i64) {
         self.set_string(key.to_string(), value.to_string());
     }
@@ -122,17 +143,29 @@ impl Properties {
             None => Err(anyhow!("`{}` field not found", key)),
         }
     }
+
+    fn set_duration(&mut self, key: &str, interval: Duration) {
+        self.set_u64(key, interval.as_millis() as u64);
+    }
+
+    fn get_duration(&self, key: &str) -> anyhow::Result<Duration> {
+        let value = self.get_u64(key)?;
+        Ok(Duration::from_millis(value))
+    }
 }
 
-pub(crate) const SYSTEM_APPLICATION_NAME: &str = "SYSTEM_APPLICATION_NAME";
-pub(crate) const SYSTEM_METADATA_STORAGE_MODE: &str = "SYSTEM_METADATA_STORAGE_MODE";
-pub(crate) const SYSTEM_KEYED_STATE_BACKEND: &str = "SYSTEM_KEYED_STATE_BACKEND";
-pub(crate) const SYSTEM_CHECKPOINT: &str = "SYSTEM_CHECKPOINT";
-pub(crate) const SYSTEM_CHECKPOINT_INTERNAL: &str = "SYSTEM_CHECKPOINT_INTERNAL";
-pub(crate) const SYSTEM_CHECKPOINT_TTL: &str = "SYSTEM_CHECKPOINT_TTL";
-pub(crate) const SYSTEM_CLUSTER_MODE: &str = "SYSTEM_CLUSTER_MODE";
-pub(crate) const SYSTEM_PUB_SUB_CHANNEL_SIZE: &str = "SYSTEM_PUB_SUB_CHANNEL_SIZE";
-pub(crate) const SYSTEM_PUB_SUB_CHANNEL_BASE_ON: &str = "SYSTEM_PUB_SUB_CHANNEL_BASE_ON";
+const SYSTEM_APPLICATION_NAME: &str = "SYSTEM_APPLICATION_NAME";
+const SYSTEM_METADATA_STORAGE_MODE: &str = "SYSTEM_METADATA_STORAGE_MODE";
+const SYSTEM_KEYED_STATE_BACKEND: &str = "SYSTEM_KEYED_STATE_BACKEND";
+const SYSTEM_CHECKPOINT: &str = "SYSTEM_CHECKPOINT";
+const SYSTEM_CHECKPOINT_INTERVAL: &str = "SYSTEM_CHECKPOINT_INTERVAL";
+const SYSTEM_CHECKPOINT_TTL: &str = "SYSTEM_CHECKPOINT_TTL";
+const SYSTEM_CLUSTER_MODE: &str = "SYSTEM_CLUSTER_MODE";
+const SYSTEM_PUB_SUB_CHANNEL_SIZE: &str = "SYSTEM_PUB_SUB_CHANNEL_SIZE";
+const SYSTEM_PUB_SUB_CHANNEL_BASE_ON: &str = "SYSTEM_PUB_SUB_CHANNEL_BASE_ON";
+const SYSTEM_SPEED_BACKPRESSURE_INTERVAL: &str = "SYSTEM_SPEED_BACKPRESSURE_INTERVAL";
+const SYSTEM_SPEED_BACKPRESSURE_MAX_TIMES: &str = "SYSTEM_SPEED_BACKPRESSURE_MAX_TIMES";
+const SYSTEM_SPEED_BACKPRESSURE_PAUSE_TIME: &str = "SYSTEM_SPEED_BACKPRESSURE_PAUSE_TIME";
 
 impl SystemProperties for Properties {
     fn set_application_name(&mut self, application_name: &str) {
@@ -171,16 +204,12 @@ impl SystemProperties for Properties {
         serde_json::from_str(value.as_str()).map_err(|e| anyhow!(e))
     }
 
-    fn set_checkpoint_internal(&mut self, internal: Duration) {
-        let value = format!("{}", internal.as_secs());
-        self.set_string(SYSTEM_CHECKPOINT_INTERNAL.to_string(), value)
+    fn set_checkpoint_interval(&mut self, interval: Duration) {
+        self.set_duration(SYSTEM_CHECKPOINT_INTERVAL, interval);
     }
 
-    fn get_checkpoint_internal(&self) -> anyhow::Result<Duration> {
-        let value = self.get_string(SYSTEM_CHECKPOINT_INTERNAL)?;
-        u64::from_str(value.as_str())
-            .map(|v| Duration::from_secs(v))
-            .map_err(|e| anyhow!(e))
+    fn get_checkpoint_interval(&self) -> anyhow::Result<Duration> {
+        self.get_duration(SYSTEM_CHECKPOINT_INTERVAL)
     }
 
     fn set_checkpoint(&mut self, mode: CheckpointBackend) {
@@ -193,16 +222,12 @@ impl SystemProperties for Properties {
         serde_json::from_str(value.as_str()).map_err(|e| anyhow!(e))
     }
 
-    fn set_checkpoint_ttl(&mut self, internal: Duration) {
-        let value = format!("{}", internal.as_secs());
-        self.set_string(SYSTEM_CHECKPOINT_TTL.to_string(), value)
+    fn set_checkpoint_ttl(&mut self, ttl: Duration) {
+        self.set_duration(SYSTEM_CHECKPOINT_TTL, ttl);
     }
 
     fn get_checkpoint_ttl(&self) -> anyhow::Result<Duration> {
-        let value = self.get_string(SYSTEM_CHECKPOINT_TTL)?;
-        u64::from_str(value.as_str())
-            .map(|v| Duration::from_secs(v))
-            .map_err(|e| anyhow!(e))
+        self.get_duration(SYSTEM_CHECKPOINT_TTL)
     }
 
     fn get_cluster_mode(&self) -> anyhow::Result<ClusterMode> {
@@ -211,13 +236,11 @@ impl SystemProperties for Properties {
     }
 
     fn set_pub_sub_channel_size(&mut self, channel_size: usize) {
-        let value = channel_size.to_string();
-        self.set_string(SYSTEM_PUB_SUB_CHANNEL_SIZE.to_string(), value);
+        self.set_usize(SYSTEM_PUB_SUB_CHANNEL_SIZE, channel_size);
     }
 
     fn get_pub_sub_channel_size(&self) -> anyhow::Result<usize> {
-        let value = self.get_string(SYSTEM_PUB_SUB_CHANNEL_SIZE)?;
-        usize::from_str(value.as_str()).map_err(|e| anyhow!(e))
+        self.get_usize(SYSTEM_PUB_SUB_CHANNEL_SIZE)
     }
 
     fn set_pub_sub_channel_base(&mut self, base_on: ChannelBaseOn) {
@@ -228,6 +251,36 @@ impl SystemProperties for Properties {
     fn get_pub_sub_channel_base(&self) -> anyhow::Result<ChannelBaseOn> {
         let value = self.get_string(SYSTEM_PUB_SUB_CHANNEL_BASE_ON)?;
         ChannelBaseOn::try_from(value.as_str()).map_err(|e| anyhow!(e))
+    }
+
+    fn set_speed_backpressure_interval(&mut self, interval: Duration) {
+        self.set_duration(SYSTEM_SPEED_BACKPRESSURE_INTERVAL, interval);
+    }
+
+    fn get_speed_backpressure_interval(&self) -> anyhow::Result<Duration> {
+        self.get_duration(SYSTEM_SPEED_BACKPRESSURE_INTERVAL)
+    }
+
+    fn set_speed_backpressure_max_times(&mut self, max_times: usize) {
+        self.set_usize(SYSTEM_SPEED_BACKPRESSURE_MAX_TIMES, max_times);
+    }
+
+    fn get_speed_backpressure_max_times(&self) -> anyhow::Result<usize> {
+        self.get_usize(SYSTEM_SPEED_BACKPRESSURE_MAX_TIMES)
+    }
+
+    fn set_speed_backpressure_pause_time(&mut self, interval: Duration) {
+        self.set_duration(SYSTEM_SPEED_BACKPRESSURE_PAUSE_TIME, interval);
+    }
+
+    fn get_speed_backpressure_pause_time(&self) -> anyhow::Result<Duration> {
+        self.get_duration(SYSTEM_SPEED_BACKPRESSURE_PAUSE_TIME)
+    }
+}
+
+impl InnerSystemProperties for Properties {
+    fn set_cluster_mode(&mut self, cluster_mode: ClusterMode) {
+        self.set_str(SYSTEM_CLUSTER_MODE, format!("{}", cluster_mode).as_str())
     }
 }
 

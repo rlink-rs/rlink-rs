@@ -1,26 +1,40 @@
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::atomic::AtomicU64;
-use std::sync::Arc;
 use std::time::Duration;
 
+use crate::core::properties::{Properties, SystemProperties};
 use crate::utils::date_time::current_timestamp_millis;
+
+impl<'a> From<&'a Properties> for Backpressure {
+    fn from(properties: &'a Properties) -> Self {
+        let backpressure = Backpressure::new();
+        if let Ok(interval) = properties.get_speed_backpressure_interval() {
+            let max_times = properties.get_speed_backpressure_max_times().unwrap_or(2);
+            let pause_time = properties
+                .get_speed_backpressure_pause_time()
+                .unwrap_or(interval / 2);
+
+            backpressure.register(EventTimeBackpressure::new(interval, max_times, pause_time));
+        }
+
+        backpressure
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct Backpressure {
     raw: Rc<RefCell<RawBackpressure>>,
-    pause_dur: Arc<AtomicU64>,
 }
 
 impl Backpressure {
     pub fn new() -> Self {
         Backpressure {
             raw: Rc::new(RefCell::new(RawBackpressure::new())),
-            pause_dur: Arc::new(AtomicU64::new(0)),
         }
     }
 
     pub fn register(&self, event_time_backpressure: EventTimeBackpressure) {
+        info!("register backpressure: {:?}", event_time_backpressure);
         self.raw.borrow_mut().register(event_time_backpressure);
     }
 
@@ -79,8 +93,7 @@ pub struct EventTimeBackpressure {
 }
 
 impl EventTimeBackpressure {
-    pub fn new(period: Duration, max_times: usize) -> Self {
-        let pause_time = period / 2;
+    pub fn new(period: Duration, max_times: usize, pause_time: Duration) -> Self {
         let period = period.as_millis() as i64;
         EventTimeBackpressure {
             process_timestamp: 0,
@@ -137,16 +150,20 @@ mod tests {
         let bp1 = backpressure.clone();
         let bp2 = backpressure.clone();
 
+        let period = Duration::from_millis(1);
+        let pause_time = period / 2;
+
         bp1.borrow_mut()
-            .register(EventTimeBackpressure::new(Duration::from_millis(1), 2));
+            .register(EventTimeBackpressure::new(period, 2, pause_time));
         bp2.borrow_mut()
-            .register(EventTimeBackpressure::new(Duration::from_millis(1), 2));
+            .register(EventTimeBackpressure::new(period, 2, pause_time));
     }
 
     #[test]
     pub fn event_time_backpressure_test() {
         let period = Duration::from_millis(50);
-        let mut backpressure = EventTimeBackpressure::new(period, 2);
+        let pause_time = period / 2;
+        let mut backpressure = EventTimeBackpressure::new(period, 2, pause_time);
 
         let begin_timestamp = current_timestamp_millis();
 
