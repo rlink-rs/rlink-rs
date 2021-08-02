@@ -14,7 +14,7 @@ use rlink::functions::schema_base::reduce::{sum_i64, SchemaBaseReduceFunction};
 use rlink::functions::schema_base::timestamp_assigner::SchemaBaseTimestampAssigner;
 use rlink::functions::schema_base::FunctionSchema;
 use rlink_connector_kafka::{
-    state::PartitionOffset, InputFormatBuilder, BOOTSTRAP_SERVERS, GROUP_ID,
+    state::PartitionOffset, InputFormatBuilder, OffsetRange, BOOTSTRAP_SERVERS, GROUP_ID,
 };
 
 use crate::buffer_gen::checkpoint_data::{self, FIELD_TYPE};
@@ -80,9 +80,12 @@ impl StreamApp for ReplayApp {
                 properties.get_string("kafka_group_id").unwrap(),
             );
 
+            let offset_range = OffsetRange::Direct {
+                begin_offset: self.begin_offset.clone(),
+                end_offset: Some(self.end_offset.clone()),
+            };
             InputFormatBuilder::new(conf_map, vec![kafka_topic_source.clone()], None)
-                .begin_offset(self.begin_offset.clone())
-                .end_offset(self.end_offset.clone())
+                .offset_range(offset_range)
                 .build()
         };
 
