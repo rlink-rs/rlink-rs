@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use rdkafka::consumer::{BaseConsumer, Consumer, DefaultConsumerContext};
+use rdkafka::error::KafkaResult;
 use rdkafka::{ClientConfig, Offset, TopicPartitionList};
 use rlink::channel::utils::handover::Handover;
 use rlink::core;
@@ -16,7 +17,6 @@ use crate::source::deserializer::KafkaRecordDeserializerBuilder;
 use crate::source::iterator::KafkaRecordIterator;
 use crate::state::PartitionOffset;
 use crate::OffsetRange;
-use rdkafka::error::KafkaResult;
 
 const CREATE_KAFKA_CONNECTION: &'static str = "create_kafka_connection";
 
