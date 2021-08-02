@@ -12,19 +12,15 @@ pub struct PartitionOffset {
 }
 
 impl PartitionOffset {
-    pub fn new(partition:i32,offset:i64)->Self{
-        Self{
-            partition,offset
-        }
+    pub fn new(partition: i32, offset: i64) -> Self {
+        Self { partition, offset }
     }
 }
-
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PartitionOffsets {
     pub(crate) partition_offsets: Vec<Option<PartitionOffset>>,
 }
-
 
 impl PartitionOffsets {
     pub fn new() -> Self {
