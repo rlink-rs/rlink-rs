@@ -125,13 +125,24 @@ pub fn create_output_format(
     )
 }
 
+pub enum OffsetRange {
+    None,
+    Direct {
+        begin_offset: HashMap<String, Vec<PartitionOffset>>,
+        end_offset: Option<HashMap<String, Vec<PartitionOffset>>>,
+    },
+    Timestamp {
+        begin_timestamp: HashMap<String, u64>,
+        end_timestamp: Option<HashMap<String, u64>>,
+    },
+}
+
 pub struct InputFormatBuilder {
     conf_map: HashMap<String, String>,
     topics: Vec<String>,
     buffer_size: Option<usize>,
     deserializer_builder: Option<Box<dyn KafkaRecordDeserializerBuilder>>,
-    begin_offset: Option<HashMap<String, Vec<PartitionOffset>>>,
-    end_offset: Option<HashMap<String, Vec<PartitionOffset>>>,
+    offset_range: OffsetRange,
 }
 
 impl InputFormatBuilder {
@@ -145,8 +156,7 @@ impl InputFormatBuilder {
             topics,
             buffer_size: None,
             deserializer_builder,
-            begin_offset: None,
-            end_offset: None,
+            offset_range: OffsetRange::None,
         }
     }
 
@@ -155,13 +165,8 @@ impl InputFormatBuilder {
         self
     }
 
-    pub fn begin_offset(mut self, begin_offset: HashMap<String, Vec<PartitionOffset>>) -> Self {
-        self.begin_offset = Some(begin_offset);
-        self
-    }
-
-    pub fn end_offset(mut self, end_offset: HashMap<String, Vec<PartitionOffset>>) -> Self {
-        self.end_offset = Some(end_offset);
+    pub fn offset_range(mut self, offset_range: OffsetRange) -> Self {
+        self.offset_range = offset_range;
         self
     }
 
@@ -186,8 +191,7 @@ impl InputFormatBuilder {
             client_config,
             self.topics,
             buffer_size,
-            self.begin_offset,
-            self.end_offset,
+            self.offset_range,
             deserializer_builder,
         )
     }

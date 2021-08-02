@@ -1,8 +1,7 @@
-use std::collections::HashMap;
 use std::time::Duration;
 
-use rdkafka::consumer::{BaseConsumer, Consumer};
-use rdkafka::{ClientConfig, Offset};
+use rdkafka::consumer::{BaseConsumer, Consumer, DefaultConsumerContext};
+use rdkafka::{ClientConfig, Offset, TopicPartitionList};
 use rlink::channel::utils::handover::Handover;
 use rlink::core;
 use rlink::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
@@ -16,6 +15,8 @@ use crate::source::consumer::{create_kafka_consumer, ConsumerRange};
 use crate::source::deserializer::KafkaRecordDeserializerBuilder;
 use crate::source::iterator::KafkaRecordIterator;
 use crate::state::PartitionOffset;
+use crate::OffsetRange;
+use rdkafka::error::KafkaResult;
 
 const CREATE_KAFKA_CONNECTION: &'static str = "create_kafka_connection";
 
@@ -25,8 +26,7 @@ pub struct KafkaInputFormat {
     topics: Vec<String>,
 
     buffer_size: usize,
-    begin_offset: Option<HashMap<String, Vec<PartitionOffset>>>,
-    end_offset: Option<HashMap<String, Vec<PartitionOffset>>>,
+    offset_range: OffsetRange,
 
     handover: Option<Handover>,
 
@@ -40,64 +40,106 @@ impl KafkaInputFormat {
         client_config: ClientConfig,
         topics: Vec<String>,
         buffer_size: usize,
-        begin_offset: Option<HashMap<String, Vec<PartitionOffset>>>,
-        end_offset: Option<HashMap<String, Vec<PartitionOffset>>>,
+        offset_range: OffsetRange,
         deserializer_builder: Box<dyn KafkaRecordDeserializerBuilder>,
     ) -> Self {
         KafkaInputFormat {
             client_config,
             topics,
             buffer_size,
-            begin_offset,
-            end_offset,
+            offset_range,
             handover: None,
             checkpoint: None,
             deserializer_builder,
         }
     }
 
-    fn consumer_ranges(&mut self, topic: String, partition: i32) -> Vec<ConsumerRange> {
-        let begin_partition_offsets = self.begin_partition_offset(topic.as_str(), partition);
-        let end_partition_offset = self.end_partition_offset(topic.as_str(), partition);
+    fn consumer_ranges(
+        &mut self,
+        topic: String,
+        partition: i32,
+    ) -> KafkaResult<Vec<ConsumerRange>> {
+        let (begin_partition, end_partition) = match &self.offset_range {
+            OffsetRange::None => {
+                let state = self.checkpoint.as_mut().unwrap().get_state();
+                (state.get(topic.as_str(), partition), None)
+            }
+            OffsetRange::Direct {
+                begin_offset,
+                end_offset,
+            } => {
+                let begin_partitions = {
+                    let partition_offsets = begin_offset.get(topic.as_str()).unwrap();
+                    partition_offsets.get(partition as usize).map(|p| p.clone())
+                };
+                let end_partitions = if let Some(end_offset) = end_offset {
+                    let partition_offsets = end_offset.get(topic.as_str()).unwrap();
+                    partition_offsets.get(partition as usize).map(|p| p.clone())
+                } else {
+                    None
+                };
 
-        let consumer_range = ConsumerRange {
+                (begin_partitions, end_partitions)
+            }
+            OffsetRange::Timestamp {
+                begin_timestamp,
+                end_timestamp,
+            } => {
+                let begin_timestamp = begin_timestamp.get(topic.as_str());
+                let end_timestamp = end_timestamp
+                    .as_ref()
+                    .map(|x| x.get(topic.as_str()))
+                    .unwrap_or_default();
+
+                let consumer: BaseConsumer<DefaultConsumerContext> = self.client_config.create()?;
+                let timeout = Duration::from_secs(3);
+
+                let begin_partition = if let Some(begin_timestamp) = begin_timestamp {
+                    let mut partition_list = TopicPartitionList::with_capacity(1);
+                    partition_list.set_partition_offset(
+                        topic.as_str(),
+                        partition,
+                        Offset::Offset(*begin_timestamp as i64),
+                    )?;
+                    let tpl = consumer.offsets_for_times(partition_list, timeout)?;
+                    tpl.find_partition(topic.as_str(), partition)
+                        .map(|elem| PartitionOffset {
+                            partition,
+                            offset: elem.offset().to_raw().unwrap(),
+                        })
+                } else {
+                    None
+                };
+
+                let end_partition = if let Some(end_timestamp) = end_timestamp {
+                    let mut partition_list = TopicPartitionList::with_capacity(1);
+                    partition_list.set_partition_offset(
+                        topic.as_str(),
+                        partition,
+                        Offset::Offset(*end_timestamp as i64),
+                    )?;
+                    let tpl = consumer.offsets_for_times(partition_list, timeout)?;
+                    tpl.find_partition(topic.as_str(), partition)
+                        .map(|elem| PartitionOffset {
+                            partition,
+                            offset: elem.offset().to_raw().unwrap(),
+                        })
+                } else {
+                    None
+                };
+
+                (begin_partition, end_partition)
+            }
+        };
+
+        Ok(vec![ConsumerRange {
             topic,
             partition,
-            begin_offset: begin_partition_offsets.offset,
-            end_offset: end_partition_offset.map(|x| x.offset),
-        };
-        vec![consumer_range]
-    }
-
-    fn end_partition_offset(&self, topic: &str, partition: i32) -> Option<PartitionOffset> {
-        let end_offset = self.end_offset.as_ref()?;
-        let pos = end_offset.get(topic)?;
-        pos.get(partition as usize).map(|x| x.clone())
-    }
-
-    /// get the offset of specified partition
-    /// 1. try get from checkpoint state
-    /// 2. try get from user specified offset
-    /// `Offset::End` otherwise
-    fn begin_partition_offset(&mut self, topic: &str, partition: i32) -> PartitionOffset {
-        let partition_offset = {
-            let state = self.checkpoint.as_mut().unwrap().get_state();
-            state.get(topic, partition)
-        };
-
-        partition_offset.unwrap_or_else(|| {
-            self.get_begin_partition_offset(topic, partition)
-                .unwrap_or(PartitionOffset {
-                    partition,
-                    offset: Offset::End.to_raw().unwrap(),
-                })
-        })
-    }
-
-    fn get_begin_partition_offset(&self, topic: &str, partition: i32) -> Option<PartitionOffset> {
-        let begin_offset = self.begin_offset.as_ref()?;
-        let partition_offsets = begin_offset.get(topic)?;
-        partition_offsets.get(partition as usize).map(|p| p.clone())
+            begin_offset: begin_partition
+                .map(|x| x.offset)
+                .unwrap_or(Offset::End.to_raw().unwrap()),
+            end_offset: end_partition.map(|x| x.offset),
+        }])
     }
 }
 
@@ -127,7 +169,7 @@ impl InputFormat for KafkaInputFormat {
         let client_config = self.client_config.clone();
         let handover = self.handover.as_ref().unwrap().clone();
 
-        let consumer_ranges = self.consumer_ranges(topic, partition);
+        let consumer_ranges = self.consumer_ranges(topic, partition).unwrap();
         create_kafka_consumer(
             context.task_id.job_id(),
             context.task_id.task_number(),
