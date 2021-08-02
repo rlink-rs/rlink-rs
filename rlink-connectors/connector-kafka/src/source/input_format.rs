@@ -92,40 +92,42 @@ impl KafkaInputFormat {
                     .unwrap_or_default();
 
                 let consumer: BaseConsumer<DefaultConsumerContext> = self.client_config.create()?;
-                let timeout = Duration::from_secs(3);
 
-                let begin_partition = if let Some(begin_timestamp) = begin_timestamp {
+                fn offsets_for_times(
+                    consumer: &BaseConsumer<DefaultConsumerContext>,
+                    topic: &str,
+                    partition: i32,
+                    timestamp: u64,
+                ) -> KafkaResult<Option<PartitionOffset>> {
+                    let timeout = Duration::from_secs(3);
                     let mut partition_list = TopicPartitionList::with_capacity(1);
                     partition_list.set_partition_offset(
-                        topic.as_str(),
+                        topic,
                         partition,
-                        Offset::Offset(*begin_timestamp as i64),
+                        Offset::Offset(timestamp as i64),
                     )?;
+
                     let tpl = consumer.offsets_for_times(partition_list, timeout)?;
-                    tpl.find_partition(topic.as_str(), partition)
-                        .map(|elem| PartitionOffset {
-                            partition,
-                            offset: elem.offset().to_raw().unwrap(),
-                        })
-                } else {
-                    None
+                    let partition_offset =
+                        tpl.find_partition(topic, partition)
+                            .map(|elem| PartitionOffset {
+                                partition,
+                                offset: elem.offset().to_raw().unwrap(),
+                            });
+                    Ok(partition_offset)
+                }
+
+                let begin_partition = match begin_timestamp {
+                    Some(timestamp) => {
+                        offsets_for_times(&consumer, topic.as_str(), partition, *timestamp)?
+                    }
+                    None => None,
                 };
-
-                let end_partition = if let Some(end_timestamp) = end_timestamp {
-                    let mut partition_list = TopicPartitionList::with_capacity(1);
-                    partition_list.set_partition_offset(
-                        topic.as_str(),
-                        partition,
-                        Offset::Offset(*end_timestamp as i64),
-                    )?;
-                    let tpl = consumer.offsets_for_times(partition_list, timeout)?;
-                    tpl.find_partition(topic.as_str(), partition)
-                        .map(|elem| PartitionOffset {
-                            partition,
-                            offset: elem.offset().to_raw().unwrap(),
-                        })
-                } else {
-                    None
+                let end_partition = match end_timestamp {
+                    Some(timestamp) => {
+                        offsets_for_times(&consumer, topic.as_str(), partition, *timestamp)?
+                    }
+                    None => None,
                 };
 
                 (begin_partition, end_partition)
