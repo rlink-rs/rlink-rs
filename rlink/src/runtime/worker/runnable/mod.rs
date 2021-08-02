@@ -24,6 +24,7 @@ pub mod source_runnable;
 pub mod watermark_assigner_runnable;
 pub mod window_assigner_runnable;
 
+use crate::runtime::worker::backpressure::Backpressure;
 pub(crate) use filter_runnable::FilterRunnable;
 pub(crate) use flat_map_runnable::FlatMapRunnable;
 pub(crate) use key_by_runnable::KeyByRunnable;
@@ -39,6 +40,7 @@ pub(crate) struct RunnableContext {
     pub(crate) cluster_descriptor: Arc<ClusterDescriptor>,
     pub(crate) task_descriptor: TaskDescriptor,
     pub(crate) window_timer: WindowTimer,
+    pub(crate) backpressure: Backpressure,
 }
 
 impl RunnableContext {

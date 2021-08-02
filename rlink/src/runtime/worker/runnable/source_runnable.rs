@@ -1,7 +1,7 @@
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
-use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -14,6 +14,7 @@ use crate::core::function::InputFormat;
 use crate::core::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
 use crate::core::runtime::{CheckpointId, JobId, OperatorId, TaskId};
 use crate::runtime::timer::TimerChannel;
+use crate::runtime::worker::backpressure::Backpressure;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
@@ -26,6 +27,8 @@ pub(crate) struct SourceRunnable {
 
     stream_source: DefaultStreamOperator<dyn InputFormat>,
     next_runnable: Option<Box<dyn Runnable>>,
+
+    backpressure: Option<Backpressure>,
 
     stream_status_timer: Option<TimerChannel>,
     checkpoint_timer: Option<TimerChannel>,
@@ -49,6 +52,8 @@ impl SourceRunnable {
             stream_source,
             next_runnable,
 
+            backpressure: None,
+
             stream_status_timer: None,
             checkpoint_timer: None,
 
@@ -58,10 +63,15 @@ impl SourceRunnable {
         }
     }
 
-    fn poll_input_element(&mut self, sender: ChannelSender<Element>, running: Arc<AtomicBool>) {
+    fn poll_input_element(
+        &mut self,
+        sender: ChannelSender<Element>,
+        running: Arc<AtomicBool>,
+        bp_pause_dur: Arc<AtomicU64>,
+    ) {
         let iterator = self.stream_source.operator_fn.element_iter();
         crate::utils::thread::spawn("poll_input_element", move || {
-            match SourceRunnable::poll_input_element0(iterator, sender, running) {
+            match SourceRunnable::poll_input_element0(iterator, sender, running, bp_pause_dur) {
                 Ok(_) => {}
                 Err(e) => panic!("poll_input_element thread error. {}", e),
             }
@@ -72,8 +82,17 @@ impl SourceRunnable {
         iterator: Box<dyn Iterator<Item = Element> + Send>,
         sender: ChannelSender<Element>,
         running: Arc<AtomicBool>,
+        bp_pause_dur: Arc<AtomicU64>,
     ) -> anyhow::Result<()> {
         for record in iterator {
+            let v = bp_pause_dur.load(Ordering::Relaxed);
+            if v > 0 {
+                bp_pause_dur.fetch_sub(v, Ordering::Relaxed);
+
+                info!("backpressure for {}ms", v);
+                std::thread::sleep(Duration::from_millis(v));
+            }
+
             sender.send(record).map_err(|e| anyhow!(e))?;
         }
 
@@ -150,6 +169,8 @@ impl Runnable for SourceRunnable {
         // first open next, then open self
         self.next_runnable.as_mut().unwrap().open(context)?;
 
+        self.backpressure = Some(context.backpressure.clone());
+
         let input_split = context.task_descriptor.input_split.clone();
         let fun_context = context.to_fun_context(self.operator_id);
         let source_func = self.stream_source.operator_fn.as_mut();
@@ -196,6 +217,8 @@ impl Runnable for SourceRunnable {
     fn run(&mut self, mut _element: Element) {
         info!("{} running...", self.stream_source.operator_fn.name());
 
+        let bp_pause_dur = Arc::new(AtomicU64::new(0));
+
         let mut element_iter = match self.stream_source.fn_creator() {
             FunctionCreator::User => {
                 let (sender, receiver) = named_channel(
@@ -205,7 +228,7 @@ impl Runnable for SourceRunnable {
                 );
                 let running = Arc::new(AtomicBool::new(true));
 
-                self.poll_input_element(sender.clone(), running.clone());
+                self.poll_input_element(sender.clone(), running.clone(), bp_pause_dur.clone());
 
                 self.poll_stream_status(sender.clone(), running.clone());
                 self.poll_checkpoint(sender.clone(), running.clone());
@@ -220,7 +243,12 @@ impl Runnable for SourceRunnable {
         let mut end_flags = 0;
         while let Some(element) = element_iter.next() {
             match element {
-                Element::Record(_) => self.next_runnable.as_mut().unwrap().run(element),
+                Element::Record(_) => {
+                    self.next_runnable.as_mut().unwrap().run(element);
+                    if let Some(v) = self.backpressure.as_ref().unwrap().take() {
+                        bp_pause_dur.fetch_add(v.as_millis() as u64, Ordering::Relaxed);
+                    }
+                }
                 Element::Barrier(barrier) => {
                     let is_barrier_align = self.barrier_alignment.apply(barrier.checkpoint_id.0);
                     if is_barrier_align {
