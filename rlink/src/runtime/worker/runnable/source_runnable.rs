@@ -105,7 +105,7 @@ impl SourceRunnable {
         crate::utils::thread::spawn("poll_stream_status", move || {
             match SourceRunnable::poll_stream_status0(stream_status_timer, sender, running) {
                 Ok(_) => {}
-                Err(e) => panic!("poll_stream_status thread error. {}", e),
+                Err(e) => warn!("poll stream_status thread error. {}", e),
             }
         });
     }
@@ -135,7 +135,7 @@ impl SourceRunnable {
         crate::utils::thread::spawn("poll_checkpoint", move || {
             match SourceRunnable::poll_checkpoint0(checkpoint_timer, sender, running) {
                 Ok(_) => {}
-                Err(e) => panic!("poll_checkpoint thread error. {}", e),
+                Err(e) => warn!("poll checkpoint thread error. {}", e),
             }
         });
     }
