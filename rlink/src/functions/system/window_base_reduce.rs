@@ -8,6 +8,8 @@ use crate::core::function::{BaseReduceFunction, Context, NamedFunction, ReduceFu
 use crate::core::properties::SystemProperties;
 use crate::core::runtime::CheckpointId;
 use crate::core::window::{TWindow, Window};
+use crate::metrics::metric::Gauge;
+use crate::metrics::register_gauge;
 use crate::runtime::worker::runnable::reduce_runnable::ReduceCheckpointHandle;
 use crate::storage::keyed_state::{TWindowState, WindowState};
 use crate::utils::date_time::timestamp_str;
@@ -19,6 +21,8 @@ pub(crate) struct WindowBaseReduceFunction {
 
     window_checkpoints: BTreeMap<CheckpointId, HashMap<Window, bool>>,
     skip_windows: Vec<Window>,
+
+    windows_gauge: Gauge,
 }
 
 impl WindowBaseReduceFunction {
@@ -28,6 +32,7 @@ impl WindowBaseReduceFunction {
             state: None,
             window_checkpoints: BTreeMap::new(),
             skip_windows: Vec::new(),
+            windows_gauge: Gauge::default(),
         }
     }
 
@@ -54,6 +59,9 @@ impl BaseReduceFunction for WindowBaseReduceFunction {
     fn open(&mut self, context: &Context) -> crate::core::Result<()> {
         let task_id = context.task_id;
         let application_id = context.application_id.clone();
+
+        self.windows_gauge =
+            register_gauge(format!("ReduceWindow_{}", self.name()), task_id.to_tags());
 
         let state_mode = context
             .application_properties
@@ -84,18 +92,22 @@ impl BaseReduceFunction for WindowBaseReduceFunction {
 
         let state = self.state.as_mut().unwrap();
         let reduce_func = &self.reduce;
-        state.merge(key, record, |val1, val2| reduce_func.reduce(val1, val2));
+        let window_count = state.merge(key, record, |val1, val2| reduce_func.reduce(val1, val2));
+        self.windows_gauge.store(window_count as i64);
     }
 
     fn drop_state(&mut self, watermark_timestamp: u64) -> Vec<Record> {
         let state = self.state.as_mut().unwrap();
         let mut drop_windows = Vec::new();
+        let mut window_count = 0;
         for window in state.windows() {
             if window.max_timestamp() <= watermark_timestamp {
                 drop_windows.push(window.clone());
-                state.drop_window(&window);
+                window_count = state.drop_window(&window);
             }
         }
+
+        self.windows_gauge.store(window_count as i64);
 
         if drop_windows.len() > 0 {
             debug!(
