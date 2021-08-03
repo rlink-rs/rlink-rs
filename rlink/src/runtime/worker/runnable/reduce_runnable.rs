@@ -113,6 +113,7 @@ impl Runnable for ReduceRunnable {
                     Some(min_watermark_window) => {
                         self.limited_watermark_window = min_watermark_window.clone();
 
+                        debug!("drop state {}", min_watermark_window.min_timestamp());
                         let drop_events = self
                             .stream_reduce
                             .operator_fn
@@ -131,7 +132,10 @@ impl Runnable for ReduceRunnable {
                 }
 
                 // convert watermark to stream_status, and continue post
-                let stream_status = StreamStatus::new(watermark.status_timestamp, false);
+                let end = watermark.timestamp == MAX_WATERMARK.timestamp;
+                let stream_status = StreamStatus::new(watermark.status_timestamp, end);
+                debug!("convert watermark to stream_status: {:?}", stream_status);
+
                 self.next_runnable
                     .as_mut()
                     .unwrap()

@@ -13,6 +13,7 @@ use crate::core::element::{Element, StreamStatus, Watermark};
 use crate::core::function::InputFormat;
 use crate::core::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
 use crate::core::runtime::{CheckpointId, JobId, OperatorId, TaskId};
+use crate::core::watermark::MAX_WATERMARK;
 use crate::runtime::timer::TimerChannel;
 use crate::runtime::worker::backpressure::Backpressure;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
@@ -124,10 +125,10 @@ impl SourceRunnable {
 
             if !running {
                 info!("StreamStatus WindowTimer stop");
-                break;
+                // break;
             }
         }
-        Ok(())
+        // Ok(())
     }
 
     fn poll_checkpoint(&mut self, sender: ChannelSender<Element>, running: Arc<AtomicBool>) {
@@ -153,10 +154,10 @@ impl SourceRunnable {
             let running = running.load(Ordering::Relaxed);
             if !running {
                 info!("Checkpoint WindowTimer stop");
-                break;
+                // break;
             }
         }
-        Ok(())
+        // Ok(())
     }
 }
 
@@ -267,6 +268,14 @@ impl Runnable for SourceRunnable {
                     }
                 }
                 Element::Watermark(watermark) => {
+                    if watermark.timestamp == MAX_WATERMARK.timestamp {
+                        end_flags += 1;
+                        if end_flags == self.waiting_end_flags {
+                            info!("all parents job stop");
+                        }
+                        // todo mark the job as end status
+                    }
+
                     let align_watermark = self.status_alignment.apply_watermark(watermark);
                     match align_watermark {
                         Some(w) => {
@@ -286,38 +295,34 @@ impl Runnable for SourceRunnable {
                     if stream_status.end {
                         end_flags += 1;
                         if end_flags == self.waiting_end_flags {
-                            let stream_status = Element::new_stream_status(0, true);
-                            self.next_runnable.as_mut().unwrap().run(stream_status);
-
+                            // todo mark the job as end status
                             info!("break source loop");
-                            break;
                         }
-                    } else {
-                        let (align, align_watermark) = self
-                            .status_alignment
-                            .apply_stream_status(stream_status.clone());
-                        if align {
-                            match align_watermark {
-                                Some(w) => {
-                                    debug!(
-                                        "Watermark&StreamStatus aligned, status_timestamp: {}",
-                                        w.status_timestamp
-                                    );
-                                    self.next_runnable
-                                        .as_mut()
-                                        .unwrap()
-                                        .run(Element::Watermark(w))
-                                }
-                                None => {
-                                    debug!(
-                                        "StreamStatus aligned, status_timestamp: {}",
-                                        stream_status.timestamp
-                                    );
-                                    self.next_runnable
-                                        .as_mut()
-                                        .unwrap()
-                                        .run(Element::StreamStatus(stream_status))
-                                }
+                    }
+                    let (align, align_watermark) = self
+                        .status_alignment
+                        .apply_stream_status(stream_status.clone());
+                    if align {
+                        match align_watermark {
+                            Some(w) => {
+                                debug!(
+                                    "Watermark&StreamStatus aligned, status_timestamp: {}",
+                                    w.status_timestamp
+                                );
+                                self.next_runnable
+                                    .as_mut()
+                                    .unwrap()
+                                    .run(Element::Watermark(w))
+                            }
+                            None => {
+                                debug!(
+                                    "StreamStatus aligned, status_timestamp: {}",
+                                    stream_status.timestamp
+                                );
+                                self.next_runnable
+                                    .as_mut()
+                                    .unwrap()
+                                    .run(Element::StreamStatus(stream_status))
                             }
                         }
                     }

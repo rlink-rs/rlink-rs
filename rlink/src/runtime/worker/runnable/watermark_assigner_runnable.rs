@@ -4,7 +4,7 @@ use crate::core::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotCont
 use crate::core::element::Element;
 use crate::core::operator::DefaultStreamOperator;
 use crate::core::runtime::{OperatorId, TaskId};
-use crate::core::watermark::{Watermark, WatermarkAssigner, MIN_WATERMARK};
+use crate::core::watermark::{Watermark, WatermarkAssigner, MAX_WATERMARK, MIN_WATERMARK};
 use crate::metrics::metric::{Counter, Gauge};
 use crate::metrics::{register_counter, register_gauge};
 use crate::runtime::worker::backpressure::Backpressure;
@@ -97,7 +97,13 @@ impl Runnable for WatermarkAssignerRunnable {
             }
             Element::StreamStatus(stream_status) => {
                 if stream_status.end {
-                    self.next_runnable.as_mut().unwrap().run(element);
+                    let watermark_ele = Element::new_watermark(
+                        self.task_id.task_number,
+                        self.task_id.num_tasks,
+                        MAX_WATERMARK.timestamp,
+                        stream_status,
+                    );
+                    self.next_runnable.as_mut().unwrap().run(watermark_ele);
                 } else {
                     let watermark = match watermark_assigner.watermark(stream_status) {
                         Some(watermark) => watermark,

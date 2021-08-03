@@ -260,6 +260,7 @@ impl Client {
             let len = element_list.len();
             if len > 0 {
                 for element in element_list {
+                    debug!("receive remote element: {:?}", element);
                     match self.sender.try_send_opt(element) {
                         Some(t) => send_to_channel(&self.sender, t).await?,
                         None => {}

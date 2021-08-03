@@ -93,6 +93,7 @@ fn get_network_channel(key: &ChannelKey) -> Option<ElementReceiver> {
 /// Remove a channel by `ChannelKey`
 /// When the `StreamStatus` of the `end` state is consumed from the channel,
 /// the channel needs to be removed.
+#[allow(dead_code)]
 fn remove_network_channel(key: &ChannelKey) {
     let network_channels: &DashMap<ChannelKey, ElementReceiver> = &*NETWORK_CHANNELS;
     network_channels.remove(key);
@@ -244,15 +245,10 @@ impl Server {
             batch_id: _,
         } = request;
 
-        let (element_list, end) = self.batch_get(&channel_key, batch_pull_size);
+        let element_list = self.batch_get(&channel_key, batch_pull_size);
         let len = self
             .batch_send(element_list, batch_pull_size, framed_write)
             .await?;
-
-        if end {
-            remove_network_channel(&channel_key);
-            info!("remove end channel, channel_key: {:?}", channel_key);
-        }
 
         if is_enable_log() {
             info!(
@@ -265,11 +261,7 @@ impl Server {
     }
 
     /// batch get elements by `ChannelKey`
-    fn batch_get(
-        &self,
-        channel_key: &ChannelKey,
-        batch_pull_size: u16,
-    ) -> (LinkedList<Element>, bool) {
+    fn batch_get(&self, channel_key: &ChannelKey, batch_pull_size: u16) -> LinkedList<Element> {
         match get_network_channel(&channel_key) {
             Some(receiver) => self.batch_receive(channel_key, batch_pull_size, receiver),
             None => {
@@ -279,7 +271,7 @@ impl Server {
                     "channel_key({:?}) not found, maybe the job haven't initialized yet",
                     channel_key
                 );
-                (LinkedList::new(), false)
+                LinkedList::new()
             }
         }
     }
@@ -290,22 +282,12 @@ impl Server {
         channel_key: &ChannelKey,
         batch_pull_size: u16,
         receiver: ElementReceiver,
-    ) -> (LinkedList<Element>, bool) {
+    ) -> LinkedList<Element> {
         let mut element_list = LinkedList::new();
-        let mut end = false;
         for _ in 0..batch_pull_size {
             match receiver.try_recv() {
                 Ok(element) => {
-                    if element.is_stream_status() {
-                        if element.as_stream_status().end {
-                            end = true;
-                        }
-                    }
-
                     element_list.push_back(element);
-                    if end {
-                        break;
-                    }
                 }
                 Err(TryRecvError::Empty) => {
                     break;
@@ -317,7 +299,7 @@ impl Server {
                 }
             }
         }
-        (element_list, end)
+        element_list
     }
 
     /// send batch response to client
