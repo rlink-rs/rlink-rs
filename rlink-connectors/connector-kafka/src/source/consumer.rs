@@ -135,16 +135,6 @@ impl KafkaConsumerThread {
                     let key = borrowed_message.key().unwrap_or(&utils::EMPTY_SLICE);
                     let payload = borrowed_message.payload().unwrap_or(&utils::EMPTY_SLICE);
 
-                    let records = self
-                        .deserializer
-                        .deserialize(timestamp, key, payload, topic, partition, offset);
-
-                    for record in records {
-                        self.handover
-                            .produce(record)
-                            .expect("kafka consumer handover `Disconnected`");
-                    }
-
                     if self.end_check(topic, partition, offset) {
                         self.handover
                             .produce(empty_record())
@@ -154,6 +144,16 @@ impl KafkaConsumerThread {
                             *self.job_id, self.task_number
                         );
                         break;
+                    }
+
+                    let records = self
+                        .deserializer
+                        .deserialize(timestamp, key, payload, topic, partition, offset);
+
+                    for record in records {
+                        self.handover
+                            .produce(record)
+                            .expect("kafka consumer handover `Disconnected`");
                     }
                 }
                 Err(e) => warn!(
