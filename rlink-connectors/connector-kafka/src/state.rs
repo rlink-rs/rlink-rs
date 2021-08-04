@@ -15,6 +15,13 @@ impl PartitionOffset {
     pub fn new(partition: i32, offset: i64) -> Self {
         Self { partition, offset }
     }
+
+    pub fn partition(&self) -> i32 {
+        self.partition
+    }
+    pub fn offset(&self) -> i64 {
+        self.offset
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
