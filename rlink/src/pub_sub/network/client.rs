@@ -27,6 +27,7 @@ use crate::metrics::{register_counter, Tag};
 use crate::pub_sub::network::{
     new_framed_read, new_framed_write, ElementRequest, ElementResponse, ResponseCode,
 };
+use crate::runtime::worker::heart_beat::get_coordinator_status;
 use crate::runtime::ClusterDescriptor;
 use crate::utils::thread::{async_runtime_multi, async_sleep};
 
@@ -161,7 +162,10 @@ async fn loop_client_task(
                 break;
             }
             Err(e) => {
-                error!("client({}) task error. {}", addr, e)
+                error!("client({}) task error. {}", addr, e);
+                if get_coordinator_status().is_terminated() {
+                    break;
+                }
             }
         }
 
@@ -381,7 +385,7 @@ async fn send_to_channel(sender: &ElementSender, element: Element) -> anyhow::Re
                 ele
             }
             Err(TrySendError::Disconnected(_)) => {
-                return Err(anyhow!("client network send to input channel Disconnected. unreachable! the next job channel must live longer than the client"));
+                return Err(anyhow!("client network send to input channel Disconnected. the next job channel must live longer than the client or the application has `Terminated`"));
             }
         }
     }

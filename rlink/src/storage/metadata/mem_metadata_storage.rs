@@ -112,7 +112,7 @@ impl TMetadataStorage for MemoryMetadataStorage {
                                 .is_none();
                             if all_tasks_end {
                                 cluster_descriptor.coordinator_manager.coordinator_status =
-                                    ManagerStatus::Stopped;
+                                    ManagerStatus::Terminated;
                             } else {
                                 let exist_tasks_end = task_manager_descriptor
                                     .task_descriptors
@@ -122,7 +122,7 @@ impl TMetadataStorage for MemoryMetadataStorage {
                                     .is_some();
                                 if exist_tasks_end {
                                     cluster_descriptor.coordinator_manager.coordinator_status =
-                                        ManagerStatus::Stopping;
+                                        ManagerStatus::Terminating;
                                 }
                             }
                         }

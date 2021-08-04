@@ -140,7 +140,7 @@ impl Iterator for ChannelIterator {
     fn next(&mut self) -> Option<Self::Item> {
         match self.receiver.recv() {
             Ok(element) => {
-                if get_coordinator_status().is_stopped() {
+                if get_coordinator_status().is_terminated() {
                     info!("ChannelIterator finish");
                     return None;
                 }
@@ -180,7 +180,7 @@ impl Iterator for MultiChannelIterator {
 
             match res {
                 Ok(element) => {
-                    if get_coordinator_status().is_stopped() {
+                    if get_coordinator_status().is_terminated() {
                         info!("MultiChannelIterator finish");
                         return None;
                     }

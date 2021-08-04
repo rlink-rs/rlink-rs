@@ -108,13 +108,22 @@ pub trait InputFormat
 where
     Self: InputSplitSource + NamedFunction + CheckpointFunction,
 {
-    // fn configure(&mut self, properties: HashMap<String, String>);
+    /// Initialization of `InputFormat`, Each task will be called once when it starts.
     fn open(&mut self, input_split: InputSplit, context: &Context) -> crate::core::Result<()>;
+    /// return an `Iterator` of `Record`, if the `next` of `Iterator` is `None`,
+    /// the task of `InputFormat` will be `Terminated`.
+    /// the function is called by `element_iter`, a user-friendly function,
+    /// usually you just need to implement it
     fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record> + Send>;
+    /// return an `Iterator` of `Element`, if the `next` of `Iterator` is `None`,
+    /// the task of `InputFormat` will be `Terminated`.
+    /// the function is called by runtime
     fn element_iter(&mut self) -> Box<dyn Iterator<Item = Element> + Send> {
         Box::new(ElementIterator::new(self.record_iter()))
     }
     fn close(&mut self) -> crate::core::Result<()>;
+    /// mark the `InputFormat` is running in daemon mode,
+    /// if `true`, this `InputFormat` is automatically terminated when any task instance ends
     fn daemon(&self) -> bool {
         false
     }
@@ -193,7 +202,6 @@ where
     Self: NamedFunction + CheckpointFunction,
 {
     fn open(&mut self, context: &Context) -> crate::core::Result<()>;
-    ///
     fn reduce(&mut self, key: Record, record: Record);
     fn drop_state(&mut self, watermark_timestamp: u64) -> Vec<Record>;
     fn close(&mut self) -> crate::core::Result<()>;

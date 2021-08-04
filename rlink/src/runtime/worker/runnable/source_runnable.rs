@@ -107,7 +107,7 @@ impl SourceRunnable {
 
             sender.send(record).map_err(|e| anyhow!(e))?;
 
-            if daemon_task && get_coordinator_status().is_stop() {
+            if daemon_task && get_coordinator_status().is_terminating() {
                 info!("daemon source stop by coordinator stop");
                 break;
             }
@@ -141,7 +141,7 @@ impl SourceRunnable {
 
             if !running {
                 info!("StreamStatus WindowTimer stop");
-                if get_coordinator_status().is_stopped() {
+                if get_coordinator_status().is_terminated() {
                     break;
                 }
             }
@@ -172,7 +172,7 @@ impl SourceRunnable {
             let running = running.load(Ordering::Relaxed);
             if !running {
                 info!("Checkpoint WindowTimer stop");
-                if get_coordinator_status().is_stopped() {
+                if get_coordinator_status().is_terminated() {
                     break;
                 }
             }

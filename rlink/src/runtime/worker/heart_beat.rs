@@ -116,7 +116,7 @@ pub(crate) async fn report_heartbeat(
 
             if let Some(coordinator_status) = resp.data {
                 match coordinator_status {
-                    ManagerStatus::Stopping | ManagerStatus::Stopped => {
+                    ManagerStatus::Terminating | ManagerStatus::Terminated => {
                         info!("coordinator status: {:?}", coordinator_status)
                     }
                     _ => {}

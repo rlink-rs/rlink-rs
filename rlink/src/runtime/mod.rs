@@ -107,23 +107,23 @@ pub enum ManagerStatus {
     Registered = 1,
     /// TaskManager lost and try to recreate a new TaskManager
     Migration = 2,
-    /// One of non-daemon Tasks stopped
-    Stopping = 3,
-    /// All Tasks stopped
-    Stopped = 4,
+    /// One of non-daemon Tasks terminated
+    Terminating = 3,
+    /// All Tasks terminated
+    Terminated = 4,
 }
 
 impl ManagerStatus {
-    pub fn is_stop(&self) -> bool {
+    pub fn is_terminating(&self) -> bool {
         match self {
-            ManagerStatus::Stopping | ManagerStatus::Stopped => true,
+            ManagerStatus::Terminating => true,
             _ => false,
         }
     }
 
-    pub fn is_stopped(&self) -> bool {
+    pub fn is_terminated(&self) -> bool {
         match self {
-            ManagerStatus::Stopped => true,
+            ManagerStatus::Terminated => true,
             _ => false,
         }
     }
