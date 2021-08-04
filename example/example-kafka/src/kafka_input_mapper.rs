@@ -19,6 +19,7 @@ pub struct KafkaInputMapperFunction {
 }
 
 impl KafkaInputMapperFunction {
+    #[allow(dead_code)]
     pub fn new(topic: String) -> Self {
         KafkaInputMapperFunction {
             err_counter: 0,
