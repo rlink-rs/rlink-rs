@@ -64,7 +64,7 @@ impl TMetadataStorage for MemoryMetadataStorage {
         task_manager_id: String,
         heartbeat_items: Vec<HeartbeatItem>,
         task_manager_status: TaskManagerStatus,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<TaskManagerStatus> {
         let mut update_success = false;
 
         let mut lock = METADATA_STORAGE
@@ -113,7 +113,10 @@ impl TMetadataStorage for MemoryMetadataStorage {
                                 .iter()
                                 .find(|x| !x.end)
                                 .is_none();
-                            cluster_descriptor.coordinator_manager.end = all_tasks_end;
+                            if all_tasks_end {
+                                cluster_descriptor.coordinator_manager.coordinator_status =
+                                    TaskManagerStatus::Stopped;
+                            }
                         }
                     }
                 }
@@ -128,8 +131,9 @@ impl TMetadataStorage for MemoryMetadataStorage {
                 "Update TaskManager metadata success. {:?}",
                 cluster_descriptor
             );
+            let coordinator_status = cluster_descriptor.coordinator_manager.coordinator_status;
             *lock = Some(cluster_descriptor);
-            Ok(())
+            Ok(coordinator_status)
         } else {
             error!(
                 "TaskManager(task_manager_id={}) metadata not found",

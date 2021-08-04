@@ -67,7 +67,6 @@ pub(crate) fn build_cluster_descriptor(
         num_task_managers: context.num_task_managers,
         uptime: crate::utils::date_time::current_timestamp_millis(),
         startup_number: 0,
-        end: false,
     };
 
     ClusterDescriptor {

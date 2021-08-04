@@ -22,7 +22,7 @@ pub trait TMetadataStorage: Debug {
         task_manager_id: String,
         heartbeat_items: Vec<HeartbeatItem>,
         task_manager_status: TaskManagerStatus,
-    ) -> anyhow::Result<()>;
+    ) -> anyhow::Result<TaskManagerStatus>;
 }
 
 #[derive(Debug)]
@@ -76,7 +76,7 @@ impl TMetadataStorage for MetadataStorage {
         task_manager_id: String,
         heartbeat_items: Vec<HeartbeatItem>,
         task_manager_status: TaskManagerStatus,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<TaskManagerStatus> {
         match self {
             MetadataStorage::MemoryMetadataStorage(storage) => storage.update_task_manager_status(
                 task_manager_id,

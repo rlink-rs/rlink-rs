@@ -97,7 +97,7 @@ pub struct TaskDescriptor {
     pub end: bool,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq)]
 pub enum TaskManagerStatus {
     /// waiting for the TaskManager register
     Pending = 0,
@@ -105,6 +105,15 @@ pub enum TaskManagerStatus {
     Registered = 1,
     /// TaskManager lost and try to recreate a new TaskManager
     Migration = 2,
+    /// All non-daemon Tasks stopped
+    Stopping = 3,
+    /// All Tasks stopped
+    Stopped = 4,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+pub enum ClusterStatus {
+    Running = 0,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -165,7 +174,6 @@ pub struct CoordinatorManagerDescriptor {
     pub num_task_managers: u32,
     pub uptime: u64,
     pub startup_number: u64,
-    pub end: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
