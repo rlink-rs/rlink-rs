@@ -3,7 +3,7 @@ use std::sync::RwLock;
 use std::time::Duration;
 
 use crate::core::cluster::MetadataStorageType;
-use crate::core::runtime::{ClusterDescriptor, HeartBeatStatus};
+use crate::core::runtime::{ClusterDescriptor, ManagerStatus};
 use crate::storage::metadata::{loop_read_cluster_descriptor, MetadataStorage};
 use crate::utils;
 
@@ -36,14 +36,12 @@ pub(crate) fn start_heartbeat_timer(metadata_storage_mode: MetadataStorageType) 
         let cluster_descriptor = loop_read_cluster_descriptor(&metadata_storage);
         update_global_cluster_descriptor(cluster_descriptor.clone());
 
-        let current_timestamp = utils::date_time::current_timestamp().as_millis() as u64;
+        if cluster_descriptor.coordinator_manager.coordinator_status == ManagerStatus::Terminated {
+            return HeartbeatResult::End;
+        }
 
-        let mut end_task_managers = 0;
+        let current_timestamp = utils::date_time::current_timestamp().as_millis() as u64;
         for task_manager_descriptor in &cluster_descriptor.worker_managers {
-            if let HeartBeatStatus::End = task_manager_descriptor.latest_heart_beat_status {
-                end_task_managers += 1;
-                continue;
-            }
             if current_timestamp < task_manager_descriptor.latest_heart_beat_ts {
                 continue;
             }
@@ -72,9 +70,5 @@ pub(crate) fn start_heartbeat_timer(metadata_storage_mode: MetadataStorageType) 
             "all({}) task is final",
             cluster_descriptor.worker_managers.len()
         );
-
-        if end_task_managers == cluster_descriptor.worker_managers.len() {
-            return HeartbeatResult::End;
-        }
     }
 }
