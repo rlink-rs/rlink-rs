@@ -101,6 +101,7 @@ fn remove_network_channel(key: &ChannelKey) {
 
 /// Check whether all channels have been removed.
 /// Used to determine whether the `TaskManager` instance can be closed.
+#[allow(dead_code)]
 pub(crate) fn empty_network_channel() -> bool {
     let network_channels: &DashMap<ChannelKey, ElementReceiver> = &*NETWORK_CHANNELS;
     network_channels.len() == 0
