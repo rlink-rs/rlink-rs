@@ -120,8 +120,8 @@ impl KafkaConsumerThread {
         consumer.assign(&assignment)?;
 
         info!(
-            "create consumer success. config: {:?}, apply checkpoint offset: {:?}, job_id: {}, task_num: {}",
-            self.client_config, self.consumer_ranges, *self.job_id, self.task_number
+            "create consumer success. config: {:?}, assign: {:?}, offset range: {:?},job_id: {}, task_num: {}",
+            self.client_config, assignment, self.consumer_ranges, *self.job_id, self.task_number
         );
 
         let mut message_stream = consumer.stream();
