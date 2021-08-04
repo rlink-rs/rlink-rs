@@ -55,6 +55,10 @@ impl InputFormat for ConfigInputFormat {
     fn close(&mut self) -> core::Result<()> {
         Ok(())
     }
+
+    fn daemon(&self) -> bool {
+        true
+    }
 }
 
 struct ConfigIterator {

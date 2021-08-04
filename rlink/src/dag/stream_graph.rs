@@ -18,6 +18,7 @@ pub struct StreamNode {
     pub(crate) id: OperatorId,
     pub(crate) parent_ids: Vec<OperatorId>,
     pub(crate) parallelism: u16,
+    pub(crate) daemon: bool,
 
     pub(crate) operator_name: String,
     pub(crate) operator_type: OperatorType,
@@ -142,6 +143,7 @@ impl RawStreamGraph {
             id: operator_id,
             parent_ids: parent_operator_ids.clone(),
             parallelism,
+            daemon: operator.is_daemon(),
             operator_name: operator.operator_name().to_string(),
             operator_type: OperatorType::from(&operator),
             fn_creator: operator.fn_creator(),

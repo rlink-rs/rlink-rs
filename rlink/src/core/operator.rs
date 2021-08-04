@@ -145,6 +145,14 @@ impl StreamOperator {
         StreamOperator::StreamSink(operator)
     }
 
+    pub fn is_daemon(&self) -> bool {
+        if let StreamOperator::StreamSource(stream_source) = self {
+            stream_source.operator_fn.daemon()
+        } else {
+            false
+        }
+    }
+
     pub fn is_source(&self) -> bool {
         if let StreamOperator::StreamSource(_stream_source) = self {
             return true;

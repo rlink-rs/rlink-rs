@@ -116,6 +116,17 @@ impl TMetadataStorage for MemoryMetadataStorage {
                             if all_tasks_end {
                                 cluster_descriptor.coordinator_manager.coordinator_status =
                                     TaskManagerStatus::Stopped;
+                            } else {
+                                let exist_tasks_end = task_manager_descriptor
+                                    .task_descriptors
+                                    .iter()
+                                    .filter(|x| !x.daemon)
+                                    .find(|x| x.end)
+                                    .is_some();
+                                if exist_tasks_end {
+                                    cluster_descriptor.coordinator_manager.coordinator_status =
+                                        TaskManagerStatus::Stopping;
+                                }
                             }
                         }
                     }

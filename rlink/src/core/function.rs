@@ -115,6 +115,9 @@ where
         Box::new(ElementIterator::new(self.record_iter()))
     }
     fn close(&mut self) -> crate::core::Result<()>;
+    fn daemon(&self) -> bool {
+        false
+    }
 }
 
 pub trait OutputFormat

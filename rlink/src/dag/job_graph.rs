@@ -42,6 +42,10 @@ impl JobNode {
             .is_some()
     }
 
+    pub fn is_daemon_job(&self) -> bool {
+        self.stream_nodes[0].daemon
+    }
+
     #[allow(dead_code)]
     fn stream_node(&self, operator_id: OperatorId) -> Option<&StreamNode> {
         self.stream_nodes.iter().find(|x| x.id == operator_id)

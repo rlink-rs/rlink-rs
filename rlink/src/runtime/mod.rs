@@ -93,6 +93,7 @@ pub struct TaskDescriptor {
     pub task_id: TaskId,
     pub operators: Vec<OperatorDescriptor>,
     pub input_split: InputSplit,
+    pub daemon: bool,
     pub thread_id: String,
     pub end: bool,
 }
@@ -109,6 +110,22 @@ pub enum TaskManagerStatus {
     Stopping = 3,
     /// All Tasks stopped
     Stopped = 4,
+}
+
+impl TaskManagerStatus {
+    pub fn is_stop(&self) -> bool {
+        match self {
+            TaskManagerStatus::Stopping | TaskManagerStatus::Stopped => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_stopped(&self) -> bool {
+        match self {
+            TaskManagerStatus::Stopped => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]

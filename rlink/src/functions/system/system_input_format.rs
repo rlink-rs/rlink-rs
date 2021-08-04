@@ -8,6 +8,7 @@ use crate::core::properties::{ChannelBaseOn, SystemProperties};
 use crate::core::runtime::TaskId;
 use crate::dag::execution_graph::ExecutionEdge;
 use crate::pub_sub::{memory, network, DEFAULT_CHANNEL_SIZE};
+use crate::runtime::worker::heart_beat::get_coordinator_status;
 
 pub(crate) struct SystemInputFormat {
     memory_receiver: Option<ElementReceiver>,
@@ -139,9 +140,10 @@ impl Iterator for ChannelIterator {
     fn next(&mut self) -> Option<Self::Item> {
         match self.receiver.recv() {
             Ok(element) => {
-                // if element.is_stream_status() && element.as_stream_status().end {
-                //     return None;
-                // }
+                if get_coordinator_status().is_stopped() {
+                    info!("ChannelIterator finish");
+                    return None;
+                }
                 return Some(element);
             }
             Err(_e) => {
@@ -178,9 +180,10 @@ impl Iterator for MultiChannelIterator {
 
             match res {
                 Ok(element) => {
-                    // if element.is_stream_status() && element.as_stream_status().end {
-                    //     return None;
-                    // }
+                    if get_coordinator_status().is_stopped() {
+                        info!("MultiChannelIterator finish");
+                        return None;
+                    }
                     return Some(element);
                 }
                 Err(TryRecvError::Empty) => continue,

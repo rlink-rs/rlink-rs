@@ -30,6 +30,7 @@ pub(crate) struct TaskInstance {
     pub task_id: TaskId,
     pub stream_nodes: Vec<StreamNode>,
     pub input_split: InputSplit,
+    pub daemon: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

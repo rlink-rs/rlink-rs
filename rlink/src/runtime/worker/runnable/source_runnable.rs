@@ -16,7 +16,7 @@ use crate::core::runtime::{CheckpointId, JobId, OperatorId, TaskId};
 use crate::runtime::timer::TimerChannel;
 use crate::runtime::worker::backpressure::Backpressure;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
-use crate::runtime::worker::heart_beat::submit_heartbeat;
+use crate::runtime::worker::heart_beat::{get_coordinator_status, submit_heartbeat};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 use crate::runtime::HeartbeatItem;
 
@@ -26,6 +26,7 @@ pub(crate) struct SourceRunnable {
     context: Option<RunnableContext>,
 
     task_id: TaskId,
+    daemon_task: bool,
 
     stream_source: DefaultStreamOperator<dyn InputFormat>,
     next_runnable: Option<Box<dyn Runnable>>,
@@ -50,6 +51,7 @@ impl SourceRunnable {
             operator_id,
             context: None,
             task_id: TaskId::default(),
+            daemon_task: false,
 
             stream_source,
             next_runnable,
@@ -70,11 +72,18 @@ impl SourceRunnable {
         sender: ChannelSender<Element>,
         running: Arc<AtomicBool>,
         bp_pause_dur: Arc<AtomicU64>,
+        daemon_task: bool,
     ) {
         let iterator = self.stream_source.operator_fn.element_iter();
         crate::utils::thread::spawn("poll_input_element", move || {
-            match SourceRunnable::poll_input_element0(iterator, sender, running, bp_pause_dur) {
-                Ok(_) => {}
+            match SourceRunnable::poll_input_element0(
+                iterator,
+                sender,
+                running,
+                bp_pause_dur,
+                daemon_task,
+            ) {
+                Ok(_) => info!("poll input_element task finish"),
                 Err(e) => panic!("poll_input_element thread error. {}", e),
             }
         });
@@ -85,6 +94,7 @@ impl SourceRunnable {
         sender: ChannelSender<Element>,
         running: Arc<AtomicBool>,
         bp_pause_dur: Arc<AtomicU64>,
+        daemon_task: bool,
     ) -> anyhow::Result<()> {
         for record in iterator {
             let v = bp_pause_dur.load(Ordering::Relaxed);
@@ -96,6 +106,11 @@ impl SourceRunnable {
             }
 
             sender.send(record).map_err(|e| anyhow!(e))?;
+
+            if daemon_task && get_coordinator_status().is_stop() {
+                info!("daemon source stop by coordinator stop");
+                break;
+            }
         }
 
         running.store(false, Ordering::Relaxed);
@@ -106,7 +121,7 @@ impl SourceRunnable {
         let stream_status_timer = self.stream_status_timer.as_ref().unwrap().clone();
         crate::utils::thread::spawn("poll_stream_status", move || {
             match SourceRunnable::poll_stream_status0(stream_status_timer, sender, running) {
-                Ok(_) => {}
+                Ok(_) => info!("poll stream_status task finish"),
                 Err(e) => warn!("poll stream_status thread error. {}", e),
             }
         });
@@ -126,17 +141,19 @@ impl SourceRunnable {
 
             if !running {
                 info!("StreamStatus WindowTimer stop");
-                // break;
+                if get_coordinator_status().is_stopped() {
+                    break;
+                }
             }
         }
-        // Ok(())
+        Ok(())
     }
 
     fn poll_checkpoint(&mut self, sender: ChannelSender<Element>, running: Arc<AtomicBool>) {
         let checkpoint_timer = self.checkpoint_timer.as_ref().unwrap().clone();
         crate::utils::thread::spawn("poll_checkpoint", move || {
             match SourceRunnable::poll_checkpoint0(checkpoint_timer, sender, running) {
-                Ok(_) => {}
+                Ok(_) => info!("poll checkpoint task finish"),
                 Err(e) => warn!("poll checkpoint thread error. {}", e),
             }
         });
@@ -155,10 +172,12 @@ impl SourceRunnable {
             let running = running.load(Ordering::Relaxed);
             if !running {
                 info!("Checkpoint WindowTimer stop");
-                // break;
+                if get_coordinator_status().is_stopped() {
+                    break;
+                }
             }
         }
-        // Ok(())
+        Ok(())
     }
 
     fn report_end_status(&self) {
@@ -173,6 +192,7 @@ impl Runnable for SourceRunnable {
         self.context = Some(context.clone());
 
         self.task_id = context.task_descriptor.task_id;
+        self.daemon_task = context.task_descriptor.daemon;
 
         // first open next, then open self
         self.next_runnable.as_mut().unwrap().open(context)?;
@@ -236,7 +256,12 @@ impl Runnable for SourceRunnable {
                 );
                 let running = Arc::new(AtomicBool::new(true));
 
-                self.poll_input_element(sender.clone(), running.clone(), bp_pause_dur.clone());
+                self.poll_input_element(
+                    sender.clone(),
+                    running.clone(),
+                    bp_pause_dur.clone(),
+                    self.daemon_task,
+                );
 
                 self.poll_stream_status(sender.clone(), running.clone());
                 self.poll_checkpoint(sender.clone(), running.clone());
@@ -275,14 +300,7 @@ impl Runnable for SourceRunnable {
                     }
                 }
                 Element::Watermark(watermark) => {
-                    if watermark.end() {
-                        end_flags += 1;
-                        if end_flags == self.waiting_end_flags {
-                            info!("all parents job stop on watermark event");
-                        }
-
-                        self.report_end_status();
-                    }
+                    let end_watermark = watermark.end();
 
                     let align_watermark = self.status_alignment.apply_watermark(watermark);
                     match align_watermark {
@@ -298,15 +316,18 @@ impl Runnable for SourceRunnable {
                         }
                         None => {}
                     }
-                }
-                Element::StreamStatus(stream_status) => {
-                    if stream_status.end {
+
+                    if end_watermark {
                         end_flags += 1;
                         if end_flags == self.waiting_end_flags {
-                            info!("all parents job stop on stream_status event");
+                            info!("all parents job stop on watermark event");
                             self.report_end_status();
                         }
                     }
+                }
+                Element::StreamStatus(stream_status) => {
+                    let end_stream_status = stream_status.end;
+
                     let (align, align_watermark) = self
                         .status_alignment
                         .apply_stream_status(stream_status.clone());
@@ -332,6 +353,14 @@ impl Runnable for SourceRunnable {
                                     .unwrap()
                                     .run(Element::StreamStatus(stream_status))
                             }
+                        }
+                    }
+
+                    if end_stream_status {
+                        end_flags += 1;
+                        if end_flags == self.waiting_end_flags {
+                            info!("all parents job stop on stream_status event");
+                            self.report_end_status();
                         }
                     }
                 }
