@@ -18,7 +18,7 @@ use crate::core::cluster::{MetadataStorageType, StdResponse};
 use crate::dag::metadata::DagMetadata;
 use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
 use crate::runtime::HeartbeatRequest;
-use crate::runtime::TaskManagerStatus;
+use crate::runtime::ManagerStatus;
 use crate::storage::metadata::{MetadataStorage, TMetadataStorage};
 use crate::utils::fs::read_binary;
 use crate::utils::http::server::{as_ok_json, page_not_found};
@@ -218,7 +218,7 @@ async fn heartbeat(req: Request<Body>, context: Arc<WebContext>) -> anyhow::Resu
 
     let metadata_storage = MetadataStorage::new(&context.metadata_mode);
     let coordinator_status = metadata_storage
-        .update_task_manager_status(task_manager_id, change_items, TaskManagerStatus::Registered)
+        .update_task_manager_status(task_manager_id, change_items, ManagerStatus::Registered)
         .unwrap();
 
     as_ok_json(&StdResponse::ok(Some(coordinator_status)))

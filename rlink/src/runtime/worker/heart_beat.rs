@@ -2,20 +2,20 @@ use std::time::Duration;
 
 use crate::channel::{unbounded, Receiver, Sender, TrySendError};
 use crate::core::cluster::StdResponse;
-use crate::runtime::{HeartBeatStatus, HeartbeatItem, HeartbeatRequest, TaskManagerStatus};
+use crate::runtime::{HeartBeatStatus, HeartbeatItem, HeartbeatRequest, ManagerStatus};
 use crate::utils::http::client::post;
 use crate::utils::thread::async_sleep;
 use crate::utils::{date_time, panic};
 
-static mut COORDINATOR_STATUS: TaskManagerStatus = TaskManagerStatus::Pending;
+static mut COORDINATOR_STATUS: ManagerStatus = ManagerStatus::Pending;
 
-fn update_coordinator_status(coordinator_status: TaskManagerStatus) {
+fn update_coordinator_status(coordinator_status: ManagerStatus) {
     unsafe {
         COORDINATOR_STATUS = coordinator_status;
     }
 }
 
-pub(crate) fn get_coordinator_status() -> TaskManagerStatus {
+pub(crate) fn get_coordinator_status() -> ManagerStatus {
     unsafe { COORDINATOR_STATUS }
 }
 
@@ -104,7 +104,7 @@ pub(crate) async fn report_heartbeat(
     let body = serde_json::to_string(&request).unwrap();
 
     let begin_time = date_time::current_timestamp_millis();
-    let resp = post::<StdResponse<TaskManagerStatus>>(url, body).await;
+    let resp = post::<StdResponse<ManagerStatus>>(url, body).await;
     let end_time = date_time::current_timestamp_millis();
     let elapsed = end_time - begin_time;
 
@@ -116,7 +116,7 @@ pub(crate) async fn report_heartbeat(
 
             if let Some(coordinator_status) = resp.data {
                 match coordinator_status {
-                    TaskManagerStatus::Stopping | TaskManagerStatus::Stopped => {
+                    ManagerStatus::Stopping | ManagerStatus::Stopped => {
                         info!("coordinator status: {:?}", coordinator_status)
                     }
                     _ => {}

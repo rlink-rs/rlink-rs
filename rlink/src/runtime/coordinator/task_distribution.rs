@@ -4,8 +4,8 @@ use crate::dag::DagManager;
 use crate::runtime::context::Context;
 use crate::runtime::HeartBeatStatus;
 use crate::runtime::{
-    ClusterDescriptor, CoordinatorManagerDescriptor, OperatorDescriptor, TaskDescriptor,
-    TaskManagerStatus, WorkerManagerDescriptor,
+    ClusterDescriptor, CoordinatorManagerDescriptor, ManagerStatus, OperatorDescriptor,
+    TaskDescriptor, WorkerManagerDescriptor,
 };
 
 pub(crate) fn build_cluster_descriptor(
@@ -38,13 +38,13 @@ pub(crate) fn build_cluster_descriptor(
                 input_split: task_instance.input_split.clone(),
                 daemon: task_instance.daemon,
                 thread_id: "".to_string(),
-                end: false,
+                stopped: false,
             };
             task_descriptors.push(task_descriptor);
         }
 
         let task_manager_descriptor = WorkerManagerDescriptor {
-            task_status: TaskManagerStatus::Pending,
+            task_status: ManagerStatus::Pending,
             latest_heart_beat_ts: 0,
             latest_heart_beat_status: HeartBeatStatus::Ok,
             task_manager_id: task_manager_instance.worker_manager_id.clone(),
@@ -62,7 +62,7 @@ pub(crate) fn build_cluster_descriptor(
         application_properties: application_properties.clone(),
         coordinator_address: "".to_string(),
         metrics_address: context.metric_addr.clone(),
-        coordinator_status: TaskManagerStatus::Pending,
+        coordinator_status: ManagerStatus::Pending,
         v_cores: context.v_cores,
         memory_mb: context.memory_mb,
         num_task_managers: context.num_task_managers,

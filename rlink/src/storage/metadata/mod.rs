@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use crate::core::cluster::MetadataStorageType;
-use crate::runtime::{ClusterDescriptor, HeartbeatItem, TaskManagerStatus};
+use crate::runtime::{ClusterDescriptor, HeartbeatItem, ManagerStatus};
 use crate::storage::metadata::mem_metadata_storage::MemoryMetadataStorage;
 
 pub mod mem_metadata_storage;
@@ -13,16 +13,13 @@ pub trait TMetadataStorage: Debug {
     fn save(&mut self, metadata: ClusterDescriptor) -> anyhow::Result<()>;
     fn delete(&mut self) -> anyhow::Result<()>;
     fn load(&self) -> anyhow::Result<ClusterDescriptor>;
-    fn update_application_status(
-        &self,
-        job_manager_status: TaskManagerStatus,
-    ) -> anyhow::Result<()>;
+    fn update_application_status(&self, job_manager_status: ManagerStatus) -> anyhow::Result<()>;
     fn update_task_manager_status(
         &self,
         task_manager_id: String,
         heartbeat_items: Vec<HeartbeatItem>,
-        task_manager_status: TaskManagerStatus,
-    ) -> anyhow::Result<TaskManagerStatus>;
+        task_manager_status: ManagerStatus,
+    ) -> anyhow::Result<ManagerStatus>;
 }
 
 #[derive(Debug)]
@@ -60,10 +57,7 @@ impl TMetadataStorage for MetadataStorage {
         }
     }
 
-    fn update_application_status(
-        &self,
-        job_manager_status: TaskManagerStatus,
-    ) -> anyhow::Result<()> {
+    fn update_application_status(&self, job_manager_status: ManagerStatus) -> anyhow::Result<()> {
         match self {
             MetadataStorage::MemoryMetadataStorage(storage) => {
                 storage.update_application_status(job_manager_status)
@@ -75,8 +69,8 @@ impl TMetadataStorage for MetadataStorage {
         &self,
         task_manager_id: String,
         heartbeat_items: Vec<HeartbeatItem>,
-        task_manager_status: TaskManagerStatus,
-    ) -> anyhow::Result<TaskManagerStatus> {
+        task_manager_status: ManagerStatus,
+    ) -> anyhow::Result<ManagerStatus> {
         match self {
             MetadataStorage::MemoryMetadataStorage(storage) => storage.update_task_manager_status(
                 task_manager_id,
@@ -109,7 +103,7 @@ pub(crate) fn loop_delete_cluster_descriptor(metadata_storage: &mut MetadataStor
 
 pub(crate) fn loop_update_application_status(
     metadata_storage: &mut MetadataStorage,
-    job_manager_status: TaskManagerStatus,
+    job_manager_status: ManagerStatus,
 ) {
     loop_fn!(
         metadata_storage.update_application_status(job_manager_status.clone()),

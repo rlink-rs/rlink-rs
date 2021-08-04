@@ -14,7 +14,7 @@ use crate::runtime::worker::checkpoint::start_report_checkpoint;
 use crate::runtime::worker::heart_beat::{start_heartbeat_timer, submit_heartbeat};
 use crate::runtime::worker::web_server::web_launch;
 use crate::runtime::{
-    worker, ClusterDescriptor, HeartBeatStatus, HeartbeatItem, TaskManagerStatus,
+    worker, ClusterDescriptor, HeartBeatStatus, HeartbeatItem, ManagerStatus,
     WorkerManagerDescriptor,
 };
 use crate::storage::metadata::MetadataLoader;
@@ -152,7 +152,7 @@ fn waiting_all_task_manager_fine0(metadata_loader: &mut MetadataLoader) -> Clust
     loop {
         let cluster_descriptor = metadata_loader.get_cluster_descriptor();
         match cluster_descriptor.coordinator_manager.coordinator_status {
-            TaskManagerStatus::Registered => {
+            ManagerStatus::Registered => {
                 return cluster_descriptor;
             }
             _ => std::thread::sleep(Duration::from_secs(2)),

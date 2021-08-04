@@ -19,7 +19,7 @@ use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
 use crate::runtime::coordinator::heart_beat_manager::HeartbeatResult;
 use crate::runtime::coordinator::task_distribution::build_cluster_descriptor;
 use crate::runtime::coordinator::web_server::web_launch;
-use crate::runtime::{ClusterDescriptor, TaskManagerStatus};
+use crate::runtime::{ClusterDescriptor, ManagerStatus};
 use crate::storage::metadata::{
     loop_delete_cluster_descriptor, loop_read_cluster_descriptor, loop_save_cluster_descriptor,
     loop_update_application_status, MetadataStorage,
@@ -262,12 +262,12 @@ where
             let unregister_worker = job_descriptor
                 .worker_managers
                 .iter()
-                .find(|x| x.task_status.ne(&TaskManagerStatus::Registered));
+                .find(|x| x.task_status.ne(&ManagerStatus::Registered));
 
             if unregister_worker.is_none() {
                 loop_update_application_status(
                     metadata_storage.borrow_mut(),
-                    TaskManagerStatus::Registered,
+                    ManagerStatus::Registered,
                 );
                 info!("all workers status fine and Job update state to `Registered`");
                 job_descriptor.worker_managers.iter().for_each(|tm| {

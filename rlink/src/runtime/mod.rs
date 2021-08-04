@@ -95,42 +95,38 @@ pub struct TaskDescriptor {
     pub input_split: InputSplit,
     pub daemon: bool,
     pub thread_id: String,
-    pub end: bool,
+    /// mark the task is stopped status
+    pub stopped: bool,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq)]
-pub enum TaskManagerStatus {
-    /// waiting for the TaskManager register
+pub enum ManagerStatus {
+    /// Waiting for the TaskManager register
     Pending = 0,
     /// TaskManager has registered
     Registered = 1,
     /// TaskManager lost and try to recreate a new TaskManager
     Migration = 2,
-    /// All non-daemon Tasks stopped
+    /// One of non-daemon Tasks stopped
     Stopping = 3,
     /// All Tasks stopped
     Stopped = 4,
 }
 
-impl TaskManagerStatus {
+impl ManagerStatus {
     pub fn is_stop(&self) -> bool {
         match self {
-            TaskManagerStatus::Stopping | TaskManagerStatus::Stopped => true,
+            ManagerStatus::Stopping | ManagerStatus::Stopped => true,
             _ => false,
         }
     }
 
     pub fn is_stopped(&self) -> bool {
         match self {
-            TaskManagerStatus::Stopped => true,
+            ManagerStatus::Stopped => true,
             _ => false,
         }
     }
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
-pub enum ClusterStatus {
-    Running = 0,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -165,7 +161,7 @@ impl<'a> TryFrom<&'a str> for HeartBeatStatus {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct WorkerManagerDescriptor {
-    pub task_status: TaskManagerStatus,
+    pub task_status: ManagerStatus,
     pub latest_heart_beat_ts: u64,
     pub latest_heart_beat_status: HeartBeatStatus,
     pub task_manager_id: String,
@@ -185,7 +181,7 @@ pub struct CoordinatorManagerDescriptor {
     // todo rename to web_address
     pub coordinator_address: String,
     pub metrics_address: String,
-    pub coordinator_status: TaskManagerStatus,
+    pub coordinator_status: ManagerStatus,
     pub v_cores: u32,
     pub memory_mb: u32,
     pub num_task_managers: u32,

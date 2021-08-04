@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 
-use crate::runtime::{ClusterDescriptor, HeartbeatItem, TaskManagerStatus};
+use crate::runtime::{ClusterDescriptor, HeartbeatItem, ManagerStatus};
 use crate::storage::metadata::TMetadataStorage;
 use crate::utils;
 
@@ -45,10 +45,7 @@ impl TMetadataStorage for MemoryMetadataStorage {
         Ok(lock.clone().unwrap())
     }
 
-    fn update_application_status(
-        &self,
-        job_manager_status: TaskManagerStatus,
-    ) -> anyhow::Result<()> {
+    fn update_application_status(&self, job_manager_status: ManagerStatus) -> anyhow::Result<()> {
         let mut lock = METADATA_STORAGE
             .lock()
             .expect("METADATA_STORAGE lock failed");
@@ -63,8 +60,8 @@ impl TMetadataStorage for MemoryMetadataStorage {
         &self,
         task_manager_id: String,
         heartbeat_items: Vec<HeartbeatItem>,
-        task_manager_status: TaskManagerStatus,
-    ) -> anyhow::Result<TaskManagerStatus> {
+        task_manager_status: ManagerStatus,
+    ) -> anyhow::Result<ManagerStatus> {
         let mut update_success = false;
 
         let mut lock = METADATA_STORAGE
@@ -104,28 +101,28 @@ impl TMetadataStorage for MemoryMetadataStorage {
                         HeartbeatItem::TaskEnd { task_id } => {
                             for task_descriptor in &mut task_manager_descriptor.task_descriptors {
                                 if task_descriptor.task_id.eq(&task_id) {
-                                    task_descriptor.end = true;
+                                    task_descriptor.stopped = true;
                                 }
                             }
 
                             let all_tasks_end = task_manager_descriptor
                                 .task_descriptors
                                 .iter()
-                                .find(|x| !x.end)
+                                .find(|x| !x.stopped)
                                 .is_none();
                             if all_tasks_end {
                                 cluster_descriptor.coordinator_manager.coordinator_status =
-                                    TaskManagerStatus::Stopped;
+                                    ManagerStatus::Stopped;
                             } else {
                                 let exist_tasks_end = task_manager_descriptor
                                     .task_descriptors
                                     .iter()
                                     .filter(|x| !x.daemon)
-                                    .find(|x| x.end)
+                                    .find(|x| x.stopped)
                                     .is_some();
                                 if exist_tasks_end {
                                     cluster_descriptor.coordinator_manager.coordinator_status =
-                                        TaskManagerStatus::Stopping;
+                                        ManagerStatus::Stopping;
                                 }
                             }
                         }
