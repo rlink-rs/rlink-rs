@@ -419,7 +419,7 @@ mod tests {
             }
         });
 
-        let addr = "10.100.189.45:28820".parse().unwrap();
+        let addr = "127.0.0.1:28820".parse().unwrap();
 
         let mut client = Client::new(channel_key, sender, addr, 100).await.unwrap();
         client.send().await.unwrap();
