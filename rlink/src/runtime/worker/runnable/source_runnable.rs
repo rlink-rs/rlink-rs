@@ -16,7 +16,9 @@ use crate::core::runtime::{CheckpointId, JobId, OperatorId, TaskId};
 use crate::runtime::timer::TimerChannel;
 use crate::runtime::worker::backpressure::Backpressure;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
+use crate::runtime::worker::heart_beat::submit_heartbeat;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
+use crate::runtime::HeartbeatItem;
 
 #[derive(Debug)]
 pub(crate) struct SourceRunnable {
@@ -158,6 +160,12 @@ impl SourceRunnable {
         }
         // Ok(())
     }
+
+    fn report_end_status(&self) {
+        submit_heartbeat(HeartbeatItem::TaskEnd {
+            task_id: self.task_id,
+        });
+    }
 }
 
 impl Runnable for SourceRunnable {
@@ -272,7 +280,8 @@ impl Runnable for SourceRunnable {
                         if end_flags == self.waiting_end_flags {
                             info!("all parents job stop on watermark event");
                         }
-                        // todo mark the job as end status
+
+                        self.report_end_status();
                     }
 
                     let align_watermark = self.status_alignment.apply_watermark(watermark);
@@ -294,8 +303,8 @@ impl Runnable for SourceRunnable {
                     if stream_status.end {
                         end_flags += 1;
                         if end_flags == self.waiting_end_flags {
-                            // todo mark the job as end status
                             info!("all parents job stop on stream_status event");
+                            self.report_end_status();
                         }
                     }
                     let (align, align_watermark) = self

@@ -37,6 +37,7 @@ pub(crate) fn build_cluster_descriptor(
                 operators,
                 input_split: task_instance.input_split.clone(),
                 thread_id: "".to_string(),
+                end: false,
             };
             task_descriptors.push(task_descriptor);
         }

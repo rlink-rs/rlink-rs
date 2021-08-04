@@ -94,6 +94,7 @@ pub struct TaskDescriptor {
     pub operators: Vec<OperatorDescriptor>,
     pub input_split: InputSplit,
     pub thread_id: String,
+    pub end: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
@@ -197,6 +198,7 @@ pub enum HeartbeatItem {
     MetricsAddress(String),
     HeartBeatStatus(HeartBeatStatus),
     TaskThreadId { task_id: TaskId, thread_id: u64 },
+    TaskEnd { task_id: TaskId },
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

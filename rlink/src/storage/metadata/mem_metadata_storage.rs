@@ -101,6 +101,13 @@ impl TMetadataStorage for MemoryMetadataStorage {
                                 }
                             }
                         }
+                        HeartbeatItem::TaskEnd { task_id } => {
+                            for task_descriptor in &mut task_manager_descriptor.task_descriptors {
+                                if task_descriptor.task_id.eq(&task_id) {
+                                    task_descriptor.end = true;
+                                }
+                            }
+                        }
                     }
                 }
 
