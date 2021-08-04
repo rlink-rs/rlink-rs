@@ -132,8 +132,7 @@ impl Runnable for ReduceRunnable {
                 }
 
                 // convert watermark to stream_status, and continue post
-                let end = watermark.timestamp == MAX_WATERMARK.timestamp;
-                let stream_status = StreamStatus::new(watermark.status_timestamp, end);
+                let stream_status = StreamStatus::from(&watermark);
                 debug!("convert watermark to stream_status: {:?}", stream_status);
 
                 self.next_runnable

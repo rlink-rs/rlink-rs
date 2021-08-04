@@ -7,7 +7,7 @@ use std::fmt::Debug;
 use bytes::{Buf, BufMut, BytesMut};
 
 use crate::core::runtime::{ChannelKey, CheckpointId};
-use crate::core::watermark::MIN_WATERMARK;
+use crate::core::watermark::{MAX_WATERMARK, MIN_WATERMARK};
 use crate::core::window::Window;
 
 lazy_static! {
@@ -278,6 +278,15 @@ impl Watermark {
     pub(crate) fn is_min(&self) -> bool {
         self.timestamp == MIN_WATERMARK.timestamp
     }
+
+    pub(crate) fn is_max(&self) -> bool {
+        self.timestamp == MAX_WATERMARK.timestamp
+    }
+
+    #[inline(always)]
+    pub(crate) fn end(&self) -> bool {
+        self.is_max()
+    }
 }
 
 impl Partition for Watermark {
@@ -347,6 +356,12 @@ impl StreamStatus {
             channel_key: ChannelKey::default(),
             end,
         }
+    }
+}
+
+impl<'a> From<&'a Watermark> for StreamStatus {
+    fn from(watermark: &'a Watermark) -> Self {
+        StreamStatus::new(watermark.status_timestamp, watermark.end())
     }
 }
 
@@ -482,6 +497,19 @@ impl Element {
             timestamp,
             stream_status,
         ))
+    }
+
+    pub(crate) fn max_watermark(
+        task_number: u16,
+        num_tasks: u16,
+        stream_status: &StreamStatus,
+    ) -> Self {
+        Self::new_watermark(
+            task_number,
+            num_tasks,
+            MAX_WATERMARK.timestamp,
+            stream_status,
+        )
     }
 
     pub(crate) fn new_stream_status(timestamp: u64, end: bool) -> Self {

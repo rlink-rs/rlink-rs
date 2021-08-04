@@ -13,7 +13,6 @@ use crate::core::element::{Element, StreamStatus, Watermark};
 use crate::core::function::InputFormat;
 use crate::core::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
 use crate::core::runtime::{CheckpointId, JobId, OperatorId, TaskId};
-use crate::core::watermark::MAX_WATERMARK;
 use crate::runtime::timer::TimerChannel;
 use crate::runtime::worker::backpressure::Backpressure;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
@@ -268,10 +267,10 @@ impl Runnable for SourceRunnable {
                     }
                 }
                 Element::Watermark(watermark) => {
-                    if watermark.timestamp == MAX_WATERMARK.timestamp {
+                    if watermark.end() {
                         end_flags += 1;
                         if end_flags == self.waiting_end_flags {
-                            info!("all parents job stop");
+                            info!("all parents job stop on watermark event");
                         }
                         // todo mark the job as end status
                     }
@@ -296,7 +295,7 @@ impl Runnable for SourceRunnable {
                         end_flags += 1;
                         if end_flags == self.waiting_end_flags {
                             // todo mark the job as end status
-                            info!("break source loop");
+                            info!("all parents job stop on stream_status event");
                         }
                     }
                     let (align, align_watermark) = self
