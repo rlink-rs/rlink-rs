@@ -5,10 +5,9 @@ use std::time::Duration;
 use crate::channel::{bounded, Receiver, Sender};
 use crate::core::checkpoint::Checkpoint;
 use crate::core::properties::SystemProperties;
-use crate::core::runtime::{CheckpointId, JobId, OperatorId};
+use crate::core::runtime::{CheckpointId, ClusterDescriptor, JobId, OperatorId};
 use crate::dag::metadata::DagMetadata;
 use crate::runtime::context::Context;
-use crate::runtime::ClusterDescriptor;
 use crate::storage::checkpoint::{CheckpointStorage, TCheckpointStorage};
 
 #[derive(Debug, Serialize, Deserialize)]

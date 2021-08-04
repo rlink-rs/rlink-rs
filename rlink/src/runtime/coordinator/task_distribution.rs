@@ -1,12 +1,11 @@
 use crate::core::properties::Properties;
-use crate::core::runtime::CheckpointId;
+use crate::core::runtime::{
+    CheckpointId, ClusterDescriptor, CoordinatorManagerDescriptor, ManagerStatus,
+    OperatorDescriptor, TaskDescriptor, WorkerManagerDescriptor,
+};
 use crate::dag::DagManager;
 use crate::runtime::context::Context;
 use crate::runtime::HeartBeatStatus;
-use crate::runtime::{
-    ClusterDescriptor, CoordinatorManagerDescriptor, ManagerStatus, OperatorDescriptor,
-    TaskDescriptor, WorkerManagerDescriptor,
-};
 
 pub(crate) fn build_cluster_descriptor(
     dag_manager: &DagManager,

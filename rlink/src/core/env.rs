@@ -5,7 +5,7 @@ use crate::core::data_stream::{DataStream, StreamBuilder};
 use crate::core::function::InputFormat;
 use crate::core::operator::StreamOperator;
 use crate::core::properties::Properties;
-use crate::core::runtime::OperatorId;
+use crate::core::runtime::{ClusterDescriptor, OperatorId};
 use crate::dag::RawStreamGraph;
 use crate::runtime;
 
@@ -20,6 +20,9 @@ pub trait StreamApp: Send + Sync + Clone {
     /// will invoke multiple times on the `Coordinator` and `Worker`,
     /// ensure the method is stateless.
     fn build_stream(&self, properties: &Properties, env: &mut StreamExecutionEnvironment);
+
+    /// Coordinator startup event. Called before Worker's resource allocation and startup
+    fn pre_worker_startup(&self, _cluster_descriptor: &ClusterDescriptor) {}
 }
 
 #[derive(Debug)]

@@ -9,6 +9,7 @@ use crate::core::cluster::MetadataStorageType;
 use crate::core::cluster::TaskResourceInfo;
 use crate::core::env::{StreamApp, StreamExecutionEnvironment};
 use crate::core::properties::{InnerSystemProperties, Properties, SystemProperties};
+use crate::core::runtime::{ClusterDescriptor, ManagerStatus};
 use crate::dag::metadata::DagMetadata;
 use crate::dag::DagManager;
 use crate::deployment::TResourceManager;
@@ -19,7 +20,6 @@ use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
 use crate::runtime::coordinator::heart_beat_manager::HeartbeatResult;
 use crate::runtime::coordinator::task_distribution::build_cluster_descriptor;
 use crate::runtime::coordinator::web_server::web_launch;
-use crate::runtime::{ClusterDescriptor, ManagerStatus};
 use crate::storage::metadata::{
     loop_delete_cluster_descriptor, loop_read_cluster_descriptor, loop_save_cluster_descriptor,
     loop_update_application_status, MetadataStorage,
@@ -117,6 +117,9 @@ where
             // save metadata to storage
             self.save_metadata(&cluster_descriptor);
             info!("save metadata to storage");
+
+            self.stream_app.pre_worker_startup(&cluster_descriptor);
+            info!("pre-worker startup event");
 
             // allocate all worker's resources
             let worker_task_ids = self.allocate_worker();

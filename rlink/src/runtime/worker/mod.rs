@@ -7,7 +7,7 @@ use crate::core::element::{Element, Record};
 use crate::core::env::{StreamApp, StreamExecutionEnvironment};
 use crate::core::function::KeySelectorFunction;
 use crate::core::operator::{DefaultStreamOperator, StreamOperator};
-use crate::core::runtime::{JobId, OperatorId};
+use crate::core::runtime::{ClusterDescriptor, JobId, OperatorId, TaskDescriptor};
 use crate::dag::metadata::DagMetadata;
 use crate::dag::OperatorType;
 use crate::runtime::context::Context;
@@ -19,7 +19,7 @@ use crate::runtime::worker::runnable::{
     FilterRunnable, FlatMapRunnable, KeyByRunnable, ReduceRunnable, Runnable, RunnableContext,
     SinkRunnable, SourceRunnable, WatermarkAssignerRunnable, WindowAssignerRunnable,
 };
-use crate::runtime::{ClusterDescriptor, HeartbeatItem, TaskDescriptor};
+use crate::runtime::HeartbeatItem;
 
 pub mod backpressure;
 pub mod checkpoint;

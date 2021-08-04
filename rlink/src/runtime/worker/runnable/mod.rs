@@ -5,14 +5,14 @@ use std::time::Duration;
 use crate::core::checkpoint::FunctionSnapshotContext;
 use crate::core::element::Element;
 use crate::core::properties::SystemProperties;
-use crate::core::runtime::{CheckpointId, OperatorId, TaskId};
+use crate::core::runtime::{CheckpointId, ClusterDescriptor, OperatorId, TaskDescriptor, TaskId};
 use crate::dag::execution_graph::{ExecutionEdge, ExecutionNode};
 use crate::dag::job_graph::{JobEdge, JobNode};
 use crate::dag::metadata::DagMetadata;
 use crate::dag::stream_graph::StreamNode;
 use crate::runtime::timer::WindowTimer;
+use crate::runtime::worker::backpressure::Backpressure;
 use crate::runtime::worker::FunctionContext;
-use crate::runtime::{ClusterDescriptor, TaskDescriptor};
 
 pub mod co_process_runnable;
 pub mod filter_runnable;
@@ -24,7 +24,6 @@ pub mod source_runnable;
 pub mod watermark_assigner_runnable;
 pub mod window_assigner_runnable;
 
-use crate::runtime::worker::backpressure::Backpressure;
 pub(crate) use filter_runnable::FilterRunnable;
 pub(crate) use flat_map_runnable::FlatMapRunnable;
 pub(crate) use key_by_runnable::KeyByRunnable;

@@ -22,13 +22,12 @@ use crate::channel::{
 };
 use crate::core::element::Element;
 use crate::core::properties::ChannelBaseOn;
-use crate::core::runtime::{ChannelKey, TaskId};
+use crate::core::runtime::{ChannelKey, ClusterDescriptor, TaskId};
 use crate::metrics::{register_counter, Tag};
 use crate::pub_sub::network::{
     new_framed_read, new_framed_write, ElementRequest, ElementResponse, ResponseCode,
 };
 use crate::runtime::worker::heart_beat::get_coordinator_status;
-use crate::runtime::ClusterDescriptor;
 use crate::utils::thread::{async_runtime_multi, async_sleep};
 
 pub(crate) static ENABLE_LOG: AtomicBool = AtomicBool::new(false);

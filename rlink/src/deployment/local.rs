@@ -3,9 +3,10 @@ use std::sync::Arc;
 
 use crate::core::cluster::TaskResourceInfo;
 use crate::core::env::{StreamApp, StreamExecutionEnvironment};
+use crate::core::runtime::ClusterDescriptor;
 use crate::deployment::{Resource, TResourceManager};
 use crate::runtime::context::Context;
-use crate::runtime::{cluster, ClusterDescriptor, ManagerType};
+use crate::runtime::{cluster, ManagerType};
 
 #[derive(Clone, Debug)]
 pub(crate) struct LocalResourceManager {

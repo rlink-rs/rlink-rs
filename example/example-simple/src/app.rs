@@ -17,6 +17,7 @@ use rlink_example_utils::buffer_gen::model::FIELD_TYPE;
 
 use crate::filter::MyFlatMapFunction;
 use crate::mapper::MyFilterFunction;
+use rlink::core::runtime::ClusterDescriptor;
 
 #[derive(Clone, Debug)]
 pub struct SimpleStreamApp {}
@@ -59,5 +60,9 @@ impl StreamApp for SimpleStreamApp {
             ))
             .reduce(reduce_function, 2)
             .add_sink(PrintOutputFormat::new(output_schema_types.as_slice()));
+    }
+
+    fn pre_worker_startup(&self, cluster_descriptor: &ClusterDescriptor) {
+        println!("{}", cluster_descriptor.coordinator_manager.metrics_address);
     }
 }
