@@ -70,8 +70,8 @@ impl TMetadataStorage for MemoryMetadataStorage {
         let mut lock = METADATA_STORAGE
             .lock()
             .expect("METADATA_STORAGE lock failed");
-        let mut job_descriptor: ClusterDescriptor = lock.clone().unwrap();
-        for mut task_manager_descriptor in &mut job_descriptor.worker_managers {
+        let mut cluster_descriptor: ClusterDescriptor = lock.clone().unwrap();
+        for mut task_manager_descriptor in &mut cluster_descriptor.worker_managers {
             if task_manager_descriptor
                 .task_manager_id
                 .eq(task_manager_id.as_str())
@@ -107,6 +107,13 @@ impl TMetadataStorage for MemoryMetadataStorage {
                                     task_descriptor.end = true;
                                 }
                             }
+
+                            let all_tasks_end = task_manager_descriptor
+                                .task_descriptors
+                                .iter()
+                                .find(|x| !x.end)
+                                .is_none();
+                            cluster_descriptor.coordinator_manager.end = all_tasks_end;
                         }
                     }
                 }
@@ -117,8 +124,11 @@ impl TMetadataStorage for MemoryMetadataStorage {
         }
 
         if update_success {
-            debug!("Update TaskManager metadata success. {:?}", job_descriptor);
-            *lock = Some(job_descriptor);
+            debug!(
+                "Update TaskManager metadata success. {:?}",
+                cluster_descriptor
+            );
+            *lock = Some(cluster_descriptor);
             Ok(())
         } else {
             error!(

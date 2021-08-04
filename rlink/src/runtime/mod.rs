@@ -165,6 +165,7 @@ pub struct CoordinatorManagerDescriptor {
     pub num_task_managers: u32,
     pub uptime: u64,
     pub startup_number: u64,
+    pub end: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
