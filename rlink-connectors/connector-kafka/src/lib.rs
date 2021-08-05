@@ -3,8 +3,6 @@ extern crate serde_derive;
 #[macro_use]
 extern crate log;
 #[macro_use]
-extern crate lazy_static;
-#[macro_use]
 extern crate rlink_derive;
 #[macro_use]
 extern crate anyhow;
@@ -12,7 +10,7 @@ extern crate anyhow;
 pub mod sink;
 pub mod source;
 
-pub(crate) mod state;
+pub mod state;
 
 pub use sink::output_format::KafkaOutputFormat;
 pub use source::input_format::KafkaInputFormat;
@@ -27,6 +25,7 @@ use crate::source::deserializer::{
     DefaultKafkaRecordDeserializer, DefaultKafkaRecordDeserializerBuilder,
     KafkaRecordDeserializerBuilder,
 };
+use crate::state::PartitionOffset;
 
 pub const BOOTSTRAP_SERVERS: &str = "bootstrap.servers";
 pub const TOPICS: &str = "topics";
@@ -109,51 +108,6 @@ impl<'a, 'b> KafkaRecord<'a, 'b> {
     }
 }
 
-pub fn field(field_name: &str) -> String {
-    format!("KAFKA_SOURCE.{}", field_name)
-}
-
-// pub fn create_input_format_from_prop(properties: &Properties) -> KafkaInputFormat {
-//     let mut conf_map = HashMap::new();
-//     conf_map.insert(
-//         BOOTSTRAP_SERVERS.to_string(),
-//         properties
-//             .get_string(field(BOOTSTRAP_SERVERS).as_str())
-//             .unwrap(),
-//     );
-//
-//     let topics = properties.get_string(field(TOPICS).as_str()).unwrap();
-//     let topics: Vec<&str> = topics.split(",").collect();
-//     let topics = topics.iter().map(|topic| topic.to_string()).collect();
-//
-//     create_input_format(conf_map, topics)
-// }
-
-pub fn create_input_format(
-    conf_map: HashMap<String, String>,
-    topics: Vec<String>,
-    buffer_size: Option<usize>,
-    deserializer_builder: Option<Box<dyn KafkaRecordDeserializerBuilder>>,
-) -> KafkaInputFormat {
-    let mut client_config = ClientConfig::new();
-    for (key, val) in conf_map {
-        client_config.set(key.as_str(), val.as_str());
-    }
-
-    let buffer_size = buffer_size.unwrap_or(SOURCE_CHANNEL_SIZE);
-
-    let deserializer_builder = deserializer_builder.unwrap_or_else(|| {
-        let deserializer_builder: Box<dyn KafkaRecordDeserializerBuilder> =
-            Box::new(DefaultKafkaRecordDeserializerBuilder::<
-                DefaultKafkaRecordDeserializer,
-            >::new());
-
-        deserializer_builder
-    });
-
-    KafkaInputFormat::new(client_config, topics, buffer_size, deserializer_builder)
-}
-
 pub fn create_output_format(
     conf_map: HashMap<String, String>,
     topic: Option<String>,
@@ -169,4 +123,76 @@ pub fn create_output_format(
         topic,
         buffer_size.unwrap_or(SINK_CHANNEL_SIZE),
     )
+}
+
+pub enum OffsetRange {
+    None,
+    Direct {
+        begin_offset: HashMap<String, Vec<PartitionOffset>>,
+        end_offset: Option<HashMap<String, Vec<PartitionOffset>>>,
+    },
+    Timestamp {
+        begin_timestamp: HashMap<String, u64>,
+        end_timestamp: Option<HashMap<String, u64>>,
+    },
+}
+
+pub struct InputFormatBuilder {
+    conf_map: HashMap<String, String>,
+    topics: Vec<String>,
+    buffer_size: Option<usize>,
+    deserializer_builder: Option<Box<dyn KafkaRecordDeserializerBuilder>>,
+    offset_range: OffsetRange,
+}
+
+impl InputFormatBuilder {
+    pub fn new(
+        conf_map: HashMap<String, String>,
+        topics: Vec<String>,
+        deserializer_builder: Option<Box<dyn KafkaRecordDeserializerBuilder>>,
+    ) -> Self {
+        InputFormatBuilder {
+            conf_map,
+            topics,
+            buffer_size: None,
+            deserializer_builder,
+            offset_range: OffsetRange::None,
+        }
+    }
+
+    pub fn buffer_size(mut self, size: usize) -> Self {
+        self.buffer_size = Some(size);
+        self
+    }
+
+    pub fn offset_range(mut self, offset_range: OffsetRange) -> Self {
+        self.offset_range = offset_range;
+        self
+    }
+
+    pub fn build(self) -> KafkaInputFormat {
+        let mut client_config = ClientConfig::new();
+        for (key, val) in &self.conf_map {
+            client_config.set(key.as_str(), val.as_str());
+        }
+
+        let buffer_size = self.buffer_size.unwrap_or(SOURCE_CHANNEL_SIZE);
+
+        let deserializer_builder = self.deserializer_builder.unwrap_or_else(|| {
+            let deserializer_builder: Box<dyn KafkaRecordDeserializerBuilder> =
+                Box::new(DefaultKafkaRecordDeserializerBuilder::<
+                    DefaultKafkaRecordDeserializer,
+                >::new());
+
+            deserializer_builder
+        });
+
+        KafkaInputFormat::new(
+            client_config,
+            self.topics,
+            buffer_size,
+            self.offset_range,
+            deserializer_builder,
+        )
+    }
 }

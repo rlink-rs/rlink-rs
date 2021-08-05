@@ -1,7 +1,7 @@
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
-use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -14,8 +14,11 @@ use crate::core::function::InputFormat;
 use crate::core::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
 use crate::core::runtime::{CheckpointId, JobId, OperatorId, TaskId};
 use crate::runtime::timer::TimerChannel;
+use crate::runtime::worker::backpressure::Backpressure;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
+use crate::runtime::worker::heart_beat::{get_coordinator_status, submit_heartbeat};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
+use crate::runtime::HeartbeatItem;
 
 #[derive(Debug)]
 pub(crate) struct SourceRunnable {
@@ -23,9 +26,12 @@ pub(crate) struct SourceRunnable {
     context: Option<RunnableContext>,
 
     task_id: TaskId,
+    daemon_task: bool,
 
     stream_source: DefaultStreamOperator<dyn InputFormat>,
     next_runnable: Option<Box<dyn Runnable>>,
+
+    backpressure: Option<Backpressure>,
 
     stream_status_timer: Option<TimerChannel>,
     checkpoint_timer: Option<TimerChannel>,
@@ -45,9 +51,12 @@ impl SourceRunnable {
             operator_id,
             context: None,
             task_id: TaskId::default(),
+            daemon_task: false,
 
             stream_source,
             next_runnable,
+
+            backpressure: None,
 
             stream_status_timer: None,
             checkpoint_timer: None,
@@ -58,11 +67,23 @@ impl SourceRunnable {
         }
     }
 
-    fn poll_input_element(&mut self, sender: ChannelSender<Element>, running: Arc<AtomicBool>) {
+    fn poll_input_element(
+        &mut self,
+        sender: ChannelSender<Element>,
+        running: Arc<AtomicBool>,
+        bp_pause_dur: Arc<AtomicU64>,
+        daemon_task: bool,
+    ) {
         let iterator = self.stream_source.operator_fn.element_iter();
         crate::utils::thread::spawn("poll_input_element", move || {
-            match SourceRunnable::poll_input_element0(iterator, sender, running) {
-                Ok(_) => {}
+            match SourceRunnable::poll_input_element0(
+                iterator,
+                sender,
+                running,
+                bp_pause_dur,
+                daemon_task,
+            ) {
+                Ok(_) => info!("poll input_element task finish"),
                 Err(e) => panic!("poll_input_element thread error. {}", e),
             }
         });
@@ -72,9 +93,24 @@ impl SourceRunnable {
         iterator: Box<dyn Iterator<Item = Element> + Send>,
         sender: ChannelSender<Element>,
         running: Arc<AtomicBool>,
+        bp_pause_dur: Arc<AtomicU64>,
+        daemon_task: bool,
     ) -> anyhow::Result<()> {
         for record in iterator {
+            let v = bp_pause_dur.load(Ordering::Relaxed);
+            if v > 0 {
+                bp_pause_dur.fetch_sub(v, Ordering::Relaxed);
+
+                info!("backpressure for {}ms", v);
+                std::thread::sleep(Duration::from_millis(v));
+            }
+
             sender.send(record).map_err(|e| anyhow!(e))?;
+
+            if daemon_task && get_coordinator_status().is_terminating() {
+                info!("daemon source stop by coordinator stop");
+                break;
+            }
         }
 
         running.store(false, Ordering::Relaxed);
@@ -85,8 +121,8 @@ impl SourceRunnable {
         let stream_status_timer = self.stream_status_timer.as_ref().unwrap().clone();
         crate::utils::thread::spawn("poll_stream_status", move || {
             match SourceRunnable::poll_stream_status0(stream_status_timer, sender, running) {
-                Ok(_) => {}
-                Err(e) => panic!("poll_stream_status thread error. {}", e),
+                Ok(_) => info!("poll stream_status task finish"),
+                Err(e) => warn!("poll stream_status thread error. {}", e),
             }
         });
     }
@@ -105,7 +141,9 @@ impl SourceRunnable {
 
             if !running {
                 info!("StreamStatus WindowTimer stop");
-                break;
+                if get_coordinator_status().is_terminated() {
+                    break;
+                }
             }
         }
         Ok(())
@@ -115,8 +153,8 @@ impl SourceRunnable {
         let checkpoint_timer = self.checkpoint_timer.as_ref().unwrap().clone();
         crate::utils::thread::spawn("poll_checkpoint", move || {
             match SourceRunnable::poll_checkpoint0(checkpoint_timer, sender, running) {
-                Ok(_) => {}
-                Err(e) => panic!("poll_checkpoint thread error. {}", e),
+                Ok(_) => info!("poll checkpoint task finish"),
+                Err(e) => warn!("poll checkpoint thread error. {}", e),
             }
         });
     }
@@ -134,10 +172,18 @@ impl SourceRunnable {
             let running = running.load(Ordering::Relaxed);
             if !running {
                 info!("Checkpoint WindowTimer stop");
-                break;
+                if get_coordinator_status().is_terminated() {
+                    break;
+                }
             }
         }
         Ok(())
+    }
+
+    fn report_end_status(&self) {
+        submit_heartbeat(HeartbeatItem::TaskEnd {
+            task_id: self.task_id,
+        });
     }
 }
 
@@ -146,9 +192,12 @@ impl Runnable for SourceRunnable {
         self.context = Some(context.clone());
 
         self.task_id = context.task_descriptor.task_id;
+        self.daemon_task = context.task_descriptor.daemon;
 
         // first open next, then open self
         self.next_runnable.as_mut().unwrap().open(context)?;
+
+        self.backpressure = Some(context.backpressure.clone());
 
         let input_split = context.task_descriptor.input_split.clone();
         let fun_context = context.to_fun_context(self.operator_id);
@@ -162,7 +211,7 @@ impl Runnable for SourceRunnable {
                 .expect("register StreamStatus timer error");
             self.stream_status_timer = Some(stream_status_timer);
 
-            let checkpoint_period = context.checkpoint_internal(Duration::from_secs(30));
+            let checkpoint_period = context.checkpoint_interval(Duration::from_secs(30));
             let checkpoint_timer = context
                 .window_timer
                 .register("Checkpoint Event Timer", checkpoint_period)
@@ -196,6 +245,8 @@ impl Runnable for SourceRunnable {
     fn run(&mut self, mut _element: Element) {
         info!("{} running...", self.stream_source.operator_fn.name());
 
+        let bp_pause_dur = Arc::new(AtomicU64::new(0));
+
         let mut element_iter = match self.stream_source.fn_creator() {
             FunctionCreator::User => {
                 let (sender, receiver) = named_channel(
@@ -205,7 +256,12 @@ impl Runnable for SourceRunnable {
                 );
                 let running = Arc::new(AtomicBool::new(true));
 
-                self.poll_input_element(sender.clone(), running.clone());
+                self.poll_input_element(
+                    sender.clone(),
+                    running.clone(),
+                    bp_pause_dur.clone(),
+                    self.daemon_task,
+                );
 
                 self.poll_stream_status(sender.clone(), running.clone());
                 self.poll_checkpoint(sender.clone(), running.clone());
@@ -220,7 +276,12 @@ impl Runnable for SourceRunnable {
         let mut end_flags = 0;
         while let Some(element) = element_iter.next() {
             match element {
-                Element::Record(_) => self.next_runnable.as_mut().unwrap().run(element),
+                Element::Record(_) => {
+                    self.next_runnable.as_mut().unwrap().run(element);
+                    if let Some(v) = self.backpressure.as_ref().unwrap().take() {
+                        bp_pause_dur.fetch_add(v.as_millis() as u64, Ordering::Relaxed);
+                    }
+                }
                 Element::Barrier(barrier) => {
                     let is_barrier_align = self.barrier_alignment.apply(barrier.checkpoint_id.0);
                     if is_barrier_align {
@@ -239,6 +300,8 @@ impl Runnable for SourceRunnable {
                     }
                 }
                 Element::Watermark(watermark) => {
+                    let end_watermark = watermark.end();
+
                     let align_watermark = self.status_alignment.apply_watermark(watermark);
                     match align_watermark {
                         Some(w) => {
@@ -253,44 +316,51 @@ impl Runnable for SourceRunnable {
                         }
                         None => {}
                     }
-                }
-                Element::StreamStatus(stream_status) => {
-                    if stream_status.end {
+
+                    if end_watermark {
                         end_flags += 1;
                         if end_flags == self.waiting_end_flags {
-                            let stream_status = Element::new_stream_status(0, true);
-                            self.next_runnable.as_mut().unwrap().run(stream_status);
-
-                            info!("break source loop");
-                            break;
+                            info!("all parents job stop on watermark event");
+                            self.report_end_status();
                         }
-                    } else {
-                        let (align, align_watermark) = self
-                            .status_alignment
-                            .apply_stream_status(stream_status.clone());
-                        if align {
-                            match align_watermark {
-                                Some(w) => {
-                                    debug!(
-                                        "Watermark&StreamStatus aligned, status_timestamp: {}",
-                                        w.status_timestamp
-                                    );
-                                    self.next_runnable
-                                        .as_mut()
-                                        .unwrap()
-                                        .run(Element::Watermark(w))
-                                }
-                                None => {
-                                    debug!(
-                                        "StreamStatus aligned, status_timestamp: {}",
-                                        stream_status.timestamp
-                                    );
-                                    self.next_runnable
-                                        .as_mut()
-                                        .unwrap()
-                                        .run(Element::StreamStatus(stream_status))
-                                }
+                    }
+                }
+                Element::StreamStatus(stream_status) => {
+                    let end_stream_status = stream_status.end;
+
+                    let (align, align_watermark) = self
+                        .status_alignment
+                        .apply_stream_status(stream_status.clone());
+                    if align {
+                        match align_watermark {
+                            Some(w) => {
+                                debug!(
+                                    "Watermark&StreamStatus aligned, status_timestamp: {}",
+                                    w.status_timestamp
+                                );
+                                self.next_runnable
+                                    .as_mut()
+                                    .unwrap()
+                                    .run(Element::Watermark(w))
                             }
+                            None => {
+                                debug!(
+                                    "StreamStatus aligned, status_timestamp: {}",
+                                    stream_status.timestamp
+                                );
+                                self.next_runnable
+                                    .as_mut()
+                                    .unwrap()
+                                    .run(Element::StreamStatus(stream_status))
+                            }
+                        }
+                    }
+
+                    if end_stream_status {
+                        end_flags += 1;
+                        if end_flags == self.waiting_end_flags {
+                            info!("all parents job stop on stream_status event");
+                            self.report_end_status();
                         }
                     }
                 }

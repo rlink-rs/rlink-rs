@@ -1,11 +1,8 @@
 use std::convert::TryFrom;
 use std::sync::Arc;
 
-use crate::core::checkpoint::CheckpointHandle;
 use crate::core::env::{StreamApp, StreamExecutionEnvironment};
-use crate::core::function::InputSplit;
-use crate::core::properties::Properties;
-use crate::core::runtime::{CheckpointId, OperatorId, TaskId};
+use crate::core::runtime::{HeartBeatStatus, TaskId};
 use crate::utils::panic::panic_notify;
 
 pub mod cluster;
@@ -81,123 +78,13 @@ impl std::fmt::Display for ManagerType {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct OperatorDescriptor {
-    pub operator_id: OperatorId,
-    pub checkpoint_id: CheckpointId,
-    pub completed_checkpoint_id: Option<CheckpointId>,
-    pub checkpoint_handle: Option<CheckpointHandle>,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct TaskDescriptor {
-    pub task_id: TaskId,
-    pub operators: Vec<OperatorDescriptor>,
-    pub input_split: InputSplit,
-    pub thread_id: String,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
-pub enum TaskManagerStatus {
-    /// waiting for the TaskManager register
-    Pending = 0,
-    /// TaskManager has registered
-    Registered = 1,
-    /// TaskManager lost and try to recreate a new TaskManager
-    Migration = 2,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub enum HeartBeatStatus {
-    Ok,
-    Panic,
-    End,
-}
-
-impl std::fmt::Display for HeartBeatStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            HeartBeatStatus::Ok => write!(f, "ok"),
-            HeartBeatStatus::Panic => write!(f, "panic"),
-            HeartBeatStatus::End => write!(f, "end"),
-        }
-    }
-}
-
-impl<'a> TryFrom<&'a str> for HeartBeatStatus {
-    type Error = anyhow::Error;
-
-    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        match value {
-            "ok" => Ok(HeartBeatStatus::Ok),
-            "panic" => Ok(HeartBeatStatus::Panic),
-            "end" => Ok(HeartBeatStatus::End),
-            _ => Err(anyhow!("unrecognized status: {}", value)),
-        }
-    }
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct WorkerManagerDescriptor {
-    pub task_status: TaskManagerStatus,
-    pub latest_heart_beat_ts: u64,
-    pub latest_heart_beat_status: HeartBeatStatus,
-    pub task_manager_id: String,
-    pub task_manager_address: String,
-    pub metrics_address: String,
-    pub web_address: String,
-    /// job tasks map: <job_id, Vec<TaskDescriptor>>
-    pub task_descriptors: Vec<TaskDescriptor>,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct CoordinatorManagerDescriptor {
-    /// `rlink` compile version
-    pub version: String,
-    pub application_id: String,
-    pub application_name: String,
-    pub application_properties: Properties,
-    // todo rename to web_address
-    pub coordinator_address: String,
-    pub metrics_address: String,
-    pub coordinator_status: TaskManagerStatus,
-    pub v_cores: u32,
-    pub memory_mb: u32,
-    pub num_task_managers: u32,
-    pub uptime: u64,
-    pub startup_number: u64,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct ClusterDescriptor {
-    pub coordinator_manager: CoordinatorManagerDescriptor,
-    pub worker_managers: Vec<WorkerManagerDescriptor>,
-}
-
-impl ClusterDescriptor {
-    pub fn get_worker_manager(&self, task_id: &TaskId) -> Option<&WorkerManagerDescriptor> {
-        self.worker_managers
-            .iter()
-            .find(|worker_manager_descriptor| {
-                worker_manager_descriptor
-                    .task_descriptors
-                    .iter()
-                    .find(|task_descriptor| task_descriptor.task_id.eq(task_id))
-                    .is_some()
-            })
-    }
-
-    pub fn to_string(&self) -> String {
-        serde_json::to_string(self).unwrap()
-    }
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum HeartbeatItem {
     WorkerManagerAddress(String),
     WorkerManagerWebAddress(String),
     MetricsAddress(String),
     HeartBeatStatus(HeartBeatStatus),
     TaskThreadId { task_id: TaskId, thread_id: u64 },
+    TaskEnd { task_id: TaskId },
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -212,7 +99,7 @@ where
 {
     panic_notify();
 
-    let context = context::Context::parse_node_arg(stream_env.application_name.as_str())?;
+    let context = context::Context::parse_node_arg()?;
     info!("Context: {:?}", context);
 
     cluster::run_task(Arc::new(context), stream_env, stream_app)

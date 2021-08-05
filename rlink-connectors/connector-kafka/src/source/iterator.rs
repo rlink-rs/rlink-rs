@@ -3,6 +3,7 @@ use std::borrow::BorrowMut;
 use rlink::channel::utils::handover::Handover;
 use rlink::core::element::Record;
 
+use crate::source::is_empty_record;
 use crate::state::KafkaSourceStateRecorder;
 use crate::KafkaRecord;
 
@@ -26,6 +27,10 @@ impl Iterator for KafkaRecordIterator {
     fn next(&mut self) -> Option<Self::Item> {
         match self.handover.poll_next() {
             Ok(mut record) => {
+                if is_empty_record(record.borrow_mut()) {
+                    return None;
+                }
+
                 let kafka_record = KafkaRecord::new(record.borrow_mut());
 
                 let topic = kafka_record.get_kafka_topic().unwrap();

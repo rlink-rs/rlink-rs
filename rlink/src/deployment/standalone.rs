@@ -3,9 +3,10 @@ use std::sync::Arc;
 
 use crate::core::cluster::{BatchExecuteRequest, ResponseCode, StdResponse, TaskResourceInfo};
 use crate::core::env::{StreamApp, StreamExecutionEnvironment};
+use crate::core::runtime::ClusterDescriptor;
 use crate::deployment::{Resource, TResourceManager};
 use crate::runtime::context::Context;
-use crate::runtime::{ClusterDescriptor, ManagerType};
+use crate::runtime::ManagerType;
 use crate::utils::http;
 
 #[derive(Clone, Debug)]

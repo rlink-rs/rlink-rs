@@ -1,15 +1,13 @@
 use crate::core::properties::Properties;
-use crate::core::runtime::CheckpointId;
+use crate::core::runtime::{
+    CheckpointId, ClusterDescriptor, CoordinatorManagerDescriptor, ManagerStatus,
+    OperatorDescriptor, TaskDescriptor, WorkerManagerDescriptor,
+};
 use crate::dag::DagManager;
 use crate::runtime::context::Context;
 use crate::runtime::HeartBeatStatus;
-use crate::runtime::{
-    ClusterDescriptor, CoordinatorManagerDescriptor, OperatorDescriptor, TaskDescriptor,
-    TaskManagerStatus, WorkerManagerDescriptor,
-};
 
 pub(crate) fn build_cluster_descriptor(
-    job_name: &str,
     dag_manager: &DagManager,
     application_properties: &Properties,
     context: &Context,
@@ -37,13 +35,15 @@ pub(crate) fn build_cluster_descriptor(
                 task_id: task_instance.task_id.clone(),
                 operators,
                 input_split: task_instance.input_split.clone(),
+                daemon: task_instance.daemon,
                 thread_id: "".to_string(),
+                stopped: false,
             };
             task_descriptors.push(task_descriptor);
         }
 
         let task_manager_descriptor = WorkerManagerDescriptor {
-            task_status: TaskManagerStatus::Pending,
+            task_status: ManagerStatus::Pending,
             latest_heart_beat_ts: 0,
             latest_heart_beat_status: HeartBeatStatus::Ok,
             task_manager_id: task_manager_instance.worker_manager_id.clone(),
@@ -58,11 +58,10 @@ pub(crate) fn build_cluster_descriptor(
     let coordinator_manager = CoordinatorManagerDescriptor {
         version: crate::utils::VERSION.to_owned(),
         application_id: context.application_id.clone(),
-        application_name: job_name.to_string(),
         application_properties: application_properties.clone(),
         coordinator_address: "".to_string(),
         metrics_address: context.metric_addr.clone(),
-        coordinator_status: TaskManagerStatus::Pending,
+        coordinator_status: ManagerStatus::Pending,
         v_cores: context.v_cores,
         memory_mb: context.memory_mb,
         num_task_managers: context.num_task_managers,

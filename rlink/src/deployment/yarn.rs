@@ -6,9 +6,10 @@ use std::sync::Arc;
 use crate::channel::{bounded, Receiver, Sender};
 use crate::core::cluster::TaskResourceInfo;
 use crate::core::env::{StreamApp, StreamExecutionEnvironment};
+use crate::core::runtime::ClusterDescriptor;
 use crate::deployment::TResourceManager;
 use crate::runtime::context::Context;
-use crate::runtime::{ClusterDescriptor, ManagerType};
+use crate::runtime::ManagerType;
 use crate::utils;
 
 #[derive(Debug)]

@@ -30,6 +30,7 @@ pub(crate) struct TaskInstance {
     pub task_id: TaskId,
     pub stream_nodes: Vec<StreamNode>,
     pub input_split: InputSplit,
+    pub daemon: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -195,7 +196,7 @@ mod tests {
 
     #[test]
     pub fn data_stream_test() {
-        let mut env = StreamExecutionEnvironment::new("job_name".to_string());
+        let mut env = StreamExecutionEnvironment::new();
 
         env.register_source(MyInputFormat::new(), 100)
             .flat_map(MyFlatMapFunction::new())
@@ -217,7 +218,7 @@ mod tests {
 
     #[test]
     pub fn data_stream_simple_test() {
-        let mut env = StreamExecutionEnvironment::new("job_name".to_string());
+        let mut env = StreamExecutionEnvironment::new();
 
         env.register_source(MyInputFormat::new(), 2)
             .flat_map(MyFlatMapFunction::new())
@@ -230,7 +231,7 @@ mod tests {
 
     #[test]
     pub fn data_stream_reduce_test() {
-        let mut env = StreamExecutionEnvironment::new("job_name".to_string());
+        let mut env = StreamExecutionEnvironment::new();
 
         env.register_source(MyInputFormat::new(), 2)
             .flat_map(MyFlatMapFunction::new())
@@ -255,7 +256,7 @@ mod tests {
 
     #[test]
     pub fn data_stream_connect_test() {
-        let mut env = StreamExecutionEnvironment::new("job_name".to_string());
+        let mut env = StreamExecutionEnvironment::new();
 
         let ds = env
             .register_source(MyInputFormat::new(), 1)

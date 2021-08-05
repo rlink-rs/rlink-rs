@@ -7,6 +7,7 @@ use crate::core::runtime::{OperatorId, TaskId};
 use crate::core::watermark::{Watermark, WatermarkAssigner, MIN_WATERMARK};
 use crate::metrics::metric::{Counter, Gauge};
 use crate::metrics::{register_counter, register_gauge};
+use crate::runtime::worker::backpressure::Backpressure;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
@@ -20,6 +21,7 @@ pub(crate) struct WatermarkAssignerRunnable {
     watermark: Watermark,
 
     context: Option<RunnableContext>,
+    backpressure: Option<Backpressure>,
 
     watermark_gauge: Gauge,
     expire_counter: Counter,
@@ -40,6 +42,7 @@ impl WatermarkAssignerRunnable {
             next_runnable,
             watermark: MIN_WATERMARK,
             context: None,
+            backpressure: None,
             watermark_gauge: Gauge::default(),
             expire_counter: Counter::default(),
         }
@@ -51,6 +54,7 @@ impl Runnable for WatermarkAssignerRunnable {
         self.next_runnable.as_mut().unwrap().open(context)?;
 
         self.context = Some(context.clone());
+        self.backpressure = Some(context.backpressure.clone());
 
         self.task_id = context.task_descriptor.task_id;
 
@@ -85,11 +89,20 @@ impl Runnable for WatermarkAssignerRunnable {
                     }
                     return;
                 }
+
+                // backpressure check
+                self.backpressure.as_ref().unwrap().filter(record.timestamp);
+
                 self.next_runnable.as_mut().unwrap().run(element);
             }
             Element::StreamStatus(stream_status) => {
                 if stream_status.end {
-                    self.next_runnable.as_mut().unwrap().run(element);
+                    let watermark_ele = Element::max_watermark(
+                        self.task_id.task_number,
+                        self.task_id.num_tasks,
+                        stream_status,
+                    );
+                    self.next_runnable.as_mut().unwrap().run(watermark_ele);
                 } else {
                     let watermark = match watermark_assigner.watermark(stream_status) {
                         Some(watermark) => watermark,

@@ -5,10 +5,9 @@ use std::time::Duration;
 use crate::channel::{bounded, Receiver, Sender};
 use crate::core::checkpoint::Checkpoint;
 use crate::core::properties::SystemProperties;
-use crate::core::runtime::{CheckpointId, JobId, OperatorId};
+use crate::core::runtime::{CheckpointId, ClusterDescriptor, JobId, OperatorId};
 use crate::dag::metadata::DagMetadata;
 use crate::runtime::context::Context;
-use crate::runtime::ClusterDescriptor;
 use crate::storage::checkpoint::{CheckpointStorage, TCheckpointStorage};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -118,7 +117,11 @@ impl CheckpointAlignManager {
         }
 
         CheckpointAlignManager {
-            application_name: context.application_name.clone(),
+            application_name: cluster_descriptor
+                .coordinator_manager
+                .application_properties
+                .get_application_name()
+                .clone(),
             application_id: context.application_id.clone(),
             checkpoint_ttl,
             current_ck_id: CheckpointId::default(),

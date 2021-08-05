@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use rlink::core::backend::KeyedStateBackend;
+use rlink::core::backend::{CheckpointBackend, KeyedStateBackend};
 use rlink::core::data_stream::CoStream;
 use rlink::core::data_stream::{TConnectedStreams, TDataStream, TKeyedStream, TWindowedStream};
 use rlink::core::env::{StreamApp, StreamExecutionEnvironment};
@@ -89,9 +89,18 @@ pub struct ConnectStreamApp1 {}
 
 impl StreamApp for ConnectStreamApp1 {
     fn prepare_properties(&self, properties: &mut Properties) {
+        properties.set_application_name("rlink-connect");
         properties.set_keyed_state_backend(KeyedStateBackend::Memory);
         properties.set_pub_sub_channel_size(100000);
         properties.set_pub_sub_channel_base(ChannelBaseOn::Unbounded);
+
+        properties.set_checkpoint(CheckpointBackend::Memory);
+        properties.set_checkpoint_interval(Duration::from_secs(15));
+        properties.set_checkpoint_ttl(Duration::from_secs(60 * 60 * 24));
+
+        properties.set_speed_backpressure_interval(Duration::from_secs(10));
+        properties.set_speed_backpressure_max_times(2);
+        properties.set_speed_backpressure_pause_time(Duration::from_secs(5));
     }
 
     fn build_stream(&self, _properties: &Properties, env: &mut StreamExecutionEnvironment) {

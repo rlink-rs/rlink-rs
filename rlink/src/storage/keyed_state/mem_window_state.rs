@@ -60,7 +60,7 @@ impl TWindowState for MemoryWindowState {
         windows
     }
 
-    fn merge<F>(&mut self, key: Record, mut record: Record, reduce_fun: F)
+    fn merge<F>(&mut self, key: Record, mut record: Record, reduce_fun: F) -> usize
     where
         F: Fn(Option<&mut Record>, &mut Record) -> Record,
     {
@@ -76,9 +76,10 @@ impl TWindowState for MemoryWindowState {
                 })
             }
         }
+        self.windows.len()
     }
 
-    fn drop_window(&mut self, window: &Window) {
+    fn drop_window(&mut self, window: &Window) -> usize {
         match self.windows.remove(&window) {
             Some(state) => {
                 let state_key = StorageKey::new(self.job_id, self.task_number);
@@ -86,6 +87,7 @@ impl TWindowState for MemoryWindowState {
             }
             None => {}
         };
+        self.windows.len()
     }
 
     fn snapshot(&mut self, _barrier: Barrier) {}

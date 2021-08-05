@@ -23,6 +23,7 @@ pub(crate) struct ExecutionNode {
     pub task_id: TaskId,
     pub stream_nodes: Vec<StreamNode>,
     pub input_split: InputSplit,
+    pub daemon: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -92,6 +93,7 @@ impl ExecutionGraph {
                         task_id: task_id.clone(),
                         stream_nodes: job_node.stream_nodes.clone(),
                         input_split: input_splits[task_number as usize].clone(),
+                        daemon: job_node.is_daemon_job(),
                     };
 
                     let node_index = self.dag.add_node(execution_node);

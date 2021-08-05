@@ -18,6 +18,7 @@ pub struct StreamNode {
     pub(crate) id: OperatorId,
     pub(crate) parent_ids: Vec<OperatorId>,
     pub(crate) parallelism: u16,
+    pub(crate) daemon: bool,
 
     pub(crate) operator_name: String,
     pub(crate) operator_type: OperatorType,
@@ -50,8 +51,6 @@ impl StreamGraph {
 
 #[derive(Debug)]
 pub(crate) struct RawStreamGraph {
-    application_name: String,
-
     stream_nodes: Vec<NodeIndex>,
     stream_edges: Vec<EdgeIndex>,
 
@@ -67,9 +66,8 @@ pub(crate) struct RawStreamGraph {
 }
 
 impl RawStreamGraph {
-    pub fn new(application_name: String) -> Self {
+    pub fn new() -> Self {
         RawStreamGraph {
-            application_name,
             stream_nodes: Vec::new(),
             stream_edges: Vec::new(),
             id_gen: OperatorId::default(),
@@ -145,6 +143,7 @@ impl RawStreamGraph {
             id: operator_id,
             parent_ids: parent_operator_ids.clone(),
             parallelism,
+            daemon: operator.is_daemon(),
             operator_name: operator.operator_name().to_string(),
             operator_type: OperatorType::from(&operator),
             fn_creator: operator.fn_creator(),

@@ -11,6 +11,19 @@ pub struct PartitionOffset {
     pub(crate) offset: i64,
 }
 
+impl PartitionOffset {
+    pub fn new(partition: i32, offset: i64) -> Self {
+        Self { partition, offset }
+    }
+
+    pub fn partition(&self) -> i32 {
+        self.partition
+    }
+    pub fn offset(&self) -> i64 {
+        self.offset
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PartitionOffsets {
     pub(crate) partition_offsets: Vec<Option<PartitionOffset>>,
@@ -68,21 +81,9 @@ impl KafkaSourceStateRecorder {
         m
     }
 
-    pub fn get(&self, topic: &str, partition: i32, default_offset: Offset) -> PartitionOffset {
-        match self.partition_offsets.get(topic) {
-            Some(kv_ref) => kv_ref
-                .partition_offsets
-                .get(partition as usize)
-                .map(|x| x.clone())
-                .unwrap_or_default()
-                .unwrap_or_else(|| PartitionOffset {
-                    partition,
-                    offset: default_offset.to_raw().unwrap(),
-                }),
-            None => PartitionOffset {
-                partition,
-                offset: default_offset.to_raw().unwrap(),
-            },
-        }
+    pub fn get(&self, topic: &str, partition: i32) -> Option<PartitionOffset> {
+        let kv_ref = self.partition_offsets.get(topic)?;
+        let po = kv_ref.partition_offsets.get(partition as usize)?;
+        po.clone()
     }
 }

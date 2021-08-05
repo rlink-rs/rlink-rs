@@ -2,10 +2,23 @@ use std::time::Duration;
 
 use crate::channel::{unbounded, Receiver, Sender, TrySendError};
 use crate::core::cluster::StdResponse;
-use crate::runtime::{HeartBeatStatus, HeartbeatItem, HeartbeatRequest};
+use crate::core::runtime::{HeartBeatStatus, ManagerStatus};
+use crate::runtime::{HeartbeatItem, HeartbeatRequest};
 use crate::utils::http::client::post;
 use crate::utils::thread::async_sleep;
 use crate::utils::{date_time, panic};
+
+static mut COORDINATOR_STATUS: ManagerStatus = ManagerStatus::Pending;
+
+fn update_coordinator_status(coordinator_status: ManagerStatus) {
+    unsafe {
+        COORDINATOR_STATUS = coordinator_status;
+    }
+}
+
+pub(crate) fn get_coordinator_status() -> ManagerStatus {
+    unsafe { COORDINATOR_STATUS }
+}
 
 pub struct HeartbeatChannel {
     sender: Sender<HeartbeatItem>,
@@ -92,7 +105,7 @@ pub(crate) async fn report_heartbeat(
     let body = serde_json::to_string(&request).unwrap();
 
     let begin_time = date_time::current_timestamp_millis();
-    let resp = post::<StdResponse<bool>>(url, body).await;
+    let resp = post::<StdResponse<ManagerStatus>>(url, body).await;
     let end_time = date_time::current_timestamp_millis();
     let elapsed = end_time - begin_time;
 
@@ -100,6 +113,17 @@ pub(crate) async fn report_heartbeat(
         Ok(resp) => {
             if elapsed > 1000 {
                 warn!("heartbeat success. {:?}, elapsed: {}ms > 1s", resp, elapsed);
+            }
+
+            if let Some(coordinator_status) = resp.data {
+                match coordinator_status {
+                    ManagerStatus::Terminating | ManagerStatus::Terminated => {
+                        info!("coordinator status: {:?}", coordinator_status)
+                    }
+                    _ => {}
+                }
+
+                update_coordinator_status(coordinator_status);
             }
         }
         Err(e) => {
