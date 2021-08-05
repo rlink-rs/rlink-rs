@@ -3,9 +3,10 @@ use std::sync::Arc;
 
 use crate::core::cluster::TaskResourceInfo;
 use crate::core::env::{StreamApp, StreamExecutionEnvironment};
+use crate::core::runtime::ClusterDescriptor;
 use crate::deployment::{Resource, TResourceManager};
 use crate::runtime::context::Context;
-use crate::runtime::{cluster, ClusterDescriptor, ManagerType};
+use crate::runtime::{cluster, ManagerType};
 
 #[derive(Clone, Debug)]
 pub(crate) struct LocalResourceManager {
@@ -30,7 +31,7 @@ impl TResourceManager for LocalResourceManager {
     fn worker_allocate<S>(
         &self,
         stream_app: &S,
-        stream_env: &StreamExecutionEnvironment,
+        _stream_env: &StreamExecutionEnvironment,
     ) -> anyhow::Result<Vec<TaskResourceInfo>>
     where
         S: StreamApp + 'static,
@@ -55,14 +56,13 @@ impl TResourceManager for LocalResourceManager {
                 .clone();
 
             let stream_app_clone = stream_app.clone();
-            let application_name = stream_env.application_name.clone();
             std::thread::Builder::new()
                 .name(format!(
                     "TaskManager(id={})",
                     &task_manager_descriptor.task_manager_id
                 ))
                 .spawn(move || {
-                    let stream_env = StreamExecutionEnvironment::new(application_name);
+                    let stream_env = StreamExecutionEnvironment::new();
                     match cluster::run_task(Arc::new(context_clone), stream_env, stream_app_clone) {
                         Ok(_) => {}
                         Err(e) => {

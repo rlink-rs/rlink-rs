@@ -11,20 +11,24 @@ use rlink::functions::schema_base::print_output_format::PrintOutputFormat;
 use rlink::functions::schema_base::reduce::{sum_i64, SchemaBaseReduceFunction};
 use rlink::functions::schema_base::timestamp_assigner::SchemaBaseTimestampAssigner;
 use rlink::functions::schema_base::FunctionSchema;
+use rlink_example_utils::bounded_input_format::VecInputFormat;
 use rlink_example_utils::buffer_gen::model;
 use rlink_example_utils::buffer_gen::model::FIELD_TYPE;
-use rlink_example_utils::unbounded_input_format::RandInputFormat;
 
 use crate::filter::MyFlatMapFunction;
 use crate::mapper::MyFilterFunction;
+use rlink::core::runtime::ClusterDescriptor;
 
 #[derive(Clone, Debug)]
 pub struct SimpleStreamApp {}
 
 impl StreamApp for SimpleStreamApp {
     fn prepare_properties(&self, properties: &mut Properties) {
+        // the `application_name` must be set in `prepare_properties`
+        properties.set_application_name("rlink-simple");
+
         properties.set_keyed_state_backend(KeyedStateBackend::Memory);
-        properties.set_checkpoint_internal(Duration::from_secs(15));
+        properties.set_checkpoint_interval(Duration::from_secs(15));
         properties.set_checkpoint(CheckpointBackend::Memory);
     }
 
@@ -41,7 +45,7 @@ impl StreamApp for SimpleStreamApp {
             key_types
         };
 
-        env.register_source(RandInputFormat::new(), 3)
+        env.register_source(VecInputFormat::new(), 3)
             .flat_map(MyFlatMapFunction::new())
             .filter(MyFilterFunction::new())
             .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
@@ -56,5 +60,9 @@ impl StreamApp for SimpleStreamApp {
             ))
             .reduce(reduce_function, 2)
             .add_sink(PrintOutputFormat::new(output_schema_types.as_slice()));
+    }
+
+    fn pre_worker_startup(&self, cluster_descriptor: &ClusterDescriptor) {
+        println!("{}", cluster_descriptor.coordinator_manager.metrics_address);
     }
 }

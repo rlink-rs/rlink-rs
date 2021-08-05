@@ -10,6 +10,6 @@ create table rlink_ck
 	operator_id int default 0 not null comment 'job id',
 	checkpoint_id bigint default 0 not null comment 'checkpoint id',
     completed_checkpoint_id bigint default 0 not null comment 'completed checkpoint id',
-	handle varchar(2000) default '' not null comment 'checkpoint handle can access checkpoint state. eg: mq''s offset, file''s path',
+	handle text comment 'checkpoint handle can access checkpoint state. eg: mq''s offset, file''s path',
 	create_time datetime default '1900-01-01 00:00:00' not null comment 'create datetime'
-)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci

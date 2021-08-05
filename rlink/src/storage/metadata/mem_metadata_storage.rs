@@ -1,6 +1,7 @@
 use std::sync::Mutex;
 
-use crate::runtime::{ClusterDescriptor, HeartbeatItem, TaskManagerStatus};
+use crate::core::runtime::{ClusterDescriptor, ManagerStatus};
+use crate::runtime::HeartbeatItem;
 use crate::storage::metadata::TMetadataStorage;
 use crate::utils;
 
@@ -45,10 +46,7 @@ impl TMetadataStorage for MemoryMetadataStorage {
         Ok(lock.clone().unwrap())
     }
 
-    fn update_application_status(
-        &self,
-        job_manager_status: TaskManagerStatus,
-    ) -> anyhow::Result<()> {
+    fn update_application_status(&self, job_manager_status: ManagerStatus) -> anyhow::Result<()> {
         let mut lock = METADATA_STORAGE
             .lock()
             .expect("METADATA_STORAGE lock failed");
@@ -63,15 +61,15 @@ impl TMetadataStorage for MemoryMetadataStorage {
         &self,
         task_manager_id: String,
         heartbeat_items: Vec<HeartbeatItem>,
-        task_manager_status: TaskManagerStatus,
-    ) -> anyhow::Result<()> {
+        task_manager_status: ManagerStatus,
+    ) -> anyhow::Result<ManagerStatus> {
         let mut update_success = false;
 
         let mut lock = METADATA_STORAGE
             .lock()
             .expect("METADATA_STORAGE lock failed");
-        let mut job_descriptor: ClusterDescriptor = lock.clone().unwrap();
-        for mut task_manager_descriptor in &mut job_descriptor.worker_managers {
+        let mut cluster_descriptor: ClusterDescriptor = lock.clone().unwrap();
+        for mut task_manager_descriptor in &mut cluster_descriptor.worker_managers {
             if task_manager_descriptor
                 .task_manager_id
                 .eq(task_manager_id.as_str())
@@ -101,6 +99,34 @@ impl TMetadataStorage for MemoryMetadataStorage {
                                 }
                             }
                         }
+                        HeartbeatItem::TaskEnd { task_id } => {
+                            for task_descriptor in &mut task_manager_descriptor.task_descriptors {
+                                if task_descriptor.task_id.eq(&task_id) {
+                                    task_descriptor.stopped = true;
+                                }
+                            }
+
+                            let all_tasks_end = task_manager_descriptor
+                                .task_descriptors
+                                .iter()
+                                .find(|x| !x.stopped)
+                                .is_none();
+                            if all_tasks_end {
+                                cluster_descriptor.coordinator_manager.coordinator_status =
+                                    ManagerStatus::Terminated;
+                            } else {
+                                let exist_tasks_end = task_manager_descriptor
+                                    .task_descriptors
+                                    .iter()
+                                    .filter(|x| !x.daemon)
+                                    .find(|x| x.stopped)
+                                    .is_some();
+                                if exist_tasks_end {
+                                    cluster_descriptor.coordinator_manager.coordinator_status =
+                                        ManagerStatus::Terminating;
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -110,9 +136,13 @@ impl TMetadataStorage for MemoryMetadataStorage {
         }
 
         if update_success {
-            debug!("Update TaskManager metadata success. {:?}", job_descriptor);
-            *lock = Some(job_descriptor);
-            Ok(())
+            debug!(
+                "Update TaskManager metadata success. {:?}",
+                cluster_descriptor
+            );
+            let coordinator_status = cluster_descriptor.coordinator_manager.coordinator_status;
+            *lock = Some(cluster_descriptor);
+            Ok(coordinator_status)
         } else {
             error!(
                 "TaskManager(task_manager_id={}) metadata not found",

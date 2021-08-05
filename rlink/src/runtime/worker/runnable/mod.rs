@@ -5,14 +5,14 @@ use std::time::Duration;
 use crate::core::checkpoint::FunctionSnapshotContext;
 use crate::core::element::Element;
 use crate::core::properties::SystemProperties;
-use crate::core::runtime::{CheckpointId, OperatorId, TaskId};
+use crate::core::runtime::{CheckpointId, ClusterDescriptor, OperatorId, TaskDescriptor, TaskId};
 use crate::dag::execution_graph::{ExecutionEdge, ExecutionNode};
 use crate::dag::job_graph::{JobEdge, JobNode};
 use crate::dag::metadata::DagMetadata;
 use crate::dag::stream_graph::StreamNode;
 use crate::runtime::timer::WindowTimer;
+use crate::runtime::worker::backpressure::Backpressure;
 use crate::runtime::worker::FunctionContext;
-use crate::runtime::{ClusterDescriptor, TaskDescriptor};
 
 pub mod co_process_runnable;
 pub mod filter_runnable;
@@ -39,6 +39,7 @@ pub(crate) struct RunnableContext {
     pub(crate) cluster_descriptor: Arc<ClusterDescriptor>,
     pub(crate) task_descriptor: TaskDescriptor,
     pub(crate) window_timer: WindowTimer,
+    pub(crate) backpressure: Backpressure,
 }
 
 impl RunnableContext {
@@ -92,11 +93,11 @@ impl RunnableContext {
         )
     }
 
-    pub(crate) fn checkpoint_internal(&self, default_value: Duration) -> Duration {
+    pub(crate) fn checkpoint_interval(&self, default_value: Duration) -> Duration {
         self.cluster_descriptor
             .coordinator_manager
             .application_properties
-            .get_checkpoint_internal()
+            .get_checkpoint_interval()
             .unwrap_or(default_value)
     }
 

@@ -3,13 +3,14 @@ use std::sync::Arc;
 
 use crate::core::cluster::TaskResourceInfo;
 use crate::core::env::{StreamApp, StreamExecutionEnvironment};
+use crate::core::runtime::ClusterDescriptor;
 #[cfg(feature = "k8s")]
 use crate::deployment::kubernetes::KubernetesResourceManager;
 use crate::deployment::local::LocalResourceManager;
 use crate::deployment::standalone::StandaloneResourceManager;
 use crate::deployment::yarn::YarnResourceManager;
 use crate::runtime::context::Context;
-use crate::runtime::{ClusterDescriptor, ClusterMode};
+use crate::runtime::ClusterMode;
 
 #[cfg(feature = "k8s")]
 pub mod kubernetes;

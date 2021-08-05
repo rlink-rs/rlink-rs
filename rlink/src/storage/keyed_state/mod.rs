@@ -127,11 +127,11 @@ impl TReducingState for ReducingState {
 pub trait TWindowState: Debug {
     fn windows(&self) -> Vec<Window>;
 
-    fn merge<F>(&mut self, key: Record, record: Record, reduce_fun: F)
+    fn merge<F>(&mut self, key: Record, record: Record, reduce_fun: F) -> usize
     where
         F: Fn(Option<&mut Record>, &mut Record) -> Record;
 
-    fn drop_window(&mut self, window: &Window);
+    fn drop_window(&mut self, window: &Window) -> usize;
 
     fn snapshot(&mut self, barrier: Barrier);
 }
@@ -165,7 +165,7 @@ impl TWindowState for WindowState {
         }
     }
 
-    fn merge<F>(&mut self, key: Record, record: Record, reduce_fun: F)
+    fn merge<F>(&mut self, key: Record, record: Record, reduce_fun: F) -> usize
     where
         F: Fn(Option<&mut Record>, &mut Record) -> Record,
     {
@@ -174,7 +174,7 @@ impl TWindowState for WindowState {
         }
     }
 
-    fn drop_window(&mut self, window: &Window) {
+    fn drop_window(&mut self, window: &Window) -> usize {
         match self {
             WindowState::MemoryWindowState(state) => state.drop_window(window),
         }

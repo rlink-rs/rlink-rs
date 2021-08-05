@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use metrics::gauge;
 use sysinfo::{ProcessExt, SystemExt};
@@ -30,6 +31,11 @@ pub fn parse_arg(arg_key: &str) -> anyhow::Result<String> {
     }
 
     return Err(anyhow!("`{}` argument is not found", arg_key));
+}
+
+pub fn parse_arg_to_u64(arg_key: &str) -> anyhow::Result<u64> {
+    let v = parse_arg(arg_key)?;
+    u64::from_str(v.as_str()).map_err(|e| anyhow!(e))
 }
 
 pub(crate) fn sys_info_metric_task(global_tag: Tag) {

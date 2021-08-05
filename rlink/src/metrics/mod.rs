@@ -31,10 +31,11 @@ pub(crate) fn init_metrics(bind_ip: &str, with_proxy: bool) -> Option<SocketAddr
     let loops = 30;
     for _index in 0..loops {
         let port = rng.gen_range(10000..30000);
-        let addr: SocketAddr = format!("{}:{}", bind_ip, port)
+        let addr_str = format!("{}:{}", bind_ip, port);
+        let addr: SocketAddr = addr_str
             .as_str()
             .parse()
-            .expect("failed to parse http listen address");
+            .expect(format!("failed to parse http listen address {}", addr_str).as_str());
 
         match install(addr, with_proxy) {
             Ok(_) => {

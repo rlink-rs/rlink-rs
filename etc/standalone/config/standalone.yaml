@@ -1,6 +1,6 @@
 ---
 application_manager_address:
-  - "http://10.100.189.40:8770"
+  - "http://127.0.0.1:8770"
 
 metadata_storage:
   type: Memory

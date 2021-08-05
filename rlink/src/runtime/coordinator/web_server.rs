@@ -15,10 +15,10 @@ use rand::Rng;
 use crate::channel::{bounded, Sender};
 use crate::core::checkpoint::Checkpoint;
 use crate::core::cluster::{MetadataStorageType, StdResponse};
+use crate::core::runtime::ManagerStatus;
 use crate::dag::metadata::DagMetadata;
 use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
 use crate::runtime::HeartbeatRequest;
-use crate::runtime::TaskManagerStatus;
 use crate::storage::metadata::{MetadataStorage, TMetadataStorage};
 use crate::utils::fs::read_binary;
 use crate::utils::http::server::{as_ok_json, page_not_found};
@@ -217,11 +217,11 @@ async fn heartbeat(req: Request<Body>, context: Arc<WebContext>) -> anyhow::Resu
     } = serde_json::from_reader(whole_body.reader())?;
 
     let metadata_storage = MetadataStorage::new(&context.metadata_mode);
-    metadata_storage
-        .update_task_manager_status(task_manager_id, change_items, TaskManagerStatus::Registered)
+    let coordinator_status = metadata_storage
+        .update_task_manager_status(task_manager_id, change_items, ManagerStatus::Registered)
         .unwrap();
 
-    as_ok_json(&StdResponse::ok(Some(true)))
+    as_ok_json(&StdResponse::ok(Some(coordinator_status)))
 }
 
 async fn checkpoint(

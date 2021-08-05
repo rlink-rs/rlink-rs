@@ -45,7 +45,6 @@ use crate::utils::process::{parse_arg, work_space};
 ///
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub(crate) struct Context {
-    pub application_name: String,
     pub application_id: String,
     /// when `ManagerType::Coordinator`: `job_manager_id`
     /// when `ManagerType::Worker`: `task_manager_id`
@@ -73,7 +72,6 @@ pub(crate) struct Context {
 
 impl Context {
     pub fn new(
-        application_name: String,
         application_id: String,
         task_manager_id: String,
         bind_ip: String,
@@ -92,7 +90,6 @@ impl Context {
         image_path: String,
     ) -> Self {
         Context {
-            application_name,
             application_id,
             task_manager_id,
             bind_ip,
@@ -112,7 +109,7 @@ impl Context {
         }
     }
 
-    pub fn parse_node_arg(application_name: &str) -> anyhow::Result<Context> {
+    pub fn parse_node_arg() -> anyhow::Result<Context> {
         let bind_ip = utils::ip::get_service_ip()?.to_string();
 
         let cluster_mode = match parse_arg("cluster_mode") {
@@ -260,7 +257,6 @@ impl Context {
         };
 
         Ok(Context::new(
-            application_name.to_string(),
             application_id,
             task_manager_id,
             bind_ip,

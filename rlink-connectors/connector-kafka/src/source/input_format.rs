@@ -1,7 +1,8 @@
 use std::time::Duration;
 
-use rdkafka::consumer::{BaseConsumer, Consumer};
-use rdkafka::{ClientConfig, Offset};
+use rdkafka::consumer::{BaseConsumer, Consumer, DefaultConsumerContext};
+use rdkafka::error::KafkaResult;
+use rdkafka::{ClientConfig, Offset, TopicPartitionList};
 use rlink::channel::utils::handover::Handover;
 use rlink::core;
 use rlink::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
@@ -11,9 +12,11 @@ use rlink::core::properties::Properties;
 use rlink::metrics::Tag;
 
 use crate::source::checkpoint::KafkaCheckpointFunction;
-use crate::source::consumer::{create_kafka_consumer, get_kafka_consumer_handover};
+use crate::source::consumer::{create_kafka_consumer, ConsumerRange};
 use crate::source::deserializer::KafkaRecordDeserializerBuilder;
 use crate::source::iterator::KafkaRecordIterator;
+use crate::state::PartitionOffset;
+use crate::OffsetRange;
 
 const CREATE_KAFKA_CONNECTION: &'static str = "create_kafka_connection";
 
@@ -23,6 +26,8 @@ pub struct KafkaInputFormat {
     topics: Vec<String>,
 
     buffer_size: usize,
+    offset_range: OffsetRange,
+
     handover: Option<Handover>,
 
     deserializer_builder: Box<dyn KafkaRecordDeserializerBuilder>,
@@ -35,16 +40,108 @@ impl KafkaInputFormat {
         client_config: ClientConfig,
         topics: Vec<String>,
         buffer_size: usize,
+        offset_range: OffsetRange,
         deserializer_builder: Box<dyn KafkaRecordDeserializerBuilder>,
     ) -> Self {
         KafkaInputFormat {
             client_config,
             topics,
             buffer_size,
+            offset_range,
             handover: None,
             checkpoint: None,
             deserializer_builder,
         }
+    }
+
+    fn consumer_ranges(
+        &mut self,
+        topic: String,
+        partition: i32,
+    ) -> KafkaResult<Vec<ConsumerRange>> {
+        let (begin_partition, end_partition) = match &self.offset_range {
+            OffsetRange::None => {
+                let state = self.checkpoint.as_mut().unwrap().get_state();
+                (state.get(topic.as_str(), partition), None)
+            }
+            OffsetRange::Direct {
+                begin_offset,
+                end_offset,
+            } => {
+                let begin_partitions = {
+                    let partition_offsets = begin_offset.get(topic.as_str()).unwrap();
+                    partition_offsets.get(partition as usize).map(|p| p.clone())
+                };
+                let end_partitions = if let Some(end_offset) = end_offset {
+                    let partition_offsets = end_offset.get(topic.as_str()).unwrap();
+                    partition_offsets.get(partition as usize).map(|p| p.clone())
+                } else {
+                    None
+                };
+
+                (begin_partitions, end_partitions)
+            }
+            OffsetRange::Timestamp {
+                begin_timestamp,
+                end_timestamp,
+            } => {
+                let begin_timestamp = begin_timestamp.get(topic.as_str());
+                let end_timestamp = end_timestamp
+                    .as_ref()
+                    .map(|x| x.get(topic.as_str()))
+                    .unwrap_or_default();
+
+                let consumer: BaseConsumer<DefaultConsumerContext> = self.client_config.create()?;
+
+                fn offsets_for_times(
+                    consumer: &BaseConsumer<DefaultConsumerContext>,
+                    topic: &str,
+                    partition: i32,
+                    timestamp: u64,
+                ) -> KafkaResult<Option<PartitionOffset>> {
+                    let timeout = Duration::from_secs(3);
+                    let mut partition_list = TopicPartitionList::with_capacity(1);
+                    partition_list.set_partition_offset(
+                        topic,
+                        partition,
+                        Offset::Offset(timestamp as i64),
+                    )?;
+
+                    let tpl = consumer.offsets_for_times(partition_list, timeout)?;
+                    let partition_offset =
+                        tpl.find_partition(topic, partition)
+                            .map(|elem| PartitionOffset {
+                                partition,
+                                offset: elem.offset().to_raw().unwrap(),
+                            });
+                    Ok(partition_offset)
+                }
+
+                let begin_partition = match begin_timestamp {
+                    Some(timestamp) => {
+                        offsets_for_times(&consumer, topic.as_str(), partition, *timestamp)?
+                    }
+                    None => None,
+                };
+                let end_partition = match end_timestamp {
+                    Some(timestamp) => {
+                        offsets_for_times(&consumer, topic.as_str(), partition, *timestamp)?
+                    }
+                    None => None,
+                };
+
+                (begin_partition, end_partition)
+            }
+        };
+
+        Ok(vec![ConsumerRange {
+            topic,
+            partition,
+            begin_offset: begin_partition
+                .map(|x| x.offset)
+                .unwrap_or(Offset::End.to_raw().unwrap()),
+            end_offset: end_partition.map(|x| x.offset),
+        }])
     }
 }
 
@@ -52,53 +149,39 @@ impl InputFormat for KafkaInputFormat {
     fn open(&mut self, input_split: InputSplit, context: &Context) -> core::Result<()> {
         info!("kafka source open");
 
-        let can_create_consumer = input_split
-            .properties()
-            .get_string(CREATE_KAFKA_CONNECTION)?;
-        if can_create_consumer.to_lowercase().eq("true") {
-            let mut kafka_checkpoint =
-                KafkaCheckpointFunction::new(context.application_id.clone(), context.task_id);
-            kafka_checkpoint
-                .initialize_state(&context.checkpoint_context(), &context.checkpoint_handle);
-            self.checkpoint = Some(kafka_checkpoint);
+        let kafka_checkpoint =
+            KafkaCheckpointFunction::new(context.application_id.clone(), context.task_id);
+        self.checkpoint = Some(kafka_checkpoint);
 
-            let topic = input_split.properties().get_string("topic").unwrap();
-            let partition = input_split.properties().get_i32("partition").unwrap();
+        self.initialize_state(&context.checkpoint_context(), &context.checkpoint_handle);
 
-            let tags = vec![
-                Tag::new("topic", topic.as_str()),
-                Tag::new("partition", partition),
-            ];
-            self.handover = Some(Handover::new(
-                "KafkaSource_Handover",
-                tags,
-                self.buffer_size,
-            ));
+        let topic = input_split.properties().get_string("topic").unwrap();
+        let partition = input_split.properties().get_i32("partition").unwrap();
 
-            let partition_offset = self.checkpoint.as_mut().unwrap().get_state().get(
-                topic.as_str(),
-                partition,
-                Offset::End,
-            );
+        let tags = vec![
+            Tag::new("topic", topic.as_str()),
+            Tag::new("partition", partition),
+        ];
+        self.handover = Some(Handover::new(
+            "KafkaSource_Handover",
+            tags,
+            self.buffer_size,
+        ));
 
-            let client_config = self.client_config.clone();
-            let handover = self.handover.as_ref().unwrap().clone();
-            let partition_offsets = vec![(topic, partition_offset)];
-            create_kafka_consumer(
-                context.task_id.job_id(),
-                context.task_id.task_number(),
-                client_config,
-                partition_offsets,
-                handover,
-                self.deserializer_builder.build(),
-            );
+        let client_config = self.client_config.clone();
+        let handover = self.handover.as_ref().unwrap().clone();
 
-            info!("start with consumer and operator mode")
-        } else {
-            self.handover = get_kafka_consumer_handover(context.task_id.job_id());
+        let consumer_ranges = self.consumer_ranges(topic, partition).unwrap();
+        create_kafka_consumer(
+            context.task_id.job_id(),
+            context.task_id.task_number(),
+            client_config,
+            consumer_ranges,
+            handover,
+            self.deserializer_builder.build(),
+        );
 
-            info!("start with follower operator mode")
-        }
+        info!("start with consumer and operator mode");
 
         Ok(())
     }
@@ -117,9 +200,13 @@ impl InputFormat for KafkaInputFormat {
 impl CheckpointFunction for KafkaInputFormat {
     fn initialize_state(
         &mut self,
-        _context: &FunctionSnapshotContext,
-        _handle: &Option<CheckpointHandle>,
+        context: &FunctionSnapshotContext,
+        handle: &Option<CheckpointHandle>,
     ) {
+        self.checkpoint
+            .as_mut()
+            .unwrap()
+            .initialize_state(context, handle);
     }
 
     /// trigger the method when the `operator` operate a `Barrier` event
@@ -157,7 +244,7 @@ impl InputSplitSource for KafkaInputFormat {
                 let mut properties = Properties::new();
                 properties.set_str("topic", topic.as_str());
                 properties.set_i32("partition", partition.id());
-                properties.set_str(CREATE_KAFKA_CONNECTION, "true");
+                properties.set_bool(CREATE_KAFKA_CONNECTION, true);
 
                 let input_split = InputSplit::new(index, properties);
                 index += 1;
@@ -182,7 +269,7 @@ impl InputSplitSource for KafkaInputFormat {
                 for input_split in &input_splits {
                     let split_number = input_split.split_number();
                     let mut properties = input_split.properties().clone();
-                    properties.set_str(CREATE_KAFKA_CONNECTION, "false");
+                    properties.set_bool(CREATE_KAFKA_CONNECTION, false);
 
                     extend_input_splits.push(InputSplit::new(split_number, properties));
                 }

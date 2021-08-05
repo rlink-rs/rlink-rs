@@ -14,8 +14,10 @@ pub struct FilesStreamApp {}
 
 impl StreamApp for FilesStreamApp {
     fn prepare_properties(&self, properties: &mut Properties) {
+        properties.set_application_name("rlink-files");
+
         properties.set_keyed_state_backend(KeyedStateBackend::Memory);
-        properties.set_checkpoint_internal(Duration::from_secs(15));
+        properties.set_checkpoint_interval(Duration::from_secs(15));
         properties.set_checkpoint(CheckpointBackend::Memory);
     }
 

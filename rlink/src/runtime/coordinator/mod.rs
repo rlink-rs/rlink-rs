@@ -8,7 +8,8 @@ use crate::core::checkpoint::CheckpointHandle;
 use crate::core::cluster::MetadataStorageType;
 use crate::core::cluster::TaskResourceInfo;
 use crate::core::env::{StreamApp, StreamExecutionEnvironment};
-use crate::core::properties::{Properties, SystemProperties, SYSTEM_CLUSTER_MODE};
+use crate::core::properties::{InnerSystemProperties, Properties, SystemProperties};
+use crate::core::runtime::{ClusterDescriptor, ManagerStatus};
 use crate::dag::metadata::DagMetadata;
 use crate::dag::DagManager;
 use crate::deployment::TResourceManager;
@@ -19,7 +20,6 @@ use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
 use crate::runtime::coordinator::heart_beat_manager::HeartbeatResult;
 use crate::runtime::coordinator::task_distribution::build_cluster_descriptor;
 use crate::runtime::coordinator::web_server::web_launch;
-use crate::runtime::{ClusterDescriptor, TaskManagerStatus};
 use crate::storage::metadata::{
     loop_delete_cluster_descriptor, loop_read_cluster_descriptor, loop_save_cluster_descriptor,
     loop_update_application_status, MetadataStorage,
@@ -118,6 +118,9 @@ where
             self.save_metadata(&cluster_descriptor);
             info!("save metadata to storage");
 
+            self.stream_app.pre_worker_startup(&cluster_descriptor);
+            info!("pre-worker startup event");
+
             // allocate all worker's resources
             let worker_task_ids = self.allocate_worker();
             info!("allocate workers success");
@@ -147,10 +150,7 @@ where
 
     fn prepare_properties(&self) -> Properties {
         let mut job_properties = Properties::new();
-        job_properties.set_str(
-            SYSTEM_CLUSTER_MODE,
-            format!("{}", self.context.cluster_mode).as_str(),
-        );
+        job_properties.set_cluster_mode(self.context.cluster_mode);
 
         self.stream_app
             .prepare_properties(job_properties.borrow_mut());
@@ -167,12 +167,8 @@ where
         dag_manager: &DagManager,
         application_properties: &Properties,
     ) -> ClusterDescriptor {
-        let cluster_descriptor = build_cluster_descriptor(
-            self.stream_env.application_name.as_str(),
-            dag_manager,
-            application_properties,
-            &self.context,
-        );
+        let cluster_descriptor =
+            build_cluster_descriptor(dag_manager, application_properties, &self.context);
         // let mut metadata_storage = MetadataStorage::new(&self.metadata_storage_mode);
         // loop_save_job_descriptor(metadata_storage.borrow_mut(), job_descriptor.clone());
         cluster_descriptor
@@ -269,12 +265,12 @@ where
             let unregister_worker = job_descriptor
                 .worker_managers
                 .iter()
-                .find(|x| x.task_status.ne(&TaskManagerStatus::Registered));
+                .find(|x| x.task_status.ne(&ManagerStatus::Registered));
 
             if unregister_worker.is_none() {
                 loop_update_application_status(
                     metadata_storage.borrow_mut(),
-                    TaskManagerStatus::Registered,
+                    ManagerStatus::Registered,
                 );
                 info!("all workers status fine and Job update state to `Registered`");
                 job_descriptor.worker_managers.iter().for_each(|tm| {

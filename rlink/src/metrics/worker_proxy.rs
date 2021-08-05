@@ -1,7 +1,7 @@
 use tokio::task::JoinHandle;
 
+use crate::core::runtime::WorkerManagerDescriptor;
 use crate::runtime::coordinator::heart_beat_manager::global_cluster_descriptor;
-use crate::runtime::WorkerManagerDescriptor;
 use crate::utils::http;
 
 pub(crate) async fn collect_worker_metrics() -> String {

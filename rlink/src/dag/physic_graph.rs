@@ -57,6 +57,7 @@ impl PhysicGraph {
                         task_id: execution_node.task_id.clone(),
                         stream_nodes: execution_node.stream_nodes.clone(),
                         input_split: execution_node.input_split.clone(),
+                        daemon: execution_node.daemon,
                     });
                 }
             }

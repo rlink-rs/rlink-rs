@@ -7,19 +7,21 @@ use crate::core::element::{Element, Record};
 use crate::core::env::{StreamApp, StreamExecutionEnvironment};
 use crate::core::function::KeySelectorFunction;
 use crate::core::operator::{DefaultStreamOperator, StreamOperator};
-use crate::core::runtime::{JobId, OperatorId};
+use crate::core::runtime::{ClusterDescriptor, JobId, OperatorId, TaskDescriptor};
 use crate::dag::metadata::DagMetadata;
 use crate::dag::OperatorType;
 use crate::runtime::context::Context;
 use crate::runtime::timer::WindowTimer;
+use crate::runtime::worker::backpressure::Backpressure;
 use crate::runtime::worker::heart_beat::submit_heartbeat;
 use crate::runtime::worker::runnable::co_process_runnable::CoProcessRunnable;
 use crate::runtime::worker::runnable::{
     FilterRunnable, FlatMapRunnable, KeyByRunnable, ReduceRunnable, Runnable, RunnableContext,
     SinkRunnable, SourceRunnable, WatermarkAssignerRunnable, WindowAssignerRunnable,
 };
-use crate::runtime::{ClusterDescriptor, HeartbeatItem, TaskDescriptor};
+use crate::runtime::HeartbeatItem;
 
+pub mod backpressure;
 pub mod checkpoint;
 pub mod heart_beat;
 pub mod runnable;
@@ -33,13 +35,12 @@ pub(crate) fn run<S>(
     cluster_descriptor: Arc<ClusterDescriptor>,
     task_descriptor: TaskDescriptor,
     stream_app: S,
-    stream_env: &StreamExecutionEnvironment,
+    _stream_env: &StreamExecutionEnvironment,
     window_timer: WindowTimer,
 ) -> JoinHandle<()>
 where
     S: StreamApp + 'static,
 {
-    let application_name = stream_env.application_name.clone();
     std::thread::Builder::new()
         .name(format!(
             "RM-Task-{}-{}",
@@ -51,7 +52,7 @@ where
                 thread_id: thread_id::get() as u64,
             });
 
-            let stream_env = StreamExecutionEnvironment::new(application_name);
+            let stream_env = StreamExecutionEnvironment::new();
             let worker_task = WorkerTask::new(
                 context,
                 dag_metadata,
@@ -124,6 +125,7 @@ where
             cluster_descriptor: self.cluster_descriptor.clone(),
             task_descriptor: self.task_descriptor.clone(),
             window_timer: self.window_timer.clone(),
+            backpressure: Backpressure::from(application_properties),
         };
 
         info!("open Operator Chain");
