@@ -1,11 +1,10 @@
 use std::borrow::BorrowMut;
 
 use crate::core::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
-use crate::core::element::{Element, Record, StreamStatus};
+use crate::core::element::{Element, Record};
 use crate::core::function::{BaseReduceFunction, KeySelectorFunction};
 use crate::core::operator::DefaultStreamOperator;
 use crate::core::runtime::{CheckpointId, OperatorId, TaskId};
-use crate::core::watermark::MAX_WATERMARK;
 use crate::core::window::{TWindow, Window};
 use crate::metrics::metric::Counter;
 use crate::metrics::register_counter;
@@ -108,38 +107,27 @@ impl Runnable for ReduceRunnable {
 
                 self.counter.fetch_add(1);
             }
-            Element::Watermark(watermark) => {
-                match watermark.min_location_windows() {
-                    Some(min_watermark_window) => {
-                        self.limited_watermark_window = min_watermark_window.clone();
+            Element::Watermark(watermark) => match watermark.min_location_windows() {
+                Some(min_watermark_window) => {
+                    self.limited_watermark_window = min_watermark_window.clone();
 
-                        debug!("drop state {}", min_watermark_window.min_timestamp());
-                        let drop_events = self
-                            .stream_reduce
-                            .operator_fn
+                    debug!("drop state {}", min_watermark_window.min_timestamp());
+                    let drop_events = self
+                        .stream_reduce
+                        .operator_fn
+                        .as_mut()
+                        .drop_state(min_watermark_window.min_timestamp());
+                    for drop_event in drop_events {
+                        self.next_runnable
                             .as_mut()
-                            .drop_state(min_watermark_window.min_timestamp());
-                        for drop_event in drop_events {
-                            self.next_runnable
-                                .as_mut()
-                                .unwrap()
-                                .run(Element::from(drop_event));
-                        }
-                    }
-                    None => {
-                        unreachable!("watermark must have window on reduce")
+                            .unwrap()
+                            .run(Element::from(drop_event));
                     }
                 }
-
-                // convert watermark to stream_status, and continue post
-                let stream_status = StreamStatus::from(&watermark);
-                debug!("convert watermark to stream_status: {:?}", stream_status);
-
-                self.next_runnable
-                    .as_mut()
-                    .unwrap()
-                    .run(Element::StreamStatus(stream_status));
-            }
+                None => {
+                    unreachable!("watermark must have window on reduce")
+                }
+            },
             Element::Barrier(mut barrier) => {
                 let checkpoint_id = barrier.checkpoint_id;
                 let snapshot_context = {
@@ -157,23 +145,6 @@ impl Runnable for ReduceRunnable {
                     .run(Element::Barrier(barrier));
             }
             Element::StreamStatus(stream_status) => {
-                if !stream_status.end {
-                    unreachable!("shouldn't catch `StreamStatus` in reduce");
-                }
-
-                // clean all reduce state
-                let drop_events = self
-                    .stream_reduce
-                    .operator_fn
-                    .as_mut()
-                    .drop_state(MAX_WATERMARK.timestamp);
-                for drop_event in drop_events {
-                    self.next_runnable
-                        .as_mut()
-                        .unwrap()
-                        .run(Element::from(drop_event));
-                }
-
                 self.next_runnable
                     .as_mut()
                     .unwrap()

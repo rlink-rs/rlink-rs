@@ -41,10 +41,6 @@ impl Backpressure {
     pub fn filter(&self, event_timestamp: u64) {
         self.raw.borrow_mut().filter(event_timestamp);
     }
-
-    pub fn take(&self) -> Option<Duration> {
-        self.raw.borrow_mut().take()
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -70,14 +66,6 @@ impl RawBackpressure {
             Some(bp) => bp.filter(event_timestamp),
             None => None,
         };
-    }
-
-    pub fn take(&mut self) -> Option<Duration> {
-        if self.pause_time.is_some() {
-            self.pause_time.take()
-        } else {
-            None
-        }
     }
 }
 

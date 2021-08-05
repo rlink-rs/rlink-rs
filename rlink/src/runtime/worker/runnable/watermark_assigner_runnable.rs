@@ -97,11 +97,7 @@ impl Runnable for WatermarkAssignerRunnable {
             }
             Element::StreamStatus(stream_status) => {
                 if stream_status.end {
-                    let watermark_ele = Element::max_watermark(
-                        self.task_id.task_number,
-                        self.task_id.num_tasks,
-                        stream_status,
-                    );
+                    let watermark_ele = Element::max_watermark();
                     self.next_runnable.as_mut().unwrap().run(watermark_ele);
                 } else {
                     let watermark = match watermark_assigner.watermark(stream_status) {
@@ -113,14 +109,12 @@ impl Runnable for WatermarkAssignerRunnable {
 
                     self.watermark = watermark;
                     self.watermark_gauge.store(self.watermark.timestamp as i64);
-                    let watermark_ele = Element::new_watermark(
-                        self.task_id.task_number,
-                        self.task_id.num_tasks,
-                        self.watermark.timestamp,
-                        stream_status,
-                    );
+                    let watermark_ele = Element::new_watermark(self.watermark.timestamp);
                     self.next_runnable.as_mut().unwrap().run(watermark_ele);
                 }
+
+                // must send after the `Watermark`
+                self.next_runnable.as_mut().unwrap().run(element);
             }
             Element::Barrier(barrier) => {
                 let checkpoint_id = barrier.checkpoint_id;
@@ -132,8 +126,8 @@ impl Runnable for WatermarkAssignerRunnable {
 
                 self.next_runnable.as_mut().unwrap().run(element);
             }
-            _ => {
-                error!("unreachable element");
+            Element::Watermark(watermark) => {
+                error!("unreachable Watermark, {:?}", watermark);
                 self.next_runnable.as_mut().unwrap().run(element);
             }
         }
