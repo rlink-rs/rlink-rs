@@ -13,7 +13,6 @@ use crate::core::function::InputFormat;
 use crate::core::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
 use crate::core::runtime::{CheckpointId, JobId, OperatorId, TaskId};
 use crate::runtime::timer::TimerChannel;
-use crate::runtime::worker::backpressure::Backpressure;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::heart_beat::{get_coordinator_status, submit_heartbeat};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
@@ -29,8 +28,6 @@ pub(crate) struct SourceRunnable {
 
     stream_source: DefaultStreamOperator<dyn InputFormat>,
     next_runnable: Option<Box<dyn Runnable>>,
-
-    backpressure: Option<Backpressure>,
 
     stream_status_timer: Option<TimerChannel>,
     checkpoint_timer: Option<TimerChannel>,
@@ -55,8 +52,6 @@ impl SourceRunnable {
 
             stream_source,
             next_runnable,
-
-            backpressure: None,
 
             stream_status_timer: None,
             checkpoint_timer: None,
@@ -181,8 +176,6 @@ impl Runnable for SourceRunnable {
 
         // first open next, then open self
         self.next_runnable.as_mut().unwrap().open(context)?;
-
-        self.backpressure = Some(context.backpressure.clone());
 
         let input_split = context.task_descriptor.input_split.clone();
         let fun_context = context.to_fun_context(self.operator_id);

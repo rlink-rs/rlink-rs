@@ -132,7 +132,7 @@ where
             // heartbeat check. blocking util heartbeat timeout
             let heartbeat_result =
                 heart_beat_manager::start_heartbeat_timer(self.metadata_storage_mode.clone());
-            info!("heartbeat has interrupted");
+            info!("heartbeat timer has interrupted");
 
             // heartbeat timeout and stop all worker's tasks
             self.stop_all_worker_tasks(worker_task_ids);
@@ -293,7 +293,6 @@ where
             let rt = self.resource_manager.stop_workers(worker_task_ids.clone());
             match rt {
                 Ok(_) => {
-                    info!("stop all workers");
                     break;
                 }
                 Err(e) => {

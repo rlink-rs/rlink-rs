@@ -5,7 +5,7 @@ use crate::core::element::Record;
 use crate::core::element::{types, BufferMutReader, BufferReader, BufferWriter};
 use crate::core::function::{Context, NamedFunction, ReduceFunction};
 use crate::functions::percentile::{get_percentile_capacity, PercentileWriter};
-use crate::functions::schema_base::FunctionSchema;
+use crate::functions::FunctionSchema;
 
 pub fn sum_i64(column_index: usize) -> Box<dyn Aggregation> {
     let agg = SumI64 {
@@ -378,7 +378,7 @@ impl Aggregation for PctU64 {
 }
 
 #[derive(Debug)]
-pub struct SchemaBaseReduceFunction {
+pub struct SchemaReduceFunction {
     field_types: Vec<u8>,
     val_field_types: Vec<u8>,
 
@@ -387,7 +387,7 @@ pub struct SchemaBaseReduceFunction {
     agg_operators: Vec<Box<dyn Aggregation>>,
 }
 
-impl SchemaBaseReduceFunction {
+impl SchemaReduceFunction {
     pub fn new(agg_operators: Vec<Box<dyn Aggregation>>, field_types: &[u8]) -> Self {
         let val_field_types: Vec<u8> = agg_operators
             .iter()
@@ -403,7 +403,7 @@ impl SchemaBaseReduceFunction {
         let val_len: usize = agg_operators.iter().map(|x| x.len()).sum();
 
         // let val_len = val_data_types.len() * 8;
-        SchemaBaseReduceFunction {
+        SchemaReduceFunction {
             field_types: field_types.to_vec(),
             val_field_types,
             val_len,
@@ -412,13 +412,13 @@ impl SchemaBaseReduceFunction {
     }
 }
 
-impl FunctionSchema for SchemaBaseReduceFunction {
+impl FunctionSchema for SchemaReduceFunction {
     fn schema_types(&self) -> Vec<u8> {
         self.val_field_types.clone()
     }
 }
 
-impl ReduceFunction for SchemaBaseReduceFunction {
+impl ReduceFunction for SchemaReduceFunction {
     fn open(&mut self, _context: &Context) -> crate::core::Result<()> {
         Ok(())
     }
@@ -461,7 +461,7 @@ impl ReduceFunction for SchemaBaseReduceFunction {
     }
 }
 
-impl NamedFunction for SchemaBaseReduceFunction {
+impl NamedFunction for SchemaReduceFunction {
     fn name(&self) -> &str {
         "SchemaBaseReduceFunction"
     }

@@ -1,6 +1,12 @@
-pub mod broadcast_flat_map;
+pub mod filter;
+pub mod flat_map;
+pub mod key_selector;
 pub mod percentile;
-pub mod range_window_filter;
-pub mod round_robin_flat_map;
-pub mod schema_base;
+pub mod reduce;
+pub mod sink;
 pub mod system;
+pub mod watermark;
+
+pub trait FunctionSchema {
+    fn schema_types(&self) -> Vec<u8>;
+}
