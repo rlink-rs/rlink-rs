@@ -64,10 +64,8 @@ impl TMetadataStorage for MemoryMetadataStorage {
         heartbeat_items: Vec<HeartbeatItem>,
         task_manager_status: ManagerStatus,
     ) -> anyhow::Result<ManagerStatus> {
-        let mut lock = METADATA_STORAGE
-            .lock()
-            .expect("METADATA_STORAGE lock failed");
-        let mut cluster_descriptor: ClusterDescriptor = lock.clone().unwrap();
+        let mut lock = METADATA_STORAGE.lock().unwrap();
+        let cluster_descriptor = (&mut *lock).as_mut().unwrap();
 
         let task_manager_descriptor = cluster_descriptor
             .borrow_mut()
@@ -129,8 +127,7 @@ impl TMetadataStorage for MemoryMetadataStorage {
             "Update TaskManager metadata success. {:?}",
             cluster_descriptor
         );
-        let coordinator_status = cluster_descriptor.coordinator_manager.coordinator_status;
-        *lock = Some(cluster_descriptor);
-        Ok(coordinator_status)
+
+        Ok(cluster_descriptor.coordinator_manager.coordinator_status)
     }
 }
