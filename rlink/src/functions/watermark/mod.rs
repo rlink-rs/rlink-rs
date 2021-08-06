@@ -172,7 +172,15 @@ impl DefaultWatermarkStrategy {
         self
     }
 
-    pub fn for_assigner<T>(mut self, assigner: T) -> Self
+    pub fn for_watermark_generator<T>(mut self, generator: T) -> Self
+    where
+        T: WatermarkGenerator + 'static,
+    {
+        self.watermark_generator = Some(Box::new(generator));
+        self
+    }
+
+    pub fn for_timestamp_assigner<T>(mut self, assigner: T) -> Self
     where
         T: TimestampAssigner + 'static,
     {

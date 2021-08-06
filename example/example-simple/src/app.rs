@@ -5,7 +5,6 @@ use rlink::core::data_stream::{TDataStream, TKeyedStream, TWindowedStream};
 use rlink::core::env::{StreamApp, StreamExecutionEnvironment};
 use rlink::core::properties::{Properties, SystemProperties};
 use rlink::core::runtime::ClusterDescriptor;
-use rlink::core::window::SlidingEventTimeWindows;
 use rlink::functions::key_selector::SchemaKeySelector;
 use rlink::functions::reduce::{sum_i64, SchemaReduceFunction};
 use rlink::functions::sink::PrintOutputFormat;
@@ -17,6 +16,7 @@ use rlink_example_utils::buffer_gen::model::FIELD_TYPE;
 
 use crate::filter::MyFlatMapFunction;
 use crate::mapper::MyFilterFunction;
+use rlink::functions::window::SlidingEventTimeWindows;
 
 #[derive(Clone, Debug)]
 pub struct SimpleStreamApp {}

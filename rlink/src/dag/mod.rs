@@ -190,10 +190,10 @@ mod tests {
     };
     use crate::core::properties::Properties;
     use crate::core::watermark::TimestampAssigner;
-    use crate::core::window::SlidingEventTimeWindows;
     use crate::dag::utils::JsonDag;
     use crate::dag::DagManager;
     use crate::functions::watermark::DefaultWatermarkStrategy;
+    use crate::functions::window::SlidingEventTimeWindows;
 
     #[test]
     pub fn data_stream_test() {
@@ -204,7 +204,7 @@ mod tests {
             .assign_timestamps_and_watermarks(
                 DefaultWatermarkStrategy::new()
                     .for_bounded_out_of_orderness(Duration::from_secs(1))
-                    .for_assigner(MyTimestampAssigner::new()),
+                    .for_timestamp_assigner(MyTimestampAssigner::new()),
             )
             .key_by(MyKeySelectorFunction::new())
             .window(SlidingEventTimeWindows::new(
@@ -240,7 +240,7 @@ mod tests {
             .assign_timestamps_and_watermarks(
                 DefaultWatermarkStrategy::new()
                     .for_bounded_out_of_orderness(Duration::from_secs(1))
-                    .for_assigner(MyTimestampAssigner::new()),
+                    .for_timestamp_assigner(MyTimestampAssigner::new()),
             )
             .key_by(MyKeySelectorFunction::new())
             .window(SlidingEventTimeWindows::new(
@@ -267,7 +267,7 @@ mod tests {
             .assign_timestamps_and_watermarks(
                 DefaultWatermarkStrategy::new()
                     .for_bounded_out_of_orderness(Duration::from_secs(1))
-                    .for_assigner(MyTimestampAssigner::new()),
+                    .for_timestamp_assigner(MyTimestampAssigner::new()),
             );
 
         env.register_source(MyInputFormat::new(), 2)
@@ -275,7 +275,7 @@ mod tests {
             .assign_timestamps_and_watermarks(
                 DefaultWatermarkStrategy::new()
                     .for_bounded_out_of_orderness(Duration::from_secs(1))
-                    .for_assigner(MyTimestampAssigner::new()),
+                    .for_timestamp_assigner(MyTimestampAssigner::new()),
             )
             .connect(vec![CoStream::from(ds)], MyCoProcessFunction {})
             .key_by(MyKeySelectorFunction::new())

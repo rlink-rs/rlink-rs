@@ -6,7 +6,6 @@ use rlink::core::backend::KeyedStateBackend;
 use rlink::core::data_stream::{TDataStream, TKeyedStream, TWindowedStream};
 use rlink::core::env::{StreamApp, StreamExecutionEnvironment};
 use rlink::core::properties::{Properties, SystemProperties};
-use rlink::core::window::SlidingEventTimeWindows;
 use rlink::functions::key_selector::SchemaKeySelector;
 use rlink::functions::reduce::{sum_i64, SchemaReduceFunction};
 use rlink::functions::sink::PrintOutputFormat;
@@ -23,6 +22,7 @@ use rlink_example_utils::buffer_gen::model;
 use crate::buffer_gen::checkpoint_data::FIELD_TYPE;
 use crate::input_mapper::InputMapperFunction;
 use crate::output_mapper::OutputMapperFunction;
+use rlink::functions::window::SlidingEventTimeWindows;
 
 #[derive(Clone, Debug)]
 pub struct KafkaGenAppStream {}

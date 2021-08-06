@@ -5,7 +5,6 @@ use rlink::core::data_stream::CoStream;
 use rlink::core::data_stream::{TConnectedStreams, TDataStream, TKeyedStream, TWindowedStream};
 use rlink::core::env::{StreamApp, StreamExecutionEnvironment};
 use rlink::core::properties::{ChannelBaseOn, Properties, SystemProperties};
-use rlink::core::window::SlidingEventTimeWindows;
 use rlink::functions::flat_map::broadcast_flat_map::BroadcastFlagMapFunction;
 use rlink::functions::flat_map::round_robin_flat_map::RoundRobinFlagMapFunction;
 use rlink::functions::key_selector::SchemaKeySelector;
@@ -21,6 +20,7 @@ use rlink_example_utils::unbounded_input_format::RandInputFormat;
 use crate::co_connect::MyCoProcessFunction;
 use crate::map_output::OutputMapFunction;
 use crate::percentile::get_percentile_scale;
+use rlink::functions::window::SlidingEventTimeWindows;
 
 #[derive(Clone, Debug)]
 pub struct ConnectStreamApp0 {}

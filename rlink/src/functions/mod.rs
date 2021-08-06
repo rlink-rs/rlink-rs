@@ -6,6 +6,7 @@ pub mod reduce;
 pub mod sink;
 pub mod system;
 pub mod watermark;
+pub mod window;
 
 pub trait FunctionSchema {
     fn schema_types(&self) -> Vec<u8>;
