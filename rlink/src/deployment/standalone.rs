@@ -75,10 +75,7 @@ impl TResourceManager for StandaloneResourceManager {
             );
             args.insert(
                 "coordinator_address".to_string(),
-                cluster_descriptor
-                    .coordinator_manager
-                    .coordinator_address
-                    .clone(),
+                cluster_descriptor.coordinator_manager.web_address.clone(),
             );
 
             task_args.push(args);

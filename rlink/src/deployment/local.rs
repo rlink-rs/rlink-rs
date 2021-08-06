@@ -50,10 +50,8 @@ impl TResourceManager for LocalResourceManager {
             let mut context_clone = self.context.deref().clone();
             context_clone.manager_type = ManagerType::Worker;
             context_clone.task_manager_id = task_manager_descriptor.task_manager_id.clone();
-            context_clone.coordinator_address = cluster_descriptor
-                .coordinator_manager
-                .coordinator_address
-                .clone();
+            context_clone.coordinator_address =
+                cluster_descriptor.coordinator_manager.web_address.clone();
 
             let stream_app_clone = stream_app.clone();
             std::thread::Builder::new()

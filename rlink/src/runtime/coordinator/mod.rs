@@ -101,7 +101,7 @@ where
         self.web_serve(cluster_descriptor.borrow_mut(), ck_manager, dag_metadata);
         info!(
             "serve coordinator web ui {}",
-            &cluster_descriptor.coordinator_manager.coordinator_address
+            &cluster_descriptor.coordinator_manager.web_address
         );
 
         self.resource_manager
@@ -246,7 +246,7 @@ where
             checkpoint_manager,
             dag_metadata,
         );
-        cluster_descriptor.coordinator_manager.coordinator_address = address;
+        cluster_descriptor.coordinator_manager.web_address = address;
     }
 
     fn allocate_worker(&self) -> Vec<TaskResourceInfo> {

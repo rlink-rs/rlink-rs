@@ -241,8 +241,7 @@ pub struct CoordinatorManagerDescriptor {
     pub version: String,
     pub application_id: String,
     pub application_properties: Properties,
-    // todo rename to web_address
-    pub coordinator_address: String,
+    pub web_address: String,
     pub metrics_address: String,
     pub coordinator_status: ManagerStatus,
     pub v_cores: u32,

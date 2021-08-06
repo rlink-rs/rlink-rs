@@ -59,7 +59,7 @@ pub(crate) fn build_cluster_descriptor(
         version: crate::utils::VERSION.to_owned(),
         application_id: context.application_id.clone(),
         application_properties: application_properties.clone(),
-        coordinator_address: "".to_string(),
+        web_address: "".to_string(),
         metrics_address: context.metric_addr.clone(),
         coordinator_status: ManagerStatus::Pending,
         v_cores: context.v_cores,

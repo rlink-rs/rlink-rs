@@ -65,10 +65,7 @@ impl TResourceManager for YarnResourceManager {
             );
             args.insert(
                 "coordinator_address".to_string(),
-                cluster_descriptor
-                    .coordinator_manager
-                    .coordinator_address
-                    .clone(),
+                cluster_descriptor.coordinator_manager.web_address.clone(),
             );
 
             task_args.push(args);
@@ -130,7 +127,7 @@ impl YarnCliCommand {
             // .arg("rlink.yarn.manager.ResourceManagerCli")
             .arg(context.yarn_manager_main_class.as_str())
             .arg("--coordinator_address")
-            .arg(coordinator_manager.coordinator_address.as_str())
+            .arg(coordinator_manager.web_address.as_str())
             .arg("--worker_process_path")
             .arg(context.worker_process_path.as_str())
             .arg("--memory_mb")

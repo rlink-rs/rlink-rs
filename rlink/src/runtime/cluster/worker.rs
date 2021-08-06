@@ -120,10 +120,7 @@ fn start_timing_task(
     submit_heartbeat(HeartbeatItem::WorkerManagerAddress(bind_addr.to_string()));
     submit_heartbeat(HeartbeatItem::MetricsAddress(context.metric_addr.clone()));
 
-    let coordinator_address = cluster_descriptor
-        .coordinator_manager
-        .coordinator_address
-        .clone();
+    let coordinator_address = cluster_descriptor.coordinator_manager.web_address.clone();
     let task_manager_id = context.task_manager_id.clone();
 
     crate::utils::thread::spawn("timer", move || {
