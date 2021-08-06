@@ -1,12 +1,20 @@
 //! DAG builder
 //! stream_graph -> job_graph -> execution_graph
 
+pub(crate) mod execution_graph;
+pub(crate) mod job_graph;
+pub(crate) mod metadata;
+pub(crate) mod physic_graph;
+pub(crate) mod stream_graph;
+pub(crate) mod utils;
+
 use std::borrow::BorrowMut;
 use std::convert::TryFrom;
 use std::fmt::Debug;
 
 use thiserror::Error;
 
+use crate::core;
 use crate::core::function::InputSplit;
 use crate::core::operator::StreamOperator;
 use crate::core::runtime::{JobId, OperatorId, TaskId};
@@ -15,14 +23,6 @@ use crate::dag::job_graph::JobGraph;
 use crate::dag::physic_graph::PhysicGraph;
 use crate::dag::stream_graph::{StreamGraph, StreamNode};
 
-pub(crate) mod execution_graph;
-pub(crate) mod job_graph;
-pub(crate) mod metadata;
-pub(crate) mod physic_graph;
-pub(crate) mod stream_graph;
-pub(crate) mod utils;
-
-use crate::core;
 pub(crate) use stream_graph::RawStreamGraph;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
