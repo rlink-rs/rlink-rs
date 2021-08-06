@@ -1,9 +1,10 @@
+use std::borrow::BorrowMut;
 use std::sync::Mutex;
 
 use crate::core::runtime::{ClusterDescriptor, ManagerStatus};
 use crate::runtime::HeartbeatItem;
 use crate::storage::metadata::TMetadataStorage;
-use crate::utils;
+use crate::utils::date_time::current_timestamp_millis;
 
 lazy_static! {
     pub static ref METADATA_STORAGE: Mutex<Option<ClusterDescriptor>> = Mutex::new(None);
@@ -63,92 +64,73 @@ impl TMetadataStorage for MemoryMetadataStorage {
         heartbeat_items: Vec<HeartbeatItem>,
         task_manager_status: ManagerStatus,
     ) -> anyhow::Result<ManagerStatus> {
-        let mut update_success = false;
-
         let mut lock = METADATA_STORAGE
             .lock()
             .expect("METADATA_STORAGE lock failed");
         let mut cluster_descriptor: ClusterDescriptor = lock.clone().unwrap();
-        for mut task_manager_descriptor in &mut cluster_descriptor.worker_managers {
-            if task_manager_descriptor
-                .task_manager_id
-                .eq(task_manager_id.as_str())
-            {
-                task_manager_descriptor.task_status = task_manager_status;
-                task_manager_descriptor.latest_heart_beat_ts =
-                    utils::date_time::current_timestamp_millis();
 
-                for heartbeat_item in heartbeat_items {
-                    match heartbeat_item {
-                        HeartbeatItem::MetricsAddress(addr) => {
-                            task_manager_descriptor.metrics_address = addr;
-                        }
-                        HeartbeatItem::WorkerManagerAddress(addr) => {
-                            task_manager_descriptor.task_manager_address = addr;
-                        }
-                        HeartbeatItem::WorkerManagerWebAddress(addr) => {
-                            task_manager_descriptor.web_address = addr;
-                        }
-                        HeartbeatItem::HeartBeatStatus(status) => {
-                            task_manager_descriptor.latest_heart_beat_status = status;
-                        }
-                        HeartbeatItem::TaskThreadId { task_id, thread_id } => {
-                            for task_descriptor in &mut task_manager_descriptor.task_descriptors {
-                                if task_descriptor.task_id.eq(&task_id) {
-                                    task_descriptor.thread_id = format!("0x{:x}", thread_id);
-                                }
-                            }
-                        }
-                        HeartbeatItem::TaskEnd { task_id } => {
-                            for task_descriptor in &mut task_manager_descriptor.task_descriptors {
-                                if task_descriptor.task_id.eq(&task_id) {
-                                    task_descriptor.stopped = true;
-                                }
-                            }
+        let task_manager_descriptor = cluster_descriptor
+            .borrow_mut()
+            .worker_managers
+            .iter_mut()
+            .find(|w| w.task_manager_id.eq(task_manager_id.as_str()))
+            .ok_or(anyhow!(
+                "TaskManager not found, task_manager_id={}",
+                task_manager_id
+            ))?;
 
-                            let all_tasks_end = task_manager_descriptor
-                                .task_descriptors
-                                .iter()
-                                .find(|x| !x.stopped)
-                                .is_none();
-                            if all_tasks_end {
-                                cluster_descriptor.coordinator_manager.coordinator_status =
-                                    ManagerStatus::Terminated;
-                            } else {
-                                let exist_tasks_end = task_manager_descriptor
-                                    .task_descriptors
-                                    .iter()
-                                    .filter(|x| !x.daemon)
-                                    .find(|x| x.stopped)
-                                    .is_some();
-                                if exist_tasks_end {
-                                    cluster_descriptor.coordinator_manager.coordinator_status =
-                                        ManagerStatus::Terminating;
-                                }
-                            }
+        task_manager_descriptor.task_status = task_manager_status;
+        task_manager_descriptor.latest_heart_beat_ts = current_timestamp_millis();
+
+        let mut exist_task_end_hb = false;
+        for heartbeat_item in heartbeat_items {
+            match heartbeat_item {
+                HeartbeatItem::MetricsAddress(addr) => {
+                    task_manager_descriptor.metrics_address = addr;
+                }
+                HeartbeatItem::WorkerManagerAddress(addr) => {
+                    task_manager_descriptor.task_manager_address = addr;
+                }
+                HeartbeatItem::WorkerManagerWebAddress(addr) => {
+                    task_manager_descriptor.web_address = addr;
+                }
+                HeartbeatItem::HeartBeatStatus(status) => {
+                    task_manager_descriptor.latest_heart_beat_status = status;
+                }
+                HeartbeatItem::TaskThreadId { task_id, thread_id } => {
+                    for task_descriptor in &mut task_manager_descriptor.task_descriptors {
+                        if task_descriptor.task_id.eq(&task_id) {
+                            task_descriptor.thread_id = format!("0x{:x}", thread_id);
                         }
                     }
                 }
+                HeartbeatItem::TaskEnd { task_id } => {
+                    for task_descriptor in &mut task_manager_descriptor.task_descriptors {
+                        if task_descriptor.task_id.eq(&task_id) {
+                            task_descriptor.terminated = true;
+                        }
+                    }
 
-                update_success = true;
-                break;
+                    exist_task_end_hb = true;
+                    info!("Receiver `TaskEnd` heartbeat from {:?}", task_id);
+                }
             }
         }
 
-        if update_success {
-            debug!(
-                "Update TaskManager metadata success. {:?}",
-                cluster_descriptor
+        if exist_task_end_hb {
+            cluster_descriptor.flush_coordinator_status();
+            info!(
+                "Flush coordinator status: {:?}",
+                cluster_descriptor.coordinator_manager.coordinator_status
             );
-            let coordinator_status = cluster_descriptor.coordinator_manager.coordinator_status;
-            *lock = Some(cluster_descriptor);
-            Ok(coordinator_status)
-        } else {
-            error!(
-                "TaskManager(task_manager_id={}) metadata not found",
-                task_manager_id
-            );
-            Err(anyhow!("metadata not found"))
         }
+
+        debug!(
+            "Update TaskManager metadata success. {:?}",
+            cluster_descriptor
+        );
+        let coordinator_status = cluster_descriptor.coordinator_manager.coordinator_status;
+        *lock = Some(cluster_descriptor);
+        Ok(coordinator_status)
     }
 }
