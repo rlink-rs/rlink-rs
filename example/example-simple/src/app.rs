@@ -9,6 +9,7 @@ use rlink::functions::key_selector::SchemaKeySelector;
 use rlink::functions::reduce::{sum_i64, SchemaReduceFunction};
 use rlink::functions::sink::PrintOutputFormat;
 use rlink::functions::watermark::DefaultWatermarkStrategy;
+use rlink::functions::window::SlidingEventTimeWindows;
 use rlink::functions::FunctionSchema;
 use rlink_example_utils::bounded_input_format::VecInputFormat;
 use rlink_example_utils::buffer_gen::model;
@@ -16,7 +17,6 @@ use rlink_example_utils::buffer_gen::model::FIELD_TYPE;
 
 use crate::filter::MyFlatMapFunction;
 use crate::mapper::MyFilterFunction;
-use rlink::functions::window::SlidingEventTimeWindows;
 
 #[derive(Clone, Debug)]
 pub struct SimpleStreamApp {}

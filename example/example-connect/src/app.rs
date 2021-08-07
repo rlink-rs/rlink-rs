@@ -11,6 +11,7 @@ use rlink::functions::key_selector::SchemaKeySelector;
 use rlink::functions::reduce::{pct_u64, sum_i64, SchemaReduceFunction};
 use rlink::functions::sink::PrintOutputFormat;
 use rlink::functions::watermark::DefaultWatermarkStrategy;
+use rlink::functions::window::SlidingEventTimeWindows;
 use rlink::functions::FunctionSchema;
 use rlink_example_utils::buffer_gen::model::FIELD_TYPE;
 use rlink_example_utils::buffer_gen::{model, output};
@@ -20,7 +21,6 @@ use rlink_example_utils::unbounded_input_format::RandInputFormat;
 use crate::co_connect::MyCoProcessFunction;
 use crate::map_output::OutputMapFunction;
 use crate::percentile::get_percentile_scale;
-use rlink::functions::window::SlidingEventTimeWindows;
 
 #[derive(Clone, Debug)]
 pub struct ConnectStreamApp0 {}

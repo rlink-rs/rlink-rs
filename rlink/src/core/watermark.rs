@@ -9,6 +9,10 @@ pub const MAX_WATERMARK: Watermark = Watermark {
 };
 pub const MIN_WATERMARK: Watermark = Watermark { timestamp: 0x0 };
 
+pub const IDLE_WATERMARK: Watermark = Watermark {
+    timestamp: MAX_WATERMARK.timestamp + 1,
+};
+
 /// Watermarks are the progress indicators in the data streams. A watermark signifies that no events
 /// with a timestamp smaller or equal to the watermark's time will occur after the water. A
 /// watermark with timestamp T indicates that the stream's event time has progressed to time T.
@@ -17,7 +21,7 @@ pub const MIN_WATERMARK: Watermark = Watermark { timestamp: 0x0 };
 /// operators.
 ///
 /// Note: A stream's time starts with a watermark of `0u64`.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Watermark {
     /// The timestamp of the watermark in milliseconds.
     pub(crate) timestamp: u64,
