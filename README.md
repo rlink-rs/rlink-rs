@@ -10,18 +10,20 @@ pure memory, zero copy. single cluster in the production environment stable hund
 
 Framework tested on Linux/MacOS/Windows, requires stable Rust.
 
-## Streaming Example
+## Example
 
 ```yaml
-rlink = "0.2"
+rlink = "0.6"
 ```
 
 ```rust
-env.register_source(TestInputFormat::new(), 1)
-    .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
-        Duration::from_secs(1),
-        SchemaBaseTimestampAssigner::new(model::index::timestamp, &FIELD_TYPE),
-    ))
+env.register_source(vec_source(vec![...]), 1)
+    .assign_timestamps_and_watermarks(
+        DefaultWatermarkStrategy::new()
+            .for_bounded_out_of_orderness(Duration::from_secs(1))
+            .wrap_time_periodic(Duration::from_secs(10), Duration::from_secs(20))
+            .for_schema_timestamp_assigner(model::index::timestamp, &FIELD_TYPE),
+    )
     .key_by(key_selector)
     .window(SlidingEventTimeWindows::new(
         Duration::from_secs(60),
@@ -29,7 +31,7 @@ env.register_source(TestInputFormat::new(), 1)
         None,
     ))
     .reduce(reduce_function, 2)
-    .add_sink(PrintOutputFormat::new(output_schema_types.as_slice()));
+    .add_sink(print_sink(output_schema_types.as_slice()));
 ```
 
 ## Build
