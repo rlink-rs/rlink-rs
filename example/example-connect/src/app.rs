@@ -9,7 +9,7 @@ use rlink::functions::flat_map::broadcast_flat_map::BroadcastFlagMapFunction;
 use rlink::functions::flat_map::round_robin_flat_map::RoundRobinFlagMapFunction;
 use rlink::functions::key_selector::SchemaKeySelector;
 use rlink::functions::reduce::{pct_u64, sum_i64, SchemaReduceFunction};
-use rlink::functions::sink::PrintOutputFormat;
+use rlink::functions::sink::print::print_sink;
 use rlink::functions::watermark::DefaultWatermarkStrategy;
 use rlink::functions::window::SlidingEventTimeWindows;
 use rlink::functions::FunctionSchema;
@@ -80,7 +80,7 @@ impl StreamApp for ConnectStreamApp0 {
                 None,
             ))
             .reduce(reduce_function, 2)
-            .add_sink(PrintOutputFormat::new(output_schema_types.as_slice()));
+            .add_sink(print_sink(output_schema_types.as_slice()));
     }
 }
 
@@ -156,6 +156,6 @@ impl StreamApp for ConnectStreamApp1 {
                 vec![CoStream::from(data_stream_right1)],
                 MyCoProcessFunction {},
             )
-            .add_sink(PrintOutputFormat::new(&output::FIELD_TYPE));
+            .add_sink(print_sink(&output::FIELD_TYPE));
     }
 }

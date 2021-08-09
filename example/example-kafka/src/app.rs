@@ -8,7 +8,6 @@ use rlink::core::env::{StreamApp, StreamExecutionEnvironment};
 use rlink::core::properties::{Properties, SystemProperties};
 use rlink::functions::key_selector::SchemaKeySelector;
 use rlink::functions::reduce::{sum_i64, SchemaReduceFunction};
-use rlink::functions::sink::PrintOutputFormat;
 use rlink::functions::source::vec_input_format::vec_source;
 use rlink::functions::watermark::DefaultWatermarkStrategy;
 use rlink::functions::window::SlidingEventTimeWindows;
@@ -24,6 +23,7 @@ use rlink_example_utils::gen_record::gen_fix_length_records;
 use crate::buffer_gen::checkpoint_data::FIELD_TYPE;
 use crate::input_mapper::InputMapperFunction;
 use crate::output_mapper::OutputMapperFunction;
+use rlink::functions::sink::print::print_sink;
 
 #[derive(Clone, Debug)]
 pub struct KafkaGenAppStream {}
@@ -111,7 +111,7 @@ impl StreamApp for KafkaOffsetRangeAppStream {
         };
 
         env.register_source(kafka_input_format, 3)
-            .add_sink(PrintOutputFormat::new(&KAFKA_DATA_TYPES));
+            .add_sink(print_sink(&KAFKA_DATA_TYPES));
     }
 }
 
@@ -192,7 +192,7 @@ impl StreamApp for KafkaReplayAppStream {
                 None,
             ))
             .reduce(reduce_function, 2)
-            .add_sink(PrintOutputFormat::new(output_schema_types.as_slice()));
+            .add_sink(print_sink(output_schema_types.as_slice()));
     }
 }
 

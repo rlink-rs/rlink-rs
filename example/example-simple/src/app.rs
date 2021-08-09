@@ -7,7 +7,7 @@ use rlink::core::properties::{Properties, SystemProperties};
 use rlink::core::runtime::ClusterDescriptor;
 use rlink::functions::key_selector::SchemaKeySelector;
 use rlink::functions::reduce::{sum_i64, SchemaReduceFunction};
-use rlink::functions::sink::PrintOutputFormat;
+use rlink::functions::sink::print::print_sink;
 use rlink::functions::source::vec_input_format::vec_source;
 use rlink::functions::watermark::DefaultWatermarkStrategy;
 use rlink::functions::window::SlidingEventTimeWindows;
@@ -61,7 +61,7 @@ impl StreamApp for SimpleStreamApp {
                 None,
             ))
             .reduce(reduce_function, 2)
-            .add_sink(PrintOutputFormat::new(output_schema_types.as_slice()));
+            .add_sink(print_sink(output_schema_types.as_slice()));
     }
 
     fn pre_worker_startup(&self, cluster_descriptor: &ClusterDescriptor) {
