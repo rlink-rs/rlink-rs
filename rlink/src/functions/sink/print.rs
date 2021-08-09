@@ -9,6 +9,10 @@ use crate::core::runtime::TaskId;
 use crate::core::window::TWindow;
 use crate::utils::date_time::fmt_date_time;
 
+pub fn print_sink(field_types: &[u8]) -> PrintOutputFormat {
+    PrintOutputFormat::new(field_types)
+}
+
 pub struct PrintOutputFormat {
     task_id: TaskId,
     field_types: Vec<u8>,

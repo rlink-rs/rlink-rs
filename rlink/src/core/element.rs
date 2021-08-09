@@ -225,15 +225,7 @@ pub struct Watermark {
     /// generate by partition number
     partition_num: u16,
 
-    // the `TaskId` info of `StreamStatus`, for align
-    /// `StreamStatus.channel_key.source_task_id.task_number`
-    pub(crate) task_number: u16,
-    /// `StreamStatus.channel_key.source_task_id.num_tasks`
-    pub(crate) num_tasks: u16,
-    /// `StreamStatus.timestamp`
-    pub(crate) status_timestamp: u64,
-
-    // current watermark timestamp
+    /// current watermark timestamp
     pub(crate) timestamp: u64,
 
     pub(crate) channel_key: ChannelKey,
@@ -245,17 +237,9 @@ pub struct Watermark {
 }
 
 impl Watermark {
-    pub fn new(
-        task_number: u16,
-        num_tasks: u16,
-        timestamp: u64,
-        stream_status: &StreamStatus,
-    ) -> Self {
+    pub fn new(timestamp: u64) -> Self {
         Watermark {
             partition_num: 0,
-            task_number,
-            num_tasks,
-            status_timestamp: stream_status.timestamp,
             timestamp,
             channel_key: ChannelKey::default(),
             location_windows: None,
@@ -301,15 +285,12 @@ impl Partition for Watermark {
 
 impl Serde for Watermark {
     fn capacity(&self) -> usize {
-        23
+        11
     }
 
     fn serialize(&self, bytes: &mut BytesMut) {
         bytes.put_u8(SER_DE_WATERMARK);
         bytes.put_u16(self.partition_num);
-        bytes.put_u16(self.task_number);
-        bytes.put_u16(self.num_tasks);
-        bytes.put_u64(self.status_timestamp);
         bytes.put_u64(self.timestamp);
     }
 
@@ -318,16 +299,10 @@ impl Serde for Watermark {
         assert_eq!(flag, SER_DE_WATERMARK, "Invalid `Watermark` flag");
 
         let partition_num = bytes.get_u16();
-        let task_number = bytes.get_u16();
-        let num_tasks = bytes.get_u16();
-        let status_timestamp = bytes.get_u64();
         let timestamp = bytes.get_u64();
 
         Watermark {
             partition_num,
-            task_number,
-            num_tasks,
-            status_timestamp,
             timestamp,
             channel_key: ChannelKey::default(),
             location_windows: None,
@@ -356,12 +331,6 @@ impl StreamStatus {
             channel_key: ChannelKey::default(),
             end,
         }
-    }
-}
-
-impl<'a> From<&'a Watermark> for StreamStatus {
-    fn from(watermark: &'a Watermark) -> Self {
-        StreamStatus::new(watermark.status_timestamp, watermark.end())
     }
 }
 
@@ -485,31 +454,12 @@ impl Element {
         Element::Record(Record::new())
     }
 
-    pub(crate) fn new_watermark(
-        task_number: u16,
-        num_tasks: u16,
-        timestamp: u64,
-        stream_status: &StreamStatus,
-    ) -> Self {
-        Element::Watermark(Watermark::new(
-            task_number,
-            num_tasks,
-            timestamp,
-            stream_status,
-        ))
+    pub(crate) fn new_watermark(timestamp: u64) -> Self {
+        Element::Watermark(Watermark::new(timestamp))
     }
 
-    pub(crate) fn max_watermark(
-        task_number: u16,
-        num_tasks: u16,
-        stream_status: &StreamStatus,
-    ) -> Self {
-        Self::new_watermark(
-            task_number,
-            num_tasks,
-            MAX_WATERMARK.timestamp,
-            stream_status,
-        )
+    pub(crate) fn max_watermark() -> Self {
+        Self::new_watermark(MAX_WATERMARK.timestamp)
     }
 
     pub(crate) fn new_stream_status(timestamp: u64, end: bool) -> Self {
@@ -751,8 +701,7 @@ mod tests {
 
     #[test]
     pub fn serde_element_watermark_test() {
-        let status = StreamStatus::new(0, false);
-        let mut watermark = Watermark::new(1, 2, 6, &status);
+        let mut watermark = Watermark::new(6);
         watermark.partition_num = 2;
         watermark.timestamp = 3;
 

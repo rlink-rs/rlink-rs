@@ -12,7 +12,6 @@ use crate::dag::metadata::DagMetadata;
 use crate::dag::OperatorType;
 use crate::runtime::context::Context;
 use crate::runtime::timer::WindowTimer;
-use crate::runtime::worker::backpressure::Backpressure;
 use crate::runtime::worker::heart_beat::submit_heartbeat;
 use crate::runtime::worker::runnable::co_process_runnable::CoProcessRunnable;
 use crate::runtime::worker::runnable::{
@@ -21,7 +20,6 @@ use crate::runtime::worker::runnable::{
 };
 use crate::runtime::HeartbeatItem;
 
-pub mod backpressure;
 pub mod checkpoint;
 pub mod heart_beat;
 pub mod runnable;
@@ -125,7 +123,6 @@ where
             cluster_descriptor: self.cluster_descriptor.clone(),
             task_descriptor: self.task_descriptor.clone(),
             window_timer: self.window_timer.clone(),
-            backpressure: Backpressure::from(application_properties),
         };
 
         info!("open Operator Chain");

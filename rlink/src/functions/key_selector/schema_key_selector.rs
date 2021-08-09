@@ -1,19 +1,19 @@
 use crate::core::checkpoint::CheckpointFunction;
 use crate::core::element::Record;
 use crate::core::function::{Context, KeySelectorFunction, NamedFunction};
-use crate::functions::schema_base::FunctionSchema;
+use crate::functions::FunctionSchema;
 
 #[derive(Debug)]
-pub struct SchemaBaseKeySelector {
+pub struct SchemaKeySelector {
     field_types: Vec<u8>,
     key_field_types: Vec<u8>,
     columns: Vec<usize>,
 }
 
-impl SchemaBaseKeySelector {
+impl SchemaKeySelector {
     pub fn new(columns: Vec<usize>, data_types: &[u8]) -> Self {
         let key_field_types: Vec<u8> = columns.iter().map(|index| data_types[*index]).collect();
-        SchemaBaseKeySelector {
+        SchemaKeySelector {
             columns,
             field_types: data_types.to_vec(),
             key_field_types,
@@ -21,13 +21,13 @@ impl SchemaBaseKeySelector {
     }
 }
 
-impl FunctionSchema for SchemaBaseKeySelector {
+impl FunctionSchema for SchemaKeySelector {
     fn schema_types(&self) -> Vec<u8> {
         self.key_field_types.clone()
     }
 }
 
-impl KeySelectorFunction for SchemaBaseKeySelector {
+impl KeySelectorFunction for SchemaKeySelector {
     fn open(&mut self, _context: &Context) -> crate::core::Result<()> {
         Ok(())
     }
@@ -52,10 +52,10 @@ impl KeySelectorFunction for SchemaBaseKeySelector {
     }
 }
 
-impl NamedFunction for SchemaBaseKeySelector {
+impl NamedFunction for SchemaKeySelector {
     fn name(&self) -> &str {
         "SchemaBaseKeySelector"
     }
 }
 
-impl CheckpointFunction for SchemaBaseKeySelector {}
+impl CheckpointFunction for SchemaKeySelector {}

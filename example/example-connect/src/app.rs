@@ -5,19 +5,18 @@ use rlink::core::data_stream::CoStream;
 use rlink::core::data_stream::{TConnectedStreams, TDataStream, TKeyedStream, TWindowedStream};
 use rlink::core::env::{StreamApp, StreamExecutionEnvironment};
 use rlink::core::properties::{ChannelBaseOn, Properties, SystemProperties};
-use rlink::core::watermark::BoundedOutOfOrdernessTimestampExtractor;
-use rlink::core::window::SlidingEventTimeWindows;
-use rlink::functions::broadcast_flat_map::BroadcastFlagMapFunction;
-use rlink::functions::round_robin_flat_map::RoundRobinFlagMapFunction;
-use rlink::functions::schema_base::key_selector::SchemaBaseKeySelector;
-use rlink::functions::schema_base::print_output_format::PrintOutputFormat;
-use rlink::functions::schema_base::reduce::{pct_u64, sum_i64, SchemaBaseReduceFunction};
-use rlink::functions::schema_base::timestamp_assigner::SchemaBaseTimestampAssigner;
-use rlink::functions::schema_base::FunctionSchema;
+use rlink::functions::flat_map::broadcast_flat_map::BroadcastFlagMapFunction;
+use rlink::functions::flat_map::round_robin_flat_map::RoundRobinFlagMapFunction;
+use rlink::functions::key_selector::SchemaKeySelector;
+use rlink::functions::reduce::{pct_u64, sum_i64, SchemaReduceFunction};
+use rlink::functions::sink::print::print_sink;
+use rlink::functions::watermark::DefaultWatermarkStrategy;
+use rlink::functions::window::SlidingEventTimeWindows;
+use rlink::functions::FunctionSchema;
 use rlink_example_utils::buffer_gen::model::FIELD_TYPE;
 use rlink_example_utils::buffer_gen::{model, output};
 use rlink_example_utils::config_input_format::ConfigInputFormat;
-use rlink_example_utils::unbounded_input_format::RandInputFormat;
+use rlink_example_utils::rand_input_format::RandInputFormat;
 
 use crate::co_connect::MyCoProcessFunction;
 use crate::map_output::OutputMapFunction;
@@ -34,8 +33,8 @@ impl StreamApp for ConnectStreamApp0 {
     }
 
     fn build_stream(&self, _properties: &Properties, env: &mut StreamExecutionEnvironment) {
-        let key_selector = SchemaBaseKeySelector::new(vec![model::index::name], &FIELD_TYPE);
-        let reduce_function = SchemaBaseReduceFunction::new(
+        let key_selector = SchemaKeySelector::new(vec![model::index::name], &FIELD_TYPE);
+        let reduce_function = SchemaReduceFunction::new(
             vec![
                 sum_i64(model::index::value),
                 pct_u64(model::index::value, get_percentile_scale()),
@@ -53,10 +52,11 @@ impl StreamApp for ConnectStreamApp0 {
 
         let data_stream_left = env
             .register_source(RandInputFormat::new(), 2)
-            .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
-                Duration::from_secs(1),
-                SchemaBaseTimestampAssigner::new(model::index::timestamp, &FIELD_TYPE),
-            ));
+            .assign_timestamps_and_watermarks(
+                DefaultWatermarkStrategy::new()
+                    .for_bounded_out_of_orderness(Duration::from_secs(1))
+                    .for_schema_timestamp_assigner(model::index::timestamp, &FIELD_TYPE),
+            );
         let data_stream_right = env
             .register_source(ConfigInputFormat::new("Broadcast"), 1)
             .flat_map(BroadcastFlagMapFunction::new());
@@ -80,7 +80,7 @@ impl StreamApp for ConnectStreamApp0 {
                 None,
             ))
             .reduce(reduce_function, 2)
-            .add_sink(PrintOutputFormat::new(output_schema_types.as_slice()));
+            .add_sink(print_sink(output_schema_types.as_slice()));
     }
 }
 
@@ -104,8 +104,8 @@ impl StreamApp for ConnectStreamApp1 {
     }
 
     fn build_stream(&self, _properties: &Properties, env: &mut StreamExecutionEnvironment) {
-        let key_selector = SchemaBaseKeySelector::new(vec![model::index::name], &FIELD_TYPE);
-        let reduce_function = SchemaBaseReduceFunction::new(
+        let key_selector = SchemaKeySelector::new(vec![model::index::name], &FIELD_TYPE);
+        let reduce_function = SchemaReduceFunction::new(
             vec![
                 sum_i64(model::index::value),
                 pct_u64(model::index::value, get_percentile_scale()),
@@ -123,10 +123,11 @@ impl StreamApp for ConnectStreamApp1 {
 
         let data_stream_left = env
             .register_source(RandInputFormat::new(), 3)
-            .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
-                Duration::from_secs(1),
-                SchemaBaseTimestampAssigner::new(model::index::timestamp, &FIELD_TYPE),
-            ));
+            .assign_timestamps_and_watermarks(
+                DefaultWatermarkStrategy::new()
+                    .for_bounded_out_of_orderness(Duration::from_secs(1))
+                    .for_schema_timestamp_assigner(model::index::timestamp, &FIELD_TYPE),
+            );
         let data_stream_right = env
             .register_source(ConfigInputFormat::new("Broadcast"), 1)
             .flat_map(BroadcastFlagMapFunction::new());
@@ -155,6 +156,6 @@ impl StreamApp for ConnectStreamApp1 {
                 vec![CoStream::from(data_stream_right1)],
                 MyCoProcessFunction {},
             )
-            .add_sink(PrintOutputFormat::new(&output::FIELD_TYPE));
+            .add_sink(print_sink(&output::FIELD_TYPE));
     }
 }

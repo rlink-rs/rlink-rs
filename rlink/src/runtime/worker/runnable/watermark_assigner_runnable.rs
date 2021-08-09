@@ -4,10 +4,12 @@ use crate::core::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotCont
 use crate::core::element::Element;
 use crate::core::operator::DefaultStreamOperator;
 use crate::core::runtime::{OperatorId, TaskId};
-use crate::core::watermark::{Watermark, WatermarkAssigner, MIN_WATERMARK};
+use crate::core::watermark::{
+    TimestampAssigner, Watermark, WatermarkGenerator, WatermarkStrategy, MAX_WATERMARK,
+    MIN_WATERMARK,
+};
 use crate::metrics::metric::{Counter, Gauge};
 use crate::metrics::{register_counter, register_gauge};
-use crate::runtime::worker::backpressure::Backpressure;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
@@ -16,12 +18,14 @@ pub(crate) struct WatermarkAssignerRunnable {
     operator_id: OperatorId,
     task_id: TaskId,
 
-    stream_watermark: DefaultStreamOperator<dyn WatermarkAssigner>,
+    watermark_generator: Box<dyn WatermarkGenerator>,
+    timestamp_assigner: Box<dyn TimestampAssigner>,
+    watermark_strategy: DefaultStreamOperator<dyn WatermarkStrategy>,
+
     next_runnable: Option<Box<dyn Runnable>>,
     watermark: Watermark,
 
     context: Option<RunnableContext>,
-    backpressure: Option<Backpressure>,
 
     watermark_gauge: Gauge,
     expire_counter: Counter,
@@ -30,7 +34,7 @@ pub(crate) struct WatermarkAssignerRunnable {
 impl WatermarkAssignerRunnable {
     pub fn new(
         operator_id: OperatorId,
-        stream_watermark: DefaultStreamOperator<dyn WatermarkAssigner>,
+        mut watermark_strategy: DefaultStreamOperator<dyn WatermarkStrategy>,
         next_runnable: Option<Box<dyn Runnable>>,
     ) -> Self {
         info!("Create WatermarkAssignerRunnable");
@@ -38,14 +42,24 @@ impl WatermarkAssignerRunnable {
         WatermarkAssignerRunnable {
             operator_id,
             task_id: TaskId::default(),
-            stream_watermark,
+            watermark_generator: watermark_strategy.operator_fn.create_watermark_generator(),
+            timestamp_assigner: watermark_strategy.operator_fn.create_timestamp_assigner(),
+            watermark_strategy,
             next_runnable,
             watermark: MIN_WATERMARK,
             context: None,
-            backpressure: None,
             watermark_gauge: Gauge::default(),
             expire_counter: Counter::default(),
         }
+    }
+
+    fn update_watermark_progress(&mut self, watermark: Watermark) {
+        if watermark.timestamp > MAX_WATERMARK.timestamp {
+            return;
+        }
+
+        self.watermark = watermark;
+        self.watermark_gauge.store(self.watermark.timestamp as i64);
     }
 }
 
@@ -54,12 +68,10 @@ impl Runnable for WatermarkAssignerRunnable {
         self.next_runnable.as_mut().unwrap().open(context)?;
 
         self.context = Some(context.clone());
-        self.backpressure = Some(context.backpressure.clone());
 
         self.task_id = context.task_descriptor.task_id;
 
-        let fn_name = self.stream_watermark.operator_fn.as_ref().name();
-
+        let fn_name = self.watermark_strategy.operator_fn.as_ref().name();
         self.watermark_gauge =
             register_gauge(format!("Watermark_{}", fn_name), self.task_id.to_tags());
 
@@ -72,11 +84,14 @@ impl Runnable for WatermarkAssignerRunnable {
     }
 
     fn run(&mut self, mut element: Element) {
-        let watermark_assigner = &mut self.stream_watermark.operator_fn;
-
         match element.borrow_mut() {
             Element::Record(record) => {
-                record.timestamp = watermark_assigner.extract_timestamp(record, 0);
+                let timestamp = self.timestamp_assigner.extract_timestamp(record, 0);
+                record.timestamp = timestamp;
+
+                let watermark = self
+                    .watermark_generator
+                    .on_event(record.borrow_mut(), timestamp);
 
                 if record.timestamp < self.watermark.timestamp {
                     let n = self.expire_counter.fetch_add(1);
@@ -90,37 +105,32 @@ impl Runnable for WatermarkAssignerRunnable {
                     return;
                 }
 
-                // backpressure check
-                self.backpressure.as_ref().unwrap().filter(record.timestamp);
-
                 self.next_runnable.as_mut().unwrap().run(element);
+
+                if let Some(watermark) = watermark {
+                    self.update_watermark_progress(watermark);
+
+                    let watermark_ele = Element::new_watermark(self.watermark.timestamp);
+                    self.next_runnable.as_mut().unwrap().run(watermark_ele);
+                }
             }
             Element::StreamStatus(stream_status) => {
                 if stream_status.end {
-                    let watermark_ele = Element::max_watermark(
-                        self.task_id.task_number,
-                        self.task_id.num_tasks,
-                        stream_status,
-                    );
+                    let watermark_ele = Element::max_watermark();
                     self.next_runnable.as_mut().unwrap().run(watermark_ele);
                 } else {
-                    let watermark = match watermark_assigner.watermark(stream_status) {
-                        Some(watermark) => watermark,
-                        None => watermark_assigner
-                            .current_watermark()
-                            .unwrap_or(MIN_WATERMARK.clone()),
-                    };
+                    let watermark = self
+                        .watermark_generator
+                        .on_periodic_emit()
+                        .unwrap_or(MIN_WATERMARK.clone());
+                    self.update_watermark_progress(watermark);
 
-                    self.watermark = watermark;
-                    self.watermark_gauge.store(self.watermark.timestamp as i64);
-                    let watermark_ele = Element::new_watermark(
-                        self.task_id.task_number,
-                        self.task_id.num_tasks,
-                        self.watermark.timestamp,
-                        stream_status,
-                    );
+                    let watermark_ele = Element::new_watermark(self.watermark.timestamp);
                     self.next_runnable.as_mut().unwrap().run(watermark_ele);
                 }
+
+                // must send after the `Watermark`
+                self.next_runnable.as_mut().unwrap().run(element);
             }
             Element::Barrier(barrier) => {
                 let checkpoint_id = barrier.checkpoint_id;
@@ -132,8 +142,8 @@ impl Runnable for WatermarkAssignerRunnable {
 
                 self.next_runnable.as_mut().unwrap().run(element);
             }
-            _ => {
-                error!("unreachable element");
+            Element::Watermark(watermark) => {
+                error!("unreachable Watermark, {:?}", watermark);
                 self.next_runnable.as_mut().unwrap().run(element);
             }
         }
@@ -149,7 +159,7 @@ impl Runnable for WatermarkAssignerRunnable {
 
     fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext) {
         let handle = self
-            .stream_watermark
+            .watermark_strategy
             .operator_fn
             .snapshot_state(&snapshot_context)
             .unwrap_or(CheckpointHandle::default());

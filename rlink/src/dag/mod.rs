@@ -1,12 +1,20 @@
 //! DAG builder
 //! stream_graph -> job_graph -> execution_graph
 
+pub(crate) mod execution_graph;
+pub(crate) mod job_graph;
+pub(crate) mod metadata;
+pub(crate) mod physic_graph;
+pub(crate) mod stream_graph;
+pub(crate) mod utils;
+
 use std::borrow::BorrowMut;
 use std::convert::TryFrom;
 use std::fmt::Debug;
 
 use thiserror::Error;
 
+use crate::core;
 use crate::core::function::InputSplit;
 use crate::core::operator::StreamOperator;
 use crate::core::runtime::{JobId, OperatorId, TaskId};
@@ -15,14 +23,6 @@ use crate::dag::job_graph::JobGraph;
 use crate::dag::physic_graph::PhysicGraph;
 use crate::dag::stream_graph::{StreamGraph, StreamNode};
 
-pub(crate) mod execution_graph;
-pub(crate) mod job_graph;
-pub(crate) mod metadata;
-pub(crate) mod physic_graph;
-pub(crate) mod stream_graph;
-pub(crate) mod utils;
-
-use crate::core;
 pub(crate) use stream_graph::RawStreamGraph;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -189,10 +189,11 @@ mod tests {
         KeySelectorFunction, NamedFunction, OutputFormat, ReduceFunction,
     };
     use crate::core::properties::Properties;
-    use crate::core::watermark::{BoundedOutOfOrdernessTimestampExtractor, TimestampAssigner};
-    use crate::core::window::SlidingEventTimeWindows;
+    use crate::core::watermark::TimestampAssigner;
     use crate::dag::utils::JsonDag;
     use crate::dag::DagManager;
+    use crate::functions::watermark::DefaultWatermarkStrategy;
+    use crate::functions::window::SlidingEventTimeWindows;
 
     #[test]
     pub fn data_stream_test() {
@@ -200,10 +201,11 @@ mod tests {
 
         env.register_source(MyInputFormat::new(), 100)
             .flat_map(MyFlatMapFunction::new())
-            .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
-                Duration::from_secs(1),
-                MyTimestampAssigner::new(),
-            ))
+            .assign_timestamps_and_watermarks(
+                DefaultWatermarkStrategy::new()
+                    .for_bounded_out_of_orderness(Duration::from_secs(1))
+                    .for_timestamp_assigner(MyTimestampAssigner::new()),
+            )
             .key_by(MyKeySelectorFunction::new())
             .window(SlidingEventTimeWindows::new(
                 Duration::from_secs(60),
@@ -235,10 +237,11 @@ mod tests {
 
         env.register_source(MyInputFormat::new(), 2)
             .flat_map(MyFlatMapFunction::new())
-            .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
-                Duration::from_secs(1),
-                MyTimestampAssigner::new(),
-            ))
+            .assign_timestamps_and_watermarks(
+                DefaultWatermarkStrategy::new()
+                    .for_bounded_out_of_orderness(Duration::from_secs(1))
+                    .for_timestamp_assigner(MyTimestampAssigner::new()),
+            )
             .key_by(MyKeySelectorFunction::new())
             .window(SlidingEventTimeWindows::new(
                 Duration::from_secs(60),
@@ -261,17 +264,19 @@ mod tests {
         let ds = env
             .register_source(MyInputFormat::new(), 1)
             .flat_map(MyFlatMapFunction::new())
-            .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
-                Duration::from_secs(1),
-                MyTimestampAssigner::new(),
-            ));
+            .assign_timestamps_and_watermarks(
+                DefaultWatermarkStrategy::new()
+                    .for_bounded_out_of_orderness(Duration::from_secs(1))
+                    .for_timestamp_assigner(MyTimestampAssigner::new()),
+            );
 
         env.register_source(MyInputFormat::new(), 2)
             .flat_map(MyFlatMapFunction::new())
-            .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
-                Duration::from_secs(1),
-                MyTimestampAssigner::new(),
-            ))
+            .assign_timestamps_and_watermarks(
+                DefaultWatermarkStrategy::new()
+                    .for_bounded_out_of_orderness(Duration::from_secs(1))
+                    .for_timestamp_assigner(MyTimestampAssigner::new()),
+            )
             .connect(vec![CoStream::from(ds)], MyCoProcessFunction {})
             .key_by(MyKeySelectorFunction::new())
             .window(SlidingEventTimeWindows::new(

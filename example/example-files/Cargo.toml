@@ -9,7 +9,7 @@ repository = "https://github.com/rlink-rs/rlink-rs.git"
 license = "MIT/Apache-2.0"
 
 [dependencies.rlink]
-version = "0.5"
+version = "0.6"
 path = "../../rlink"
 
 [dependencies.rlink-derive]
@@ -17,11 +17,11 @@ version = "0.3"
 path = "../../rlink-derive"
 
 [dependencies.rlink-connector-files]
-version = "0.5"
+version = "0.6"
 path = "../../rlink-connectors/connector-files"
 
 [dependencies.rlink-example-utils]
-version = "0.5"
+version = "0.6"
 path = "../example-utils"
 
 [dependencies]
