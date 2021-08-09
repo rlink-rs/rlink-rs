@@ -1,11 +1,11 @@
 [package]
 name = "rlink-example-kafka"
-version = "0.1.0"
+version = "0.6.0"
 authors = ["rlink-rs <rlink_rs@163.com>"]
 edition = "2018"
 
 [dependencies.rlink]
-version = "0.5"
+version = "0.6"
 path = "../../rlink"
 
 [dependencies.rlink-derive]
@@ -13,15 +13,15 @@ version = "0.3"
 path = "../../rlink-derive"
 
 [dependencies.rlink-connector-files]
-version = "0.5"
+version = "0.6"
 path = "../../rlink-connectors/connector-files"
 
 [dependencies.rlink-connector-kafka]
-version = "0.5"
+version = "0.6"
 path = "../../rlink-connectors/connector-kafka"
 
 [dependencies.rlink-example-utils]
-version = "0.5"
+version = "0.6"
 path = "../example-utils"
 
 [dependencies]

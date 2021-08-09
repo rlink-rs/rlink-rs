@@ -4,20 +4,20 @@ use rlink::core::backend::{CheckpointBackend, KeyedStateBackend};
 use rlink::core::data_stream::{TDataStream, TKeyedStream, TWindowedStream};
 use rlink::core::env::{StreamApp, StreamExecutionEnvironment};
 use rlink::core::properties::{Properties, SystemProperties};
-use rlink::core::watermark::BoundedOutOfOrdernessTimestampExtractor;
-use rlink::core::window::SlidingEventTimeWindows;
-use rlink::functions::schema_base::key_selector::SchemaBaseKeySelector;
-use rlink::functions::schema_base::print_output_format::PrintOutputFormat;
-use rlink::functions::schema_base::reduce::{sum_i64, SchemaBaseReduceFunction};
-use rlink::functions::schema_base::timestamp_assigner::SchemaBaseTimestampAssigner;
-use rlink::functions::schema_base::FunctionSchema;
-use rlink_example_utils::bounded_input_format::VecInputFormat;
+use rlink::core::runtime::ClusterDescriptor;
+use rlink::functions::key_selector::SchemaKeySelector;
+use rlink::functions::reduce::{sum_i64, SchemaReduceFunction};
+use rlink::functions::sink::print::print_sink;
+use rlink::functions::source::vec_input_format::vec_source;
+use rlink::functions::watermark::DefaultWatermarkStrategy;
+use rlink::functions::window::SlidingEventTimeWindows;
+use rlink::functions::FunctionSchema;
 use rlink_example_utils::buffer_gen::model;
 use rlink_example_utils::buffer_gen::model::FIELD_TYPE;
+use rlink_example_utils::gen_record::gen_fix_length_records;
 
 use crate::filter::MyFlatMapFunction;
 use crate::mapper::MyFilterFunction;
-use rlink::core::runtime::ClusterDescriptor;
 
 #[derive(Clone, Debug)]
 pub struct SimpleStreamApp {}
@@ -33,9 +33,9 @@ impl StreamApp for SimpleStreamApp {
     }
 
     fn build_stream(&self, _properties: &Properties, env: &mut StreamExecutionEnvironment) {
-        let key_selector = SchemaBaseKeySelector::new(vec![model::index::name], &FIELD_TYPE);
+        let key_selector = SchemaKeySelector::new(vec![model::index::name], &FIELD_TYPE);
         let reduce_function =
-            SchemaBaseReduceFunction::new(vec![sum_i64(model::index::value)], &FIELD_TYPE);
+            SchemaReduceFunction::new(vec![sum_i64(model::index::value)], &FIELD_TYPE);
 
         // the schema after reduce
         let output_schema_types = {
@@ -45,13 +45,15 @@ impl StreamApp for SimpleStreamApp {
             key_types
         };
 
-        env.register_source(VecInputFormat::new(), 3)
+        env.register_source(vec_source(gen_fix_length_records()), 3)
             .flat_map(MyFlatMapFunction::new())
             .filter(MyFilterFunction::new())
-            .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
-                Duration::from_secs(1),
-                SchemaBaseTimestampAssigner::new(model::index::timestamp, &FIELD_TYPE),
-            ))
+            .assign_timestamps_and_watermarks(
+                DefaultWatermarkStrategy::new()
+                    .for_bounded_out_of_orderness(Duration::from_secs(1))
+                    .wrap_time_periodic(Duration::from_secs(10), Duration::from_secs(20))
+                    .for_schema_timestamp_assigner(model::index::timestamp, &FIELD_TYPE),
+            )
             .key_by(key_selector)
             .window(SlidingEventTimeWindows::new(
                 Duration::from_secs(60),
@@ -59,7 +61,7 @@ impl StreamApp for SimpleStreamApp {
                 None,
             ))
             .reduce(reduce_function, 2)
-            .add_sink(PrintOutputFormat::new(output_schema_types.as_slice()));
+            .add_sink(print_sink(output_schema_types.as_slice()));
     }
 
     fn pre_worker_startup(&self, cluster_descriptor: &ClusterDescriptor) {

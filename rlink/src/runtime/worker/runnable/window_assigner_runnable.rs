@@ -77,8 +77,8 @@ impl Runnable for WindowAssignerRunnable {
 
                 self.next_runnable.as_mut().unwrap().run(element);
             }
-            _ => {
-                error!("unreachable element");
+            Element::StreamStatus(_stream_status) => {
+                // error!("unreachable element");
                 self.next_runnable.as_mut().unwrap().run(element);
             }
         }

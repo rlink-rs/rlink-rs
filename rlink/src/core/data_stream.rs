@@ -8,7 +8,7 @@ use crate::core::function::{
 };
 use crate::core::operator::{FunctionCreator, StreamOperator};
 use crate::core::runtime::OperatorId;
-use crate::core::watermark::WatermarkAssigner;
+use crate::core::watermark::WatermarkStrategy;
 use crate::core::window::WindowAssigner;
 use crate::functions::system::window_base_reduce::WindowBaseReduceFunction;
 
@@ -29,7 +29,7 @@ pub trait TDataStream {
 
     fn assign_timestamps_and_watermarks<W>(self, timestamp_and_watermark_assigner: W) -> DataStream
     where
-        W: WatermarkAssigner + 'static;
+        W: WatermarkStrategy + 'static;
 
     /// Re-balance: Round-robin, Hash, Broadcast
     fn connect<F>(self, data_streams: Vec<CoStream>, f: F) -> ConnectedStreams
@@ -134,7 +134,7 @@ impl TDataStream for DataStream {
 
     fn assign_timestamps_and_watermarks<W>(self, timestamp_and_watermark_assigner: W) -> DataStream
     where
-        W: WatermarkAssigner + 'static,
+        W: WatermarkStrategy + 'static,
     {
         self.data_stream
             .assign_timestamps_and_watermarks(timestamp_and_watermark_assigner)
@@ -336,7 +336,7 @@ impl TDataStream for StreamBuilder {
         timestamp_and_watermark_assigner: W,
     ) -> DataStream
     where
-        W: WatermarkAssigner + 'static,
+        W: WatermarkStrategy + 'static,
     {
         let time_assigner_func = Box::new(timestamp_and_watermark_assigner);
         let stream_watermark_assigner = StreamOperator::new_watermark_assigner(time_assigner_func);

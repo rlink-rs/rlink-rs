@@ -11,7 +11,6 @@ use crate::dag::job_graph::{JobEdge, JobNode};
 use crate::dag::metadata::DagMetadata;
 use crate::dag::stream_graph::StreamNode;
 use crate::runtime::timer::WindowTimer;
-use crate::runtime::worker::backpressure::Backpressure;
 use crate::runtime::worker::FunctionContext;
 
 pub mod co_process_runnable;
@@ -39,7 +38,6 @@ pub(crate) struct RunnableContext {
     pub(crate) cluster_descriptor: Arc<ClusterDescriptor>,
     pub(crate) task_descriptor: TaskDescriptor,
     pub(crate) window_timer: WindowTimer,
-    pub(crate) backpressure: Backpressure,
 }
 
 impl RunnableContext {

@@ -37,7 +37,7 @@ pub mod client {
     where
         T: Serialize + serde::de::DeserializeOwned + 'static,
     {
-        async_runtime("http").block_on(post(url, body))
+        async_runtime("http-client").block_on(post(url, body))
     }
 
     pub async fn post<T>(
@@ -47,10 +47,41 @@ pub mod client {
     where
         T: Serialize + serde::de::DeserializeOwned + 'static,
     {
+        request("POST", url, body).await
+    }
+
+    pub fn put_sync<T>(
+        url: String,
+        body: String,
+    ) -> Result<T, Box<dyn std::error::Error + Send + Sync>>
+    where
+        T: Serialize + serde::de::DeserializeOwned + 'static,
+    {
+        async_runtime("http-client").block_on(put(url, body))
+    }
+
+    pub async fn put<T>(
+        url: String,
+        body: String,
+    ) -> Result<T, Box<dyn std::error::Error + Send + Sync>>
+    where
+        T: Serialize + serde::de::DeserializeOwned + 'static,
+    {
+        request("PUT", url, body).await
+    }
+
+    pub async fn request<T>(
+        method: &'static str,
+        url: String,
+        body: String,
+    ) -> Result<T, Box<dyn std::error::Error + Send + Sync>>
+    where
+        T: Serialize + serde::de::DeserializeOwned + 'static,
+    {
         let client = Client::new();
 
         let req = Request::builder()
-            .method("POST")
+            .method(method)
             .uri(url.as_str())
             .header("Content-Type", "application/json")
             .body(Body::from(body))

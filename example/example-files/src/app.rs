@@ -5,7 +5,7 @@ use rlink::core::data_stream::TDataStream;
 use rlink::core::env::{StreamApp, StreamExecutionEnvironment};
 use rlink::core::properties::{Properties, SystemProperties};
 use rlink_example_utils::buffer_gen::model::FIELD_TYPE;
-use rlink_example_utils::unbounded_input_format::RandInputFormat;
+use rlink_example_utils::rand_input_format::RandInputFormat;
 
 use crate::hdfs_sink::create_hdfs_sink;
 

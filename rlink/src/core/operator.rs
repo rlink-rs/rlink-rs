@@ -4,7 +4,7 @@ use crate::core::function::{
     BaseReduceFunction, CoProcessFunction, FilterFunction, FlatMapFunction, InputFormat,
     KeySelectorFunction, NamedFunction, OutputFormat,
 };
-use crate::core::watermark::WatermarkAssigner;
+use crate::core::watermark::WatermarkStrategy;
 use crate::core::window::WindowAssigner;
 
 pub const DEFAULT_PARALLELISM: u16 = 0;
@@ -81,7 +81,7 @@ pub(crate) enum StreamOperator {
     StreamCoProcess(DefaultStreamOperator<dyn CoProcessFunction>),
     StreamKeyBy(DefaultStreamOperator<dyn KeySelectorFunction>),
     StreamReduce(DefaultStreamOperator<dyn BaseReduceFunction>),
-    StreamWatermarkAssigner(DefaultStreamOperator<dyn WatermarkAssigner>),
+    StreamWatermarkAssigner(DefaultStreamOperator<dyn WatermarkStrategy>),
     StreamWindowAssigner(DefaultStreamOperator<dyn WindowAssigner>),
     StreamSink(DefaultStreamOperator<dyn OutputFormat>),
 }
@@ -125,7 +125,7 @@ impl StreamOperator {
         StreamOperator::StreamReduce(operator)
     }
 
-    pub fn new_watermark_assigner(watermark_assigner: Box<dyn WatermarkAssigner>) -> Self {
+    pub fn new_watermark_assigner(watermark_assigner: Box<dyn WatermarkStrategy>) -> Self {
         let operator = DefaultStreamOperator::new(
             DEFAULT_PARALLELISM,
             FunctionCreator::User,

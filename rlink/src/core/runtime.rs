@@ -158,8 +158,8 @@ pub struct TaskDescriptor {
     pub input_split: InputSplit,
     pub daemon: bool,
     pub thread_id: String,
-    /// mark the task is stopped status
-    pub stopped: bool,
+    /// mark the task is `Terminated` status
+    pub terminated: bool,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq)]
@@ -241,8 +241,7 @@ pub struct CoordinatorManagerDescriptor {
     pub version: String,
     pub application_id: String,
     pub application_properties: Properties,
-    // todo rename to web_address
-    pub coordinator_address: String,
+    pub web_address: String,
     pub metrics_address: String,
     pub coordinator_status: ManagerStatus,
     pub v_cores: u32,
@@ -269,6 +268,26 @@ impl ClusterDescriptor {
                     .find(|task_descriptor| task_descriptor.task_id.eq(task_id))
                     .is_some()
             })
+    }
+
+    pub fn flush_coordinator_status(&mut self) {
+        let mut task_count = 0;
+        let mut terminated_count = 0;
+
+        for worker_manager in &self.worker_managers {
+            for task in &worker_manager.task_descriptors {
+                task_count += 1;
+                if task.terminated {
+                    terminated_count += 1;
+                }
+            }
+        }
+
+        if task_count == terminated_count {
+            self.coordinator_manager.coordinator_status = ManagerStatus::Terminated;
+        } else if terminated_count > 0 {
+            self.coordinator_manager.coordinator_status = ManagerStatus::Terminating;
+        }
     }
 
     pub fn to_string(&self) -> String {
