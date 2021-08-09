@@ -5,7 +5,8 @@ use crate::core::element::Element;
 use crate::core::operator::DefaultStreamOperator;
 use crate::core::runtime::{OperatorId, TaskId};
 use crate::core::watermark::{
-    TimestampAssigner, Watermark, WatermarkGenerator, WatermarkStrategy, MIN_WATERMARK,
+    TimestampAssigner, Watermark, WatermarkGenerator, WatermarkStrategy, MAX_WATERMARK,
+    MIN_WATERMARK,
 };
 use crate::metrics::metric::{Counter, Gauge};
 use crate::metrics::{register_counter, register_gauge};
@@ -50,6 +51,15 @@ impl WatermarkAssignerRunnable {
             watermark_gauge: Gauge::default(),
             expire_counter: Counter::default(),
         }
+    }
+
+    fn update_watermark_progress(&mut self, watermark: Watermark) {
+        if watermark.timestamp > MAX_WATERMARK.timestamp {
+            return;
+        }
+
+        self.watermark = watermark;
+        self.watermark_gauge.store(self.watermark.timestamp as i64);
     }
 }
 
@@ -98,8 +108,7 @@ impl Runnable for WatermarkAssignerRunnable {
                 self.next_runnable.as_mut().unwrap().run(element);
 
                 if let Some(watermark) = watermark {
-                    self.watermark = watermark;
-                    self.watermark_gauge.store(self.watermark.timestamp as i64);
+                    self.update_watermark_progress(watermark);
 
                     let watermark_ele = Element::new_watermark(self.watermark.timestamp);
                     self.next_runnable.as_mut().unwrap().run(watermark_ele);
@@ -114,9 +123,7 @@ impl Runnable for WatermarkAssignerRunnable {
                         .watermark_generator
                         .on_periodic_emit()
                         .unwrap_or(MIN_WATERMARK.clone());
-
-                    self.watermark = watermark;
-                    self.watermark_gauge.store(self.watermark.timestamp as i64);
+                    self.update_watermark_progress(watermark);
 
                     let watermark_ele = Element::new_watermark(self.watermark.timestamp);
                     self.next_runnable.as_mut().unwrap().run(watermark_ele);

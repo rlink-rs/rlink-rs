@@ -12,6 +12,7 @@ use crate::core::element::{Element, StreamStatus, Watermark};
 use crate::core::function::InputFormat;
 use crate::core::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
 use crate::core::runtime::{CheckpointId, JobId, OperatorId, TaskId};
+use crate::core::watermark::MAX_WATERMARK;
 use crate::runtime::timer::TimerChannel;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::heart_beat::{get_coordinator_status, submit_heartbeat};
@@ -33,8 +34,8 @@ pub(crate) struct SourceRunnable {
     checkpoint_timer: Option<TimerChannel>,
 
     waiting_end_flags: usize,
-    barrier_alignment: BarrierAlignManager,
-    stream_status_alignment: BarrierAlignManager,
+    barrier_alignment: AlignManager,
+    stream_status_alignment: AlignManager,
     watermark_manager: WatermarkManager,
 }
 
@@ -57,8 +58,8 @@ impl SourceRunnable {
             checkpoint_timer: None,
 
             waiting_end_flags: 0,
-            barrier_alignment: BarrierAlignManager::default(),
-            stream_status_alignment: BarrierAlignManager::default(),
+            barrier_alignment: AlignManager::default(),
+            stream_status_alignment: AlignManager::default(),
             watermark_manager: WatermarkManager::default(),
         }
     }
@@ -221,8 +222,8 @@ impl Runnable for SourceRunnable {
             self.task_id, parent_jobs
         );
 
-        self.barrier_alignment = BarrierAlignManager::new(parent_execution_size);
-        self.stream_status_alignment = BarrierAlignManager::new(parent_execution_size);
+        self.barrier_alignment = AlignManager::new(parent_execution_size);
+        self.stream_status_alignment = AlignManager::new(parent_execution_size);
         self.watermark_manager = WatermarkManager::new(parent_jobs);
 
         info!(
@@ -357,29 +358,29 @@ impl Runnable for SourceRunnable {
 }
 
 #[derive(Debug, Default)]
-struct BarrierAlignManager {
+struct AlignManager {
     parent_execution_size: usize,
 
-    checkpoint_id: u64,
+    batch_id: u64,
     reached_size: usize,
 }
 
-impl BarrierAlignManager {
+impl AlignManager {
     pub fn new(parent_execution_size: usize) -> Self {
-        BarrierAlignManager {
+        AlignManager {
             parent_execution_size,
-            checkpoint_id: 0,
+            batch_id: 0,
             reached_size: 0,
         }
     }
 
     /// apply a element event and check whether all event is reached.
-    pub fn apply(&mut self, checkpoint_id: u64) -> bool {
+    pub fn apply(&mut self, batch_id: u64) -> bool {
         if self.parent_execution_size == 0 {
             return true;
         }
 
-        if self.checkpoint_id == checkpoint_id {
+        if self.batch_id == batch_id {
             self.reached_size += 1;
 
             if self.reached_size > self.parent_execution_size {
@@ -387,15 +388,15 @@ impl BarrierAlignManager {
             }
 
             self.reached_size == self.parent_execution_size
-        } else if self.checkpoint_id < checkpoint_id {
-            self.checkpoint_id = checkpoint_id;
+        } else if self.batch_id < batch_id {
+            self.batch_id = batch_id;
             self.reached_size = 1;
 
             self.reached_size == self.parent_execution_size
         } else {
             error!(
                 "barrier delay, current {}, reached {}",
-                self.checkpoint_id, checkpoint_id
+                self.batch_id, batch_id
             );
             false
         }
@@ -413,6 +414,25 @@ impl ParentWatermark {
         ParentWatermark {
             latest_watermark,
             is_dependency,
+        }
+    }
+
+    pub fn update_watermark(&mut self, watermark: Watermark) {
+        match &self.latest_watermark {
+            Some(w) => {
+                if watermark.timestamp > MAX_WATERMARK.timestamp {
+                    // special `Watermark`, don't need to compare, just assign
+                    self.latest_watermark = Some(watermark);
+                } else if watermark.timestamp >= w.timestamp {
+                    self.latest_watermark = Some(watermark);
+                } else {
+                    error!(
+                        "low level watermark {:?} reached. current: {:?}",
+                        watermark, self.latest_watermark
+                    )
+                }
+            }
+            None => self.latest_watermark = Some(watermark),
         }
     }
 }
@@ -460,7 +480,7 @@ impl WatermarkManager {
                     panic!("Does not depend on the task, {:?}", watermark.channel_key);
                 }
 
-                watermarks[task_number].latest_watermark = Some(watermark);
+                watermarks[task_number].update_watermark(watermark);
             }
             None => panic!("unreached! the JobId of `Watermark` is not in the parent jobs list, or the job key has removed"),
         }
