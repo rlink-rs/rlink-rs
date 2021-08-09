@@ -16,7 +16,7 @@ use rlink::functions::FunctionSchema;
 use rlink_example_utils::buffer_gen::model::FIELD_TYPE;
 use rlink_example_utils::buffer_gen::{model, output};
 use rlink_example_utils::config_input_format::ConfigInputFormat;
-use rlink_example_utils::unbounded_input_format::RandInputFormat;
+use rlink_example_utils::rand_input_format::RandInputFormat;
 
 use crate::co_connect::MyCoProcessFunction;
 use crate::map_output::OutputMapFunction;
