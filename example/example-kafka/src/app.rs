@@ -9,6 +9,7 @@ use rlink::core::properties::{Properties, SystemProperties};
 use rlink::functions::key_selector::SchemaKeySelector;
 use rlink::functions::reduce::{sum_i64, SchemaReduceFunction};
 use rlink::functions::sink::PrintOutputFormat;
+use rlink::functions::source::vec_input_format::vec_source;
 use rlink::functions::watermark::DefaultWatermarkStrategy;
 use rlink::functions::window::SlidingEventTimeWindows;
 use rlink::functions::FunctionSchema;
@@ -17,8 +18,8 @@ use rlink_connector_kafka::{
     create_output_format, state::PartitionOffset, InputFormatBuilder, OffsetRange,
     BOOTSTRAP_SERVERS, GROUP_ID, KAFKA_DATA_TYPES,
 };
-use rlink_example_utils::bounded_input_format::VecInputFormat;
 use rlink_example_utils::buffer_gen::model;
+use rlink_example_utils::gen_record::gen_fix_length_records;
 
 use crate::buffer_gen::checkpoint_data::FIELD_TYPE;
 use crate::input_mapper::InputMapperFunction;
@@ -59,7 +60,7 @@ impl StreamApp for KafkaGenAppStream {
 
         let sink = create_output_format(conf_map, Some(kafka_topic_sink.clone()), None);
 
-        env.register_source(VecInputFormat::new(), 3)
+        env.register_source(vec_source(gen_fix_length_records()), 3)
             .flat_map(OutputMapperFunction::new(kafka_topic_sink))
             .add_sink(sink);
     }

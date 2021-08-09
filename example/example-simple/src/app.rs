@@ -8,12 +8,13 @@ use rlink::core::runtime::ClusterDescriptor;
 use rlink::functions::key_selector::SchemaKeySelector;
 use rlink::functions::reduce::{sum_i64, SchemaReduceFunction};
 use rlink::functions::sink::PrintOutputFormat;
+use rlink::functions::source::vec_input_format::vec_source;
 use rlink::functions::watermark::DefaultWatermarkStrategy;
 use rlink::functions::window::SlidingEventTimeWindows;
 use rlink::functions::FunctionSchema;
-use rlink_example_utils::bounded_input_format::VecInputFormat;
 use rlink_example_utils::buffer_gen::model;
 use rlink_example_utils::buffer_gen::model::FIELD_TYPE;
+use rlink_example_utils::gen_record::gen_fix_length_records;
 
 use crate::filter::MyFlatMapFunction;
 use crate::mapper::MyFilterFunction;
@@ -44,7 +45,7 @@ impl StreamApp for SimpleStreamApp {
             key_types
         };
 
-        env.register_source(VecInputFormat::new(), 3)
+        env.register_source(vec_source(gen_fix_length_records()), 3)
             .flat_map(MyFlatMapFunction::new())
             .filter(MyFilterFunction::new())
             .assign_timestamps_and_watermarks(
