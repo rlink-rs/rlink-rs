@@ -1,7 +1,7 @@
 use rlink::core;
 use rlink::core::element::{Record, Schema};
 use rlink::core::function::{CoProcessFunction, Context};
-use rlink_example_utils::buffer_gen::{config, model};
+use rlink_example_utils::buffer_gen::config;
 
 #[derive(Debug, Function)]
 pub struct MyCoProcessFunction {}
@@ -35,7 +35,7 @@ impl CoProcessFunction for MyCoProcessFunction {
         Ok(())
     }
 
-    fn schema(&self, _input_schema: Schema) -> Schema {
-        Schema::from(&model::FIELD_TYPE[..])
+    fn schema(&self, input_schema: Schema) -> Schema {
+        input_schema
     }
 }
