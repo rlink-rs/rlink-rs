@@ -1,32 +1,36 @@
 use std::fmt::{Debug, Formatter};
 
 use crate::core::checkpoint::CheckpointFunction;
-use crate::core::element::Record;
+use crate::core::element::{Record, Schema};
 use crate::core::function::{Context, InputFormat, InputSplit, InputSplitSource, NamedFunction};
 
 pub fn vec_source(
     data: Vec<Record>,
+    schema: &[u8],
 ) -> IteratorInputFormat<impl FnOnce(InputSplit, Context) -> Box<dyn Iterator<Item = Record> + Send>>
 {
-    let n = IteratorInputFormat::new(move |_input_split, context| {
-        let num_tasks = context.task_id.num_tasks;
-        let task_number = context.task_id.task_number;
-        let task_data = if num_tasks == 1 {
-            data
-        } else {
-            data.iter()
-                .enumerate()
-                .filter_map(|(index, record)| {
-                    if index as u16 % num_tasks == task_number {
-                        Some(record.clone())
-                    } else {
-                        None
-                    }
-                })
-                .collect()
-        };
-        Box::new(task_data.into_iter())
-    });
+    let n = IteratorInputFormat::new(
+        move |_input_split, context| {
+            let num_tasks = context.task_id.num_tasks;
+            let task_number = context.task_id.task_number;
+            let task_data = if num_tasks == 1 {
+                data
+            } else {
+                data.iter()
+                    .enumerate()
+                    .filter_map(|(index, record)| {
+                        if index as u16 % num_tasks == task_number {
+                            Some(record.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect()
+            };
+            Box::new(task_data.into_iter())
+        },
+        schema,
+    );
     n
 }
 
@@ -35,6 +39,7 @@ where
     T: FnOnce(InputSplit, Context) -> Box<dyn Iterator<Item = Record> + Send>,
 {
     vec_builder: Option<T>,
+    schema: Vec<u8>,
 
     input_split: Option<InputSplit>,
     context: Option<Context>,
@@ -44,9 +49,10 @@ impl<T> IteratorInputFormat<T>
 where
     T: FnOnce(InputSplit, Context) -> Box<dyn Iterator<Item = Record> + Send>,
 {
-    pub fn new(vec_builder: T) -> Self {
+    pub fn new(vec_builder: T, schema: &[u8]) -> Self {
         IteratorInputFormat {
             vec_builder: Some(vec_builder),
+            schema: schema.to_vec(),
             input_split: None,
             context: None,
         }
@@ -79,6 +85,10 @@ where
 
     fn close(&mut self) -> crate::core::Result<()> {
         Ok(())
+    }
+
+    fn schema(&self, _input_schema: Schema) -> Schema {
+        Schema::from(self.schema.as_slice())
     }
 }
 

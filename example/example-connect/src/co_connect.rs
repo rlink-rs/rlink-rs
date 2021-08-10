@@ -1,7 +1,7 @@
 use rlink::core;
-use rlink::core::element::Record;
+use rlink::core::element::{Record, Schema};
 use rlink::core::function::{CoProcessFunction, Context};
-use rlink_example_utils::buffer_gen::config;
+use rlink_example_utils::buffer_gen::{config, model};
 
 #[derive(Debug, Function)]
 pub struct MyCoProcessFunction {}
@@ -12,6 +12,8 @@ impl CoProcessFunction for MyCoProcessFunction {
     }
 
     fn process_left(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>> {
+        // let n = model::Entity::parse(record.as_buffer()).unwrap();
+        // info!("--> {:?}", n);
         Box::new(vec![record].into_iter())
     }
 
@@ -31,5 +33,9 @@ impl CoProcessFunction for MyCoProcessFunction {
 
     fn close(&mut self) -> core::Result<()> {
         Ok(())
+    }
+
+    fn schema(&self, _input_schema: Schema) -> Schema {
+        Schema::from(&model::FIELD_TYPE[..])
     }
 }

@@ -72,6 +72,9 @@ impl RunnableContext {
             completed_checkpoint_id: operator.completed_checkpoint_id,
             checkpoint_handle: operator.checkpoint_handle.clone(),
 
+            input_schema: operator.input_schema.clone(),
+            output_schema: operator.output_schema.clone(),
+
             parents,
             children,
         }

@@ -3,6 +3,7 @@ use std::error::Error;
 use std::iter::Iterator;
 
 use rlink::core;
+use rlink::core::element::Schema;
 use rlink::core::{
     element::Record,
     function::{Context, FlatMapFunction},
@@ -10,7 +11,7 @@ use rlink::core::{
 use rlink_connector_kafka::KafkaRecord;
 use serde_json::Value;
 
-use crate::buffer_gen::checkpoint_data::FieldWriter;
+use crate::buffer_gen::checkpoint_data;
 
 #[derive(Debug, Default, Function)]
 pub struct KafkaInputMapperFunction {
@@ -44,6 +45,10 @@ impl FlatMapFunction for KafkaInputMapperFunction {
     fn close(&mut self) -> core::Result<()> {
         Ok(())
     }
+
+    fn schema(&self, _input_schema: Schema) -> Schema {
+        Schema::from(&checkpoint_data::FIELD_TYPE[..])
+    }
 }
 
 fn parse_data(line: &str) -> Result<Record, Box<dyn Error>> {
@@ -51,7 +56,7 @@ fn parse_data(line: &str) -> Result<Record, Box<dyn Error>> {
     let json_map = json.as_object().ok_or("log is not json")?;
 
     let mut record_new = Record::new();
-    let mut writer = FieldWriter::new(record_new.as_buffer());
+    let mut writer = checkpoint_data::FieldWriter::new(record_new.as_buffer());
 
     writer.set_ts(json_map.get("ts").unwrap().as_u64().unwrap())?;
     writer.set_app(json_map.get("app").unwrap().as_str().unwrap())?;

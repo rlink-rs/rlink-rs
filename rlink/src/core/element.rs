@@ -22,6 +22,47 @@ pub mod types {
     pub use serbuffer::types::*;
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum Schema {
+    Empty,
+    Single(Vec<u8>),
+    Tuple(Vec<u8>, Vec<u8>),
+}
+
+impl Schema {
+    pub fn first(&self) -> &[u8] {
+        match self {
+            Self::Single(v) => v.as_slice(),
+            Self::Tuple(v, _v1) => v.as_slice(),
+            _ => panic!("no schema"),
+        }
+    }
+}
+
+impl<'a> From<&'a [u8]> for Schema {
+    fn from(schema: &'a [u8]) -> Self {
+        Schema::Single(schema.to_vec())
+    }
+}
+
+impl Into<Vec<u8>> for Schema {
+    fn into(self) -> Vec<u8> {
+        match self {
+            Schema::Single(v) => v,
+            _ => panic!("..."),
+        }
+    }
+}
+
+impl Into<(Vec<u8>, Vec<u8>)> for Schema {
+    fn into(self) -> (Vec<u8>, Vec<u8>) {
+        match self {
+            Schema::Tuple(v0, v1) => (v0, v1),
+            _ => panic!("..."),
+        }
+    }
+}
+
 pub(crate) trait Partition {
     fn partition(&self) -> u16;
     fn set_partition(&mut self, partition: u16);

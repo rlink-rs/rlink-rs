@@ -1,6 +1,6 @@
 use crate::core::backend::KeyedStateBackend;
 use crate::core::checkpoint::CheckpointFunction;
-use crate::core::element::{Element, Record};
+use crate::core::element::{Element, Record, Schema};
 use crate::core::function::{Context, FlatMapFunction, NamedFunction};
 use crate::core::properties::SystemProperties;
 use crate::core::runtime::JobId;
@@ -68,6 +68,11 @@ impl FlatMapFunction for KeyedStateFlatMapFunction {
 
     fn close(&mut self) -> crate::core::Result<()> {
         Ok(())
+    }
+
+    fn schema(&self, input_schema: Schema) -> Schema {
+        let (_flag_record, reduce_schema): (Vec<u8>, Vec<u8>) = input_schema.into();
+        Schema::Single(reduce_schema)
     }
 }
 

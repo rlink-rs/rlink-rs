@@ -1,6 +1,6 @@
 use std::borrow::BorrowMut;
 
-use rlink::core::element::Record;
+use rlink::core::element::{Record, Schema};
 use rlink::core::function::{Context, FlatMapFunction};
 use rlink_connector_kafka::KafkaRecord;
 use rlink_example_utils::buffer_gen::model;
@@ -40,5 +40,9 @@ impl FlatMapFunction for InputMapperFunction {
 
     fn close(&mut self) -> rlink::core::Result<()> {
         Ok(())
+    }
+
+    fn schema(&self, _input_schema: Schema) -> Schema {
+        Schema::from(&model::FIELD_TYPE[..])
     }
 }

@@ -1,5 +1,5 @@
 use rlink::core;
-use rlink::core::element::Record;
+use rlink::core::element::{Record, Schema};
 use rlink::core::function::{Context, FlatMapFunction};
 use rlink::functions::percentile::PercentileReader;
 use rlink_example_utils::buffer_gen::output;
@@ -11,13 +11,17 @@ pub struct OutputMapFunction {
 }
 
 impl OutputMapFunction {
-    pub fn new(data_type: Vec<u8>, scala: &'static [f64]) -> Self {
-        OutputMapFunction { data_type, scala }
+    pub fn new(scala: &'static [f64]) -> Self {
+        OutputMapFunction {
+            data_type: vec![],
+            scala,
+        }
     }
 }
 
 impl FlatMapFunction for OutputMapFunction {
-    fn open(&mut self, _context: &Context) -> core::Result<()> {
+    fn open(&mut self, context: &Context) -> core::Result<()> {
+        self.data_type = context.input_schema.first().to_vec();
         Ok(())
     }
 
@@ -44,5 +48,9 @@ impl FlatMapFunction for OutputMapFunction {
 
     fn close(&mut self) -> core::Result<()> {
         Ok(())
+    }
+
+    fn schema(&self, _input_schema: Schema) -> Schema {
+        Schema::from(&output::FIELD_TYPE[..])
     }
 }

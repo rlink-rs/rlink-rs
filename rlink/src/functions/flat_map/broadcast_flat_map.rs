@@ -1,5 +1,5 @@
 use crate::core::checkpoint::CheckpointFunction;
-use crate::core::element::Record;
+use crate::core::element::{Record, Schema};
 use crate::core::function::{Context, FlatMapFunction, NamedFunction};
 
 pub struct BroadcastFlagMapFunction {
@@ -38,6 +38,10 @@ impl FlatMapFunction for BroadcastFlagMapFunction {
 
     fn close(&mut self) -> crate::core::Result<()> {
         Ok(())
+    }
+
+    fn schema(&self, input_schema: Schema) -> Schema {
+        input_schema
     }
 }
 

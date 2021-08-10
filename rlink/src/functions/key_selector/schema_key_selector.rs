@@ -1,5 +1,5 @@
 use crate::core::checkpoint::CheckpointFunction;
-use crate::core::element::Record;
+use crate::core::element::{Record, Schema};
 use crate::core::function::{Context, KeySelectorFunction, NamedFunction};
 use crate::functions::FunctionSchema;
 
@@ -11,12 +11,11 @@ pub struct SchemaKeySelector {
 }
 
 impl SchemaKeySelector {
-    pub fn new(columns: Vec<usize>, data_types: &[u8]) -> Self {
-        let key_field_types: Vec<u8> = columns.iter().map(|index| data_types[*index]).collect();
+    pub fn new(columns: Vec<usize>) -> Self {
         SchemaKeySelector {
             columns,
-            field_types: data_types.to_vec(),
-            key_field_types,
+            field_types: vec![],
+            key_field_types: vec![],
         }
     }
 }
@@ -28,7 +27,19 @@ impl FunctionSchema for SchemaKeySelector {
 }
 
 impl KeySelectorFunction for SchemaKeySelector {
-    fn open(&mut self, _context: &Context) -> crate::core::Result<()> {
+    fn open(&mut self, context: &Context) -> crate::core::Result<()> {
+        // if `KeySelector` opened in `Reduce` operator, the `input_schema` is a Tuple
+        let field_types = match &context.input_schema {
+            Schema::Single(field_types) => field_types,
+            Schema::Tuple(field_types, _key_field_types) => field_types,
+            _ => panic!("input schema not found in selector operator"),
+        };
+
+        self.field_types = field_types.to_vec();
+        self.key_field_types = self
+            .key_schema(Schema::from(self.field_types.as_slice()))
+            .into();
+
         Ok(())
     }
 
@@ -49,6 +60,21 @@ impl KeySelectorFunction for SchemaKeySelector {
 
     fn close(&mut self) -> crate::core::Result<()> {
         Ok(())
+    }
+
+    fn key_schema(&self, input_schema: Schema) -> Schema {
+        let field_types: Vec<u8> = input_schema.into();
+        let key_field_types: Vec<u8> = self
+            .columns
+            .iter()
+            .map(|index| field_types[*index])
+            .collect();
+
+        if key_field_types.is_empty() {
+            panic!("key not found");
+        }
+
+        Schema::Single(key_field_types)
     }
 }
 

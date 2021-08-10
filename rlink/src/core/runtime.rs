@@ -4,7 +4,7 @@ use std::ops::Deref;
 use bytes::{Buf, BufMut, BytesMut};
 
 use crate::core::checkpoint::CheckpointHandle;
-use crate::core::element::Serde;
+use crate::core::element::{Schema, Serde};
 use crate::core::function::InputSplit;
 use crate::core::properties::Properties;
 use crate::metrics::Tag;
@@ -146,6 +146,8 @@ impl CheckpointId {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct OperatorDescriptor {
     pub operator_id: OperatorId,
+    pub input_schema: Schema,
+    pub output_schema: Schema,
     pub checkpoint_id: CheckpointId,
     pub completed_checkpoint_id: Option<CheckpointId>,
     pub checkpoint_handle: Option<CheckpointHandle>,

@@ -182,7 +182,7 @@ mod tests {
     use crate::core::data_stream::CoStream;
     use crate::core::data_stream::{TConnectedStreams, TKeyedStream};
     use crate::core::data_stream::{TDataStream, TWindowedStream};
-    use crate::core::element::Record;
+    use crate::core::element::{types, Record, Schema};
     use crate::core::env::StreamExecutionEnvironment;
     use crate::core::function::{
         CoProcessFunction, Context, FlatMapFunction, InputFormat, InputSplit, InputSplitSource,
@@ -345,6 +345,10 @@ mod tests {
         fn close(&mut self) -> core::Result<()> {
             Ok(())
         }
+
+        fn schema(&self, _input_schema: Schema) -> Schema {
+            Schema::Single(vec![types::STRING, types::I64])
+        }
     }
 
     #[derive(Serialize, Deserialize, Debug)]
@@ -368,6 +372,10 @@ mod tests {
         fn close(&mut self) -> core::Result<()> {
             Ok(())
         }
+
+        fn schema(&self, input_schema: Schema) -> Schema {
+            input_schema
+        }
     }
 
     impl NamedFunction for MyFlatMapFunction {
@@ -388,6 +396,10 @@ mod tests {
     }
 
     impl TimestampAssigner for MyTimestampAssigner {
+        fn open(&mut self, _context: &Context) -> core::Result<()> {
+            Ok(())
+        }
+
         fn extract_timestamp(
             &mut self,
             _row: &mut Record,
@@ -427,6 +439,10 @@ mod tests {
         fn close(&mut self) -> core::Result<()> {
             Ok(())
         }
+
+        fn key_schema(&self, _input_schema: Schema) -> Schema {
+            Schema::Single(vec![types::STRING])
+        }
     }
 
     impl NamedFunction for MyKeySelectorFunction {
@@ -457,6 +473,10 @@ mod tests {
 
         fn close(&mut self) -> core::Result<()> {
             Ok(())
+        }
+
+        fn schema(&self, _input_schema: Schema) -> Schema {
+            Schema::Single(vec![types::I64])
         }
     }
 
@@ -489,6 +509,10 @@ mod tests {
         fn close(&mut self) -> core::Result<()> {
             Ok(())
         }
+
+        fn schema(&self, input_schema: Schema) -> Schema {
+            input_schema
+        }
     }
 
     impl NamedFunction for MyOutputFormat {
@@ -520,6 +544,10 @@ mod tests {
 
         fn close(&mut self) -> core::Result<()> {
             Ok(())
+        }
+
+        fn schema(&self, input_schema: Schema) -> Schema {
+            input_schema
         }
     }
 

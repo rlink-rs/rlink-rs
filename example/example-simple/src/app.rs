@@ -7,14 +7,12 @@ use rlink::core::properties::{Properties, SystemProperties};
 use rlink::core::runtime::ClusterDescriptor;
 use rlink::functions::key_selector::SchemaKeySelector;
 use rlink::functions::reduce::{sum_i64, SchemaReduceFunction};
-use rlink::functions::sink::print::print_sink;
-use rlink::functions::source::vec_input_format::vec_source;
+use rlink::functions::sink::print_sink;
+use rlink::functions::source::vec_source;
 use rlink::functions::watermark::DefaultWatermarkStrategy;
 use rlink::functions::window::SlidingEventTimeWindows;
-use rlink::functions::FunctionSchema;
 use rlink_example_utils::buffer_gen::model;
-use rlink_example_utils::buffer_gen::model::FIELD_TYPE;
-use rlink_example_utils::gen_record::gen_fix_length_records;
+use rlink_example_utils::gen_record::gen_records;
 
 use crate::filter::MyFlatMapFunction;
 use crate::mapper::MyFilterFunction;
@@ -33,35 +31,26 @@ impl StreamApp for SimpleStreamApp {
     }
 
     fn build_stream(&self, _properties: &Properties, env: &mut StreamExecutionEnvironment) {
-        let key_selector = SchemaKeySelector::new(vec![model::index::name], &FIELD_TYPE);
-        let reduce_function =
-            SchemaReduceFunction::new(vec![sum_i64(model::index::value)], &FIELD_TYPE);
-
-        // the schema after reduce
-        let output_schema_types = {
-            let mut key_types = key_selector.schema_types();
-            let reduce_types = reduce_function.schema_types();
-            key_types.extend_from_slice(reduce_types.as_slice());
-            key_types
-        };
-
-        env.register_source(vec_source(gen_fix_length_records()), 3)
+        env.register_source(vec_source(gen_records(), &model::FIELD_TYPE), 3)
             .flat_map(MyFlatMapFunction::new())
             .filter(MyFilterFunction::new())
             .assign_timestamps_and_watermarks(
                 DefaultWatermarkStrategy::new()
                     .for_bounded_out_of_orderness(Duration::from_secs(1))
                     .wrap_time_periodic(Duration::from_secs(10), Duration::from_secs(20))
-                    .for_schema_timestamp_assigner(model::index::timestamp, &FIELD_TYPE),
+                    .for_schema_timestamp_assigner(model::index::timestamp),
             )
-            .key_by(key_selector)
+            .key_by(SchemaKeySelector::new(vec![model::index::name]))
             .window(SlidingEventTimeWindows::new(
                 Duration::from_secs(60),
                 Duration::from_secs(20),
                 None,
             ))
-            .reduce(reduce_function, 2)
-            .add_sink(print_sink(output_schema_types.as_slice()));
+            .reduce(
+                SchemaReduceFunction::new(vec![sum_i64(model::index::value)]),
+                2,
+            )
+            .add_sink(print_sink());
     }
 
     fn pre_worker_startup(&self, cluster_descriptor: &ClusterDescriptor) {

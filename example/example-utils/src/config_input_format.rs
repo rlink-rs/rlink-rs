@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use rlink::core;
-use rlink::core::element::Record;
+use rlink::core::element::{Record, Schema};
 use rlink::core::function::{Context, InputFormat, InputSplit, InputSplitSource};
 
 use crate::buffer_gen::config;
@@ -58,6 +58,10 @@ impl InputFormat for ConfigInputFormat {
 
     fn daemon(&self) -> bool {
         true
+    }
+
+    fn schema(&self, _input_schema: Schema) -> Schema {
+        Schema::from(&config::FIELD_TYPE[..])
     }
 }
 

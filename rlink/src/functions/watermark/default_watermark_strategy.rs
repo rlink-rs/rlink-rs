@@ -54,8 +54,8 @@ impl DefaultWatermarkStrategy {
         }
     }
 
-    pub fn for_schema_timestamp_assigner(mut self, column: usize, field_types: &[u8]) -> Self {
-        self.timestamp_assigner = Some(Box::new(SchemaTimestampAssigner::new(column, field_types)));
+    pub fn for_schema_timestamp_assigner(mut self, column: usize) -> Self {
+        self.timestamp_assigner = Some(Box::new(SchemaTimestampAssigner::new(column)));
         self
     }
 

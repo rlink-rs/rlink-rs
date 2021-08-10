@@ -3,14 +3,14 @@ use std::time::Duration;
 use serbuffer::types;
 
 use crate::core::checkpoint::CheckpointFunction;
-use crate::core::element::Record;
+use crate::core::element::{Record, Schema};
 use crate::core::function::{Context, NamedFunction, OutputFormat};
 use crate::core::runtime::TaskId;
 use crate::core::window::TWindow;
 use crate::utils::date_time::fmt_date_time;
 
-pub fn print_sink(field_types: &[u8]) -> PrintOutputFormat {
-    PrintOutputFormat::new(field_types)
+pub fn print_sink() -> PrintOutputFormat {
+    PrintOutputFormat::new()
 }
 
 pub struct PrintOutputFormat {
@@ -19,10 +19,10 @@ pub struct PrintOutputFormat {
 }
 
 impl PrintOutputFormat {
-    pub fn new(field_types: &[u8]) -> Self {
+    pub fn new() -> Self {
         PrintOutputFormat {
             task_id: TaskId::default(),
-            field_types: field_types.to_vec(),
+            field_types: Vec::new(),
         }
     }
 }
@@ -30,6 +30,14 @@ impl PrintOutputFormat {
 impl OutputFormat for PrintOutputFormat {
     fn open(&mut self, context: &Context) -> crate::core::Result<()> {
         self.task_id = context.task_id;
+
+        // let s: Vec<u8> = context.input_schema.clone().into();
+        // if !s.as_slice().eq(self.field_types.as_slice()) {
+        //     println!("{:?}", s,);
+        //     println!("{:?}", self.field_types);
+        //     panic!("00000");
+        // }
+        self.field_types = context.input_schema.clone().into();
 
         Ok(())
     }
@@ -85,6 +93,10 @@ impl OutputFormat for PrintOutputFormat {
 
     fn close(&mut self) -> crate::core::Result<()> {
         Ok(())
+    }
+
+    fn schema(&self, _input_schema: Schema) -> Schema {
+        Schema::Empty
     }
 }
 

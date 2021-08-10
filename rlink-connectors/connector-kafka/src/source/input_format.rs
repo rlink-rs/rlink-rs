@@ -6,7 +6,7 @@ use rdkafka::{ClientConfig, Offset, TopicPartitionList};
 use rlink::channel::utils::handover::Handover;
 use rlink::core;
 use rlink::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
-use rlink::core::element::Record;
+use rlink::core::element::{Record, Schema};
 use rlink::core::function::{Context, InputFormat, InputSplit, InputSplitSource};
 use rlink::core::properties::Properties;
 use rlink::metrics::Tag;
@@ -194,6 +194,11 @@ impl InputFormat for KafkaInputFormat {
 
     fn close(&mut self) -> core::Result<()> {
         Ok(())
+    }
+
+    fn schema(&self, _input_schema: Schema) -> Schema {
+        // todo
+        Schema::Empty
     }
 }
 

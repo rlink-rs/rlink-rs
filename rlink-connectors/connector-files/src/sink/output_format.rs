@@ -1,5 +1,5 @@
 use rlink::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
-use rlink::core::element::Record;
+use rlink::core::element::{Record, Schema};
 use rlink::core::function::{Context, OutputFormat};
 use rlink::core::runtime::TaskId;
 
@@ -36,6 +36,10 @@ impl OutputFormat for HdfsOutputFormat {
     fn close(&mut self) -> rlink::core::Result<()> {
         self.writer_manager.close()?;
         Ok(())
+    }
+
+    fn schema(&self, _input_schema: Schema) -> Schema {
+        Schema::Empty
     }
 }
 

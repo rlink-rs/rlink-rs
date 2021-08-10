@@ -1,5 +1,5 @@
 use rlink::core;
-use rlink::core::element::Record;
+use rlink::core::element::{Record, Schema};
 use rlink::core::function::{Context, FlatMapFunction};
 
 #[derive(Debug, Function)]
@@ -22,5 +22,9 @@ impl FlatMapFunction for MyFlatMapFunction {
 
     fn close(&mut self) -> core::Result<()> {
         Ok(())
+    }
+
+    fn schema(&self, input_schema: Schema) -> Schema {
+        input_schema
     }
 }
