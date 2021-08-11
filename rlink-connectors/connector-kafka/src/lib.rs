@@ -26,10 +26,19 @@ use crate::source::deserializer::{
     KafkaRecordDeserializerBuilder,
 };
 use crate::state::PartitionOffset;
+use rlink::core::properties::Properties;
 
 pub const BOOTSTRAP_SERVERS: &str = "bootstrap.servers";
 pub const TOPICS: &str = "topics";
 pub const GROUP_ID: &str = "group.id";
+pub const BUFFER_SIZE: &str = "buffer.size";
+
+pub const KAFKA: &str = "kafka";
+pub const REPLAY: &str = "replay";
+pub const OFFSET_BEGIN: &str = "offset.begin";
+pub const OFFSET_END: &str = "offset.end";
+
+pub const INPUT_FORMAT_FN_NAME_DEFAULT: &str = "KafkaInputFormat";
 
 pub const SOURCE_CHANNEL_SIZE: usize = 50000;
 pub const SINK_CHANNEL_SIZE: usize = 50000;
@@ -123,6 +132,80 @@ pub fn create_output_format(
         topic,
         buffer_size.unwrap_or(SINK_CHANNEL_SIZE),
     )
+}
+
+pub fn create_input_format(
+    properties: &Properties,
+    fn_name: Option<String>,
+    deserializer_builder: Option<Box<dyn KafkaRecordDeserializerBuilder>>,
+) -> anyhow::Result<KafkaInputFormat> {
+    let fn_name = fn_name.unwrap_or(INPUT_FORMAT_FN_NAME_DEFAULT.to_owned());
+    let source_properties = properties.get_source_properties(fn_name.as_str());
+    let kafka_properties = source_properties.get_sub_properties(KAFKA);
+
+    let mut client_config = ClientConfig::new();
+    let bootstrap_servers = kafka_properties.get_string(BOOTSTRAP_SERVERS)?;
+    let group_id = kafka_properties.get_string(GROUP_ID)?;
+    client_config.set(BOOTSTRAP_SERVERS, bootstrap_servers);
+    client_config.set(GROUP_ID, group_id);
+
+    let topics = kafka_properties.get_string(TOPICS)?;
+    let topics: Vec<String> = serde_json::from_str(topics.as_str())
+        .map_err(|_e| anyhow!("topics '{}' is not array", topics))?;
+
+    let buffer_size = kafka_properties
+        .get_usize(BUFFER_SIZE)
+        .unwrap_or(SOURCE_CHANNEL_SIZE);
+
+    let replay_properties = kafka_properties.get_sub_properties(REPLAY);
+    let offset_range = if replay_properties.as_map().is_empty() {
+        OffsetRange::None
+    } else {
+        let begin_offset = replay_properties.get_string(OFFSET_BEGIN)?;
+        let begin_offset = parse_replay_offset(begin_offset.as_str())?;
+        let mut end_offset = None;
+        if let Ok(end_offset_str) = replay_properties.get_string(OFFSET_END) {
+            let end_offset_map = parse_replay_offset(end_offset_str.as_str())?;
+            end_offset = Some(end_offset_map);
+        }
+        OffsetRange::Direct {
+            begin_offset,
+            end_offset,
+        }
+    };
+
+    let deserializer_builder = deserializer_builder.unwrap_or_else(|| {
+        let deserializer_builder: Box<dyn KafkaRecordDeserializerBuilder> =
+            Box::new(DefaultKafkaRecordDeserializerBuilder::<
+                DefaultKafkaRecordDeserializer,
+            >::new());
+        deserializer_builder
+    });
+
+    let kafka_input_format = KafkaInputFormat::new(
+        client_config,
+        topics,
+        buffer_size,
+        offset_range,
+        deserializer_builder,
+    );
+    Ok(kafka_input_format)
+}
+
+fn parse_replay_offset(
+    offset_config: &str,
+) -> anyhow::Result<HashMap<String, Vec<PartitionOffset>>> {
+    let offset: HashMap<String, Vec<i64>> = serde_json::from_str(offset_config)
+        .map_err(|_e| anyhow!("offset config is illegal: {}", offset_config))?;
+    let mut partition_offset = HashMap::new();
+    for (topic, vec) in offset {
+        let mut offset_vec = Vec::new();
+        for (partition, value) in vec.iter().enumerate() {
+            offset_vec.push(PartitionOffset::new(partition as i32, *value))
+        }
+        partition_offset.insert(topic, offset_vec);
+    }
+    Ok(partition_offset)
 }
 
 pub enum OffsetRange {
