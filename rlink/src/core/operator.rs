@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use crate::core::element::Schema;
+use crate::core::element::FnSchema;
 use crate::core::function::{
     BaseReduceFunction, CoProcessFunction, FilterFunction, FlatMapFunction, InputFormat,
     KeySelectorFunction, NamedFunction, OutputFormat,
@@ -19,7 +19,7 @@ pub enum FunctionCreator {
 pub trait TStreamOperator: Debug {
     fn operator_name(&self) -> &str;
     fn parallelism(&self) -> u16;
-    fn schema(&self, input_schema: Schema) -> Schema;
+    fn schema(&self, input_schema: FnSchema) -> FnSchema;
     fn fn_creator(&self) -> FunctionCreator;
 }
 
@@ -57,7 +57,7 @@ where
         self.parallelism
     }
 
-    fn schema(&self, _input_schema: Schema) -> Schema {
+    fn schema(&self, _input_schema: FnSchema) -> FnSchema {
         unimplemented!()
     }
 
@@ -252,7 +252,7 @@ impl TStreamOperator for StreamOperator {
         }
     }
 
-    fn schema(&self, input_schema: Schema) -> Schema {
+    fn schema(&self, input_schema: FnSchema) -> FnSchema {
         match self {
             StreamOperator::StreamSource(op) => op.operator_fn.schema(input_schema),
             StreamOperator::StreamFlatMap(op) => op.operator_fn.schema(input_schema),
@@ -260,22 +260,22 @@ impl TStreamOperator for StreamOperator {
             StreamOperator::StreamCoProcess(op) => op.operator_fn.schema(input_schema),
             StreamOperator::StreamKeyBy(op) => {
                 let key_schema = op.operator_fn.key_schema(input_schema.clone());
-                Schema::Tuple(input_schema.into(), key_schema.into())
+                FnSchema::Tuple(input_schema.into(), key_schema.into())
             }
             StreamOperator::StreamReduce(op) => {
                 let value_schema = op.operator_fn.value_schema(input_schema.clone());
 
                 let schema: Vec<u8> = match input_schema {
-                    Schema::Single(_record_schema) => value_schema.into(),
-                    Schema::Tuple(_record_schema, mut key_schema) => {
+                    FnSchema::Single(_record_schema) => value_schema.into(),
+                    FnSchema::Tuple(_record_schema, mut key_schema) => {
                         let v: Vec<u8> = value_schema.into();
                         key_schema.extend_from_slice(v.as_slice());
                         key_schema
                     }
-                    Schema::Empty => panic!("unreached!"),
+                    FnSchema::Empty => panic!("unreached!"),
                 };
 
-                Schema::Tuple(vec![], schema)
+                FnSchema::Tuple(vec![], schema)
             }
             StreamOperator::StreamWatermarkAssigner(_op) => input_schema,
             StreamOperator::StreamWindowAssigner(_op) => input_schema,

@@ -6,7 +6,7 @@ use std::time::Duration;
 use clickhouse_rs::{ClientHandle, Options, Pool};
 use rlink::channel::utils::handover::Handover;
 use rlink::core::checkpoint::CheckpointFunction;
-use rlink::core::element::{Record, Schema};
+use rlink::core::element::{FnSchema, Record};
 use rlink::core::function::{Context, NamedFunction, OutputFormat};
 use rlink::utils::thread::{async_runtime, async_sleep, async_spawn};
 use rlink::{core, utils};
@@ -94,8 +94,8 @@ impl OutputFormat for ClickhouseSink {
         Ok(())
     }
 
-    fn schema(&self, _input_schema: Schema) -> Schema {
-        Schema::Empty
+    fn schema(&self, _input_schema: FnSchema) -> FnSchema {
+        FnSchema::Empty
     }
 }
 

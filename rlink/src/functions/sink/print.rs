@@ -3,7 +3,7 @@ use std::time::Duration;
 use serbuffer::types;
 
 use crate::core::checkpoint::CheckpointFunction;
-use crate::core::element::{Record, Schema};
+use crate::core::element::{FnSchema, Record};
 use crate::core::function::{Context, NamedFunction, OutputFormat};
 use crate::core::runtime::TaskId;
 use crate::core::window::TWindow;
@@ -95,8 +95,8 @@ impl OutputFormat for PrintOutputFormat {
         Ok(())
     }
 
-    fn schema(&self, _input_schema: Schema) -> Schema {
-        Schema::Empty
+    fn schema(&self, _input_schema: FnSchema) -> FnSchema {
+        FnSchema::Empty
     }
 }
 

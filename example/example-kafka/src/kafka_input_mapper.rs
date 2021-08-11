@@ -3,7 +3,7 @@ use std::error::Error;
 use std::iter::Iterator;
 
 use rlink::core;
-use rlink::core::element::Schema;
+use rlink::core::element::FnSchema;
 use rlink::core::{
     element::Record,
     function::{Context, FlatMapFunction},
@@ -46,8 +46,8 @@ impl FlatMapFunction for KafkaInputMapperFunction {
         Ok(())
     }
 
-    fn schema(&self, _input_schema: Schema) -> Schema {
-        Schema::from(&checkpoint_data::FIELD_TYPE[..])
+    fn schema(&self, _input_schema: FnSchema) -> FnSchema {
+        FnSchema::from(&checkpoint_data::FIELD_TYPE[..])
     }
 }
 

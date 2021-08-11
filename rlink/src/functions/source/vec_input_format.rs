@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Formatter};
 
 use crate::core::checkpoint::CheckpointFunction;
-use crate::core::element::{Record, Schema};
+use crate::core::element::{FnSchema, Record};
 use crate::core::function::{Context, InputFormat, InputSplit, InputSplitSource, NamedFunction};
 
 pub fn vec_source(
@@ -87,8 +87,8 @@ where
         Ok(())
     }
 
-    fn schema(&self, _input_schema: Schema) -> Schema {
-        Schema::from(self.schema.as_slice())
+    fn schema(&self, _input_schema: FnSchema) -> FnSchema {
+        FnSchema::from(self.schema.as_slice())
     }
 }
 

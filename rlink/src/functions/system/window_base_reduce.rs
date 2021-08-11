@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use crate::core::backend::KeyedStateBackend;
 use crate::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
-use crate::core::element::{Record, Schema};
+use crate::core::element::{FnSchema, Record};
 use crate::core::function::{BaseReduceFunction, Context, NamedFunction, ReduceFunction};
 use crate::core::properties::SystemProperties;
 use crate::core::runtime::CheckpointId;
@@ -144,7 +144,7 @@ impl BaseReduceFunction for WindowBaseReduceFunction {
         Ok(())
     }
 
-    fn value_schema(&self, input_schema: Schema) -> Schema {
+    fn value_schema(&self, input_schema: FnSchema) -> FnSchema {
         self.reduce.schema(input_schema)
         // let value_schema = self.reduce.schema();
         // match input_schema {

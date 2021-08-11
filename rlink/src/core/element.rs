@@ -23,13 +23,13 @@ pub mod types {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum Schema {
+pub enum FnSchema {
     Empty,
     Single(Vec<u8>),
     Tuple(Vec<u8>, Vec<u8>),
 }
 
-impl Schema {
+impl FnSchema {
     pub fn first(&self) -> &[u8] {
         match self {
             Self::Single(v) => v.as_slice(),
@@ -39,25 +39,25 @@ impl Schema {
     }
 }
 
-impl<'a> From<&'a [u8]> for Schema {
+impl<'a> From<&'a [u8]> for FnSchema {
     fn from(schema: &'a [u8]) -> Self {
-        Schema::Single(schema.to_vec())
+        FnSchema::Single(schema.to_vec())
     }
 }
 
-impl Into<Vec<u8>> for Schema {
+impl Into<Vec<u8>> for FnSchema {
     fn into(self) -> Vec<u8> {
         match self {
-            Schema::Single(v) => v,
+            FnSchema::Single(v) => v,
             _ => panic!("..."),
         }
     }
 }
 
-impl Into<(Vec<u8>, Vec<u8>)> for Schema {
+impl Into<(Vec<u8>, Vec<u8>)> for FnSchema {
     fn into(self) -> (Vec<u8>, Vec<u8>) {
         match self {
-            Schema::Tuple(v0, v1) => (v0, v1),
+            FnSchema::Tuple(v0, v1) => (v0, v1),
             _ => panic!("..."),
         }
     }

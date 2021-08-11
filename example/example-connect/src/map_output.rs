@@ -1,5 +1,5 @@
 use rlink::core;
-use rlink::core::element::{Record, Schema};
+use rlink::core::element::{FnSchema, Record};
 use rlink::core::function::{Context, FlatMapFunction};
 use rlink::functions::percentile::PercentileReader;
 use rlink_example_utils::buffer_gen::output;
@@ -50,7 +50,7 @@ impl FlatMapFunction for OutputMapFunction {
         Ok(())
     }
 
-    fn schema(&self, _input_schema: Schema) -> Schema {
-        Schema::from(&output::FIELD_TYPE[..])
+    fn schema(&self, _input_schema: FnSchema) -> FnSchema {
+        FnSchema::from(&output::FIELD_TYPE[..])
     }
 }

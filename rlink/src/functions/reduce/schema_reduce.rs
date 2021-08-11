@@ -2,7 +2,7 @@ use std::borrow::BorrowMut;
 use std::fmt::Debug;
 
 use crate::core::element::{types, BufferMutReader, BufferReader, BufferWriter};
-use crate::core::element::{Record, Schema};
+use crate::core::element::{FnSchema, Record};
 use crate::core::function::{Context, NamedFunction, ReduceFunction};
 use crate::functions::percentile::{get_percentile_capacity, PercentileWriter};
 use crate::functions::FunctionSchema;
@@ -455,7 +455,7 @@ impl ReduceFunction for SchemaReduceFunction {
         Ok(())
     }
 
-    fn schema(&self, input_schema: Schema) -> Schema {
+    fn schema(&self, input_schema: FnSchema) -> FnSchema {
         let field_types = input_schema.first();
         let val_field_types: Vec<u8> = self
             .agg_operators
@@ -470,7 +470,7 @@ impl ReduceFunction for SchemaReduceFunction {
             })
             .collect();
 
-        Schema::Single(val_field_types)
+        FnSchema::Single(val_field_types)
     }
 }
 

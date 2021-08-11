@@ -182,7 +182,7 @@ mod tests {
     use crate::core::data_stream::CoStream;
     use crate::core::data_stream::{TConnectedStreams, TKeyedStream};
     use crate::core::data_stream::{TDataStream, TWindowedStream};
-    use crate::core::element::{types, Record, Schema};
+    use crate::core::element::{types, FnSchema, Record};
     use crate::core::env::StreamExecutionEnvironment;
     use crate::core::function::{
         CoProcessFunction, Context, FlatMapFunction, InputFormat, InputSplit, InputSplitSource,
@@ -346,8 +346,8 @@ mod tests {
             Ok(())
         }
 
-        fn schema(&self, _input_schema: Schema) -> Schema {
-            Schema::Single(vec![types::STRING, types::I64])
+        fn schema(&self, _input_schema: FnSchema) -> FnSchema {
+            FnSchema::Single(vec![types::STRING, types::I64])
         }
     }
 
@@ -373,7 +373,7 @@ mod tests {
             Ok(())
         }
 
-        fn schema(&self, input_schema: Schema) -> Schema {
+        fn schema(&self, input_schema: FnSchema) -> FnSchema {
             input_schema
         }
     }
@@ -440,8 +440,8 @@ mod tests {
             Ok(())
         }
 
-        fn key_schema(&self, _input_schema: Schema) -> Schema {
-            Schema::Single(vec![types::STRING])
+        fn key_schema(&self, _input_schema: FnSchema) -> FnSchema {
+            FnSchema::Single(vec![types::STRING])
         }
     }
 
@@ -475,8 +475,8 @@ mod tests {
             Ok(())
         }
 
-        fn schema(&self, _input_schema: Schema) -> Schema {
-            Schema::Single(vec![types::I64])
+        fn schema(&self, _input_schema: FnSchema) -> FnSchema {
+            FnSchema::Single(vec![types::I64])
         }
     }
 
@@ -510,7 +510,7 @@ mod tests {
             Ok(())
         }
 
-        fn schema(&self, input_schema: Schema) -> Schema {
+        fn schema(&self, input_schema: FnSchema) -> FnSchema {
             input_schema
         }
     }
@@ -546,7 +546,7 @@ mod tests {
             Ok(())
         }
 
-        fn schema(&self, input_schema: Schema) -> Schema {
+        fn schema(&self, input_schema: FnSchema) -> FnSchema {
             input_schema
         }
     }

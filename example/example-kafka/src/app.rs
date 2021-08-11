@@ -190,18 +190,18 @@ fn gen_kafka_offset_range(topic: &str) -> OffsetRange {
     begin_offset.insert(
         topic.to_string(),
         vec![
-            PartitionOffset::new(0, 72),
-            PartitionOffset::new(1, 32),
-            PartitionOffset::new(2, 31),
+            PartitionOffset::new(0, 121),
+            PartitionOffset::new(1, 71),
+            PartitionOffset::new(2, 78),
         ],
     );
     let mut end_offset = HashMap::new();
     end_offset.insert(
         topic.to_string(),
         vec![
-            PartitionOffset::new(0, 87),
-            PartitionOffset::new(1, 48),
-            PartitionOffset::new(2, 45),
+            PartitionOffset::new(0, 137),
+            PartitionOffset::new(1, 84),
+            PartitionOffset::new(2, 94),
         ],
     );
 

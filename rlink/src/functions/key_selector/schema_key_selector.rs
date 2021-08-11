@@ -1,5 +1,5 @@
 use crate::core::checkpoint::CheckpointFunction;
-use crate::core::element::{Record, Schema};
+use crate::core::element::{FnSchema, Record};
 use crate::core::function::{Context, KeySelectorFunction, NamedFunction};
 use crate::functions::FunctionSchema;
 
@@ -30,14 +30,14 @@ impl KeySelectorFunction for SchemaKeySelector {
     fn open(&mut self, context: &Context) -> crate::core::Result<()> {
         // if `KeySelector` opened in `Reduce` operator, the `input_schema` is a Tuple
         let field_types = match &context.input_schema {
-            Schema::Single(field_types) => field_types,
-            Schema::Tuple(field_types, _key_field_types) => field_types,
+            FnSchema::Single(field_types) => field_types,
+            FnSchema::Tuple(field_types, _key_field_types) => field_types,
             _ => panic!("input schema not found in selector operator"),
         };
 
         self.field_types = field_types.to_vec();
         self.key_field_types = self
-            .key_schema(Schema::from(self.field_types.as_slice()))
+            .key_schema(FnSchema::from(self.field_types.as_slice()))
             .into();
 
         Ok(())
@@ -62,7 +62,7 @@ impl KeySelectorFunction for SchemaKeySelector {
         Ok(())
     }
 
-    fn key_schema(&self, input_schema: Schema) -> Schema {
+    fn key_schema(&self, input_schema: FnSchema) -> FnSchema {
         let field_types: Vec<u8> = input_schema.into();
         let key_field_types: Vec<u8> = self
             .columns
@@ -74,7 +74,7 @@ impl KeySelectorFunction for SchemaKeySelector {
             panic!("key not found");
         }
 
-        Schema::Single(key_field_types)
+        FnSchema::Single(key_field_types)
     }
 }
 

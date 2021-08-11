@@ -6,7 +6,7 @@ use rdkafka::{ClientConfig, Offset, TopicPartitionList};
 use rlink::channel::utils::handover::Handover;
 use rlink::core;
 use rlink::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
-use rlink::core::element::{Record, Schema};
+use rlink::core::element::{FnSchema, Record};
 use rlink::core::function::{Context, InputFormat, InputSplit, InputSplitSource};
 use rlink::core::properties::Properties;
 use rlink::metrics::Tag;
@@ -31,6 +31,7 @@ pub struct KafkaInputFormat {
     handover: Option<Handover>,
 
     deserializer_builder: Box<dyn KafkaRecordDeserializerBuilder>,
+    schema: FnSchema,
 
     checkpoint: Option<KafkaCheckpointFunction>,
 }
@@ -43,6 +44,7 @@ impl KafkaInputFormat {
         offset_range: OffsetRange,
         deserializer_builder: Box<dyn KafkaRecordDeserializerBuilder>,
     ) -> Self {
+        let schema = deserializer_builder.schema();
         KafkaInputFormat {
             client_config,
             topics,
@@ -51,6 +53,7 @@ impl KafkaInputFormat {
             handover: None,
             checkpoint: None,
             deserializer_builder,
+            schema,
         }
     }
 
@@ -196,9 +199,8 @@ impl InputFormat for KafkaInputFormat {
         Ok(())
     }
 
-    fn schema(&self, _input_schema: Schema) -> Schema {
-        // todo
-        Schema::Empty
+    fn schema(&self, _input_schema: FnSchema) -> FnSchema {
+        self.schema.clone()
     }
 }
 

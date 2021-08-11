@@ -4,7 +4,7 @@ use std::ops::Index;
 
 use daggy::{Dag, EdgeIndex, NodeIndex};
 
-use crate::core::element::Schema;
+use crate::core::element::FnSchema;
 use crate::core::operator::{
     DefaultStreamOperator, FunctionCreator, StreamOperator, TStreamOperator, DEFAULT_PARALLELISM,
 };
@@ -19,8 +19,8 @@ pub struct StreamNode {
     pub(crate) id: OperatorId,
     pub(crate) parent_ids: Vec<OperatorId>,
     pub(crate) parallelism: u16,
-    pub(crate) input_schema: Schema,
-    pub(crate) output_schema: Schema,
+    pub(crate) input_schema: FnSchema,
+    pub(crate) output_schema: FnSchema,
     pub(crate) daemon: bool,
 
     pub(crate) operator_name: String,
@@ -143,7 +143,7 @@ impl RawStreamGraph {
         self.id_gen.0 = self.id_gen.0 + 1;
 
         let input_schema = match parent_operator_ids.len() {
-            0 => Schema::Empty,
+            0 => FnSchema::Empty,
             1 => {
                 let (p_node_index, _p_operator) =
                     self.operators.get(&parent_operator_ids[0]).unwrap();

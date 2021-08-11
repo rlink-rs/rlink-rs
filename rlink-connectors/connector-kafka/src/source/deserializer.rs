@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use rlink::core::element::Record;
+use rlink::core::element::{FnSchema, Record};
 
 use crate::build_kafka_record;
 
@@ -18,6 +18,7 @@ pub trait KafkaRecordDeserializer: Sync + Send {
 
 pub trait KafkaRecordDeserializerBuilder {
     fn build(&self) -> Box<dyn KafkaRecordDeserializer>;
+    fn schema(&self) -> FnSchema;
 }
 
 #[derive(Default)]
@@ -44,14 +45,18 @@ where
     T: Default + KafkaRecordDeserializer + 'static,
 {
     a: PhantomData<T>,
+    schema: FnSchema,
 }
 
 impl<T> DefaultKafkaRecordDeserializerBuilder<T>
 where
     T: Default + KafkaRecordDeserializer + 'static,
 {
-    pub fn new() -> Self {
-        DefaultKafkaRecordDeserializerBuilder { a: PhantomData }
+    pub fn new(schema: FnSchema) -> Self {
+        DefaultKafkaRecordDeserializerBuilder {
+            a: PhantomData,
+            schema,
+        }
     }
 }
 
@@ -62,5 +67,9 @@ where
     fn build(&self) -> Box<dyn KafkaRecordDeserializer> {
         let t: Box<dyn KafkaRecordDeserializer> = Box::new(T::default());
         t
+    }
+
+    fn schema(&self) -> FnSchema {
+        self.schema.clone()
     }
 }

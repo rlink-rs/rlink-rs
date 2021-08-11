@@ -1,5 +1,5 @@
 use rlink::core;
-use rlink::core::element::{Record, Schema};
+use rlink::core::element::{FnSchema, Record};
 use rlink::core::function::{CoProcessFunction, Context};
 use rlink_example_utils::buffer_gen::config;
 
@@ -35,7 +35,7 @@ impl CoProcessFunction for MyCoProcessFunction {
         Ok(())
     }
 
-    fn schema(&self, input_schema: Schema) -> Schema {
+    fn schema(&self, input_schema: FnSchema) -> FnSchema {
         input_schema
     }
 }

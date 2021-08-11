@@ -19,6 +19,7 @@ use std::collections::HashMap;
 
 use rdkafka::ClientConfig;
 use rlink::core::element::BufferReader;
+use rlink::core::element::FnSchema;
 use rlink::core::element::Record;
 
 use crate::source::deserializer::{
@@ -182,7 +183,9 @@ impl InputFormatBuilder {
             let deserializer_builder: Box<dyn KafkaRecordDeserializerBuilder> =
                 Box::new(DefaultKafkaRecordDeserializerBuilder::<
                     DefaultKafkaRecordDeserializer,
-                >::new());
+                >::new(FnSchema::from(
+                    &KAFKA_DATA_TYPES[..],
+                )));
 
             deserializer_builder
         });

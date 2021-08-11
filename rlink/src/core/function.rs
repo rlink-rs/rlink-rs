@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use crate::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
-use crate::core::element::{Element, Record, Schema};
+use crate::core::element::{Element, FnSchema, Record};
 use crate::core::properties::Properties;
 use crate::core::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::dag::execution_graph::{ExecutionEdge, ExecutionNode};
@@ -22,8 +22,8 @@ pub struct Context {
     pub completed_checkpoint_id: Option<CheckpointId>,
     pub checkpoint_handle: Option<CheckpointHandle>,
 
-    pub input_schema: Schema,
-    pub output_schema: Schema,
+    pub input_schema: FnSchema,
+    pub output_schema: FnSchema,
 
     pub(crate) children: Vec<(ExecutionNode, ExecutionEdge)>,
     pub(crate) parents: Vec<(ExecutionNode, ExecutionEdge)>,
@@ -131,7 +131,7 @@ where
         false
     }
 
-    fn schema(&self, input_schema: Schema) -> Schema;
+    fn schema(&self, input_schema: FnSchema) -> FnSchema;
 }
 
 pub trait OutputFormat
@@ -160,7 +160,9 @@ where
     // fn commit(&mut self) {}
     // fn abort(&mut self) {}
 
-    fn schema(&self, input_schema: Schema) -> Schema;
+    fn schema(&self, _input_schema: FnSchema) -> FnSchema {
+        FnSchema::Empty
+    }
 }
 
 pub trait FlatMapFunction
@@ -175,7 +177,7 @@ where
     }
     fn close(&mut self) -> crate::core::Result<()>;
 
-    fn schema(&self, input_schema: Schema) -> Schema;
+    fn schema(&self, input_schema: FnSchema) -> FnSchema;
 }
 
 pub trait FilterFunction
@@ -195,7 +197,7 @@ where
     fn get_key(&self, record: &mut Record) -> Record;
     fn close(&mut self) -> crate::core::Result<()>;
 
-    fn key_schema(&self, input_schema: Schema) -> Schema;
+    fn key_schema(&self, input_schema: FnSchema) -> FnSchema;
 }
 
 pub trait ReduceFunction
@@ -207,7 +209,7 @@ where
     fn reduce(&self, value: Option<&mut Record>, record: &mut Record) -> Record;
     fn close(&mut self) -> crate::core::Result<()>;
 
-    fn schema(&self, input_schema: Schema) -> Schema;
+    fn schema(&self, input_schema: FnSchema) -> FnSchema;
 }
 
 pub(crate) trait BaseReduceFunction
@@ -219,7 +221,7 @@ where
     fn drop_state(&mut self, watermark_timestamp: u64) -> Vec<Record>;
     fn close(&mut self) -> crate::core::Result<()>;
 
-    fn value_schema(&self, key_schema: Schema) -> Schema;
+    fn value_schema(&self, key_schema: FnSchema) -> FnSchema;
 }
 
 pub trait CoProcessFunction
@@ -238,7 +240,7 @@ where
     ) -> Box<dyn Iterator<Item = Record>>;
     fn close(&mut self) -> crate::core::Result<()>;
 
-    fn schema(&self, input_schema: Schema) -> Schema;
+    fn schema(&self, input_schema: FnSchema) -> FnSchema;
 }
 
 pub(crate) struct ElementIterator<T>

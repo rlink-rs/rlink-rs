@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::channel::ElementSender;
 use crate::core::checkpoint::CheckpointFunction;
-use crate::core::element::{Element, Partition, Record, Schema, StreamStatus};
+use crate::core::element::{Element, FnSchema, Partition, Record, StreamStatus};
 use crate::core::function::{Context, NamedFunction, OutputFormat};
 use crate::core::properties::{ChannelBaseOn, SystemProperties};
 use crate::core::runtime::{ChannelKey, JobId, TaskId};
@@ -202,7 +202,7 @@ impl OutputFormat for SystemOutputFormat {
         Ok(())
     }
 
-    fn schema(&self, input_schema: Schema) -> Schema {
+    fn schema(&self, input_schema: FnSchema) -> FnSchema {
         input_schema
     }
 }

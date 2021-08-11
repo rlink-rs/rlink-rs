@@ -1,5 +1,5 @@
 use crate::core::checkpoint::CheckpointFunction;
-use crate::core::element::{Record, Schema};
+use crate::core::element::{FnSchema, Record};
 use crate::core::function::{Context, FlatMapFunction, NamedFunction};
 
 pub struct RoundRobinFlagMapFunction {
@@ -37,7 +37,7 @@ impl FlatMapFunction for RoundRobinFlagMapFunction {
         Ok(())
     }
 
-    fn schema(&self, input_schema: Schema) -> Schema {
+    fn schema(&self, input_schema: FnSchema) -> FnSchema {
         input_schema
     }
 }

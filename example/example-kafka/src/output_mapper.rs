@@ -1,4 +1,4 @@
-use rlink::core::element::{Record, Schema};
+use rlink::core::element::{FnSchema, Record};
 use rlink::core::function::{Context, FlatMapFunction};
 use rlink::utils::date_time::current_timestamp_millis;
 use rlink_connector_kafka::{build_kafka_record, KAFKA_DATA_TYPES};
@@ -48,7 +48,7 @@ impl FlatMapFunction for OutputMapperFunction {
         Ok(())
     }
 
-    fn schema(&self, _input_schema: Schema) -> Schema {
-        Schema::from(&KAFKA_DATA_TYPES[..])
+    fn schema(&self, _input_schema: FnSchema) -> FnSchema {
+        FnSchema::from(&KAFKA_DATA_TYPES[..])
     }
 }
