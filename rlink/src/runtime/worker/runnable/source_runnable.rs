@@ -485,10 +485,19 @@ impl WatermarkManager {
             None => panic!("unreached! the JobId of `Watermark` is not in the parent jobs list, or the job key has removed"),
         }
 
-        // find the min watermark
+        self.min_watermark()
+    }
+
+    /// find the min watermark
+    pub fn min_watermark(&self) -> Option<Watermark> {
         let mut min_watermark: Option<&Watermark> = None;
         for (_job_id, watermarks) in &self.reached_watermarks {
             for p_watermark in watermarks {
+                // skip placeholder `Watermark`
+                if !p_watermark.is_dependency {
+                    continue;
+                }
+
                 match &p_watermark.latest_watermark {
                     Some(watermark) => {
                         if let Some(w) = min_watermark {

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::ops::Index;
 use std::str::FromStr;
 use std::time::Duration;
 
@@ -144,13 +145,55 @@ impl Properties {
         }
     }
 
-    fn set_duration(&mut self, key: &str, interval: Duration) {
+    pub fn set_duration(&mut self, key: &str, interval: Duration) {
         self.set_u64(key, interval.as_millis() as u64);
     }
 
-    fn get_duration(&self, key: &str) -> anyhow::Result<Duration> {
+    pub fn get_duration(&self, key: &str) -> anyhow::Result<Duration> {
         let value = self.get_u64(key)?;
         Ok(Duration::from_millis(value))
+    }
+
+    pub fn get_sub_properties(&self, pre_key: &str) -> Properties {
+        let pre_key = format!("{}.", pre_key);
+        let mut properties = Properties::new();
+        for (key, value) in self.as_map() {
+            if key.starts_with(pre_key.as_str()) {
+                let key = key.index(pre_key.len()..);
+                properties.set_string(key.to_owned(), value.to_owned());
+            }
+        }
+        properties
+    }
+
+    pub fn get_source_properties(&self, fn_name: &str) -> Properties {
+        let pre_key = format!("source.{fn_name}", fn_name = fn_name);
+        self.get_sub_properties(pre_key.as_str())
+    }
+
+    pub fn get_window_properties(&self, fn_name: &str) -> Properties {
+        let pre_key = format!("window.{fn_name}", fn_name = fn_name);
+        self.get_sub_properties(pre_key.as_str())
+    }
+
+    pub fn get_reduce_properties(&self, fn_name: &str) -> Properties {
+        let pre_key = format!("reduce.{fn_name}", fn_name = fn_name);
+        self.get_sub_properties(pre_key.as_str())
+    }
+
+    pub fn get_filter_properties(&self, fn_name: &str) -> Properties {
+        let pre_key = format!("filter.{fn_name}", fn_name = fn_name);
+        self.get_sub_properties(pre_key.as_str())
+    }
+
+    pub fn get_sink_properties(&self, fn_name: &str) -> Properties {
+        let pre_key = format!("source.{fn_name}", fn_name = fn_name);
+        self.get_sub_properties(pre_key.as_str())
+    }
+
+    pub fn get_custom_properties(&self, fn_name: &str) -> Properties {
+        let pre_key = format!("custom.{fn_name}", fn_name = fn_name);
+        self.get_sub_properties(pre_key.as_str())
     }
 }
 
@@ -296,5 +339,16 @@ mod tests {
         println!("{:?}", properties.get_u32("u32"));
         println!("{:?}", properties.get_i64("i64"));
         println!("{:?}", properties.get_u64("u64"));
+    }
+
+    #[test]
+    pub fn test_sub_properties() {
+        let mut properties = Properties::new();
+        properties.set_str("a.b", "v");
+        properties.set_str("a.b.c", "v");
+        properties.set_str("a.b.c.d", "v");
+        let sub_properties = properties.get_sub_properties("a.b");
+        println!("{:?}", properties);
+        println!("{:?}", sub_properties);
     }
 }
