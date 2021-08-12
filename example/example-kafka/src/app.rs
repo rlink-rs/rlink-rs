@@ -22,6 +22,7 @@ use rlink_example_utils::gen_record::gen_records;
 
 use crate::input_mapper::InputMapperFunction;
 use crate::output_mapper::OutputMapperFunction;
+use rlink::core::data_types::Schema;
 
 #[derive(Clone, Debug)]
 pub struct KafkaGenAppStream {}
@@ -58,9 +59,12 @@ impl StreamApp for KafkaGenAppStream {
 
         let sink = create_output_format(conf_map, Some(kafka_topic_sink.clone()), None);
 
-        env.register_source(vec_source(gen_records(), &model::FIELD_TYPE), 3)
-            .flat_map(OutputMapperFunction::new(kafka_topic_sink))
-            .add_sink(sink);
+        env.register_source(
+            vec_source(gen_records(), Schema::from(&model::FIELD_METADATA)),
+            3,
+        )
+        .flat_map(OutputMapperFunction::new(kafka_topic_sink))
+        .add_sink(sink);
     }
 }
 

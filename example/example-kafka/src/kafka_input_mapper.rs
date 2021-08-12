@@ -1,4 +1,3 @@
-use std::borrow::BorrowMut;
 use std::error::Error;
 use std::iter::Iterator;
 
@@ -8,10 +7,10 @@ use rlink::core::{
     element::Record,
     function::{Context, FlatMapFunction},
 };
-use rlink_connector_kafka::KafkaRecord;
 use serde_json::Value;
 
 use crate::buffer_gen::checkpoint_data;
+use rlink_connector_kafka::buffer_gen::kafka_message;
 
 #[derive(Debug, Default, Function)]
 pub struct KafkaInputMapperFunction {
@@ -35,8 +34,9 @@ impl FlatMapFunction for KafkaInputMapperFunction {
     }
 
     fn flat_map(&mut self, mut record: Record) -> Box<dyn Iterator<Item = Record>> {
-        let kafka_record = KafkaRecord::new(record.borrow_mut());
-        let payload = kafka_record.get_kafka_payload().unwrap();
+        let kafka_message::Entity { payload, .. } =
+            kafka_message::Entity::parse(record.as_buffer()).unwrap();
+
         let line = String::from_utf8(payload.to_vec()).unwrap();
         let record_new = parse_data(line.as_str()).unwrap();
 
@@ -47,7 +47,7 @@ impl FlatMapFunction for KafkaInputMapperFunction {
     }
 
     fn schema(&self, _input_schema: FnSchema) -> FnSchema {
-        FnSchema::from(&checkpoint_data::FIELD_TYPE[..])
+        FnSchema::from(&checkpoint_data::FIELD_METADATA)
     }
 }
 

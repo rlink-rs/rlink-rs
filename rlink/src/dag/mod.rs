@@ -182,7 +182,8 @@ mod tests {
     use crate::core::data_stream::CoStream;
     use crate::core::data_stream::{TConnectedStreams, TKeyedStream};
     use crate::core::data_stream::{TDataStream, TWindowedStream};
-    use crate::core::element::{types, FnSchema, Record};
+    use crate::core::data_types::{DataType, Field, Schema};
+    use crate::core::element::{FnSchema, Record};
     use crate::core::env::StreamExecutionEnvironment;
     use crate::core::function::{
         CoProcessFunction, Context, FlatMapFunction, InputFormat, InputSplit, InputSplitSource,
@@ -347,7 +348,10 @@ mod tests {
         }
 
         fn schema(&self, _input_schema: FnSchema) -> FnSchema {
-            FnSchema::Single(vec![types::STRING, types::I64])
+            FnSchema::Single(Schema::new(vec![
+                Field::new("a", DataType::Binary),
+                Field::new("b", DataType::Int64),
+            ]))
         }
     }
 
@@ -441,7 +445,7 @@ mod tests {
         }
 
         fn key_schema(&self, _input_schema: FnSchema) -> FnSchema {
-            FnSchema::Single(vec![types::STRING])
+            FnSchema::Single(Schema::new(vec![Field::new("a", DataType::Binary)]))
         }
     }
 
@@ -476,7 +480,7 @@ mod tests {
         }
 
         fn schema(&self, _input_schema: FnSchema) -> FnSchema {
-            FnSchema::Single(vec![types::I64])
+            FnSchema::Single(Schema::new(vec![Field::new("b", DataType::Int64)]))
         }
     }
 

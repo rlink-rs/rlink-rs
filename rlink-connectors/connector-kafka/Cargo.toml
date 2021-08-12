@@ -20,6 +20,8 @@ version = "0.3"
 path = "../../rlink-derive"
 
 [dependencies]
+serbuffer = "1.2"
+
 log = "0.4"
 anyhow = "1.0"
 dashmap = "4.0"
@@ -36,3 +38,6 @@ rdkafka = { version = "0.25", features = ["cmake-build"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["time", "rt-multi-thread"] }
+
+[build-dependencies]
+serbuffer-gen = "1.2"
