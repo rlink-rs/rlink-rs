@@ -55,6 +55,7 @@ impl RunnableContext {
             .into_iter()
             .map(|(node, edge)| (node.clone(), edge.clone()))
             .collect();
+        let stream_node = self.dag_metadata.stream_node(operator_id).unwrap();
 
         let operator = self
             .task_descriptor
@@ -72,8 +73,8 @@ impl RunnableContext {
             completed_checkpoint_id: operator.completed_checkpoint_id,
             checkpoint_handle: operator.checkpoint_handle.clone(),
 
-            input_schema: operator.input_schema.clone(),
-            output_schema: operator.output_schema.clone(),
+            input_schema: stream_node.input_schema.clone(),
+            output_schema: stream_node.output_schema.clone(),
 
             parents,
             children,
