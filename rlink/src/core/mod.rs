@@ -2,6 +2,7 @@ pub mod backend;
 pub mod checkpoint;
 pub mod cluster;
 pub mod data_stream;
+pub mod data_types;
 pub mod element;
 pub mod env;
 pub mod error;

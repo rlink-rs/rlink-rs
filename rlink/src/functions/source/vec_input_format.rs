@@ -1,12 +1,13 @@
 use std::fmt::{Debug, Formatter};
 
 use crate::core::checkpoint::CheckpointFunction;
+use crate::core::data_types::Schema;
 use crate::core::element::{FnSchema, Record};
 use crate::core::function::{Context, InputFormat, InputSplit, InputSplitSource, NamedFunction};
 
 pub fn vec_source(
     data: Vec<Record>,
-    schema: &[u8],
+    schema: Schema,
 ) -> IteratorInputFormat<impl FnOnce(InputSplit, Context) -> Box<dyn Iterator<Item = Record> + Send>>
 {
     let n = IteratorInputFormat::new(
@@ -39,7 +40,7 @@ where
     T: FnOnce(InputSplit, Context) -> Box<dyn Iterator<Item = Record> + Send>,
 {
     vec_builder: Option<T>,
-    schema: Vec<u8>,
+    schema: Schema,
 
     input_split: Option<InputSplit>,
     context: Option<Context>,
@@ -49,10 +50,10 @@ impl<T> IteratorInputFormat<T>
 where
     T: FnOnce(InputSplit, Context) -> Box<dyn Iterator<Item = Record> + Send>,
 {
-    pub fn new(vec_builder: T, schema: &[u8]) -> Self {
+    pub fn new(vec_builder: T, schema: Schema) -> Self {
         IteratorInputFormat {
             vec_builder: Some(vec_builder),
-            schema: schema.to_vec(),
+            schema,
             input_split: None,
             context: None,
         }
@@ -88,7 +89,7 @@ where
     }
 
     fn schema(&self, _input_schema: FnSchema) -> FnSchema {
-        FnSchema::from(self.schema.as_slice())
+        FnSchema::from(&self.schema)
     }
 }
 

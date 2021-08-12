@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 
+use crate::core::data_types::Schema;
 use crate::core::element::FnSchema;
 use crate::core::function::{
     BaseReduceFunction, CoProcessFunction, FilterFunction, FlatMapFunction, InputFormat,
@@ -265,17 +266,17 @@ impl TStreamOperator for StreamOperator {
             StreamOperator::StreamReduce(op) => {
                 let value_schema = op.operator_fn.value_schema(input_schema.clone());
 
-                let schema: Vec<u8> = match input_schema {
+                let schema: Schema = match input_schema {
                     FnSchema::Single(_record_schema) => value_schema.into(),
                     FnSchema::Tuple(_record_schema, mut key_schema) => {
-                        let v: Vec<u8> = value_schema.into();
-                        key_schema.extend_from_slice(v.as_slice());
+                        let v: Schema = value_schema.into();
+                        key_schema.merge(&v); //.unwrap();
                         key_schema
                     }
                     FnSchema::Empty => panic!("unreached!"),
                 };
 
-                FnSchema::Tuple(vec![], schema)
+                FnSchema::Tuple(Schema::empty(), schema)
             }
             StreamOperator::StreamWatermarkAssigner(_op) => input_schema,
             StreamOperator::StreamWindowAssigner(_op) => input_schema,

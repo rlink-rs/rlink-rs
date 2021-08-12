@@ -1,11 +1,12 @@
 use std::borrow::BorrowMut;
 use std::fmt::Debug;
 
+use crate::core::data_types::{DataType, Field, Schema};
 use crate::core::element::{types, BufferMutReader, BufferReader, BufferWriter};
 use crate::core::element::{FnSchema, Record};
 use crate::core::function::{Context, NamedFunction, ReduceFunction};
 use crate::functions::percentile::{get_percentile_capacity, PercentileWriter};
-use crate::functions::FunctionSchema;
+use std::convert::TryFrom;
 
 pub fn sum_i64(column_index: usize) -> Box<dyn Aggregation> {
     let agg = SumI64 {
@@ -379,8 +380,8 @@ impl Aggregation for PctU64 {
 
 #[derive(Debug)]
 pub struct SchemaReduceFunction {
-    field_types: Vec<u8>,
-    val_field_types: Vec<u8>,
+    schema: Schema,
+    val_schema: Schema,
 
     val_len: usize,
 
@@ -391,28 +392,22 @@ impl SchemaReduceFunction {
     pub fn new(agg_operators: Vec<Box<dyn Aggregation>>) -> Self {
         // let val_len = val_data_types.len() * 8;
         SchemaReduceFunction {
-            field_types: vec![],
-            val_field_types: vec![],
+            schema: Schema::empty(),
+            val_schema: Schema::empty(),
             val_len: 0,
             agg_operators,
         }
     }
 }
 
-impl FunctionSchema for SchemaReduceFunction {
-    fn schema_types(&self) -> Vec<u8> {
-        self.val_field_types.clone()
-    }
-}
-
 impl ReduceFunction for SchemaReduceFunction {
     fn open(&mut self, context: &Context) -> crate::core::Result<()> {
-        let field_types = context.input_schema.first();
-        let val_field_types: Vec<u8> = self.schema(context.input_schema.clone()).into();
+        let schema = context.input_schema.first();
+        let val_schema: Schema = self.schema(context.input_schema.clone()).into();
         let val_len: usize = self.agg_operators.iter().map(|x| x.len()).sum();
 
-        self.field_types = field_types.to_vec();
-        self.val_field_types = val_field_types;
+        self.schema = schema.clone();
+        self.val_schema = val_schema;
         self.val_len = val_len;
 
         Ok(())
@@ -420,13 +415,13 @@ impl ReduceFunction for SchemaReduceFunction {
 
     fn reduce(&self, value: Option<&mut Record>, record: &mut Record) -> Record {
         let mut record_rt = Record::with_capacity(self.val_len);
-        let mut writer = record_rt.as_writer(self.val_field_types.as_slice());
+        let mut writer = record_rt.as_writer(self.val_schema.as_type_ids());
 
-        let mut record_reader = record.as_reader(self.field_types.as_slice());
+        let mut record_reader = record.as_reader(self.schema.as_type_ids());
 
         match value {
             Some(state_value) => {
-                let mut stat_reader = state_value.as_reader_mut(self.val_field_types.as_slice());
+                let mut stat_reader = state_value.as_reader_mut(self.val_schema.as_type_ids());
 
                 for index in 0..self.agg_operators.len() {
                     self.agg_operators[index].reduce(
@@ -456,21 +451,21 @@ impl ReduceFunction for SchemaReduceFunction {
     }
 
     fn schema(&self, input_schema: FnSchema) -> FnSchema {
-        let field_types = input_schema.first();
-        let val_field_types: Vec<u8> = self
+        let schema = input_schema.first();
+        let val_fields: Vec<Field> = self
             .agg_operators
             .iter()
             .map(|agg| {
-                if agg.agg_type() != types::BYTES
-                    && field_types[agg.record_index()] != agg.agg_type()
-                {
+                let field = schema.field(agg.record_index());
+                let type_id = agg.agg_type();
+                if type_id != types::BYTES && field.data_type_id() != type_id {
                     panic!("column type check failure at {}", agg.record_index());
                 }
-                agg.agg_type()
+                Field::new("agg", DataType::try_from(type_id).unwrap())
             })
             .collect();
 
-        FnSchema::Single(val_field_types)
+        FnSchema::Single(Schema::new(val_fields))
     }
 }
 

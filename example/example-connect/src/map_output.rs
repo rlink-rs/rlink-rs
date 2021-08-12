@@ -1,4 +1,5 @@
 use rlink::core;
+use rlink::core::data_types::Schema;
 use rlink::core::element::{FnSchema, Record};
 use rlink::core::function::{Context, FlatMapFunction};
 use rlink::functions::percentile::PercentileReader;
@@ -6,14 +7,14 @@ use rlink_example_utils::buffer_gen::output;
 
 #[derive(Debug, Function)]
 pub struct OutputMapFunction {
-    data_type: Vec<u8>,
+    data_type: Schema,
     scala: &'static [f64],
 }
 
 impl OutputMapFunction {
     pub fn new(scala: &'static [f64]) -> Self {
         OutputMapFunction {
-            data_type: vec![],
+            data_type: Schema::empty(),
             scala,
         }
     }
@@ -21,12 +22,12 @@ impl OutputMapFunction {
 
 impl FlatMapFunction for OutputMapFunction {
     fn open(&mut self, context: &Context) -> core::Result<()> {
-        self.data_type = context.input_schema.first().to_vec();
+        self.data_type = context.input_schema.first().clone();
         Ok(())
     }
 
     fn flat_map(&mut self, mut record: Record) -> Box<dyn Iterator<Item = Record>> {
-        let reader = record.as_reader(self.data_type.as_slice());
+        let reader = record.as_reader(self.data_type.as_type_ids());
 
         let percentile_buffer = reader.get_bytes(2).unwrap();
         let percentile = PercentileReader::new(self.scala, percentile_buffer);
@@ -51,6 +52,6 @@ impl FlatMapFunction for OutputMapFunction {
     }
 
     fn schema(&self, _input_schema: FnSchema) -> FnSchema {
-        FnSchema::from(&output::FIELD_TYPE[..])
+        FnSchema::from(&output::FIELD_METADATA)
     }
 }

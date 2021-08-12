@@ -5,7 +5,9 @@ use std::cmp::Ordering;
 use std::fmt::Debug;
 
 use bytes::{Buf, BufMut, BytesMut};
+use serbuffer::FieldMetadata;
 
+use crate::core::data_types::Schema;
 use crate::core::runtime::{ChannelKey, CheckpointId};
 use crate::core::watermark::{MAX_WATERMARK, MIN_WATERMARK};
 use crate::core::window::Window;
@@ -25,40 +27,46 @@ pub mod types {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum FnSchema {
     Empty,
-    Single(Vec<u8>),
-    Tuple(Vec<u8>, Vec<u8>),
+    Single(Schema),
+    Tuple(Schema, Schema),
 }
 
 impl FnSchema {
-    pub fn first(&self) -> &[u8] {
+    pub fn first(&self) -> &Schema {
         match self {
-            Self::Single(v) => v.as_slice(),
-            Self::Tuple(v, _v1) => v.as_slice(),
+            Self::Single(v) => v,
+            Self::Tuple(v, _v1) => v,
             _ => panic!("no schema"),
         }
     }
 }
 
-impl<'a> From<&'a [u8]> for FnSchema {
-    fn from(schema: &'a [u8]) -> Self {
-        FnSchema::Single(schema.to_vec())
+impl<'a> From<&'a Schema> for FnSchema {
+    fn from(schema: &'a Schema) -> Self {
+        FnSchema::Single(schema.clone())
     }
 }
 
-impl Into<Vec<u8>> for FnSchema {
-    fn into(self) -> Vec<u8> {
+impl<'a, const N: usize> From<&'a FieldMetadata<N>> for FnSchema {
+    fn from(metadata: &'a FieldMetadata<N>) -> Self {
+        FnSchema::Single(Schema::from(metadata))
+    }
+}
+
+impl Into<Schema> for FnSchema {
+    fn into(self) -> Schema {
         match self {
             FnSchema::Single(v) => v,
-            _ => panic!("..."),
+            _ => panic!("only support `Single`"),
         }
     }
 }
 
-impl Into<(Vec<u8>, Vec<u8>)> for FnSchema {
-    fn into(self) -> (Vec<u8>, Vec<u8>) {
+impl Into<(Schema, Schema)> for FnSchema {
+    fn into(self) -> (Schema, Schema) {
         match self {
             FnSchema::Tuple(v0, v1) => (v0, v1),
-            _ => panic!("..."),
+            _ => panic!("only support `Tuple`"),
         }
     }
 }

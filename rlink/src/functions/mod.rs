@@ -8,7 +8,3 @@ pub mod source;
 pub mod system;
 pub mod watermark;
 pub mod window;
-
-pub trait FunctionSchema {
-    fn schema_types(&self) -> Vec<u8>;
-}

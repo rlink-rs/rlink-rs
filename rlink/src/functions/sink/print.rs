@@ -3,6 +3,7 @@ use std::time::Duration;
 use serbuffer::types;
 
 use crate::core::checkpoint::CheckpointFunction;
+use crate::core::data_types::Schema;
 use crate::core::element::{FnSchema, Record};
 use crate::core::function::{Context, NamedFunction, OutputFormat};
 use crate::core::runtime::TaskId;
@@ -15,14 +16,14 @@ pub fn print_sink() -> PrintOutputFormat {
 
 pub struct PrintOutputFormat {
     task_id: TaskId,
-    field_types: Vec<u8>,
+    schema: Schema,
 }
 
 impl PrintOutputFormat {
     pub fn new() -> Self {
         PrintOutputFormat {
             task_id: TaskId::default(),
-            field_types: Vec::new(),
+            schema: Schema::empty(),
         }
     }
 }
@@ -37,17 +38,17 @@ impl OutputFormat for PrintOutputFormat {
         //     println!("{:?}", self.field_types);
         //     panic!("00000");
         // }
-        self.field_types = context.input_schema.clone().into();
+        self.schema = context.input_schema.clone().into();
 
         Ok(())
     }
 
     fn write_record(&mut self, mut record: Record) {
-        let mut reader = record.as_buffer().as_reader(self.field_types.as_slice());
+        let mut reader = record.as_buffer().as_reader(self.schema.as_type_ids());
         let mut field_str_vec = Vec::new();
-        for i in 0..self.field_types.len() {
-            let field_type = self.field_types[i];
-            let field_str = match field_type {
+        for i in 0..self.schema.fields().len() {
+            let field = self.schema.field(i);
+            let field_str = match field.data_type_id() {
                 types::BOOL => reader.get_bool(i).unwrap().to_string(),
                 types::I8 => reader.get_i8(i).unwrap().to_string(),
                 types::U8 => reader.get_u8(i).unwrap().to_string(),

@@ -27,6 +27,7 @@ use crate::source::deserializer::{
     KafkaRecordDeserializerBuilder,
 };
 use crate::state::PartitionOffset;
+use rlink::core::data_types::Schema;
 
 pub const BOOTSTRAP_SERVERS: &str = "bootstrap.servers";
 pub const TOPICS: &str = "topics";

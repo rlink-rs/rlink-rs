@@ -33,7 +33,7 @@ impl InputFormat for RandInputFormat {
     }
 
     fn schema(&self, _input_schema: FnSchema) -> FnSchema {
-        FnSchema::from(&model::FIELD_TYPE[..])
+        FnSchema::from(&model::FIELD_METADATA)
     }
 }
 
