@@ -44,7 +44,7 @@ impl OutputFormat for PrintOutputFormat {
     }
 
     fn write_record(&mut self, mut record: Record) {
-        let mut reader = record.as_buffer().as_reader(self.schema.as_type_ids());
+        let reader = record.as_buffer().as_reader(self.schema.as_type_ids());
         let mut field_str_vec = Vec::new();
         for i in 0..self.schema.fields().len() {
             let field = self.schema.field(i);
@@ -60,11 +60,11 @@ impl OutputFormat for PrintOutputFormat {
                 types::U64 => reader.get_u64(i).unwrap().to_string(),
                 types::F32 => reader.get_f32(i).unwrap().to_string(),
                 types::F64 => reader.get_f64(i).unwrap().to_string(),
-                types::BYTES => match reader.get_str(i) {
+                types::BINARY => match reader.get_str(i) {
                     Ok(s) => s.to_owned(),
-                    Err(_e) => format!("{:?}", reader.get_bytes(i).unwrap()),
+                    Err(_e) => format!("{:?}", reader.get_binary(i).unwrap()),
                 },
-                // types::STRING => reader.get_bool(i).unwrap().to_string(),
+                types::STRING => reader.get_str(i).unwrap().to_string(),
                 _ => panic!("unknown type"),
             };
 

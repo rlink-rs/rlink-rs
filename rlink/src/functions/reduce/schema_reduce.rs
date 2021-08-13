@@ -1,4 +1,5 @@
 use std::borrow::BorrowMut;
+use std::convert::TryFrom;
 use std::fmt::Debug;
 
 use crate::core::data_types::{DataType, Field, Schema};
@@ -6,7 +7,6 @@ use crate::core::element::{types, BufferMutReader, BufferReader, BufferWriter};
 use crate::core::element::{FnSchema, Record};
 use crate::core::function::{Context, NamedFunction, ReduceFunction};
 use crate::functions::percentile::{get_percentile_capacity, PercentileWriter};
-use std::convert::TryFrom;
 
 pub fn sum_i64(column_index: usize) -> Box<dyn Aggregation> {
     let agg = SumI64 {
@@ -338,7 +338,7 @@ pub struct PctU64 {
 impl Aggregation for PctU64 {
     #[inline]
     fn agg_type(&self) -> u8 {
-        types::BYTES
+        types::BINARY
     }
 
     fn len(&self) -> usize {
@@ -359,12 +359,12 @@ impl Aggregation for PctU64 {
         let record_value = record_reader.get_i64(self.record_index).unwrap();
         match value_reader {
             Some(value_reader) => {
-                let stat_value = value_reader.get_bytes_mut(value_index).unwrap();
+                let stat_value = value_reader.get_binary_mut(value_index).unwrap();
 
                 let mut percentile = PercentileWriter::new(self.scale, stat_value);
                 percentile.accumulate(record_value as f64);
 
-                writer.set_bytes(stat_value).unwrap();
+                writer.set_binary(stat_value).unwrap();
             }
             None => {
                 let mut count_container = self.count_container.clone();
@@ -372,7 +372,7 @@ impl Aggregation for PctU64 {
                     PercentileWriter::new(self.scale, count_container.as_mut_slice());
                 percentile.accumulate(record_value as f64);
 
-                writer.set_bytes(count_container.as_slice()).unwrap();
+                writer.set_binary(count_container.as_slice()).unwrap();
             }
         }
     }
@@ -458,7 +458,7 @@ impl ReduceFunction for SchemaReduceFunction {
             .map(|agg| {
                 let field = schema.field(agg.record_index());
                 let type_id = agg.agg_type();
-                if type_id != types::BYTES && field.data_type_id() != type_id {
+                if type_id < types::BINARY && field.data_type_id() != type_id {
                     panic!("column type check failure at {}", agg.record_index());
                 }
                 Field::new("agg", DataType::try_from(type_id).unwrap())

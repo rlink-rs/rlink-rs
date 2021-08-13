@@ -21,7 +21,7 @@ version = "0.6"
 path = "../example-utils"
 
 [dependencies]
-serbuffer = "1.2"
+serbuffer = "1.3"
 
 log = "0.4.8"
 anyhow = "1.0"
@@ -29,4 +29,4 @@ rand = "0.7"
 chrono = "0.4"
 
 [build-dependencies]
-serbuffer-gen = "1.2"
+serbuffer-gen = "1.3"

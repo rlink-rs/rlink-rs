@@ -1,7 +1,6 @@
-use serbuffer::FieldMetadata;
-
-use crate::core::element::types;
 use std::convert::TryFrom;
+
+use serbuffer::{types, FieldMetadata};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum DataType {
@@ -29,6 +28,8 @@ pub enum DataType {
     Float64,
     /// Opaque binary data of variable length.
     Binary,
+    /// A variable-length string in Unicode with UTF-8 encoding.
+    String,
 }
 
 impl DataType {
@@ -46,6 +47,7 @@ impl DataType {
             Self::Float32 => 4,
             Self::Float64 => 8,
             Self::Binary => 0,
+            Self::String => 0,
         }
     }
 
@@ -62,7 +64,8 @@ impl DataType {
             Self::UInt64 => types::U64,
             Self::Float32 => types::F32,
             Self::Float64 => types::F64,
-            Self::Binary => types::BYTES,
+            Self::Binary => types::BINARY,
+            Self::String => types::STRING,
         }
     }
 }
@@ -83,7 +86,8 @@ impl TryFrom<u8> for DataType {
             types::U64 => Ok(Self::UInt64),
             types::F32 => Ok(Self::Float32),
             types::F64 => Ok(Self::Float64),
-            types::BYTES => Ok(Self::Binary),
+            types::BINARY => Ok(Self::Binary),
+            types::STRING => Ok(Self::String),
             _ => Err(crate::core::Error::from("unknown type")),
         }
     }
@@ -130,6 +134,10 @@ impl Field {
     #[inline]
     pub fn len(&self) -> usize {
         self.len
+    }
+
+    pub fn is_numeric(&self) -> bool {
+        self.type_id < types::BINARY
     }
 }
 

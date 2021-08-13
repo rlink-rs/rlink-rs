@@ -15,7 +15,7 @@ name = "rlink"
 k8s = ["kube", "kube-runtime", "k8s-openapi"]
 
 [dependencies]
-serbuffer = "1.2"
+serbuffer = "1.3"
 
 log = "0.4"
 log4rs = "1.0"

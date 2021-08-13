@@ -29,7 +29,7 @@ impl FlatMapFunction for OutputMapFunction {
     fn flat_map(&mut self, mut record: Record) -> Box<dyn Iterator<Item = Record>> {
         let reader = record.as_reader(self.data_type.as_type_ids());
 
-        let percentile_buffer = reader.get_bytes(2).unwrap();
+        let percentile_buffer = reader.get_binary(2).unwrap();
         let percentile = PercentileReader::new(self.scala, percentile_buffer);
         let pct_99 = percentile.get_result(99) as i64;
         let pct_90 = percentile.get_result(90) as i64;
