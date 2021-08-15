@@ -78,12 +78,19 @@ impl AggregationDescriptor {
                 let (index, field) = column_locate.to_column(schema);
                 create_basic_agg(index, BasicAggType::Sum, field.clone())
             }
+            Self::Max(column_locate) => {
+                let (index, field) = column_locate.to_column(schema);
+                create_basic_agg(index, BasicAggType::Max, field.clone())
+            }
+            Self::Min(column_locate) => {
+                let (index, field) = column_locate.to_column(schema);
+                create_basic_agg(index, BasicAggType::Min, field.clone())
+            }
             Self::Pct(column_locate, scale) => {
                 let (index, field) = column_locate.to_column(schema);
                 let agg = PctAggregation::new(index, field.clone(), scale);
                 Box::new(agg)
             }
-            _ => panic!(""),
         }
     }
 }
