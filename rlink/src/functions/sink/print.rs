@@ -6,7 +6,7 @@ use crate::core::element::{FnSchema, Record};
 use crate::core::function::{Context, NamedFunction, OutputFormat};
 use crate::core::runtime::TaskId;
 use crate::core::window::TWindow;
-use crate::utils::date_time::fmt_date_time;
+use crate::utils::date_time::{current_timestamp_millis, fmt_date_time};
 
 pub fn print_sink() -> PrintOutputFormat {
     PrintOutputFormat::new()
@@ -15,6 +15,8 @@ pub fn print_sink() -> PrintOutputFormat {
 pub struct PrintOutputFormat {
     task_id: TaskId,
     schema: Schema,
+    header: String,
+    laster_print_timestamp: u64,
 }
 
 impl PrintOutputFormat {
@@ -22,6 +24,8 @@ impl PrintOutputFormat {
         PrintOutputFormat {
             task_id: TaskId::default(),
             schema: Schema::empty(),
+            header: "".to_string(),
+            laster_print_timestamp: 0,
         }
     }
 }
@@ -30,6 +34,15 @@ impl OutputFormat for PrintOutputFormat {
     fn open(&mut self, context: &Context) -> crate::core::Result<()> {
         self.task_id = context.task_id;
         self.schema = context.input_schema.clone().into();
+
+        let field_names: Vec<String> = self
+            .schema
+            .fields()
+            .iter()
+            .enumerate()
+            .map(|(index, field)| format!("{}:{}", index, field.name()))
+            .collect();
+        self.header = field_names.join("|");
 
         Ok(())
     }
@@ -58,7 +71,7 @@ impl OutputFormat for PrintOutputFormat {
                 DataType::String => reader.get_str(i).unwrap().to_string(),
             };
 
-            field_str_vec.push(format!("{}:{}", i, field_str));
+            field_str_vec.push(format!("{}", field_str));
         }
 
         let window_str = record
@@ -74,8 +87,14 @@ impl OutputFormat for PrintOutputFormat {
             })
             .unwrap_or_default();
 
+        let current_timestamp = current_timestamp_millis();
+        if current_timestamp - self.laster_print_timestamp > 3000 {
+            println!("task_number|window[start,end]|{}", self.header);
+        }
+        self.laster_print_timestamp = current_timestamp;
+
         println!(
-            "task_number: {}, window: {}, row: [{}]",
+            "{}, {}, {}",
             self.task_id.task_number,
             window_str,
             field_str_vec.join(","),
