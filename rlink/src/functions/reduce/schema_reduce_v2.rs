@@ -169,11 +169,47 @@ pub fn create_basic_agg(
     input_field: Field,
 ) -> Box<dyn Aggregation> {
     match input_field.data_type() {
+        DataType::Int8 => {
+            let basic_agg = BasicAggregation::<i8>::new(column_index, agg_type, input_field);
+            Box::new(basic_agg)
+        }
+        DataType::UInt8 => {
+            let basic_agg = BasicAggregation::<u8>::new(column_index, agg_type, input_field);
+            Box::new(basic_agg)
+        }
+        DataType::Int16 => {
+            let basic_agg = BasicAggregation::<i16>::new(column_index, agg_type, input_field);
+            Box::new(basic_agg)
+        }
+        DataType::UInt16 => {
+            let basic_agg = BasicAggregation::<u16>::new(column_index, agg_type, input_field);
+            Box::new(basic_agg)
+        }
+        DataType::Int32 => {
+            let basic_agg = BasicAggregation::<i32>::new(column_index, agg_type, input_field);
+            Box::new(basic_agg)
+        }
+        DataType::UInt32 => {
+            let basic_agg = BasicAggregation::<u32>::new(column_index, agg_type, input_field);
+            Box::new(basic_agg)
+        }
         DataType::Int64 => {
             let basic_agg = BasicAggregation::<i64>::new(column_index, agg_type, input_field);
             Box::new(basic_agg)
         }
-        _ => panic!(),
+        DataType::UInt64 => {
+            let basic_agg = BasicAggregation::<u64>::new(column_index, agg_type, input_field);
+            Box::new(basic_agg)
+        }
+        DataType::Float32 => {
+            let basic_agg = BasicAggregation::<f32>::new(column_index, agg_type, input_field);
+            Box::new(basic_agg)
+        }
+        DataType::Float64 => {
+            let basic_agg = BasicAggregation::<f64>::new(column_index, agg_type, input_field);
+            Box::new(basic_agg)
+        }
+        _ => panic!("un-support DataType {:?}", input_field.data_type()),
     }
 }
 
@@ -251,8 +287,22 @@ impl<T: ValueAgg> Aggregation for BasicAggregation<T> {
                 let basic_value = self.value_agg.read_value(value_reader, value_index);
                 match self.agg_type {
                     BasicAggType::Sum => basic_value + record_value,
-                    BasicAggType::Max => std::cmp::max(basic_value, record_value),
-                    BasicAggType::Min => std::cmp::min(basic_value, record_value),
+                    BasicAggType::Max => {
+                        if basic_value > record_value {
+                            basic_value
+                        } else {
+                            record_value
+                        }
+                        // std::cmp::max(basic_value, record_value)
+                    }
+                    BasicAggType::Min => {
+                        if basic_value > record_value {
+                            record_value
+                        } else {
+                            basic_value
+                        }
+                        // std::cmp::min(basic_value, record_value)
+                    }
                 }
             }
             None => record_value,
@@ -261,10 +311,94 @@ impl<T: ValueAgg> Aggregation for BasicAggregation<T> {
     }
 }
 
-pub trait ValueAgg: Add<Output = Self> + Ord + Default + Debug {
+pub trait ValueAgg: Add<Output = Self> + PartialOrd + Default + Debug {
     fn read_value(&self, value_reader: &mut BufferMutReader, index: usize) -> Self;
     fn read_record(&self, record_reader: &BufferReader, index: usize) -> Self;
     fn write_record(&self, writer: &mut BufferWriter, value: Self);
+}
+
+impl ValueAgg for i8 {
+    fn read_value(&self, value_reader: &mut BufferMutReader, index: usize) -> Self {
+        value_reader.get_i8(index).unwrap()
+    }
+
+    fn read_record(&self, record_reader: &BufferReader, index: usize) -> Self {
+        record_reader.get_i8(index).unwrap()
+    }
+
+    fn write_record(&self, writer: &mut BufferWriter, value: Self) {
+        writer.set_i8(value).unwrap()
+    }
+}
+
+impl ValueAgg for u8 {
+    fn read_value(&self, value_reader: &mut BufferMutReader, index: usize) -> Self {
+        value_reader.get_u8(index).unwrap()
+    }
+
+    fn read_record(&self, record_reader: &BufferReader, index: usize) -> Self {
+        record_reader.get_u8(index).unwrap()
+    }
+
+    fn write_record(&self, writer: &mut BufferWriter, value: Self) {
+        writer.set_u8(value).unwrap()
+    }
+}
+
+impl ValueAgg for i16 {
+    fn read_value(&self, value_reader: &mut BufferMutReader, index: usize) -> Self {
+        value_reader.get_i16(index).unwrap()
+    }
+
+    fn read_record(&self, record_reader: &BufferReader, index: usize) -> Self {
+        record_reader.get_i16(index).unwrap()
+    }
+
+    fn write_record(&self, writer: &mut BufferWriter, value: Self) {
+        writer.set_i16(value).unwrap()
+    }
+}
+
+impl ValueAgg for u16 {
+    fn read_value(&self, value_reader: &mut BufferMutReader, index: usize) -> Self {
+        value_reader.get_u16(index).unwrap()
+    }
+
+    fn read_record(&self, record_reader: &BufferReader, index: usize) -> Self {
+        record_reader.get_u16(index).unwrap()
+    }
+
+    fn write_record(&self, writer: &mut BufferWriter, value: Self) {
+        writer.set_u16(value).unwrap()
+    }
+}
+
+impl ValueAgg for i32 {
+    fn read_value(&self, value_reader: &mut BufferMutReader, index: usize) -> Self {
+        value_reader.get_i32(index).unwrap()
+    }
+
+    fn read_record(&self, record_reader: &BufferReader, index: usize) -> Self {
+        record_reader.get_i32(index).unwrap()
+    }
+
+    fn write_record(&self, writer: &mut BufferWriter, value: Self) {
+        writer.set_i32(value).unwrap()
+    }
+}
+
+impl ValueAgg for u32 {
+    fn read_value(&self, value_reader: &mut BufferMutReader, index: usize) -> Self {
+        value_reader.get_u32(index).unwrap()
+    }
+
+    fn read_record(&self, record_reader: &BufferReader, index: usize) -> Self {
+        record_reader.get_u32(index).unwrap()
+    }
+
+    fn write_record(&self, writer: &mut BufferWriter, value: Self) {
+        writer.set_u32(value).unwrap()
+    }
 }
 
 impl ValueAgg for i64 {
@@ -292,6 +426,34 @@ impl ValueAgg for u64 {
 
     fn write_record(&self, writer: &mut BufferWriter, value: Self) {
         writer.set_u64(value).unwrap()
+    }
+}
+
+impl ValueAgg for f32 {
+    fn read_value(&self, value_reader: &mut BufferMutReader, index: usize) -> Self {
+        value_reader.get_f32(index).unwrap()
+    }
+
+    fn read_record(&self, record_reader: &BufferReader, index: usize) -> Self {
+        record_reader.get_f32(index).unwrap()
+    }
+
+    fn write_record(&self, writer: &mut BufferWriter, value: Self) {
+        writer.set_f32(value).unwrap()
+    }
+}
+
+impl ValueAgg for f64 {
+    fn read_value(&self, value_reader: &mut BufferMutReader, index: usize) -> Self {
+        value_reader.get_f64(index).unwrap()
+    }
+
+    fn read_record(&self, record_reader: &BufferReader, index: usize) -> Self {
+        record_reader.get_f64(index).unwrap()
+    }
+
+    fn write_record(&self, writer: &mut BufferWriter, value: Self) {
+        writer.set_f64(value).unwrap()
     }
 }
 
