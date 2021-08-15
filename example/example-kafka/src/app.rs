@@ -7,7 +7,7 @@ use rlink::core::data_stream::{TDataStream, TKeyedStream, TWindowedStream};
 use rlink::core::env::{StreamApp, StreamExecutionEnvironment};
 use rlink::core::properties::{Properties, SystemProperties};
 use rlink::functions::key_selector::SchemaKeySelector;
-use rlink::functions::reduce::{sum_index, SchemaReduceFunction};
+use rlink::functions::reduce::{sum, SchemaReduceFunction};
 use rlink::functions::sink::print::print_sink;
 use rlink::functions::source::vec_input_format::vec_source;
 use rlink::functions::watermark::DefaultWatermarkStrategy;
@@ -181,10 +181,7 @@ impl StreamApp for KafkaReplayAppStream {
                 Duration::from_secs(20),
                 None,
             ))
-            .reduce(
-                SchemaReduceFunction::new(vec![sum_index(model::index::value)]),
-                2,
-            )
+            .reduce(SchemaReduceFunction::new(vec![sum(model::index::value)]), 2)
             .add_sink(print_sink());
     }
 }

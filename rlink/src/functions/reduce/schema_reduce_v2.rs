@@ -11,27 +11,21 @@ pub fn count() -> AggregationDescriptor {
     AggregationDescriptor::Count
 }
 
-pub fn sum(column_name: &str) -> AggregationDescriptor {
-    AggregationDescriptor::Sum(ColumnLocate::Name(column_name.to_string()))
+pub fn sum<T: ColumnLocateBuilder>(column: T) -> AggregationDescriptor {
+    AggregationDescriptor::Sum(column.build())
 }
 
-pub fn sum_index(column_index: usize) -> AggregationDescriptor {
-    AggregationDescriptor::Sum(ColumnLocate::Index(column_index))
+pub fn max<T: ColumnLocateBuilder>(column: T) -> AggregationDescriptor {
+    AggregationDescriptor::Max(column.build())
 }
 
-pub fn pct(column_name: &str, scale: &'static [f64]) -> AggregationDescriptor {
-    AggregationDescriptor::Pct(ColumnLocate::Name(column_name.to_string()), scale)
+pub fn min<T: ColumnLocateBuilder>(column: T) -> AggregationDescriptor {
+    AggregationDescriptor::Min(column.build())
 }
 
-pub fn pct_index(column_index: usize, scale: &'static [f64]) -> AggregationDescriptor {
-    AggregationDescriptor::Pct(ColumnLocate::Index(column_index), scale)
+pub fn pct<T: ColumnLocateBuilder>(column: T, scale: &'static [f64]) -> AggregationDescriptor {
+    AggregationDescriptor::Pct(column.build(), scale)
 }
-
-// pub fn max(column_index: usize) {}
-//
-// pub fn min(column_index: usize) {}
-//
-// pub fn pct(column_index: usize) {}
 
 #[derive(Clone, Debug)]
 pub enum ColumnLocate {
@@ -45,6 +39,22 @@ impl ColumnLocate {
             Self::Index(index) => (*index, schema.field(*index)),
             Self::Name(name) => schema.column_with_name(name.as_str()).unwrap(),
         }
+    }
+}
+
+pub trait ColumnLocateBuilder {
+    fn build(&self) -> ColumnLocate;
+}
+
+impl ColumnLocateBuilder for usize {
+    fn build(&self) -> ColumnLocate {
+        ColumnLocate::Index(*self)
+    }
+}
+
+impl<'a> ColumnLocateBuilder for &'a str {
+    fn build(&self) -> ColumnLocate {
+        ColumnLocate::Name(self.to_string())
     }
 }
 
