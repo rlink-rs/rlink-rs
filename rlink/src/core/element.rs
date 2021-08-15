@@ -712,7 +712,8 @@ impl From<Barrier> for Element {
 mod tests {
     use std::borrow::BorrowMut;
 
-    use crate::core::element::types;
+    use serbuffer::types;
+
     use crate::core::element::{Element, Record, Serde, StreamStatus, Watermark};
 
     #[test]
@@ -721,14 +722,20 @@ mod tests {
         record.partition_num = 2;
         record.timestamp = 3;
 
-        let data_types = vec![types::U32, types::U64, types::I32, types::I64, types::BYTES];
+        let data_types = vec![
+            types::U32,
+            types::U64,
+            types::I32,
+            types::I64,
+            types::BINARY,
+        ];
         let mut writer = record.as_writer(&data_types);
 
         writer.set_u32(10).unwrap();
         writer.set_u64(20).unwrap();
         writer.set_i32(30).unwrap();
         writer.set_i64(40).unwrap();
-        writer.set_bytes("abc".as_bytes()).unwrap();
+        writer.set_binary("abc".as_bytes()).unwrap();
 
         let record_clone = record.clone();
         let reader = record.as_reader(&data_types);
@@ -743,8 +750,8 @@ mod tests {
         assert_eq!(reader.get_i32(2).unwrap(), de_reader.get_i32(2).unwrap());
         assert_eq!(reader.get_i64(3).unwrap(), de_reader.get_i64(3).unwrap());
         assert_eq!(
-            reader.get_bytes(4).unwrap(),
-            de_reader.get_bytes(4).unwrap()
+            reader.get_binary(4).unwrap(),
+            de_reader.get_binary(4).unwrap()
         );
     }
 

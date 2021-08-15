@@ -7,7 +7,7 @@ use rlink::core::env::{StreamApp, StreamExecutionEnvironment};
 use rlink::core::properties::{Properties, SystemProperties};
 use rlink::core::runtime::ClusterDescriptor;
 use rlink::functions::key_selector::SchemaKeySelector;
-use rlink::functions::reduce::{sum_i64, SchemaReduceFunction};
+use rlink::functions::reduce::{count, sum_index, SchemaReduceFunction};
 use rlink::functions::sink::print_sink;
 use rlink::functions::source::vec_source;
 use rlink::functions::watermark::DefaultWatermarkStrategy;
@@ -51,7 +51,7 @@ impl StreamApp for SimpleStreamApp {
             None,
         ))
         .reduce(
-            SchemaReduceFunction::new(vec![sum_i64(model::index::value)]),
+            SchemaReduceFunction::new(vec![sum_index(model::index::value), count()]),
             2,
         )
         .add_sink(print_sink());

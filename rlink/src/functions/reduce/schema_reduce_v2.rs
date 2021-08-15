@@ -7,9 +7,14 @@ use crate::core::element::{BufferMutReader, BufferReader, BufferWriter, FnSchema
 use crate::core::function::{Context, NamedFunction, ReduceFunction};
 use crate::functions::percentile::{get_percentile_capacity, PercentileWriter};
 
+pub fn count() -> AggregationDescriptor {
+    AggregationDescriptor::Count
+}
+
 pub fn sum(column_name: &str) -> AggregationDescriptor {
     AggregationDescriptor::Sum(ColumnLocate::Name(column_name.to_string()))
 }
+
 pub fn sum_index(column_index: usize) -> AggregationDescriptor {
     AggregationDescriptor::Sum(ColumnLocate::Index(column_index))
 }
@@ -175,6 +180,7 @@ impl Display for BasicAggType {
 #[derive(Debug)]
 pub struct BasicAggregation<T: ValueAgg> {
     column_index: usize,
+    agg_type: BasicAggType,
     input_field: Field,
     output_field: Field,
     value_agg: T,
@@ -189,6 +195,7 @@ impl<T: ValueAgg> BasicAggregation<T> {
 
         BasicAggregation {
             column_index,
+            agg_type,
             input_field,
             output_field,
             value_agg: T::default(),
@@ -225,7 +232,11 @@ impl<T: ValueAgg> Aggregation for BasicAggregation<T> {
         let agg_value = match value_reader {
             Some(value_reader) => {
                 let basic_value = self.value_agg.read_value(value_reader, value_index);
-                basic_value + record_value
+                match self.agg_type {
+                    BasicAggType::Sum => basic_value + record_value,
+                    BasicAggType::Max => std::cmp::max(basic_value, record_value),
+                    BasicAggType::Min => std::cmp::min(basic_value, record_value),
+                }
             }
             None => record_value,
         };
@@ -233,7 +244,7 @@ impl<T: ValueAgg> Aggregation for BasicAggregation<T> {
     }
 }
 
-pub trait ValueAgg: Add<Output = Self> + Default + Debug {
+pub trait ValueAgg: Add<Output = Self> + Ord + Default + Debug {
     fn read_value(&self, value_reader: &mut BufferMutReader, index: usize) -> Self;
     fn read_record(&self, record_reader: &BufferReader, index: usize) -> Self;
     fn write_record(&self, writer: &mut BufferWriter, value: Self);
@@ -347,6 +358,9 @@ impl Aggregation for PctAggregation {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
 pub struct SchemaReduceFunction {
