@@ -8,7 +8,7 @@ use rlink::core::properties::{ChannelBaseOn, Properties, SystemProperties};
 use rlink::functions::flat_map::broadcast_flat_map::BroadcastFlagMapFunction;
 use rlink::functions::flat_map::round_robin_flat_map::RoundRobinFlagMapFunction;
 use rlink::functions::key_selector::SchemaKeySelector;
-use rlink::functions::reduce::{pct_u64, sum_i64, SchemaReduceFunction};
+use rlink::functions::reduce::{pct_index, sum_index, SchemaReduceFunction};
 use rlink::functions::sink::print::print_sink;
 use rlink::functions::watermark::DefaultWatermarkStrategy;
 use rlink::functions::window::SlidingEventTimeWindows;
@@ -62,8 +62,8 @@ impl StreamApp for ConnectStreamApp0 {
             ))
             .reduce(
                 SchemaReduceFunction::new(vec![
-                    sum_i64(model::index::value),
-                    pct_u64(model::index::value, get_percentile_scale()),
+                    sum_index(model::index::value),
+                    pct_index(model::index::value, get_percentile_scale()),
                 ]),
                 2,
             )
@@ -115,8 +115,8 @@ impl StreamApp for ConnectStreamApp1 {
             ))
             .reduce(
                 SchemaReduceFunction::new(vec![
-                    sum_i64(model::index::value),
-                    pct_u64(model::index::value, get_percentile_scale()),
+                    sum_index(model::index::value),
+                    pct_index(model::index::value, get_percentile_scale()),
                 ]),
                 5,
             )

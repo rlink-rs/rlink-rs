@@ -1,9 +1,7 @@
 use std::time::Duration;
 
-use serbuffer::types;
-
 use crate::core::checkpoint::CheckpointFunction;
-use crate::core::data_types::Schema;
+use crate::core::data_types::{DataType, Schema};
 use crate::core::element::{FnSchema, Record};
 use crate::core::function::{Context, NamedFunction, OutputFormat};
 use crate::core::runtime::TaskId;
@@ -31,13 +29,6 @@ impl PrintOutputFormat {
 impl OutputFormat for PrintOutputFormat {
     fn open(&mut self, context: &Context) -> crate::core::Result<()> {
         self.task_id = context.task_id;
-
-        // let s: Vec<u8> = context.input_schema.clone().into();
-        // if !s.as_slice().eq(self.field_types.as_slice()) {
-        //     println!("{:?}", s,);
-        //     println!("{:?}", self.field_types);
-        //     panic!("00000");
-        // }
         self.schema = context.input_schema.clone().into();
 
         Ok(())
@@ -48,24 +39,23 @@ impl OutputFormat for PrintOutputFormat {
         let mut field_str_vec = Vec::new();
         for i in 0..self.schema.fields().len() {
             let field = self.schema.field(i);
-            let field_str = match field.data_type_id() {
-                types::BOOL => reader.get_bool(i).unwrap().to_string(),
-                types::I8 => reader.get_i8(i).unwrap().to_string(),
-                types::U8 => reader.get_u8(i).unwrap().to_string(),
-                types::I16 => reader.get_i16(i).unwrap().to_string(),
-                types::U16 => reader.get_i16(i).unwrap().to_string(),
-                types::I32 => reader.get_i32(i).unwrap().to_string(),
-                types::U32 => reader.get_u32(i).unwrap().to_string(),
-                types::I64 => reader.get_i64(i).unwrap().to_string(),
-                types::U64 => reader.get_u64(i).unwrap().to_string(),
-                types::F32 => reader.get_f32(i).unwrap().to_string(),
-                types::F64 => reader.get_f64(i).unwrap().to_string(),
-                types::BINARY => match reader.get_str(i) {
+            let field_str = match field.data_type() {
+                DataType::Boolean => reader.get_bool(i).unwrap().to_string(),
+                DataType::Int8 => reader.get_i8(i).unwrap().to_string(),
+                DataType::UInt8 => reader.get_u8(i).unwrap().to_string(),
+                DataType::Int16 => reader.get_i16(i).unwrap().to_string(),
+                DataType::UInt16 => reader.get_i16(i).unwrap().to_string(),
+                DataType::Int32 => reader.get_i32(i).unwrap().to_string(),
+                DataType::UInt32 => reader.get_u32(i).unwrap().to_string(),
+                DataType::Int64 => reader.get_i64(i).unwrap().to_string(),
+                DataType::UInt64 => reader.get_u64(i).unwrap().to_string(),
+                DataType::Float32 => reader.get_f32(i).unwrap().to_string(),
+                DataType::Float64 => reader.get_f64(i).unwrap().to_string(),
+                DataType::Binary => match reader.get_str(i) {
                     Ok(s) => s.to_owned(),
                     Err(_e) => format!("{:?}", reader.get_binary(i).unwrap()),
                 },
-                types::STRING => reader.get_str(i).unwrap().to_string(),
-                _ => panic!("unknown type"),
+                DataType::String => reader.get_str(i).unwrap().to_string(),
             };
 
             field_str_vec.push(format!("{}:{}", i, field_str));
