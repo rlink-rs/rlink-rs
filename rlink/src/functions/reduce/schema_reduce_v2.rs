@@ -96,9 +96,7 @@ impl AggregationDescriptor {
 }
 
 pub trait Aggregation: Debug {
-    fn input_data_type(&self) -> &DataType;
     fn output_field(&self) -> &Field;
-    fn column_index(&self) -> usize;
     fn len(&self) -> usize;
     fn reduce(
         &self,
@@ -126,16 +124,8 @@ impl CountAggregation {
 }
 
 impl Aggregation for CountAggregation {
-    fn input_data_type(&self) -> &DataType {
-        todo!()
-    }
-
     fn output_field(&self) -> &Field {
         &self.output_field
-    }
-
-    fn column_index(&self) -> usize {
-        todo!()
     }
 
     fn len(&self) -> usize {
@@ -257,17 +247,9 @@ impl<T: ValueAgg> BasicAggregation<T> {
 }
 
 impl<T: ValueAgg> Aggregation for BasicAggregation<T> {
-    fn input_data_type(&self) -> &DataType {
-        self.input_field.data_type()
-    }
-
     #[inline]
     fn output_field(&self) -> &Field {
         &self.output_field
-    }
-
-    fn column_index(&self) -> usize {
-        self.column_index
     }
 
     fn len(&self) -> usize {
@@ -497,16 +479,8 @@ impl Aggregation for PctAggregation {
         get_percentile_capacity(self.scale)
     }
 
-    fn input_data_type(&self) -> &DataType {
-        self.input_field.data_type()
-    }
-
     fn output_field(&self) -> &Field {
         &self.output_field
-    }
-
-    fn column_index(&self) -> usize {
-        self.column_index
     }
 
     fn reduce(
