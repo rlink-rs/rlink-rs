@@ -505,22 +505,31 @@ impl SchemaReduceFunction {
             agg_operators: vec![],
         }
     }
+
+    fn agg_schema(&self, schema: &Schema) -> (Vec<Box<dyn Aggregation>>, Vec<Field>, usize) {
+        let mut aggs = Vec::new();
+        let mut fields = Vec::new();
+        let mut len = 0;
+
+        for agg_descriptor in &self.agg_descriptors {
+            let agg = agg_descriptor.to_aggregation(schema);
+
+            len += agg.len();
+            fields.push(agg.output_field().clone());
+            aggs.push(agg);
+        }
+        (aggs, fields, len)
+    }
 }
 
 impl ReduceFunction for SchemaReduceFunction {
     fn open(&mut self, context: &Context) -> crate::core::Result<()> {
-        let schema = context.input_schema.first();
-        let val_schema: Schema = self.schema(context.input_schema.clone()).into();
-        let val_len: usize = self.agg_operators.iter().map(|x| x.len()).sum();
+        self.schema = context.input_schema.first().clone();
+        self.val_schema = self.schema(context.input_schema.clone()).into();
 
-        self.schema = schema.clone();
-        self.val_schema = val_schema;
+        let (agg_operators, _fields, val_len) = self.agg_schema(&self.schema);
         self.val_len = val_len;
-        self.agg_operators = self
-            .agg_descriptors
-            .iter()
-            .map(|x| x.to_aggregation(&self.schema))
-            .collect();
+        self.agg_operators = agg_operators;
 
         Ok(())
     }
@@ -564,12 +573,7 @@ impl ReduceFunction for SchemaReduceFunction {
 
     fn schema(&self, input_schema: FnSchema) -> FnSchema {
         let schema = input_schema.first();
-
-        let val_fields: Vec<Field> = self
-            .agg_descriptors
-            .iter()
-            .map(|x| x.to_aggregation(schema).output_field().clone())
-            .collect();
+        let val_fields: Vec<Field> = self.agg_schema(schema).1;
 
         FnSchema::Single(Schema::new(val_fields))
     }
