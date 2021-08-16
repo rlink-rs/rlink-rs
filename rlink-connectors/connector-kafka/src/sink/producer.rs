@@ -1,4 +1,3 @@
-use std::borrow::BorrowMut;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -8,9 +7,8 @@ use rdkafka::ClientConfig;
 use rlink::channel::utils::handover::Handover;
 use rlink::channel::TryRecvError;
 use rlink::utils::thread::async_sleep;
-use rlink::utils::EMPTY_SLICE;
 
-use crate::KafkaRecord;
+use crate::buffer_gen::kafka_message;
 
 #[derive(Clone)]
 pub struct KafkaProducerThread {
@@ -48,9 +46,14 @@ impl KafkaProducerThread {
             for _n in 0..batch {
                 match self.handover.try_poll_next() {
                     Ok(mut record) => {
-                        let reader = KafkaRecord::new(record.borrow_mut());
+                        let kafka_message::Entity {
+                            timestamp,
+                            key,
+                            payload,
+                            topic,
+                            ..
+                        } = kafka_message::Entity::parse(record.as_buffer()).unwrap();
 
-                        let topic = reader.get_kafka_topic().unwrap();
                         let topic = match self.topic.as_ref() {
                             Some(topic) => topic.as_str(),
                             None => {
@@ -61,14 +64,10 @@ impl KafkaProducerThread {
                             }
                         };
 
-                        let timestamp = reader.get_kafka_timestamp().unwrap_or_default();
-                        let key = reader.get_kafka_key().unwrap_or(&EMPTY_SLICE).to_vec();
-                        let payload = reader.get_kafka_payload().unwrap_or(&EMPTY_SLICE);
-
                         let future_record = FutureRecord::to(topic)
                             .payload(payload)
                             .timestamp(timestamp as i64)
-                            .key(&key);
+                            .key(key);
 
                         match self.producer.send_result(future_record) {
                             Ok(delivery_future) => future_queue.push(delivery_future),

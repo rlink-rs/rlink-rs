@@ -187,7 +187,7 @@ impl Properties {
     }
 
     pub fn get_sink_properties(&self, fn_name: &str) -> Properties {
-        let pre_key = format!("source.{fn_name}", fn_name = fn_name);
+        let pre_key = format!("sink.{fn_name}", fn_name = fn_name);
         self.get_sub_properties(pre_key.as_str())
     }
 

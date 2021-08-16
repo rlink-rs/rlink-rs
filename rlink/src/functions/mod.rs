@@ -1,3 +1,4 @@
+pub mod column_locate;
 pub mod filter;
 pub mod flat_map;
 pub mod key_selector;
@@ -8,7 +9,3 @@ pub mod source;
 pub mod system;
 pub mod watermark;
 pub mod window;
-
-pub trait FunctionSchema {
-    fn schema_types(&self) -> Vec<u8>;
-}

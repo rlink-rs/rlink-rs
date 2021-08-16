@@ -234,7 +234,7 @@
             html += "<span class='node_id'>JobId:" + node.detail.job_id + "</span>";
             html += "<span class='parallelism'>Parallelism:" + node.detail.parallelism + "</span>";
             node.detail.stream_nodes.forEach(function (stream_node) {
-                html += "<span class='detail'> * " + stream_node.operator_name + "</span>";
+                html += "<span class='detail'> * " + stream_node.operator_name + JSON.stringify(stream_node.output_schema) + "</span>";
             });
             html += "</div>";
             return html;

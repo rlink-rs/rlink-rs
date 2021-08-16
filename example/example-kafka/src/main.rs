@@ -8,13 +8,16 @@ extern crate serde_derive;
 extern crate anyhow;
 
 mod app;
-mod buffer_gen;
 mod entry;
 mod filter;
 mod input_mapper;
 mod kafka_input_mapper;
 mod output_mapper;
 mod writer;
+
+mod buffer_gen {
+    include!(concat!(env!("OUT_DIR"), "/buffer_gen/mod.rs"));
+}
 
 fn main() {
     // rlink::core::env::execute(app::KafkaGenAppStream::new());

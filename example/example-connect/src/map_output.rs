@@ -1,30 +1,35 @@
 use rlink::core;
-use rlink::core::element::Record;
+use rlink::core::data_types::Schema;
+use rlink::core::element::{FnSchema, Record};
 use rlink::core::function::{Context, FlatMapFunction};
 use rlink::functions::percentile::PercentileReader;
 use rlink_example_utils::buffer_gen::output;
 
 #[derive(Debug, Function)]
 pub struct OutputMapFunction {
-    data_type: Vec<u8>,
+    data_type: Schema,
     scala: &'static [f64],
 }
 
 impl OutputMapFunction {
-    pub fn new(data_type: Vec<u8>, scala: &'static [f64]) -> Self {
-        OutputMapFunction { data_type, scala }
+    pub fn new(scala: &'static [f64]) -> Self {
+        OutputMapFunction {
+            data_type: Schema::empty(),
+            scala,
+        }
     }
 }
 
 impl FlatMapFunction for OutputMapFunction {
-    fn open(&mut self, _context: &Context) -> core::Result<()> {
+    fn open(&mut self, context: &Context) -> core::Result<()> {
+        self.data_type = context.input_schema.first().clone();
         Ok(())
     }
 
     fn flat_map(&mut self, mut record: Record) -> Box<dyn Iterator<Item = Record>> {
-        let reader = record.as_reader(self.data_type.as_slice());
+        let reader = record.as_reader(self.data_type.as_type_ids());
 
-        let percentile_buffer = reader.get_bytes(2).unwrap();
+        let percentile_buffer = reader.get_binary(2).unwrap();
         let percentile = PercentileReader::new(self.scala, percentile_buffer);
         let pct_99 = percentile.get_result(99) as i64;
         let pct_90 = percentile.get_result(90) as i64;
@@ -44,5 +49,9 @@ impl FlatMapFunction for OutputMapFunction {
 
     fn close(&mut self) -> core::Result<()> {
         Ok(())
+    }
+
+    fn schema(&self, _input_schema: FnSchema) -> FnSchema {
+        FnSchema::from(&output::FIELD_METADATA)
     }
 }

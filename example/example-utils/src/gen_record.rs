@@ -4,7 +4,7 @@ use rlink::core::element::Record;
 
 use crate::buffer_gen::model;
 
-pub fn gen_fix_length_records() -> Vec<Record> {
+pub fn gen_records() -> Vec<Record> {
     let mut rows = Vec::new();
 
     rows.push(create_record("A-key-0", 1, "2020-03-11T12:01:00+0800"));

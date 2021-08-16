@@ -4,7 +4,6 @@ use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::anyhow;
 use elasticsearch::http::headers::HeaderMap;
 use elasticsearch::http::request::JsonBody;
 use elasticsearch::http::transport::{SingleNodeConnectionPool, TransportBuilder};
@@ -12,7 +11,7 @@ use elasticsearch::http::Url;
 use elasticsearch::{BulkParts, Elasticsearch};
 use rlink::channel::utils::handover::Handover;
 use rlink::core::checkpoint::CheckpointFunction;
-use rlink::core::element::Record;
+use rlink::core::element::{FnSchema, Record};
 use rlink::core::function::{Context, NamedFunction, OutputFormat};
 use rlink::utils::thread::{async_runtime, async_sleep, async_spawn};
 use rlink::{core, utils};
@@ -106,6 +105,10 @@ impl OutputFormat for ElasticsearchOutputFormat {
 
     fn close(&mut self) -> core::Result<()> {
         Ok(())
+    }
+
+    fn schema(&self, _input_schema: FnSchema) -> FnSchema {
+        FnSchema::Empty
     }
 }
 

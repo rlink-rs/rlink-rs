@@ -67,16 +67,14 @@ pub(crate) fn sys_info_metric_task(global_tag: Tag) {
             gauge!("sys_load_average", load_avg.fifteen, &labels,);
         }
 
-        let cpu_usage = system
+        let (cpu_usage, used_memory) = system
             .get_process(pid)
-            .map(|p| p.cpu_usage())
+            .map(|p| (p.cpu_usage(), p.memory()))
             .unwrap_or_default();
         {
             let labels = labels.clone();
             gauge!("sys_cpu_usage", cpu_usage as f64, &labels,);
         }
-
-        let used_memory = system.get_used_memory();
         {
             let mut labels = labels.clone();
             labels.push(("type".to_owned(), "used_memory".to_owned()));

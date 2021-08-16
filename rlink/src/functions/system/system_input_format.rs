@@ -2,7 +2,7 @@ use crate::channel::select::ChannelSelect;
 use crate::channel::{ElementReceiver, TryRecvError};
 use crate::core;
 use crate::core::checkpoint::CheckpointFunction;
-use crate::core::element::{Element, Record};
+use crate::core::element::{Element, FnSchema, Record};
 use crate::core::function::{Context, InputFormat, InputSplit, InputSplitSource, NamedFunction};
 use crate::core::properties::{ChannelBaseOn, SystemProperties};
 use crate::core::runtime::TaskId;
@@ -111,6 +111,10 @@ impl InputFormat for SystemInputFormat {
 
     fn close(&mut self) -> crate::core::Result<()> {
         Ok(())
+    }
+
+    fn schema(&self, input_schema: FnSchema) -> FnSchema {
+        input_schema
     }
 }
 

@@ -80,6 +80,9 @@ impl Runnable for WatermarkAssignerRunnable {
             self.task_id.to_tags(),
         );
 
+        let fun_context = context.to_fun_context(self.operator_id);
+        self.timestamp_assigner.open(&fun_context)?;
+
         Ok(())
     }
 

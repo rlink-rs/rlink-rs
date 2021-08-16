@@ -231,7 +231,6 @@ pub struct WorkerManagerDescriptor {
     pub task_manager_address: String,
     pub metrics_address: String,
     pub web_address: String,
-    /// job tasks map: <job_id, Vec<TaskDescriptor>>
     pub task_descriptors: Vec<TaskDescriptor>,
 }
 

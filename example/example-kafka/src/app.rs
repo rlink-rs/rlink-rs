@@ -7,23 +7,22 @@ use rlink::core::data_stream::{TDataStream, TKeyedStream, TWindowedStream};
 use rlink::core::env::{StreamApp, StreamExecutionEnvironment};
 use rlink::core::properties::{Properties, SystemProperties};
 use rlink::functions::key_selector::SchemaKeySelector;
-use rlink::functions::reduce::{sum_i64, SchemaReduceFunction};
+use rlink::functions::reduce::{sum, SchemaReduceFunction};
+use rlink::functions::sink::print::print_sink;
 use rlink::functions::source::vec_input_format::vec_source;
 use rlink::functions::watermark::DefaultWatermarkStrategy;
 use rlink::functions::window::SlidingEventTimeWindows;
-use rlink::functions::FunctionSchema;
 use rlink::utils::process::{parse_arg, parse_arg_to_u64};
 use rlink_connector_kafka::{
     create_output_format, state::PartitionOffset, InputFormatBuilder, OffsetRange,
-    BOOTSTRAP_SERVERS, GROUP_ID, KAFKA_DATA_TYPES,
+    BOOTSTRAP_SERVERS, GROUP_ID,
 };
 use rlink_example_utils::buffer_gen::model;
-use rlink_example_utils::gen_record::gen_fix_length_records;
+use rlink_example_utils::gen_record::gen_records;
 
-use crate::buffer_gen::checkpoint_data::FIELD_TYPE;
 use crate::input_mapper::InputMapperFunction;
 use crate::output_mapper::OutputMapperFunction;
-use rlink::functions::sink::print::print_sink;
+use rlink::core::data_types::Schema;
 
 #[derive(Clone, Debug)]
 pub struct KafkaGenAppStream {}
@@ -60,9 +59,12 @@ impl StreamApp for KafkaGenAppStream {
 
         let sink = create_output_format(conf_map, Some(kafka_topic_sink.clone()), None);
 
-        env.register_source(vec_source(gen_fix_length_records()), 3)
-            .flat_map(OutputMapperFunction::new(kafka_topic_sink))
-            .add_sink(sink);
+        env.register_source(
+            vec_source(gen_records(), Schema::from(&model::FIELD_METADATA)),
+            3,
+        )
+        .flat_map(OutputMapperFunction::new(kafka_topic_sink))
+        .add_sink(sink);
     }
 }
 
@@ -111,7 +113,7 @@ impl StreamApp for KafkaOffsetRangeAppStream {
         };
 
         env.register_source(kafka_input_format, 3)
-            .add_sink(print_sink(&KAFKA_DATA_TYPES));
+            .add_sink(print_sink());
     }
 }
 
@@ -166,33 +168,21 @@ impl StreamApp for KafkaReplayAppStream {
                 .build()
         };
 
-        let key_selector = SchemaKeySelector::new(vec![model::index::name], &FIELD_TYPE);
-        let reduce_function =
-            SchemaReduceFunction::new(vec![sum_i64(model::index::value)], &FIELD_TYPE);
-
-        // the schema after reduce
-        let output_schema_types = {
-            let mut key_types = key_selector.schema_types();
-            let reduce_types = reduce_function.schema_types();
-            key_types.extend_from_slice(reduce_types.as_slice());
-            key_types
-        };
-
         env.register_source(kafka_input_format, source_parallelism)
             .flat_map(InputMapperFunction::new())
             .assign_timestamps_and_watermarks(
                 DefaultWatermarkStrategy::new()
                     .for_bounded_out_of_orderness(Duration::from_secs(1))
-                    .for_schema_timestamp_assigner(model::index::timestamp, &FIELD_TYPE),
+                    .for_schema_timestamp_assigner(model::index::timestamp),
             )
-            .key_by(key_selector)
+            .key_by(SchemaKeySelector::new(vec![model::index::name]))
             .window(SlidingEventTimeWindows::new(
                 Duration::from_secs(60),
                 Duration::from_secs(20),
                 None,
             ))
-            .reduce(reduce_function, 2)
-            .add_sink(print_sink(output_schema_types.as_slice()));
+            .reduce(SchemaReduceFunction::new(vec![sum(model::index::value)]), 2)
+            .add_sink(print_sink());
     }
 }
 
@@ -201,18 +191,18 @@ fn gen_kafka_offset_range(topic: &str) -> OffsetRange {
     begin_offset.insert(
         topic.to_string(),
         vec![
-            PartitionOffset::new(0, 72),
-            PartitionOffset::new(1, 32),
-            PartitionOffset::new(2, 31),
+            PartitionOffset::new(0, 121),
+            PartitionOffset::new(1, 71),
+            PartitionOffset::new(2, 78),
         ],
     );
     let mut end_offset = HashMap::new();
     end_offset.insert(
         topic.to_string(),
         vec![
-            PartitionOffset::new(0, 87),
-            PartitionOffset::new(1, 48),
-            PartitionOffset::new(2, 45),
+            PartitionOffset::new(0, 137),
+            PartitionOffset::new(1, 84),
+            PartitionOffset::new(2, 94),
         ],
     );
 

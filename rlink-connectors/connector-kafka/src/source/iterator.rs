@@ -3,9 +3,9 @@ use std::borrow::BorrowMut;
 use rlink::channel::utils::handover::Handover;
 use rlink::core::element::Record;
 
+use crate::buffer_gen::kafka_message;
 use crate::source::is_empty_record;
 use crate::state::KafkaSourceStateRecorder;
-use crate::KafkaRecord;
 
 pub struct KafkaRecordIterator {
     handover: Handover,
@@ -31,11 +31,12 @@ impl Iterator for KafkaRecordIterator {
                     return None;
                 }
 
-                let kafka_record = KafkaRecord::new(record.borrow_mut());
-
-                let topic = kafka_record.get_kafka_topic().unwrap();
-                let partition = kafka_record.get_kafka_partition().unwrap();
-                let offset = kafka_record.get_kafka_offset().unwrap();
+                let kafka_message::Entity {
+                    topic,
+                    partition,
+                    offset,
+                    ..
+                } = kafka_message::Entity::parse(record.as_buffer()).unwrap();
 
                 self.state_recorder.update(topic, partition, offset);
 

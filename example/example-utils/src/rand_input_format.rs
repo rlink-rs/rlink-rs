@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use rand::Rng;
 use rlink::core;
-use rlink::core::element::Record;
+use rlink::core::element::{FnSchema, Record};
 use rlink::core::function::{Context, InputFormat, InputSplit, InputSplitSource};
 use rlink::utils::date_time::current_timestamp_millis;
 
@@ -30,6 +30,10 @@ impl InputFormat for RandInputFormat {
 
     fn close(&mut self) -> core::Result<()> {
         Ok(())
+    }
+
+    fn schema(&self, _input_schema: FnSchema) -> FnSchema {
+        FnSchema::from(&model::FIELD_METADATA)
     }
 }
 

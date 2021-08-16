@@ -12,21 +12,26 @@ pub mod source;
 
 pub mod state;
 
+pub mod buffer_gen {
+    include!(concat!(env!("OUT_DIR"), "/buffer_gen/mod.rs"));
+}
+
 pub use sink::output_format::KafkaOutputFormat;
 pub use source::input_format::KafkaInputFormat;
 
 use std::collections::HashMap;
 
 use rdkafka::ClientConfig;
-use rlink::core::element::BufferReader;
+use rlink::core::element::FnSchema;
 use rlink::core::element::Record;
+use rlink::core::properties::Properties;
 
+use crate::buffer_gen::kafka_message;
 use crate::source::deserializer::{
     DefaultKafkaRecordDeserializer, DefaultKafkaRecordDeserializerBuilder,
     KafkaRecordDeserializerBuilder,
 };
 use crate::state::PartitionOffset;
-use rlink::core::properties::Properties;
 
 pub const BOOTSTRAP_SERVERS: &str = "bootstrap.servers";
 pub const TOPICS: &str = "topics";
@@ -39,24 +44,10 @@ pub const OFFSET_BEGIN: &str = "offset.begin";
 pub const OFFSET_END: &str = "offset.end";
 
 pub const INPUT_FORMAT_FN_NAME_DEFAULT: &str = "KafkaInputFormat";
+pub const OUTPUT_FORMAT_FN_NAME_DEFAULT: &str = "KafkaOutputFormat";
 
 pub const SOURCE_CHANNEL_SIZE: usize = 50000;
 pub const SINK_CHANNEL_SIZE: usize = 50000;
-
-pub static KAFKA_DATA_TYPES: [u8; 6] = [
-    // timestamp
-    rlink::core::element::types::I64,
-    // key
-    rlink::core::element::types::BYTES,
-    // payload
-    rlink::core::element::types::BYTES,
-    // topic
-    rlink::core::element::types::BYTES,
-    // partition
-    rlink::core::element::types::I32,
-    // offset
-    rlink::core::element::types::I64,
-];
 
 pub fn build_kafka_record(
     timestamp: i64,
@@ -66,55 +57,24 @@ pub fn build_kafka_record(
     partition: i32,
     offset: i64,
 ) -> Result<Record, std::io::Error> {
+    let message = kafka_message::Entity {
+        timestamp,
+        key,
+        payload,
+        topic,
+        partition,
+        offset,
+    };
+
     // 36 = 12(len(payload) + len(topic) + len(key)) +
     //      20(len(timestamp) + len(partition) + len(offset)) +
     //      4(place_holder)
     let capacity = payload.len() + topic.len() + key.len() + 36;
     let mut record = Record::with_capacity(capacity);
-    let mut writer = record.as_writer(&KAFKA_DATA_TYPES);
-    writer.set_i64(timestamp)?;
-    writer.set_bytes(key)?;
-    writer.set_bytes(payload)?;
-    writer.set_str(topic)?;
-    writer.set_i32(partition)?;
-    writer.set_i64(offset)?;
+
+    message.to_buffer(record.as_buffer()).unwrap();
 
     Ok(record)
-}
-
-pub struct KafkaRecord<'a, 'b> {
-    reader: BufferReader<'a, 'b>,
-}
-
-impl<'a, 'b> KafkaRecord<'a, 'b> {
-    pub fn new(record: &'a mut Record) -> Self {
-        let reader = record.as_reader(&KAFKA_DATA_TYPES);
-        KafkaRecord { reader }
-    }
-
-    pub fn get_kafka_timestamp(&self) -> Result<i64, std::io::Error> {
-        self.reader.get_i64(0)
-    }
-
-    pub fn get_kafka_key(&self) -> Result<&[u8], std::io::Error> {
-        self.reader.get_bytes(1)
-    }
-
-    pub fn get_kafka_payload(&self) -> Result<&[u8], std::io::Error> {
-        self.reader.get_bytes(2)
-    }
-
-    pub fn get_kafka_topic(&self) -> Result<&str, std::io::Error> {
-        self.reader.get_str(3)
-    }
-
-    pub fn get_kafka_partition(&self) -> Result<i32, std::io::Error> {
-        self.reader.get_i32(4)
-    }
-
-    pub fn get_kafka_offset(&self) -> Result<i64, std::io::Error> {
-        self.reader.get_i64(5)
-    }
 }
 
 pub fn create_output_format(
@@ -134,7 +94,36 @@ pub fn create_output_format(
     )
 }
 
-pub fn create_input_format(
+pub fn create_output_format_from_props(
+    properties: &Properties,
+    fn_name: Option<String>,
+) -> anyhow::Result<KafkaOutputFormat> {
+    let fn_name = fn_name.unwrap_or(OUTPUT_FORMAT_FN_NAME_DEFAULT.to_owned());
+    let sink_properties = properties.get_sink_properties(fn_name.as_str());
+    let kafka_properties = sink_properties.get_sub_properties(KAFKA);
+
+    let mut client_config = ClientConfig::new();
+    let bootstrap_servers = kafka_properties.get_string(BOOTSTRAP_SERVERS)?;
+    client_config.set(BOOTSTRAP_SERVERS, bootstrap_servers);
+
+    let topic = match kafka_properties.get_string(TOPICS) {
+        Ok(topics) => {
+            let topics: Vec<String> = serde_json::from_str(topics.as_str())
+                .map_err(|_e| anyhow!("topics '{}' is not array", topics))?;
+            Some(topics[0].clone())
+        }
+        Err(_e) => None,
+    };
+
+    let buffer_size = kafka_properties
+        .get_usize(BUFFER_SIZE)
+        .unwrap_or(SOURCE_CHANNEL_SIZE);
+
+    let kafka_output_format = KafkaOutputFormat::new(client_config, topic, buffer_size);
+    Ok(kafka_output_format)
+}
+
+pub fn create_input_format_from_props(
     properties: &Properties,
     fn_name: Option<String>,
     deserializer_builder: Option<Box<dyn KafkaRecordDeserializerBuilder>>,
@@ -163,11 +152,13 @@ pub fn create_input_format(
     } else {
         let begin_offset = replay_properties.get_string(OFFSET_BEGIN)?;
         let begin_offset = parse_replay_offset(begin_offset.as_str())?;
+
         let mut end_offset = None;
         if let Ok(end_offset_str) = replay_properties.get_string(OFFSET_END) {
             let end_offset_map = parse_replay_offset(end_offset_str.as_str())?;
             end_offset = Some(end_offset_map);
         }
+
         OffsetRange::Direct {
             begin_offset,
             end_offset,
@@ -178,7 +169,9 @@ pub fn create_input_format(
         let deserializer_builder: Box<dyn KafkaRecordDeserializerBuilder> =
             Box::new(DefaultKafkaRecordDeserializerBuilder::<
                 DefaultKafkaRecordDeserializer,
-            >::new());
+            >::new(FnSchema::from(
+                &kafka_message::FIELD_METADATA,
+            )));
         deserializer_builder
     });
 
@@ -197,6 +190,7 @@ fn parse_replay_offset(
 ) -> anyhow::Result<HashMap<String, Vec<PartitionOffset>>> {
     let offset: HashMap<String, Vec<i64>> = serde_json::from_str(offset_config)
         .map_err(|_e| anyhow!("offset config is illegal: {}", offset_config))?;
+
     let mut partition_offset = HashMap::new();
     for (topic, vec) in offset {
         let mut offset_vec = Vec::new();
@@ -205,6 +199,7 @@ fn parse_replay_offset(
         }
         partition_offset.insert(topic, offset_vec);
     }
+
     Ok(partition_offset)
 }
 
@@ -265,7 +260,9 @@ impl InputFormatBuilder {
             let deserializer_builder: Box<dyn KafkaRecordDeserializerBuilder> =
                 Box::new(DefaultKafkaRecordDeserializerBuilder::<
                     DefaultKafkaRecordDeserializer,
-                >::new());
+                >::new(FnSchema::from(
+                    &kafka_message::FIELD_METADATA,
+                )));
 
             deserializer_builder
         });

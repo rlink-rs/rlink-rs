@@ -4,6 +4,7 @@ use std::time::Duration;
 use crate::core::checkpoint::CheckpointFunction;
 use crate::core::function::NamedFunction;
 use crate::core::watermark::{TimestampAssigner, WatermarkGenerator, WatermarkStrategy};
+use crate::functions::column_locate::ColumnLocateBuilder;
 use crate::functions::watermark::watermarks_with_idleness::WatermarksWithIdleness;
 use crate::functions::watermark::{
     BoundedOutOfOrdernessWatermarks, SchemaTimestampAssigner, TimePeriodicWatermarks,
@@ -54,8 +55,8 @@ impl DefaultWatermarkStrategy {
         }
     }
 
-    pub fn for_schema_timestamp_assigner(mut self, column: usize, field_types: &[u8]) -> Self {
-        self.timestamp_assigner = Some(Box::new(SchemaTimestampAssigner::new(column, field_types)));
+    pub fn for_schema_timestamp_assigner<T: ColumnLocateBuilder>(mut self, column: T) -> Self {
+        self.timestamp_assigner = Some(Box::new(SchemaTimestampAssigner::new(column)));
         self
     }
 

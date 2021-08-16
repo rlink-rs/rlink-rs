@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use crate::core::checkpoint::CheckpointFunction;
 use crate::core::element::Record;
-use crate::core::function::NamedFunction;
+use crate::core::function::{Context, NamedFunction};
 
 pub const MAX_WATERMARK: Watermark = Watermark {
     timestamp: 253402185600000u64,
@@ -45,6 +45,8 @@ impl PartialEq for Watermark {
 /// Timestamps can be an arbitrary `u64` value, but all built-in implementations represent it as the
 /// milliseconds since the Epoch (midnight, January 1, 1970 UTC).
 pub trait TimestampAssigner: Debug {
+    fn open(&mut self, context: &Context) -> crate::core::Result<()>;
+
     /// Assigns a timestamp to an element, in milliseconds since the Epoch. This is independent of
     /// any particular time zone or calendar.
     fn extract_timestamp(&mut self, row: &mut Record, previous_element_timestamp: u64) -> u64;

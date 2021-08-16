@@ -4,6 +4,7 @@ use std::ops::Index;
 
 use daggy::{Dag, EdgeIndex, NodeIndex};
 
+use crate::core::element::FnSchema;
 use crate::core::operator::{
     DefaultStreamOperator, FunctionCreator, StreamOperator, TStreamOperator, DEFAULT_PARALLELISM,
 };
@@ -18,6 +19,8 @@ pub struct StreamNode {
     pub(crate) id: OperatorId,
     pub(crate) parent_ids: Vec<OperatorId>,
     pub(crate) parallelism: u16,
+    pub(crate) input_schema: FnSchema,
+    pub(crate) output_schema: FnSchema,
     pub(crate) daemon: bool,
 
     pub(crate) operator_name: String,
@@ -139,10 +142,28 @@ impl RawStreamGraph {
         let operator_id = self.id_gen;
         self.id_gen.0 = self.id_gen.0 + 1;
 
+        let input_schema = match parent_operator_ids.len() {
+            0 => FnSchema::Empty,
+            1 => {
+                let (p_node_index, _p_operator) =
+                    self.operators.get(&parent_operator_ids[0]).unwrap();
+                self.dag.index(*p_node_index).output_schema.clone()
+            }
+            _ => {
+                let (p_node_index, _p_operator) = self
+                    .operators
+                    .get(&parent_operator_ids[parent_operator_ids.len() - 1])
+                    .unwrap();
+                self.dag.index(*p_node_index).output_schema.clone()
+            }
+        };
+
         let stream_node = StreamNode {
             id: operator_id,
             parent_ids: parent_operator_ids.clone(),
             parallelism,
+            input_schema: input_schema.clone(),
+            output_schema: operator.schema(input_schema),
             daemon: operator.is_daemon(),
             operator_name: operator.operator_name().to_string(),
             operator_type: OperatorType::from(&operator),

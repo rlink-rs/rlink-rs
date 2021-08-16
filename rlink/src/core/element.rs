@@ -5,7 +5,9 @@ use std::cmp::Ordering;
 use std::fmt::Debug;
 
 use bytes::{Buf, BufMut, BytesMut};
+use serbuffer::FieldMetadata;
 
+use crate::core::data_types::Schema;
 use crate::core::runtime::{ChannelKey, CheckpointId};
 use crate::core::watermark::{MAX_WATERMARK, MIN_WATERMARK};
 use crate::core::window::Window;
@@ -18,8 +20,55 @@ pub type Buffer = serbuffer::Buffer;
 pub type BufferReader<'a, 'b> = serbuffer::BufferReader<'a, 'b>;
 pub type BufferMutReader<'a, 'b> = serbuffer::BufferMutReader<'a, 'b>;
 pub type BufferWriter<'a, 'b> = serbuffer::BufferWriter<'a, 'b>;
-pub mod types {
-    pub use serbuffer::types::*;
+// pub mod types {
+//     pub use serbuffer::types::*;
+// }
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum FnSchema {
+    Empty,
+    Single(Schema),
+    Tuple(Schema, Schema),
+}
+
+impl FnSchema {
+    pub fn first(&self) -> &Schema {
+        match self {
+            Self::Single(v) => v,
+            Self::Tuple(v, _v1) => v,
+            _ => panic!("no schema"),
+        }
+    }
+}
+
+impl<'a> From<&'a Schema> for FnSchema {
+    fn from(schema: &'a Schema) -> Self {
+        FnSchema::Single(schema.clone())
+    }
+}
+
+impl<'a, const N: usize> From<&'a FieldMetadata<N>> for FnSchema {
+    fn from(metadata: &'a FieldMetadata<N>) -> Self {
+        FnSchema::Single(Schema::from(metadata))
+    }
+}
+
+impl Into<Schema> for FnSchema {
+    fn into(self) -> Schema {
+        match self {
+            FnSchema::Single(v) => v,
+            _ => panic!("only support `Single`"),
+        }
+    }
+}
+
+impl Into<(Schema, Schema)> for FnSchema {
+    fn into(self) -> (Schema, Schema) {
+        match self {
+            FnSchema::Tuple(v0, v1) => (v0, v1),
+            _ => panic!("only support `Tuple`"),
+        }
+    }
 }
 
 pub(crate) trait Partition {
@@ -663,7 +712,8 @@ impl From<Barrier> for Element {
 mod tests {
     use std::borrow::BorrowMut;
 
-    use crate::core::element::types;
+    use serbuffer::types;
+
     use crate::core::element::{Element, Record, Serde, StreamStatus, Watermark};
 
     #[test]
@@ -672,14 +722,20 @@ mod tests {
         record.partition_num = 2;
         record.timestamp = 3;
 
-        let data_types = vec![types::U32, types::U64, types::I32, types::I64, types::BYTES];
+        let data_types = vec![
+            types::U32,
+            types::U64,
+            types::I32,
+            types::I64,
+            types::BINARY,
+        ];
         let mut writer = record.as_writer(&data_types);
 
         writer.set_u32(10).unwrap();
         writer.set_u64(20).unwrap();
         writer.set_i32(30).unwrap();
         writer.set_i64(40).unwrap();
-        writer.set_bytes("abc".as_bytes()).unwrap();
+        writer.set_binary("abc".as_bytes()).unwrap();
 
         let record_clone = record.clone();
         let reader = record.as_reader(&data_types);
@@ -694,8 +750,8 @@ mod tests {
         assert_eq!(reader.get_i32(2).unwrap(), de_reader.get_i32(2).unwrap());
         assert_eq!(reader.get_i64(3).unwrap(), de_reader.get_i64(3).unwrap());
         assert_eq!(
-            reader.get_bytes(4).unwrap(),
-            de_reader.get_bytes(4).unwrap()
+            reader.get_binary(4).unwrap(),
+            de_reader.get_binary(4).unwrap()
         );
     }
 

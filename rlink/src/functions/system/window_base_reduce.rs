@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use crate::core::backend::KeyedStateBackend;
 use crate::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
-use crate::core::element::Record;
+use crate::core::element::{FnSchema, Record};
 use crate::core::function::{BaseReduceFunction, Context, NamedFunction, ReduceFunction};
 use crate::core::properties::SystemProperties;
 use crate::core::runtime::CheckpointId;
@@ -74,7 +74,8 @@ impl BaseReduceFunction for WindowBaseReduceFunction {
             state_mode,
         ));
         self.initialize_state(&context.checkpoint_context(), &context.checkpoint_handle);
-        Ok(())
+
+        self.reduce.open(context)
     }
 
     fn reduce(&mut self, key: Record, mut record: Record) {
@@ -141,6 +142,20 @@ impl BaseReduceFunction for WindowBaseReduceFunction {
 
     fn close(&mut self) -> crate::core::Result<()> {
         Ok(())
+    }
+
+    fn value_schema(&self, input_schema: FnSchema) -> FnSchema {
+        self.reduce.schema(input_schema)
+        // let value_schema = self.reduce.schema();
+        // match input_schema {
+        //     Schema::Single(_record_schema) => value_schema,
+        //     Schema::Tuple(_record_schema, mut key_schema) => {
+        //         let v: Vec<u8> = value_schema.into();
+        //         key_schema.extend_from_slice(v.as_slice());
+        //         Schema::Single(key_schema)
+        //     }
+        //     Schema::Empty => panic!("unreached!"),
+        // }
     }
 }
 
