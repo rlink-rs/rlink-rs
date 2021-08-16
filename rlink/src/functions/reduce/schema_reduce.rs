@@ -275,7 +275,6 @@ impl<T: ValueAgg> Aggregation for BasicAggregation<T> {
                         } else {
                             record_value
                         }
-                        // std::cmp::max(basic_value, record_value)
                     }
                     BasicAggType::Min => {
                         if basic_value > record_value {
@@ -283,7 +282,6 @@ impl<T: ValueAgg> Aggregation for BasicAggregation<T> {
                         } else {
                             basic_value
                         }
-                        // std::cmp::min(basic_value, record_value)
                     }
                 }
             }

@@ -97,7 +97,7 @@ impl OutputFormat for PrintOutputFormat {
             "{}, {}, {}",
             self.task_id.task_number,
             window_str,
-            field_str_vec.join(","),
+            field_str_vec.join(", "),
         );
     }
 
