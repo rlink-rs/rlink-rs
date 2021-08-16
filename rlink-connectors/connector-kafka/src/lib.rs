@@ -44,6 +44,7 @@ pub const OFFSET_BEGIN: &str = "offset.begin";
 pub const OFFSET_END: &str = "offset.end";
 
 pub const INPUT_FORMAT_FN_NAME_DEFAULT: &str = "KafkaInputFormat";
+pub const OUTPUT_FORMAT_FN_NAME_DEFAULT: &str = "KafkaOutputFormat";
 
 pub const SOURCE_CHANNEL_SIZE: usize = 50000;
 pub const SINK_CHANNEL_SIZE: usize = 50000;
@@ -93,7 +94,36 @@ pub fn create_output_format(
     )
 }
 
-pub fn create_input_format(
+pub fn create_output_format_from_props(
+    properties: &Properties,
+    fn_name: Option<String>,
+) -> anyhow::Result<KafkaOutputFormat> {
+    let fn_name = fn_name.unwrap_or(OUTPUT_FORMAT_FN_NAME_DEFAULT.to_owned());
+    let sink_properties = properties.get_sink_properties(fn_name.as_str());
+    let kafka_properties = sink_properties.get_sub_properties(KAFKA);
+
+    let mut client_config = ClientConfig::new();
+    let bootstrap_servers = kafka_properties.get_string(BOOTSTRAP_SERVERS)?;
+    client_config.set(BOOTSTRAP_SERVERS, bootstrap_servers);
+
+    let topic = match kafka_properties.get_string(TOPICS) {
+        Ok(topics) => {
+            let topics: Vec<String> = serde_json::from_str(topics.as_str())
+                .map_err(|_e| anyhow!("topics '{}' is not array", topics))?;
+            Some(topics[0].clone())
+        }
+        Err(_e) => None,
+    };
+
+    let buffer_size = kafka_properties
+        .get_usize(BUFFER_SIZE)
+        .unwrap_or(SOURCE_CHANNEL_SIZE);
+
+    let kafka_output_format = KafkaOutputFormat::new(client_config, topic, buffer_size);
+    Ok(kafka_output_format)
+}
+
+pub fn create_input_format_from_props(
     properties: &Properties,
     fn_name: Option<String>,
     deserializer_builder: Option<Box<dyn KafkaRecordDeserializerBuilder>>,
