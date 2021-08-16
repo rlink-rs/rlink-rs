@@ -1,36 +1,53 @@
 use crate::core::checkpoint::CheckpointFunction;
-use crate::core::data_types::Schema;
+use crate::core::data_types::{Field, Schema};
 use crate::core::element::{FnSchema, Record};
 use crate::core::function::{Context, KeySelectorFunction, NamedFunction};
+use crate::functions::column_locate::{ColumnLocate, ColumnLocateBuilder};
 
 #[derive(Debug)]
 pub struct SchemaKeySelector {
     schema: Schema,
     key_schema: Schema,
+    column_locates: Vec<ColumnLocate>,
+
     columns: Vec<usize>,
 }
 
 impl SchemaKeySelector {
-    pub fn new(columns: Vec<usize>) -> Self {
+    pub fn new<T: ColumnLocateBuilder>(columns: Vec<T>) -> Self {
+        let column_locates: Vec<ColumnLocate> = columns.into_iter().map(|x| x.build()).collect();
         SchemaKeySelector {
-            columns,
+            column_locates,
             schema: Schema::empty(),
             key_schema: Schema::empty(),
+            columns: vec![],
         }
+    }
+
+    fn key_column(&self, schema: &Schema) -> (Vec<usize>, Vec<Field>) {
+        let mut columns = Vec::new();
+        let mut fields = Vec::new();
+
+        for column_locate in &self.column_locates {
+            let (index, field) = column_locate.to_column(&schema);
+            columns.push(index);
+            fields.push(field.clone());
+        }
+
+        (columns, fields)
     }
 }
 
 impl KeySelectorFunction for SchemaKeySelector {
     fn open(&mut self, context: &Context) -> crate::core::Result<()> {
         // if `KeySelector` opened in `Reduce` operator, the `input_schema` is a Tuple
-        let schema = match &context.input_schema {
-            FnSchema::Single(field_types) => field_types,
-            FnSchema::Tuple(field_types, _key_field_types) => field_types,
-            _ => panic!("input schema not found in selector operator"),
-        };
+        let schema = context.input_schema.first();
 
         self.schema = schema.clone();
         self.key_schema = self.key_schema(FnSchema::from(&self.schema)).into();
+
+        let (columns, _fields) = self.key_column(&self.schema);
+        self.columns = columns;
 
         Ok(())
     }
@@ -56,7 +73,9 @@ impl KeySelectorFunction for SchemaKeySelector {
 
     fn key_schema(&self, input_schema: FnSchema) -> FnSchema {
         let schema: Schema = input_schema.into();
-        let key_schema = schema.sub_schema(self.columns.as_slice());
+        let (_columns, fields) = self.key_column(&schema);
+
+        let key_schema = Schema::new(fields);
         if key_schema.is_empty() {
             panic!("key not found");
         }
