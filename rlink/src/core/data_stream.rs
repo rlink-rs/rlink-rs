@@ -65,7 +65,7 @@ pub trait TKeyedStream {
 }
 
 pub trait TWindowedStream {
-    fn reduce<F>(self, reduce: F, parallelism: u16) -> DataStream
+    fn reduce<F>(self, reduce: F) -> DataStream
     where
         F: ReduceFunction + 'static;
 }
@@ -225,11 +225,11 @@ impl WindowedStream {
 }
 
 impl TWindowedStream for WindowedStream {
-    fn reduce<F>(self, reduce: F, parallelism: u16) -> DataStream
+    fn reduce<F>(self, reduce: F) -> DataStream
     where
         F: ReduceFunction + 'static,
     {
-        self.windowed_stream.reduce(reduce, parallelism)
+        self.windowed_stream.reduce(reduce)
     }
 }
 
@@ -416,10 +416,11 @@ impl TKeyedStream for StreamBuilder {
 }
 
 impl TWindowedStream for StreamBuilder {
-    fn reduce<F>(mut self, reduce: F, parallelism: u16) -> DataStream
+    fn reduce<F>(mut self, reduce: F) -> DataStream
     where
         F: ReduceFunction + 'static,
     {
+        let parallelism = reduce.parallelism();
         let reduce_func = Box::new(reduce);
         let base_reduce_func = Box::new(WindowBaseReduceFunction::new(reduce_func));
         let stream_reduce = StreamOperator::new_reduce(parallelism, base_reduce_func);

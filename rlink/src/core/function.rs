@@ -132,6 +132,7 @@ where
     }
 
     fn schema(&self, input_schema: FnSchema) -> FnSchema;
+    fn parallelism(&self) -> u16;
 }
 
 pub trait OutputFormat
@@ -205,11 +206,11 @@ where
     Self: NamedFunction,
 {
     fn open(&mut self, context: &Context) -> crate::core::Result<()>;
-    ///
     fn reduce(&self, value: Option<&mut Record>, record: &mut Record) -> Record;
     fn close(&mut self) -> crate::core::Result<()>;
 
     fn schema(&self, input_schema: FnSchema) -> FnSchema;
+    fn parallelism(&self) -> u16;
 }
 
 pub(crate) trait BaseReduceFunction

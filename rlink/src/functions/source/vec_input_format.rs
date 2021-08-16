@@ -8,6 +8,7 @@ use crate::core::function::{Context, InputFormat, InputSplit, InputSplitSource, 
 pub fn vec_source(
     data: Vec<Record>,
     schema: Schema,
+    parallelism: u16,
 ) -> IteratorInputFormat<impl FnOnce(InputSplit, Context) -> Box<dyn Iterator<Item = Record> + Send>>
 {
     let n = IteratorInputFormat::new(
@@ -31,6 +32,7 @@ pub fn vec_source(
             Box::new(task_data.into_iter())
         },
         schema,
+        parallelism,
     );
     n
 }
@@ -39,6 +41,8 @@ pub struct IteratorInputFormat<T>
 where
     T: FnOnce(InputSplit, Context) -> Box<dyn Iterator<Item = Record> + Send>,
 {
+    parallelism: u16,
+
     vec_builder: Option<T>,
     schema: Schema,
 
@@ -50,8 +54,9 @@ impl<T> IteratorInputFormat<T>
 where
     T: FnOnce(InputSplit, Context) -> Box<dyn Iterator<Item = Record> + Send>,
 {
-    pub fn new(vec_builder: T, schema: Schema) -> Self {
+    pub fn new(vec_builder: T, schema: Schema, parallelism: u16) -> Self {
         IteratorInputFormat {
+            parallelism,
             vec_builder: Some(vec_builder),
             schema,
             input_split: None,
@@ -90,6 +95,10 @@ where
 
     fn schema(&self, _input_schema: FnSchema) -> FnSchema {
         FnSchema::from(&self.schema)
+    }
+
+    fn parallelism(&self) -> u16 {
+        self.parallelism
     }
 }
 

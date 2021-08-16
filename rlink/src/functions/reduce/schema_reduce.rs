@@ -485,6 +485,8 @@ impl Aggregation for PctAggregation {
 
 #[derive(Debug)]
 pub struct SchemaReduceFunction {
+    parallelism: u16,
+
     schema: Schema,
     val_schema: Schema,
 
@@ -495,9 +497,10 @@ pub struct SchemaReduceFunction {
 }
 
 impl SchemaReduceFunction {
-    pub fn new(agg_descriptors: Vec<AggregationDescriptor>) -> Self {
+    pub fn new(agg_descriptors: Vec<AggregationDescriptor>, parallelism: u16) -> Self {
         // let val_len = val_data_types.len() * 8;
         SchemaReduceFunction {
+            parallelism,
             schema: Schema::empty(),
             val_schema: Schema::empty(),
             val_len: 0,
@@ -576,6 +579,10 @@ impl ReduceFunction for SchemaReduceFunction {
         let val_fields: Vec<Field> = self.agg_schema(schema).1;
 
         FnSchema::Single(Schema::new(val_fields))
+    }
+
+    fn parallelism(&self) -> u16 {
+        self.parallelism
     }
 }
 

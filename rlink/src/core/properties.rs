@@ -82,6 +82,28 @@ impl Properties {
         }
     }
 
+    pub fn set_i16(&mut self, key: &str, value: i16) {
+        self.set_string(key.to_string(), value.to_string());
+    }
+
+    pub fn get_i16(&self, key: &str) -> anyhow::Result<i16> {
+        match self.properties.get(key) {
+            Some(v) => i16::from_str(v).map_err(|e| anyhow!(e)),
+            None => Err(anyhow!("`{}` field not found", key)),
+        }
+    }
+
+    pub fn set_u16(&mut self, key: &str, value: u16) {
+        self.set_string(key.to_string(), value.to_string());
+    }
+
+    pub fn get_u16(&self, key: &str) -> anyhow::Result<u16> {
+        match self.properties.get(key) {
+            Some(v) => u16::from_str(v).map_err(|e| anyhow!(e)),
+            None => Err(anyhow!("`{}` field not found", key)),
+        }
+    }
+
     pub fn set_i32(&mut self, key: &str, value: i32) {
         self.set_string(key.to_string(), value.to_string());
     }

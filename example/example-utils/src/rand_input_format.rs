@@ -9,11 +9,13 @@ use rlink::utils::date_time::current_timestamp_millis;
 use crate::buffer_gen::model;
 
 #[derive(Debug, Function)]
-pub struct RandInputFormat {}
+pub struct RandInputFormat {
+    parallelism: u16,
+}
 
 impl RandInputFormat {
-    pub fn new() -> Self {
-        RandInputFormat {}
+    pub fn new(parallelism: u16) -> Self {
+        RandInputFormat { parallelism }
     }
 }
 
@@ -34,6 +36,10 @@ impl InputFormat for RandInputFormat {
 
     fn schema(&self, _input_schema: FnSchema) -> FnSchema {
         FnSchema::from(&model::FIELD_METADATA)
+    }
+
+    fn parallelism(&self) -> u16 {
+        self.parallelism
     }
 }
 

@@ -59,10 +59,11 @@ impl StreamApp for KafkaGenAppStream {
 
         let sink = create_output_format(conf_map, Some(kafka_topic_sink.clone()), None);
 
-        env.register_source(
-            vec_source(gen_records(), Schema::from(&model::FIELD_METADATA)),
+        env.register_source(vec_source(
+            gen_records(),
+            Schema::from(&model::FIELD_METADATA),
             3,
-        )
+        ))
         .flat_map(OutputMapperFunction::new(kafka_topic_sink))
         .add_sink(sink);
     }
@@ -107,12 +108,12 @@ impl StreamApp for KafkaOffsetRangeAppStream {
             conf_map.insert(BOOTSTRAP_SERVERS.to_string(), kafka_broker_servers_source);
             conf_map.insert(GROUP_ID.to_string(), kafka_group_id);
 
-            InputFormatBuilder::new(conf_map, vec![kafka_topic_source.clone()], None)
+            InputFormatBuilder::new(conf_map, vec![kafka_topic_source.clone()], None, 3)
                 .offset_range(gen_kafka_offset_range(kafka_topic_source.as_str()))
                 .build()
         };
 
-        env.register_source(kafka_input_format, 3)
+        env.register_source(kafka_input_format)
             .add_sink(print_sink());
     }
 }
@@ -163,12 +164,17 @@ impl StreamApp for KafkaReplayAppStream {
             conf_map.insert(BOOTSTRAP_SERVERS.to_string(), kafka_broker_servers_source);
             conf_map.insert(GROUP_ID.to_string(), kafka_group_id);
 
-            InputFormatBuilder::new(conf_map, vec![kafka_topic_source.clone()], None)
-                .offset_range(gen_kafka_offset_range(kafka_topic_source.as_str()))
-                .build()
+            InputFormatBuilder::new(
+                conf_map,
+                vec![kafka_topic_source.clone()],
+                None,
+                source_parallelism,
+            )
+            .offset_range(gen_kafka_offset_range(kafka_topic_source.as_str()))
+            .build()
         };
 
-        env.register_source(kafka_input_format, source_parallelism)
+        env.register_source(kafka_input_format)
             .flat_map(InputMapperFunction::new())
             .assign_timestamps_and_watermarks(
                 DefaultWatermarkStrategy::new()
@@ -181,7 +187,7 @@ impl StreamApp for KafkaReplayAppStream {
                 Duration::from_secs(20),
                 None,
             ))
-            .reduce(SchemaReduceFunction::new(vec![sum(model::index::value)]), 2)
+            .reduce(SchemaReduceFunction::new(vec![sum(model::index::value)], 2))
             .add_sink(print_sink());
     }
 }

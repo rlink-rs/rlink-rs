@@ -37,10 +37,11 @@ impl StreamExecutionEnvironment {
         }
     }
 
-    pub fn register_source<I>(&mut self, input_format: I, parallelism: u16) -> DataStream
+    pub fn register_source<I>(&mut self, input_format: I) -> DataStream
     where
         I: InputFormat + 'static,
     {
+        let parallelism = input_format.parallelism();
         let stream_builder = StreamBuilder::with_source(
             self.stream_manager.clone(),
             Box::new(input_format),

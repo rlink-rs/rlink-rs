@@ -22,6 +22,8 @@ const CREATE_KAFKA_CONNECTION: &'static str = "create_kafka_connection";
 
 #[derive(NamedFunction)]
 pub struct KafkaInputFormat {
+    parallelism: u16,
+
     client_config: ClientConfig,
     topics: Vec<String>,
 
@@ -43,9 +45,11 @@ impl KafkaInputFormat {
         buffer_size: usize,
         offset_range: OffsetRange,
         deserializer_builder: Box<dyn KafkaRecordDeserializerBuilder>,
+        parallelism: u16,
     ) -> Self {
         let schema = deserializer_builder.schema();
         KafkaInputFormat {
+            parallelism,
             client_config,
             topics,
             buffer_size,
@@ -201,6 +205,10 @@ impl InputFormat for KafkaInputFormat {
 
     fn schema(&self, _input_schema: FnSchema) -> FnSchema {
         self.schema.clone()
+    }
+
+    fn parallelism(&self) -> u16 {
+        self.parallelism
     }
 }
 

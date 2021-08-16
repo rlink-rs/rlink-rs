@@ -22,7 +22,7 @@ impl StreamApp for FilesStreamApp {
     }
 
     fn build_stream(&self, _properties: &Properties, env: &mut StreamExecutionEnvironment) {
-        env.register_source(RandInputFormat::new(), 3)
+        env.register_source(RandInputFormat::new(3))
             .add_sink(create_hdfs_sink(&FIELD_TYPE));
     }
 }

@@ -32,10 +32,11 @@ impl StreamApp for SimpleStreamApp {
     }
 
     fn build_stream(&self, _properties: &Properties, env: &mut StreamExecutionEnvironment) {
-        env.register_source(
-            vec_source(gen_records(), Schema::from(&model::FIELD_METADATA)),
+        env.register_source(vec_source(
+            gen_records(),
+            Schema::from(&model::FIELD_METADATA),
             3,
-        )
+        ))
         .flat_map(MyFlatMapFunction::new())
         .filter(MyFilterFunction::new())
         .assign_timestamps_and_watermarks(
@@ -50,15 +51,15 @@ impl StreamApp for SimpleStreamApp {
             Duration::from_secs(20),
             None,
         ))
-        .reduce(
-            SchemaReduceFunction::new(vec![
+        .reduce(SchemaReduceFunction::new(
+            vec![
                 sum(model::index::value),
                 max(model::index::value),
                 min(model::index::value),
                 count(),
-            ]),
+            ],
             2,
-        )
+        ))
         .add_sink(print_sink());
     }
 

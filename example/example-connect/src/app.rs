@@ -32,18 +32,18 @@ impl StreamApp for ConnectStreamApp0 {
 
     fn build_stream(&self, _properties: &Properties, env: &mut StreamExecutionEnvironment) {
         let data_stream_left = env
-            .register_source(RandInputFormat::new(), 2)
+            .register_source(RandInputFormat::new(2))
             .assign_timestamps_and_watermarks(
                 DefaultWatermarkStrategy::new()
                     .for_bounded_out_of_orderness(Duration::from_secs(1))
                     .for_schema_timestamp_assigner(model::index::timestamp),
             );
         let data_stream_right = env
-            .register_source(ConfigInputFormat::new("Broadcast"), 1)
+            .register_source(ConfigInputFormat::new("Broadcast"))
             .flat_map(BroadcastFlagMapFunction::new());
 
         let data_stream_right1 = env
-            .register_source(ConfigInputFormat::new("RoundRobin"), 1)
+            .register_source(ConfigInputFormat::new("RoundRobin"))
             .flat_map(RoundRobinFlagMapFunction::new());
 
         data_stream_left
@@ -60,13 +60,13 @@ impl StreamApp for ConnectStreamApp0 {
                 Duration::from_secs(60),
                 None,
             ))
-            .reduce(
-                SchemaReduceFunction::new(vec![
+            .reduce(SchemaReduceFunction::new(
+                vec![
                     sum(model::index::value),
                     pct(model::index::value, get_percentile_scale()),
-                ]),
+                ],
                 2,
-            )
+            ))
             .add_sink(print_sink());
     }
 }
@@ -88,18 +88,18 @@ impl StreamApp for ConnectStreamApp1 {
 
     fn build_stream(&self, _properties: &Properties, env: &mut StreamExecutionEnvironment) {
         let data_stream_left = env
-            .register_source(RandInputFormat::new(), 3)
+            .register_source(RandInputFormat::new(3))
             .assign_timestamps_and_watermarks(
                 DefaultWatermarkStrategy::new()
                     .for_bounded_out_of_orderness(Duration::from_secs(3))
                     .for_schema_timestamp_assigner(model::index::timestamp),
             );
         let data_stream_right = env
-            .register_source(ConfigInputFormat::new("Broadcast"), 1)
+            .register_source(ConfigInputFormat::new("Broadcast"))
             .flat_map(BroadcastFlagMapFunction::new());
 
         let data_stream_right1 = env
-            .register_source(ConfigInputFormat::new("RoundRobin"), 1)
+            .register_source(ConfigInputFormat::new("RoundRobin"))
             .flat_map(RoundRobinFlagMapFunction::new());
 
         data_stream_left
@@ -113,13 +113,13 @@ impl StreamApp for ConnectStreamApp1 {
                 Duration::from_secs(10),
                 None,
             ))
-            .reduce(
-                SchemaReduceFunction::new(vec![
+            .reduce(SchemaReduceFunction::new(
+                vec![
                     sum(model::index::value),
                     pct(model::index::value, get_percentile_scale()),
-                ]),
+                ],
                 5,
-            )
+            ))
             .flat_map(OutputMapFunction::new(get_percentile_scale()))
             .connect(
                 vec![CoStream::from(data_stream_right1)],

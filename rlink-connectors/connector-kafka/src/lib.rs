@@ -132,6 +132,8 @@ pub fn create_input_format_from_props(
     let source_properties = properties.get_source_properties(fn_name.as_str());
     let kafka_properties = source_properties.get_sub_properties(KAFKA);
 
+    let parallelism = kafka_properties.get_u16("parallelism").unwrap();
+
     let mut client_config = ClientConfig::new();
     let bootstrap_servers = kafka_properties.get_string(BOOTSTRAP_SERVERS)?;
     let group_id = kafka_properties.get_string(GROUP_ID)?;
@@ -181,6 +183,7 @@ pub fn create_input_format_from_props(
         buffer_size,
         offset_range,
         deserializer_builder,
+        parallelism,
     );
     Ok(kafka_input_format)
 }
@@ -216,6 +219,7 @@ pub enum OffsetRange {
 }
 
 pub struct InputFormatBuilder {
+    parallelism: u16,
     conf_map: HashMap<String, String>,
     topics: Vec<String>,
     buffer_size: Option<usize>,
@@ -228,8 +232,10 @@ impl InputFormatBuilder {
         conf_map: HashMap<String, String>,
         topics: Vec<String>,
         deserializer_builder: Option<Box<dyn KafkaRecordDeserializerBuilder>>,
+        parallelism: u16,
     ) -> Self {
         InputFormatBuilder {
+            parallelism,
             conf_map,
             topics,
             buffer_size: None,
@@ -273,6 +279,7 @@ impl InputFormatBuilder {
             buffer_size,
             self.offset_range,
             deserializer_builder,
+            self.parallelism,
         )
     }
 }
