@@ -10,8 +10,11 @@ extern crate anyhow;
 pub mod sink;
 pub mod source;
 
-pub mod buffer_gen;
 pub mod state;
+
+pub mod buffer_gen {
+    include!(concat!(env!("OUT_DIR"), "/buffer_gen/mod.rs"));
+}
 
 pub use sink::output_format::KafkaOutputFormat;
 pub use source::input_format::KafkaInputFormat;

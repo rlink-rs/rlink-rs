@@ -16,6 +16,19 @@ Framework tested on Linux/MacOS/Windows, requires stable Rust.
 rlink = "0.6"
 ```
 
+```sql
+SELECT
+  HOP_START(timestamp, INTERVAL '20' SECOND, INTERVAL '60' SECOND),
+  HOP_END(timestamp, INTERVAL '20' SECOND, INTERVAL '60' SECOND),
+  name,
+  SUM(value),
+  MAX(value),
+  MIN(value),
+  COUNT(*),
+FROM stream_table
+GROUP BY HOP(timestamp, INTERVAL '20' SECOND, INTERVAL '60' SECOND), name
+```
+
 ```rust
 #[derive(Clone, Debug)]
 pub struct SimpleStreamApp {}
@@ -26,21 +39,21 @@ impl StreamApp for SimpleStreamApp {
     }
 
     fn build_stream(&self, _properties: &Properties, env: &mut StreamExecutionEnvironment) {
-        env.register_source(vec_source(gen_records(), &model::FIELD_TYPE), 1)
+        env.register_source(vec_source(gen_records(), &model::FIELD_METADATA), 1)
             .assign_timestamps_and_watermarks(
                 DefaultWatermarkStrategy::new()
                     .for_bounded_out_of_orderness(Duration::from_secs(1))
                     .wrap_time_periodic(Duration::from_secs(10), Duration::from_secs(20))
-                    .for_schema_timestamp_assigner(model::index::timestamp),
+                    .for_schema_timestamp_assigner("timestamp"),
             )
-            .key_by(SchemaKeySelector::new(vec![model::index::name]))
+            .key_by(SchemaKeySelector::new(vec!["name"]))
             .window(SlidingEventTimeWindows::new(
                 Duration::from_secs(60),
                 Duration::from_secs(20),
                 None,
             ))
             .reduce(
-                SchemaReduceFunction::new(vec![sum_i64(model::index::value)]),
+                SchemaReduceFunction::new(vec![sum("value"), max("value"), min("value"), count()]),
                 2,
             )
             .add_sink(print_sink());
