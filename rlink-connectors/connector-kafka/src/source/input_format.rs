@@ -15,8 +15,8 @@ use crate::source::checkpoint::KafkaCheckpointFunction;
 use crate::source::consumer::{create_kafka_consumer, ConsumerRange};
 use crate::source::deserializer::KafkaRecordDeserializerBuilder;
 use crate::source::iterator::KafkaRecordIterator;
+use crate::source::offset_range::OffsetRange;
 use crate::state::PartitionOffset;
-use crate::OffsetRange;
 
 const CREATE_KAFKA_CONNECTION: &'static str = "create_kafka_connection";
 

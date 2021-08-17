@@ -40,15 +40,20 @@ pub trait SystemProperties {
 
     fn set_pub_sub_channel_base(&mut self, base_on: ChannelBaseOn);
     fn get_pub_sub_channel_base(&self) -> anyhow::Result<ChannelBaseOn>;
+}
 
-    fn set_speed_backpressure_interval(&mut self, interval: Duration);
-    fn get_speed_backpressure_interval(&self) -> anyhow::Result<Duration>;
+pub trait FunctionProperties {
+    fn get_source_properties(&self, fn_name: &str) -> Properties;
 
-    fn set_speed_backpressure_max_times(&mut self, max_times: usize);
-    fn get_speed_backpressure_max_times(&self) -> anyhow::Result<usize>;
+    fn get_window_properties(&self, fn_name: &str) -> Properties;
 
-    fn set_speed_backpressure_pause_time(&mut self, interval: Duration);
-    fn get_speed_backpressure_pause_time(&self) -> anyhow::Result<Duration>;
+    fn get_reduce_properties(&self, fn_name: &str) -> Properties;
+
+    fn get_filter_properties(&self, fn_name: &str) -> Properties;
+
+    fn get_sink_properties(&self, fn_name: &str) -> Properties;
+
+    fn get_custom_properties(&self, fn_name: &str) -> Properties;
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -65,6 +70,10 @@ impl Properties {
 
     pub fn as_map(&self) -> &HashMap<String, String> {
         &self.properties
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.properties.is_empty()
     }
 
     pub fn set_str(&mut self, key: &str, value: &str) {
@@ -176,8 +185,8 @@ impl Properties {
         Ok(Duration::from_millis(value))
     }
 
-    pub fn get_sub_properties(&self, pre_key: &str) -> Properties {
-        let pre_key = format!("{}.", pre_key);
+    pub fn to_sub_properties(&self, prefix_key: &str) -> Properties {
+        let pre_key = format!("{}.", prefix_key);
         let mut properties = Properties::new();
         for (key, value) in self.as_map() {
             if key.starts_with(pre_key.as_str()) {
@@ -188,34 +197,53 @@ impl Properties {
         properties
     }
 
-    pub fn get_source_properties(&self, fn_name: &str) -> Properties {
+    pub fn extend_sub_properties(&mut self, prefix_key: &str, properties: &Properties) {
+        for (sub_key, sub_val) in properties.as_map() {
+            let key = format!("{}.{}", prefix_key, sub_key);
+            self.properties.insert(key, sub_val.to_string());
+        }
+    }
+
+    pub fn to_lines_string(&self) -> String {
+        let mut lines: Vec<String> = self
+            .properties
+            .iter()
+            .map(|(k, v)| format!("{}:{}", k, v))
+            .collect();
+        lines.sort();
+        lines.join("\n")
+    }
+}
+
+impl FunctionProperties for Properties {
+    fn get_source_properties(&self, fn_name: &str) -> Properties {
         let pre_key = format!("source.{fn_name}", fn_name = fn_name);
-        self.get_sub_properties(pre_key.as_str())
+        self.to_sub_properties(pre_key.as_str())
     }
 
-    pub fn get_window_properties(&self, fn_name: &str) -> Properties {
+    fn get_window_properties(&self, fn_name: &str) -> Properties {
         let pre_key = format!("window.{fn_name}", fn_name = fn_name);
-        self.get_sub_properties(pre_key.as_str())
+        self.to_sub_properties(pre_key.as_str())
     }
 
-    pub fn get_reduce_properties(&self, fn_name: &str) -> Properties {
+    fn get_reduce_properties(&self, fn_name: &str) -> Properties {
         let pre_key = format!("reduce.{fn_name}", fn_name = fn_name);
-        self.get_sub_properties(pre_key.as_str())
+        self.to_sub_properties(pre_key.as_str())
     }
 
-    pub fn get_filter_properties(&self, fn_name: &str) -> Properties {
+    fn get_filter_properties(&self, fn_name: &str) -> Properties {
         let pre_key = format!("filter.{fn_name}", fn_name = fn_name);
-        self.get_sub_properties(pre_key.as_str())
+        self.to_sub_properties(pre_key.as_str())
     }
 
-    pub fn get_sink_properties(&self, fn_name: &str) -> Properties {
+    fn get_sink_properties(&self, fn_name: &str) -> Properties {
         let pre_key = format!("sink.{fn_name}", fn_name = fn_name);
-        self.get_sub_properties(pre_key.as_str())
+        self.to_sub_properties(pre_key.as_str())
     }
 
-    pub fn get_custom_properties(&self, fn_name: &str) -> Properties {
+    fn get_custom_properties(&self, fn_name: &str) -> Properties {
         let pre_key = format!("custom.{fn_name}", fn_name = fn_name);
-        self.get_sub_properties(pre_key.as_str())
+        self.to_sub_properties(pre_key.as_str())
     }
 }
 
@@ -228,9 +256,6 @@ const SYSTEM_CHECKPOINT_TTL: &str = "SYSTEM_CHECKPOINT_TTL";
 const SYSTEM_CLUSTER_MODE: &str = "SYSTEM_CLUSTER_MODE";
 const SYSTEM_PUB_SUB_CHANNEL_SIZE: &str = "SYSTEM_PUB_SUB_CHANNEL_SIZE";
 const SYSTEM_PUB_SUB_CHANNEL_BASE_ON: &str = "SYSTEM_PUB_SUB_CHANNEL_BASE_ON";
-const SYSTEM_SPEED_BACKPRESSURE_INTERVAL: &str = "SYSTEM_SPEED_BACKPRESSURE_INTERVAL";
-const SYSTEM_SPEED_BACKPRESSURE_MAX_TIMES: &str = "SYSTEM_SPEED_BACKPRESSURE_MAX_TIMES";
-const SYSTEM_SPEED_BACKPRESSURE_PAUSE_TIME: &str = "SYSTEM_SPEED_BACKPRESSURE_PAUSE_TIME";
 
 impl SystemProperties for Properties {
     fn set_application_name(&mut self, application_name: &str) {
@@ -317,30 +342,6 @@ impl SystemProperties for Properties {
         let value = self.get_string(SYSTEM_PUB_SUB_CHANNEL_BASE_ON)?;
         ChannelBaseOn::try_from(value.as_str()).map_err(|e| anyhow!(e))
     }
-
-    fn set_speed_backpressure_interval(&mut self, interval: Duration) {
-        self.set_duration(SYSTEM_SPEED_BACKPRESSURE_INTERVAL, interval);
-    }
-
-    fn get_speed_backpressure_interval(&self) -> anyhow::Result<Duration> {
-        self.get_duration(SYSTEM_SPEED_BACKPRESSURE_INTERVAL)
-    }
-
-    fn set_speed_backpressure_max_times(&mut self, max_times: usize) {
-        self.set_usize(SYSTEM_SPEED_BACKPRESSURE_MAX_TIMES, max_times);
-    }
-
-    fn get_speed_backpressure_max_times(&self) -> anyhow::Result<usize> {
-        self.get_usize(SYSTEM_SPEED_BACKPRESSURE_MAX_TIMES)
-    }
-
-    fn set_speed_backpressure_pause_time(&mut self, interval: Duration) {
-        self.set_duration(SYSTEM_SPEED_BACKPRESSURE_PAUSE_TIME, interval);
-    }
-
-    fn get_speed_backpressure_pause_time(&self) -> anyhow::Result<Duration> {
-        self.get_duration(SYSTEM_SPEED_BACKPRESSURE_PAUSE_TIME)
-    }
 }
 
 impl InnerSystemProperties for Properties {
@@ -369,7 +370,7 @@ mod tests {
         properties.set_str("a.b", "v");
         properties.set_str("a.b.c", "v");
         properties.set_str("a.b.c.d", "v");
-        let sub_properties = properties.get_sub_properties("a.b");
+        let sub_properties = properties.to_sub_properties("a.b");
         println!("{:?}", properties);
         println!("{:?}", sub_properties);
     }

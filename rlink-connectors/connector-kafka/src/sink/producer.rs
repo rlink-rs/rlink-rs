@@ -56,13 +56,11 @@ impl KafkaProducerThread {
 
                         let topic = match self.topic.as_ref() {
                             Some(topic) => topic.as_str(),
-                            None => {
-                                if topic.is_empty() {
-                                    panic!("topic not found in `KafkaRecord`");
-                                }
-                                topic
-                            }
+                            None => topic,
                         };
+                        if topic.is_empty() {
+                            panic!("topic not found in `KafkaRecord`");
+                        }
 
                         let future_record = FutureRecord::to(topic)
                             .payload(payload)

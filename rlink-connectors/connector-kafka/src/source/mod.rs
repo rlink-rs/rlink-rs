@@ -1,8 +1,10 @@
+pub mod builder;
 pub mod checkpoint;
 pub mod consumer;
 pub mod deserializer;
 pub mod input_format;
 pub mod iterator;
+pub mod offset_range;
 
 #[inline]
 pub(crate) fn empty_record() -> rlink::core::element::Record {
