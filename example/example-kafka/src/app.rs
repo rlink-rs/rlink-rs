@@ -7,7 +7,7 @@ use rlink::core::backend::KeyedStateBackend;
 use rlink::core::data_stream::{TDataStream, TKeyedStream, TWindowedStream};
 use rlink::core::data_types::Schema;
 use rlink::core::env::{StreamApp, StreamExecutionEnvironment};
-use rlink::core::properties::{Properties, SystemProperties};
+use rlink::core::properties::{FunctionProperties, Properties, SystemProperties};
 use rlink::functions::key_selector::SchemaKeySelector;
 use rlink::functions::reduce::{sum, SchemaReduceFunction};
 use rlink::functions::sink::print::print_sink;
@@ -17,6 +17,7 @@ use rlink::functions::window::SlidingEventTimeWindows;
 use rlink::utils::process::parse_arg;
 use rlink_connector_kafka::sink::builder::KafkaOutputFormatBuilder;
 use rlink_connector_kafka::source::builder::KafkaInputFormatBuilder;
+use rlink_connector_kafka::source::offset_range::OffsetRange;
 use rlink_connector_kafka::{
     state::PartitionOffset, BOOTSTRAP_SERVERS, GROUP_ID, KAFKA, OFFSET, TOPICS,
 };
@@ -25,7 +26,8 @@ use rlink_example_utils::gen_record::gen_records;
 
 use crate::input_mapper::InputMapperFunction;
 use crate::output_mapper::OutputMapperFunction;
-use rlink_connector_kafka::source::offset_range::OffsetRange;
+
+const KAFKA_FN: &'static str = "kafka_fn";
 
 #[derive(Clone, Debug)]
 pub struct KafkaGenAppStream {}
@@ -56,20 +58,19 @@ impl StreamApp for KafkaGenAppStream {
             let mut kafka_properties = Properties::new();
             kafka_properties.set_str(BOOTSTRAP_SERVERS, brokers.as_str());
 
-            sink_properties.extend_sub_properties(KAFKA, &kafka_properties);
+            sink_properties.extend_sub_properties(KAFKA, kafka_properties);
             sink_properties
         };
 
-        properties.extend_sub_properties("sink.kafka_fn", &kafka_sink_properties);
+        properties.extend_sink(KAFKA_FN, kafka_sink_properties);
 
         println!("{}", properties.to_lines_string());
     }
 
     fn build_stream(&self, properties: &Properties, env: &mut StreamExecutionEnvironment) {
-        let sink =
-            KafkaOutputFormatBuilder::try_from(properties.to_sub_properties("sink.kafka_fn"))
-                .unwrap()
-                .build();
+        let sink = KafkaOutputFormatBuilder::try_from(properties.to_sink(KAFKA_FN))
+            .unwrap()
+            .build();
 
         env.register_source(vec_source(
             gen_records(),
@@ -111,25 +112,24 @@ impl StreamApp for KafkaOffsetRangeAppStream {
             let mut kafka_properties = Properties::new();
             kafka_properties.set_str(BOOTSTRAP_SERVERS, brokers.as_str());
             kafka_properties.set_str(GROUP_ID, "rlink-test-consumer-group");
-            source_properties.extend_sub_properties(KAFKA, &kafka_properties);
+            source_properties.extend_sub_properties(KAFKA, kafka_properties);
 
             let offset_range = gen_kafka_offset_range(topic.as_str());
             let offset_properties = offset_range.into();
-            source_properties.extend_sub_properties(OFFSET, &offset_properties);
+            source_properties.extend_sub_properties(OFFSET, offset_properties);
 
             source_properties
         };
 
-        properties.extend_sub_properties("source.kafka_fn", &kafka_source_properties);
+        properties.extend_source(KAFKA_FN, kafka_source_properties);
 
         println!("{}", properties.to_lines_string());
     }
 
     fn build_stream(&self, properties: &Properties, env: &mut StreamExecutionEnvironment) {
-        let source =
-            KafkaInputFormatBuilder::try_from(properties.to_sub_properties("source.kafka_fn"))
-                .unwrap()
-                .build(None);
+        let source = KafkaInputFormatBuilder::try_from(properties.to_source(KAFKA_FN))
+            .unwrap()
+            .build(None);
 
         env.register_source(source).add_sink(print_sink());
     }
@@ -169,23 +169,22 @@ impl StreamApp for KafkaReplayAppStream {
             let mut kafka_properties = Properties::new();
             kafka_properties.set_str(BOOTSTRAP_SERVERS, brokers.as_str());
             kafka_properties.set_str(GROUP_ID, "rlink-test-consumer-group");
-            source_properties.extend_sub_properties(KAFKA, &kafka_properties);
+            source_properties.extend_sub_properties(KAFKA, kafka_properties);
 
             let offset_range = gen_kafka_offset_range(topic.as_str());
             let offset_properties = offset_range.into();
-            source_properties.extend_sub_properties(OFFSET, &offset_properties);
+            source_properties.extend_sub_properties(OFFSET, offset_properties);
 
             source_properties
         };
 
-        properties.extend_sub_properties("source.kafka_fn", &kafka_source_properties);
+        properties.extend_source(KAFKA_FN, kafka_source_properties);
     }
 
     fn build_stream(&self, properties: &Properties, env: &mut StreamExecutionEnvironment) {
-        let source =
-            KafkaInputFormatBuilder::try_from(properties.to_sub_properties("source.kafka_fn"))
-                .unwrap()
-                .build(None);
+        let source = KafkaInputFormatBuilder::try_from(properties.to_source(KAFKA_FN))
+            .unwrap()
+            .build(None);
 
         env.register_source(source)
             .flat_map(InputMapperFunction::new())
