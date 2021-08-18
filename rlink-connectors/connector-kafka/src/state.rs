@@ -37,7 +37,11 @@ impl PartitionOffsets {
     }
 
     pub fn update(&mut self, partition: i32, offset: i64) {
-        let offset = Offset::Offset(offset).to_raw().unwrap();
+        let kafka_offset = Offset::from_raw(offset);
+        let offset = match kafka_offset.to_raw() {
+            Some(offset) => offset,
+            None => panic!("illegal offset {}", offset),
+        };
 
         let partition_index = partition as usize;
         if partition_index >= self.partition_offsets.len() {
