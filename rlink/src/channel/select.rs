@@ -14,7 +14,7 @@ impl<'a> ChannelSelect<'a> {
 
     pub fn recv<T>(&mut self, r: &'a ChannelReceiver<T>) -> usize
     where
-        T: Clone,
+        T: Sync + Send,
     {
         self.select.recv(&r.receiver)
     }

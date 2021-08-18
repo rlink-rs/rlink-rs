@@ -3,11 +3,15 @@ use crate::channel::sender::ChannelSender;
 use crate::channel::{named_channel, RecvError, SendError, TryRecvError, TrySendError};
 use crate::core::element::Record;
 use crate::metrics::Tag;
+use std::fmt::Debug;
 
 #[derive(Clone, Debug)]
-pub struct Handover {
-    sender: ChannelSender<Record>,
-    receiver: ChannelReceiver<Record>,
+pub struct Handover<T = Record>
+where
+    T: Debug + Send + Sync,
+{
+    sender: ChannelSender<T>,
+    receiver: ChannelReceiver<T>,
 }
 
 impl Handover {

@@ -72,7 +72,7 @@ pub fn named_channel<T>(
     cap: usize,
 ) -> (ChannelSender<T>, ChannelReceiver<T>)
 where
-    T: Clone,
+    T: Sync + Send,
 {
     named_channel_with_base(name, tags, cap, ChannelBaseOn::Unbounded)
 }
@@ -84,7 +84,7 @@ pub fn named_channel_with_base<T>(
     base_on: ChannelBaseOn,
 ) -> (ChannelSender<T>, ChannelReceiver<T>)
 where
-    T: Clone,
+    T: Sync + Send,
 {
     info!(
         "Create channel named with {}, capacity: {}, base on: {}",

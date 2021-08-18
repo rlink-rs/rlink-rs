@@ -6,7 +6,7 @@ use crate::metrics::metric::{Counter, Gauge};
 #[derive(Clone, Debug)]
 pub struct ChannelSender<T>
 where
-    T: Clone,
+    T: Sync + Send,
 {
     name: String,
     guava_size_name: String,
@@ -21,7 +21,7 @@ where
 
 impl<T> ChannelSender<T>
 where
-    T: Clone,
+    T: Sync + Send,
 {
     pub fn new(
         name: &str,
