@@ -68,7 +68,7 @@ impl KafkaInputFormat {
     ) -> KafkaResult<Vec<ConsumerRange>> {
         let (begin_partition, end_partition) = match &self.offset_range {
             OffsetRange::None => {
-                let state = self.checkpoint.as_mut().unwrap().get_state();
+                let state = self.checkpoint.as_mut().unwrap().as_state_mut();
                 (state.get(topic.as_str(), partition), None)
             }
             OffsetRange::Direct {
@@ -195,7 +195,7 @@ impl InputFormat for KafkaInputFormat {
 
     fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record> + Send> {
         let handover = self.handover.as_ref().unwrap().clone();
-        let state_recorder = self.checkpoint.as_mut().unwrap().get_state().clone();
+        let state_recorder = self.checkpoint.as_mut().unwrap().as_state_mut().clone();
         Box::new(KafkaRecordIterator::new(handover, state_recorder))
     }
 

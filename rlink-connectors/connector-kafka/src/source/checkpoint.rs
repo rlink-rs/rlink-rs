@@ -21,7 +21,7 @@ impl KafkaCheckpointFunction {
         }
     }
 
-    pub fn get_state(&mut self) -> &mut KafkaSourceStateRecorder {
+    pub fn as_state_mut(&mut self) -> &mut KafkaSourceStateRecorder {
         self.state_recorder.as_mut().unwrap()
     }
 }

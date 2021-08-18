@@ -48,9 +48,14 @@ impl PartitionOffsets {
             for _ in self.partition_offsets.len()..(partition_index + 1) {
                 self.partition_offsets.push(None)
             }
+            self.partition_offsets[partition_index] = Some(PartitionOffset { partition, offset });
+            info!("add partition {}, offset: {}", partition, offset);
         }
 
-        self.partition_offsets[partition_index] = Some(PartitionOffset { partition, offset });
+        self.partition_offsets[partition_index]
+            .as_mut()
+            .unwrap()
+            .offset = offset;
     }
 }
 

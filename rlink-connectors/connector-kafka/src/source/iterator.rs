@@ -7,6 +7,8 @@ use crate::buffer_gen::kafka_message;
 use crate::source::is_empty_record;
 use crate::state::KafkaSourceStateRecorder;
 
+/// Simulate a Kafka consumption stream as an iterator.
+/// only support one topic and one partition
 pub struct KafkaRecordIterator {
     handover: Handover,
     state_recorder: KafkaSourceStateRecorder,
