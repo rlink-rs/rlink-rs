@@ -18,6 +18,7 @@ use crate::source::iterator::KafkaRecordIterator;
 use crate::source::offset_range::{OffsetRange, PartitionOffset};
 use crate::source::ConsumerRecord;
 
+/// Depending on whether the task has `InputSplit`, and whether the client needs to be created
 const CREATE_KAFKA_CONNECTION: &'static str = "create_kafka_connection";
 
 pub struct KafkaInputFormat {
