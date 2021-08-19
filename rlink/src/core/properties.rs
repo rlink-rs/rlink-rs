@@ -10,6 +10,9 @@ use crate::core::cluster::MetadataStorageType;
 pub type ClusterMode = crate::runtime::ClusterMode;
 pub type ChannelBaseOn = crate::channel::ChannelBaseOn;
 
+pub const FN_NAME: &'static str = "fn_name";
+pub const PARALLELISM: &'static str = "parallelism";
+
 pub(crate) trait InnerSystemProperties {
     fn set_cluster_mode(&mut self, cluster_mode: ClusterMode);
 }

@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 
 use rdkafka::ClientConfig;
 use rlink::core::element::FnSchema;
-use rlink::core::properties::Properties;
+use rlink::core::properties::{Properties, FN_NAME, PARALLELISM};
 
 use crate::buffer_gen::kafka_message;
 use crate::source::deserializer::{
@@ -17,6 +17,7 @@ use crate::{
 };
 
 pub struct KafkaInputFormatBuilder {
+    fn_name: Option<String>,
     parallelism: u16,
     conf_map: HashMap<String, String>,
     topics: Vec<String>,
@@ -27,12 +28,18 @@ pub struct KafkaInputFormatBuilder {
 impl KafkaInputFormatBuilder {
     pub fn new(conf_map: HashMap<String, String>, topics: Vec<String>, parallelism: u16) -> Self {
         KafkaInputFormatBuilder {
+            fn_name: None,
             parallelism,
             conf_map,
             topics,
             buffer_size: None,
             offset_range: OffsetRange::None,
         }
+    }
+
+    pub fn fn_name(mut self, name: &str) -> Self {
+        self.fn_name = Some(name.to_string());
+        self
     }
 
     pub fn buffer_size(mut self, size: usize) -> Self {
@@ -54,6 +61,7 @@ impl KafkaInputFormatBuilder {
             client_config.set(key.as_str(), val.as_str());
         }
 
+        let fn_name = self.fn_name.unwrap_or("KafkaInputFormat".to_string());
         let buffer_size = self.buffer_size.unwrap_or(SOURCE_CHANNEL_SIZE);
 
         let deserializer_builder = deserializer_builder.unwrap_or_else(|| {
@@ -74,6 +82,7 @@ impl KafkaInputFormatBuilder {
             self.offset_range,
             deserializer_builder,
             self.parallelism,
+            fn_name,
         )
     }
 }
@@ -82,7 +91,7 @@ impl TryFrom<Properties> for KafkaInputFormatBuilder {
     type Error = anyhow::Error;
 
     fn try_from(properties: Properties) -> Result<Self, Self::Error> {
-        let parallelism = properties.get_u16("parallelism")?;
+        let parallelism = properties.get_u16(PARALLELISM)?;
 
         let client_config = {
             let kafka_properties = properties.to_sub_properties(KAFKA);
@@ -100,16 +109,19 @@ impl TryFrom<Properties> for KafkaInputFormatBuilder {
             return Err(anyhow!("`topics` not found"));
         }
 
-        let buffer_size = properties
-            .get_usize(BUFFER_SIZE)
-            .unwrap_or(SOURCE_CHANNEL_SIZE);
+        let mut builder = KafkaInputFormatBuilder::new(client_config, topics, parallelism);
+
+        if let Ok(fn_name) = properties.get_string(FN_NAME) {
+            builder = builder.fn_name(fn_name.as_str());
+        }
+
+        if let Ok(buffer_size) = properties.get_usize(BUFFER_SIZE) {
+            builder = builder.buffer_size(buffer_size);
+        }
 
         let offset_properties = properties.to_sub_properties(OFFSET);
         let offset_range = OffsetRange::try_from(offset_properties)?;
-
-        let builder = KafkaInputFormatBuilder::new(client_config, topics, parallelism)
-            .buffer_size(buffer_size)
-            .offset_range(offset_range);
+        let builder = builder.offset_range(offset_range);
 
         Ok(builder)
     }

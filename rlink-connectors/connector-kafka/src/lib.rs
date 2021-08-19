@@ -10,8 +10,6 @@ extern crate anyhow;
 pub mod sink;
 pub mod source;
 
-pub mod state;
-
 pub mod buffer_gen {
     include!(concat!(env!("OUT_DIR"), "/buffer_gen/mod.rs"));
 }

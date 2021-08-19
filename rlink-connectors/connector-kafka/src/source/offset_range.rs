@@ -5,8 +5,26 @@ use std::str::FromStr;
 
 use rlink::core::properties::Properties;
 
-use crate::state::PartitionOffset;
 use crate::{OFFSET_BEGIN, OFFSET_END, OFFSET_TYPE};
+
+#[derive(Clone, Debug)]
+pub struct PartitionOffset {
+    pub(crate) partition: i32,
+    pub(crate) offset: i64,
+}
+
+impl PartitionOffset {
+    pub fn new(partition: i32, offset: i64) -> Self {
+        Self { partition, offset }
+    }
+
+    pub fn partition(&self) -> i32 {
+        self.partition
+    }
+    pub fn offset(&self) -> i64 {
+        self.offset
+    }
+}
 
 #[derive(Clone, Debug)]
 pub enum OffsetRange {
@@ -166,8 +184,7 @@ mod tests {
 
     use rlink::core::properties::Properties;
 
-    use crate::source::offset_range::OffsetRange;
-    use crate::state::PartitionOffset;
+    use crate::source::offset_range::{OffsetRange, PartitionOffset};
 
     #[test]
     pub fn properties_convert_test() {

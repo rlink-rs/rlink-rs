@@ -1,23 +1,26 @@
-use std::collections::HashMap;
+use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::Arc;
 
 use rlink::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
 use rlink::core::runtime::TaskId;
-
-use crate::state::{KafkaSourceStateRecorder, PartitionOffset, PartitionOffsets};
 
 #[derive(Debug, Clone)]
 pub struct KafkaCheckpointFunction {
     pub(crate) state_recorder: Option<KafkaSourceStateRecorder>,
     pub(crate) application_id: String,
     pub(crate) task_id: TaskId,
+    topic: String,
+    partition: i32,
 }
 
 impl KafkaCheckpointFunction {
-    pub fn new(application_id: String, task_id: TaskId) -> Self {
+    pub fn new(application_id: String, task_id: TaskId, topic: &str, partition: i32) -> Self {
         KafkaCheckpointFunction {
             state_recorder: None,
             application_id,
             task_id,
+            topic: topic.to_string(),
+            partition,
         }
     }
 
@@ -32,42 +35,101 @@ impl CheckpointFunction for KafkaCheckpointFunction {
         context: &FunctionSnapshotContext,
         handle: &Option<CheckpointHandle>,
     ) {
-        self.state_recorder = Some(KafkaSourceStateRecorder::new());
+        self.state_recorder = Some(KafkaSourceStateRecorder::new(
+            self.topic.as_str(),
+            self.partition,
+        ));
         info!("Checkpoint initialize, context: {:?}", context);
 
-        if context.checkpoint_id.0 > 0 && handle.is_some() {
-            let data = handle.as_ref().unwrap();
-
-            let offsets: HashMap<String, PartitionOffsets> =
-                serde_json::from_str(data.handle.as_str()).unwrap();
-
-            for (topic, partition_offsets) in offsets {
-                for partition_offset in partition_offsets.partition_offsets {
-                    if let Some(partition_offset) = partition_offset {
-                        let PartitionOffset { partition, offset } = partition_offset;
-
-                        let state_cache = self.state_recorder.as_mut().unwrap();
-                        state_cache.update(topic.as_str(), partition, offset);
-
-                        info!(
-                            "load state value from checkpoint({:?}): {:?}",
-                            context.checkpoint_id, data
-                        );
-                    }
-                }
-            }
+        if context.checkpoint_id.is_default() || handle.is_none() {
+            return;
         }
+
+        let handle = handle.as_ref().unwrap();
+
+        let state_cache = self.state_recorder.as_mut().unwrap();
+        state_cache
+            .update_from_snapshot(handle.handle.as_str())
+            .unwrap();
+
+        info!(
+            "load state value from checkpoint({:?}): {:?}",
+            context.checkpoint_id, handle.handle
+        );
     }
 
     fn snapshot_state(&mut self, context: &FunctionSnapshotContext) -> Option<CheckpointHandle> {
-        let offset_snapshot = self.state_recorder.as_ref().unwrap().snapshot();
-        debug!(
-            "Checkpoint snapshot: {:?}, context: {:?}",
-            offset_snapshot, context
-        );
+        let handle = self.state_recorder.as_ref().unwrap().snapshot();
+        debug!("Checkpoint snapshot: {:?}, context: {:?}", handle, context);
 
-        let json = serde_json::to_string(&offset_snapshot).unwrap();
+        Some(CheckpointHandle { handle })
+    }
+}
 
-        Some(CheckpointHandle { handle: json })
+#[derive(Serialize, Deserialize)]
+struct OffsetSnapshot<'a> {
+    topic: &'a str,
+    partition: i32,
+    offset: Option<i64>,
+}
+
+#[derive(Debug, Clone)]
+pub struct KafkaSourceStateRecorder {
+    topic: String,
+    partition: i32,
+    offset: Arc<AtomicI64>,
+}
+
+impl KafkaSourceStateRecorder {
+    pub fn new(topic: &str, partition: i32) -> Self {
+        KafkaSourceStateRecorder {
+            topic: topic.to_string(),
+            partition,
+            offset: Arc::new(AtomicI64::new(i64::MIN)),
+        }
+    }
+
+    pub fn update(&self, offset: i64) {
+        self.offset.store(offset, Ordering::Relaxed);
+    }
+
+    pub fn update_from_snapshot(&self, snapshot_handle: &str) -> anyhow::Result<()> {
+        let offset_snapshot: OffsetSnapshot = serde_json::from_str(snapshot_handle)?;
+
+        if !offset_snapshot.topic.eq(self.topic.as_str())
+            || offset_snapshot.partition != self.partition
+        {
+            return Err(anyhow!("Does not belong to the checkpoint of the task"));
+        }
+
+        self.update(offset_snapshot.offset.unwrap_or(i64::MIN));
+        Ok(())
+    }
+
+    pub fn snapshot(&self) -> String {
+        let offset = {
+            let offset = self.offset.load(Ordering::Relaxed);
+            if offset == i64::MIN {
+                None
+            } else {
+                Some(offset)
+            }
+        };
+
+        serde_json::to_string(&OffsetSnapshot {
+            topic: self.topic.as_str(),
+            partition: self.partition,
+            offset,
+        })
+        .unwrap()
+    }
+
+    pub fn get(&self) -> Option<i64> {
+        let offset = self.offset.load(Ordering::Relaxed);
+        if offset == i64::MIN {
+            None
+        } else {
+            Some(offset)
+        }
     }
 }

@@ -7,7 +7,7 @@ use rlink::utils;
 use rlink::utils::thread::async_runtime;
 
 use crate::source::deserializer::KafkaRecordDeserializer;
-use crate::source::empty_record;
+use crate::source::{empty_record, ConsumerRecord};
 
 #[derive(Debug, Clone)]
 pub(crate) struct ConsumerRange {
@@ -21,8 +21,8 @@ pub(crate) fn create_kafka_consumer(
     job_id: JobId,
     task_number: u16,
     client_config: ClientConfig,
-    consumer_ranges: Vec<ConsumerRange>,
-    handover: Handover,
+    consumer_ranges: ConsumerRange,
+    handover: Handover<ConsumerRecord>,
     deserializer: Box<dyn KafkaRecordDeserializer>,
 ) {
     utils::thread::spawn("kafka-source-block", move || {
@@ -50,10 +50,10 @@ pub(crate) struct KafkaConsumerThread {
     task_number: u16,
 
     client_config: ClientConfig,
-    consumer_ranges: Vec<ConsumerRange>,
-    with_end_consumer_ranges: Vec<ConsumerRange>,
+    consumer_ranges: ConsumerRange,
+    with_end_consumer_ranges: bool,
 
-    handover: Handover,
+    handover: Handover<ConsumerRecord>,
     deserializer: Box<dyn KafkaRecordDeserializer>,
 }
 
@@ -62,15 +62,11 @@ impl KafkaConsumerThread {
         job_id: JobId,
         task_number: u16,
         client_config: ClientConfig,
-        consumer_ranges: Vec<ConsumerRange>,
-        handover: Handover,
+        consumer_ranges: ConsumerRange,
+        handover: Handover<ConsumerRecord>,
         deserializer: Box<dyn KafkaRecordDeserializer>,
     ) -> Self {
-        let with_end_consumer_ranges: Vec<ConsumerRange> = consumer_ranges
-            .iter()
-            .filter(|x| x.end_offset.is_some())
-            .map(|x| x.clone())
-            .collect();
+        let with_end_consumer_ranges = consumer_ranges.end_offset.is_some();
         KafkaConsumerThread {
             job_id,
             task_number,
@@ -83,17 +79,15 @@ impl KafkaConsumerThread {
     }
 
     fn end_check(&self, topic: &str, partition: i32, offset: i64) -> bool {
-        if self.with_end_consumer_ranges.len() == 0 {
+        if !self.with_end_consumer_ranges {
             return false;
         }
 
-        for consumer_range in &self.with_end_consumer_ranges {
-            if consumer_range.partition == partition
-                && consumer_range.end_offset.unwrap() < offset
-                && consumer_range.topic.eq(topic)
-            {
-                return true;
-            }
+        if self.consumer_ranges.partition == partition
+            && self.consumer_ranges.end_offset.unwrap() < offset
+            && self.consumer_ranges.topic.eq(topic)
+        {
+            return true;
         }
 
         false
@@ -101,15 +95,13 @@ impl KafkaConsumerThread {
 
     pub async fn run(&mut self) -> anyhow::Result<()> {
         let mut assignment = TopicPartitionList::new();
-        for consumer_range in &self.consumer_ranges {
-            assignment
-                .add_partition_offset(
-                    consumer_range.topic.as_str(),
-                    consumer_range.partition,
-                    Offset::from_raw(consumer_range.begin_offset),
-                )
-                .unwrap();
-        }
+        assignment
+            .add_partition_offset(
+                self.consumer_ranges.topic.as_str(),
+                self.consumer_ranges.partition,
+                Offset::from_raw(self.consumer_ranges.begin_offset),
+            )
+            .unwrap();
 
         // let group_id = format!("rlink{}", Uuid::new_v4());
         self.client_config
@@ -137,7 +129,7 @@ impl KafkaConsumerThread {
 
                     if self.end_check(topic, partition, offset) {
                         self.handover
-                            .produce(empty_record())
+                            .produce(ConsumerRecord::new(empty_record(), 0))
                             .expect("kafka consumer handover `Disconnected`");
                         info!(
                             "kafka end offset reached. job_id: {}, task_num: {}",
@@ -152,7 +144,7 @@ impl KafkaConsumerThread {
 
                     for record in records {
                         self.handover
-                            .produce(record)
+                            .produce(ConsumerRecord::new(record, offset))
                             .expect("kafka consumer handover `Disconnected`");
                     }
                 }
