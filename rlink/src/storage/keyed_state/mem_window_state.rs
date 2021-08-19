@@ -8,7 +8,7 @@ use crate::storage::keyed_state::mem_reducing_state::MemoryReducingState;
 use crate::storage::keyed_state::mem_storage::{append_drop_window, StorageKey};
 use crate::storage::keyed_state::{StateKey, TReducingState, TWindowState};
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct MemoryWindowState {
     application_id: String,
     job_id: JobId,

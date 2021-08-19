@@ -17,10 +17,8 @@ use rlink::functions::window::SlidingEventTimeWindows;
 use rlink::utils::process::parse_arg;
 use rlink_connector_kafka::sink::builder::KafkaOutputFormatBuilder;
 use rlink_connector_kafka::source::builder::KafkaInputFormatBuilder;
-use rlink_connector_kafka::source::offset_range::OffsetRange;
-use rlink_connector_kafka::{
-    state::PartitionOffset, BOOTSTRAP_SERVERS, GROUP_ID, KAFKA, OFFSET, TOPICS,
-};
+use rlink_connector_kafka::source::offset_range::{OffsetRange, PartitionOffset};
+use rlink_connector_kafka::{BOOTSTRAP_SERVERS, GROUP_ID, KAFKA, OFFSET, TOPICS};
 use rlink_example_utils::buffer_gen::model;
 use rlink_example_utils::gen_record::gen_records;
 

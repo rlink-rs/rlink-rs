@@ -6,7 +6,7 @@ use crate::storage::keyed_state::{StateIterator, StateKey, TReducingState};
 
 // type RecordBuildHasher = std::hash::BuildHasherDefault<RecordHasher>;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct MemoryReducingState {
     state_key: StateKey,
     kv: BTreeMap<Record, Record>,

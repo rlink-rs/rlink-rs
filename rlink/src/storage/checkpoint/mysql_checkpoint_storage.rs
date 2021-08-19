@@ -8,7 +8,6 @@ use crate::utils::date_time::{current_timestamp, fmt_date_time};
 
 const DEFAULT_TABLE_NAME: &'static str = "rlink_ck";
 
-#[derive(Debug)]
 pub struct MySqlCheckpointStorage {
     url: String,
     table: String,

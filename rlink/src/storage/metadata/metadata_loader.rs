@@ -3,7 +3,7 @@ use crate::core::runtime::ClusterDescriptor;
 use crate::dag::metadata::DagMetadata;
 use crate::utils::http::client::get_sync;
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize)]
 pub(crate) struct MetadataLoader {
     coordinator_address: String,
     cluster_descriptor_cache: Option<ClusterDescriptor>,

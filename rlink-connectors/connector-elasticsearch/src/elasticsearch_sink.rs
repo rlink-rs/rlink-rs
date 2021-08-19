@@ -49,11 +49,11 @@ impl Index {
     }
 }
 
-pub trait ElasticsearchConverter: Debug + Send + Sync {
+pub trait ElasticsearchConverter: Send + Sync {
     fn to_json(&self, record: &mut Record) -> ElasticsearchModel;
 }
 
-#[derive(Debug, NamedFunction)]
+#[derive(NamedFunction)]
 pub struct ElasticsearchOutputFormat {
     address: String,
     headers: HashMap<String, String>,

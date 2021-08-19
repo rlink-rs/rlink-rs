@@ -8,7 +8,7 @@ use crate::deployment::{Resource, TResourceManager};
 use crate::runtime::context::Context;
 use crate::runtime::{cluster, ManagerType};
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub(crate) struct LocalResourceManager {
     context: Arc<Context>,
     cluster_descriptor: Option<ClusterDescriptor>,

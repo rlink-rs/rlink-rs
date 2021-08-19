@@ -9,7 +9,7 @@ use crate::runtime::context::Context;
 use crate::runtime::ManagerType;
 use crate::utils::http;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub(crate) struct StandaloneResourceManager {
     context: Arc<Context>,
     cluster_descriptor: Option<ClusterDescriptor>,

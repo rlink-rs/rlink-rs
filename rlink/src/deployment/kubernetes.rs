@@ -7,6 +7,7 @@ use kube::{
 };
 use serde_json::json;
 
+use crate::core::runtime::ClusterDescriptor;
 use crate::core::{
     cluster::TaskResourceInfo,
     env::{StreamApp, StreamExecutionEnvironment},
@@ -16,7 +17,7 @@ use crate::runtime::context::Context;
 use crate::runtime::ClusterDescriptor;
 use crate::utils::thread::async_runtime_single;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub(crate) struct KubernetesResourceManager {
     context: Arc<Context>,
     cluster_descriptor: Option<ClusterDescriptor>,

@@ -31,7 +31,6 @@ pub trait TCheckpointStorage {
     ) -> anyhow::Result<Vec<Checkpoint>>;
 }
 
-#[derive(Debug)]
 pub enum CheckpointStorage {
     MemoryCheckpointStorage(MemoryCheckpointStorage),
     MySqlCheckpointStorage(MySqlCheckpointStorage),

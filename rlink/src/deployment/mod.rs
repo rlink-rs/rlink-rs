@@ -1,4 +1,3 @@
-use std::fmt::Debug;
 use std::sync::Arc;
 
 use crate::core::cluster::TaskResourceInfo;
@@ -29,10 +28,7 @@ impl Resource {
     }
 }
 
-pub(crate) trait TResourceManager
-where
-    Self: Debug,
-{
+pub(crate) trait TResourceManager {
     fn prepare(&mut self, context: &Context, job_descriptor: &ClusterDescriptor);
 
     /// worker resource allocate
@@ -48,7 +44,6 @@ where
     fn stop_workers(&self, task_ids: Vec<TaskResourceInfo>) -> anyhow::Result<()>;
 }
 
-#[derive(Debug)]
 pub(crate) enum ResourceManager {
     LocalResourceManager(LocalResourceManager),
     StandaloneResourceManager(StandaloneResourceManager),

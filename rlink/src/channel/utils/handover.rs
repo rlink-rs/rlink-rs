@@ -1,5 +1,3 @@
-use std::fmt::Debug;
-
 use crate::channel::receiver::ChannelReceiver;
 use crate::channel::sender::ChannelSender;
 use crate::channel::{named_channel, RecvError, SendError, TryRecvError, TrySendError};
@@ -9,7 +7,7 @@ use crate::metrics::Tag;
 #[derive(Clone)]
 pub struct Handover<T = Record>
 where
-    T: Debug + Send + Sync,
+    T: Send + Sync,
 {
     sender: ChannelSender<T>,
     receiver: ChannelReceiver<T>,
@@ -17,7 +15,7 @@ where
 
 impl<T> Handover<T>
 where
-    T: Debug + Send + Sync,
+    T: Send + Sync,
 {
     pub fn new(name: &str, tags: Vec<Tag>, buffer_size: usize) -> Self {
         let (sender, receiver) = named_channel(name, tags, buffer_size);
