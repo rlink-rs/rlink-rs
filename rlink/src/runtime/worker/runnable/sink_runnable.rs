@@ -9,11 +9,10 @@ use crate::metrics::register_counter;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
-#[derive(Debug)]
 pub(crate) struct SinkRunnable {
     operator_id: OperatorId,
     task_id: TaskId,
-    child_target_id: TaskId,
+    // child_target_id: TaskId,
     child_parallelism: u16,
 
     context: Option<RunnableContext>,
@@ -31,7 +30,7 @@ impl SinkRunnable {
         SinkRunnable {
             operator_id,
             task_id: TaskId::default(),
-            child_target_id: TaskId::default(),
+            // child_target_id: TaskId::default(),
             child_parallelism: 0,
             context: None,
             stream_sink,

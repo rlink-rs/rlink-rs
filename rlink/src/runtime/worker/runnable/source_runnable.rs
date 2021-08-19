@@ -21,7 +21,6 @@ use crate::runtime::worker::heart_beat::{get_coordinator_status, submit_heartbea
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 use crate::runtime::HeartbeatItem;
 
-#[derive(Debug)]
 pub(crate) struct SourceRunnable {
     operator_id: OperatorId,
     context: Option<RunnableContext>,

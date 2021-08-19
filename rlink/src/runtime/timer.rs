@@ -7,7 +7,7 @@ use crate::channel::sender::ChannelSender;
 use crate::channel::{named_channel, RecvError, TryRecvError, TrySendError};
 use crate::utils;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct TimerChannel {
     name: String,
     sender: ChannelSender<u64>,
@@ -45,7 +45,7 @@ impl TimerChannel {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct WindowTimer {
     sender: ChannelSender<TimerChannel>,
 }

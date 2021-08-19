@@ -6,7 +6,7 @@ use crate::channel::{named_channel, RecvError, SendError, TryRecvError, TrySendE
 use crate::core::element::Record;
 use crate::metrics::Tag;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Handover<T = Record>
 where
     T: Debug + Send + Sync,

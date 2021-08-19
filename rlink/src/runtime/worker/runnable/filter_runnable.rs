@@ -8,7 +8,6 @@ use crate::core::runtime::OperatorId;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
-#[derive(Debug)]
 pub(crate) struct FilterRunnable {
     operator_id: OperatorId,
     stream_filter: DefaultStreamOperator<dyn FilterFunction>,

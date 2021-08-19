@@ -8,7 +8,6 @@ use crate::core::window::{WindowAssigner, WindowAssignerContext};
 use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
-#[derive(Debug)]
 pub(crate) struct WindowAssignerRunnable {
     operator_id: OperatorId,
     stream_window: DefaultStreamOperator<dyn WindowAssigner>,

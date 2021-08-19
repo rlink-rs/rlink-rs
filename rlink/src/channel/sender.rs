@@ -3,7 +3,7 @@ use std::time::Duration;
 use crate::channel::{ChannelBaseOn, SendError, Sender, TrySendError, CHANNEL_SIZE_PREFIX};
 use crate::metrics::metric::{Counter, Gauge};
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct ChannelSender<T>
 where
     T: Sync + Send,

@@ -3,7 +3,7 @@ use std::time::Duration;
 use crate::channel::{Receiver, RecvError, RecvTimeoutError, TryRecvError, CHANNEL_SIZE_PREFIX};
 use crate::metrics::metric::{Counter, Gauge};
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct ChannelReceiver<T>
 where
     T: Sync + Send,
