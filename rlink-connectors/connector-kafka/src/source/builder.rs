@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 
 use rdkafka::ClientConfig;
 use rlink::core::element::FnSchema;
-use rlink::core::properties::{Properties, FN_NAME, PARALLELISM};
+use rlink::core::properties::{Properties, PARALLELISM};
 
 use crate::buffer_gen::kafka_message;
 use crate::source::deserializer::{
