@@ -111,9 +111,7 @@ impl TryFrom<Properties> for KafkaInputFormatBuilder {
 
         let mut builder = KafkaInputFormatBuilder::new(client_config, topics, parallelism);
 
-        if let Ok(fn_name) = properties.get_string(FN_NAME) {
-            builder = builder.fn_name(fn_name.as_str());
-        }
+        builder = builder.fn_name(properties.name());
 
         if let Ok(buffer_size) = properties.get_usize(BUFFER_SIZE) {
             builder = builder.buffer_size(buffer_size);
