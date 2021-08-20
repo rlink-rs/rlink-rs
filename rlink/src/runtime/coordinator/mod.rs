@@ -149,17 +149,25 @@ where
     }
 
     fn prepare_properties(&self) -> Properties {
-        let mut job_properties = Properties::new();
-        job_properties.set_cluster_mode(self.context.cluster_mode);
+        let mut application_properties = Properties::new();
+        application_properties.set_cluster_mode(self.context.cluster_mode);
 
         self.stream_app
-            .prepare_properties(job_properties.borrow_mut());
+            .prepare_properties(application_properties.borrow_mut());
 
-        for (k, v) in job_properties.as_map() {
-            info!("properties key={}, value={}", k, v);
+        let mut keys: Vec<&str> = application_properties
+            .as_map()
+            .keys()
+            .map(|x| x.as_str())
+            .collect();
+        keys.sort();
+
+        for key in keys {
+            let value = application_properties.as_map().get(key).unwrap();
+            info!("properties key={}, value={}", key, value,);
         }
 
-        job_properties
+        application_properties
     }
 
     fn build_metadata(
