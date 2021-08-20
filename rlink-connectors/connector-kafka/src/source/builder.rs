@@ -16,6 +16,7 @@ use crate::{
     TOPICS,
 };
 
+#[derive(Debug)]
 pub struct KafkaInputFormatBuilder {
     fn_name: Option<String>,
     parallelism: u16,
@@ -56,6 +57,8 @@ impl KafkaInputFormatBuilder {
         self,
         deserializer_builder: Option<Box<dyn KafkaRecordDeserializerBuilder>>,
     ) -> KafkaInputFormat {
+        info!("build kafka source with: {:?}", &self);
+
         let mut client_config = ClientConfig::new();
         for (key, val) in &self.conf_map {
             client_config.set(key.as_str(), val.as_str());

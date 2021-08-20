@@ -9,6 +9,7 @@ use crate::{
     SOURCE_CHANNEL_SIZE, TOPICS,
 };
 
+#[derive(Debug)]
 pub struct KafkaOutputFormatBuilder {
     conf_map: HashMap<String, String>,
     topics: Option<String>,
@@ -30,6 +31,8 @@ impl KafkaOutputFormatBuilder {
     }
 
     pub fn build(self) -> KafkaOutputFormat {
+        info!("build kafka sink with: {:?}", &self);
+
         let mut client_config = ClientConfig::new();
         for (key, val) in &self.conf_map {
             client_config.set(key.as_str(), val.as_str());
