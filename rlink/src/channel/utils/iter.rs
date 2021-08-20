@@ -2,14 +2,14 @@ use crate::channel::receiver::ChannelReceiver;
 
 pub struct ChannelIterator<T>
 where
-    T: Clone,
+    T: Sync + Send,
 {
     receiver: ChannelReceiver<T>,
 }
 
 impl<T> ChannelIterator<T>
 where
-    T: Clone,
+    T: Sync + Send,
 {
     pub fn new(receiver: ChannelReceiver<T>) -> Self {
         ChannelIterator { receiver }
@@ -18,7 +18,7 @@ where
 
 impl<T> Iterator for ChannelIterator<T>
 where
-    T: Clone,
+    T: Sync + Send,
 {
     type Item = T;
 

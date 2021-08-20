@@ -11,7 +11,6 @@ use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 use crate::utils;
 
-#[derive(Debug)]
 pub(crate) struct KeyByRunnable {
     operator_id: OperatorId,
     task_id: TaskId,

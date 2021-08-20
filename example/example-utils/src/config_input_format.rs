@@ -63,6 +63,10 @@ impl InputFormat for ConfigInputFormat {
     fn schema(&self, _input_schema: FnSchema) -> FnSchema {
         FnSchema::from(&config::FIELD_METADATA)
     }
+
+    fn parallelism(&self) -> u16 {
+        1
+    }
 }
 
 struct ConfigIterator {

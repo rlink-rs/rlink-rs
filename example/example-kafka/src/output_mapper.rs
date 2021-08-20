@@ -8,13 +8,11 @@ use crate::entry::SerDeEntity;
 use rlink_connector_kafka::buffer_gen::kafka_message;
 
 #[derive(Debug, Default, Function)]
-pub struct OutputMapperFunction {
-    topic: String,
-}
+pub struct OutputMapperFunction {}
 
 impl OutputMapperFunction {
-    pub fn new(topic: String) -> Self {
-        OutputMapperFunction { topic }
+    pub fn new() -> Self {
+        OutputMapperFunction {}
     }
 }
 
@@ -37,7 +35,7 @@ impl FlatMapFunction for OutputMapperFunction {
             current_timestamp_millis() as i64,
             key.as_bytes(),
             body.as_bytes(),
-            self.topic.as_str(),
+            "",
             0,
             0,
         )

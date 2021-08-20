@@ -20,9 +20,6 @@ pub type Buffer = serbuffer::Buffer;
 pub type BufferReader<'a, 'b> = serbuffer::BufferReader<'a, 'b>;
 pub type BufferMutReader<'a, 'b> = serbuffer::BufferMutReader<'a, 'b>;
 pub type BufferWriter<'a, 'b> = serbuffer::BufferWriter<'a, 'b>;
-// pub mod types {
-//     pub use serbuffer::types::*;
-// }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum FnSchema {

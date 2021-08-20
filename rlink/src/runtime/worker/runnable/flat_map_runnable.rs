@@ -9,7 +9,6 @@ use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 use std::borrow::BorrowMut;
 
-#[derive(Debug)]
 pub(crate) struct FlatMapRunnable {
     operator_id: OperatorId,
     task_id: TaskId,

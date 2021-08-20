@@ -1,16 +1,14 @@
-use std::fmt::Debug;
-
 use crate::core::cluster::MetadataStorageType;
+use crate::core::runtime::{ClusterDescriptor, ManagerStatus};
+use crate::runtime::HeartbeatItem;
 use crate::storage::metadata::mem_metadata_storage::MemoryMetadataStorage;
 
 pub mod mem_metadata_storage;
 
 pub mod metadata_loader;
-use crate::core::runtime::{ClusterDescriptor, ManagerStatus};
-use crate::runtime::HeartbeatItem;
 pub(crate) use metadata_loader::MetadataLoader;
 
-pub trait TMetadataStorage: Debug {
+pub trait TMetadataStorage {
     fn save(&mut self, metadata: ClusterDescriptor) -> anyhow::Result<()>;
     fn delete(&mut self) -> anyhow::Result<()>;
     fn load(&self) -> anyhow::Result<ClusterDescriptor>;
@@ -23,7 +21,6 @@ pub trait TMetadataStorage: Debug {
     ) -> anyhow::Result<ManagerStatus>;
 }
 
-#[derive(Debug)]
 pub enum MetadataStorage {
     MemoryMetadataStorage(MemoryMetadataStorage),
 }

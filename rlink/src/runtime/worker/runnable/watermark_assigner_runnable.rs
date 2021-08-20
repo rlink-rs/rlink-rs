@@ -13,7 +13,6 @@ use crate::metrics::{register_counter, register_gauge};
 use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
-#[derive(Debug)]
 pub(crate) struct WatermarkAssignerRunnable {
     operator_id: OperatorId,
     task_id: TaskId,

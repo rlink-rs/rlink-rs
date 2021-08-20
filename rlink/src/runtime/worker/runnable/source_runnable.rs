@@ -13,13 +13,14 @@ use crate::core::function::InputFormat;
 use crate::core::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
 use crate::core::runtime::{CheckpointId, JobId, OperatorId, TaskId};
 use crate::core::watermark::MAX_WATERMARK;
+use crate::metrics::metric::Counter;
+use crate::metrics::register_counter;
 use crate::runtime::timer::TimerChannel;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::heart_beat::{get_coordinator_status, submit_heartbeat};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 use crate::runtime::HeartbeatItem;
 
-#[derive(Debug)]
 pub(crate) struct SourceRunnable {
     operator_id: OperatorId,
     context: Option<RunnableContext>,
@@ -37,6 +38,8 @@ pub(crate) struct SourceRunnable {
     barrier_alignment: AlignManager,
     stream_status_alignment: AlignManager,
     watermark_manager: WatermarkManager,
+
+    counter: Counter,
 }
 
 impl SourceRunnable {
@@ -61,6 +64,7 @@ impl SourceRunnable {
             barrier_alignment: AlignManager::default(),
             stream_status_alignment: AlignManager::default(),
             watermark_manager: WatermarkManager::default(),
+            counter: Counter::default(),
         }
     }
 
@@ -225,11 +229,16 @@ impl Runnable for SourceRunnable {
         self.barrier_alignment = AlignManager::new(parent_execution_size);
         self.stream_status_alignment = AlignManager::new(parent_execution_size);
         self.watermark_manager = WatermarkManager::new(parent_jobs);
-
         info!(
             "SourceRunnable Opened, operator_id={:?}, task_id={:?}, ElementEventAlign parent_execution_size={:?}",
             self.operator_id, self.task_id, parent_execution_size,
         );
+
+        self.counter = register_counter(
+            format!("Source_{}", self.stream_source.operator_fn.as_ref().name()),
+            self.task_id.to_tags(),
+        );
+
         Ok(())
     }
 
@@ -262,6 +271,7 @@ impl Runnable for SourceRunnable {
             match element {
                 Element::Record(_) => {
                     self.next_runnable.as_mut().unwrap().run(element);
+                    self.counter.fetch_add(1);
                 }
                 Element::Barrier(barrier) => {
                     let is_barrier_align = self.barrier_alignment.apply(barrier.checkpoint_id.0);

@@ -4,7 +4,6 @@ use crate::core::checkpoint::Checkpoint;
 use crate::core::runtime::{CheckpointId, JobId, OperatorId};
 use crate::storage::checkpoint::TCheckpointStorage;
 
-#[derive(Debug)]
 pub struct MemoryCheckpointStorage {
     history_cks: HashMap<CheckpointId, Vec<Checkpoint>>,
 }

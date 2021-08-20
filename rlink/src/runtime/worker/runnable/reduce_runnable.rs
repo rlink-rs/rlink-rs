@@ -11,7 +11,6 @@ use crate::metrics::register_counter;
 use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
-#[derive(Debug)]
 pub(crate) struct ReduceRunnable {
     operator_id: OperatorId,
     task_id: TaskId,

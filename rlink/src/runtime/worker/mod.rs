@@ -28,7 +28,7 @@ pub mod web_server;
 pub(crate) type FunctionContext = crate::core::function::Context;
 
 pub(crate) fn run<S>(
-    context: Arc<Context>,
+    _context: Arc<Context>,
     dag_metadata: Arc<DagMetadata>,
     cluster_descriptor: Arc<ClusterDescriptor>,
     task_descriptor: TaskDescriptor,
@@ -52,7 +52,6 @@ where
 
             let stream_env = StreamExecutionEnvironment::new();
             let worker_task = WorkerTask::new(
-                context,
                 dag_metadata,
                 cluster_descriptor,
                 task_descriptor,
@@ -66,12 +65,11 @@ where
         .unwrap()
 }
 
-#[derive(Debug)]
 pub struct WorkerTask<S>
 where
     S: StreamApp + 'static,
 {
-    context: Arc<Context>,
+    // context: Arc<Context>,
     dag_metadata: Arc<DagMetadata>,
     cluster_descriptor: Arc<ClusterDescriptor>,
     task_descriptor: TaskDescriptor,
@@ -85,7 +83,7 @@ where
     S: StreamApp + 'static,
 {
     pub(crate) fn new(
-        context: Arc<Context>,
+        // context: Arc<Context>,
         dag_metadata: Arc<DagMetadata>,
         cluster_descriptor: Arc<ClusterDescriptor>,
         task_descriptor: TaskDescriptor,
@@ -94,7 +92,7 @@ where
         window_timer: WindowTimer,
     ) -> Self {
         WorkerTask {
-            context,
+            // context,
             dag_metadata,
             cluster_descriptor,
             task_descriptor,
@@ -116,7 +114,7 @@ where
         let operators = raw_stream_graph.pop_operators();
 
         let mut operator_invoke_chain = self.build_invoke_chain(operators);
-        debug!("Invoke: {:?}", operator_invoke_chain);
+        // debug!("Invoke: {:?}", operator_invoke_chain);
 
         let runnable_context = RunnableContext {
             dag_metadata: self.dag_metadata.clone(),

@@ -200,7 +200,7 @@ mod tests {
     pub fn data_stream_test() {
         let mut env = StreamExecutionEnvironment::new();
 
-        env.register_source(MyInputFormat::new(), 100)
+        env.register_source(MyInputFormat::new())
             .flat_map(MyFlatMapFunction::new())
             .assign_timestamps_and_watermarks(
                 DefaultWatermarkStrategy::new()
@@ -213,7 +213,7 @@ mod tests {
                 Duration::from_secs(20),
                 None,
             ))
-            .reduce(MyReduceFunction::new(), 10)
+            .reduce(MyReduceFunction::new())
             .add_sink(MyOutputFormat::new(Properties::new()));
 
         println!("{:?}", env.stream_manager.stream_graph.borrow().dag);
@@ -223,7 +223,7 @@ mod tests {
     pub fn data_stream_simple_test() {
         let mut env = StreamExecutionEnvironment::new();
 
-        env.register_source(MyInputFormat::new(), 2)
+        env.register_source(MyInputFormat::new())
             .flat_map(MyFlatMapFunction::new())
             .add_sink(MyOutputFormat::new(Properties::new()));
 
@@ -236,7 +236,7 @@ mod tests {
     pub fn data_stream_reduce_test() {
         let mut env = StreamExecutionEnvironment::new();
 
-        env.register_source(MyInputFormat::new(), 2)
+        env.register_source(MyInputFormat::new())
             .flat_map(MyFlatMapFunction::new())
             .assign_timestamps_and_watermarks(
                 DefaultWatermarkStrategy::new()
@@ -249,7 +249,7 @@ mod tests {
                 Duration::from_secs(20),
                 None,
             ))
-            .reduce(MyReduceFunction::new(), 3)
+            .reduce(MyReduceFunction::new())
             .flat_map(MyFlatMapFunction::new())
             .add_sink(MyOutputFormat::new(Properties::new()));
 
@@ -263,7 +263,7 @@ mod tests {
         let mut env = StreamExecutionEnvironment::new();
 
         let ds = env
-            .register_source(MyInputFormat::new(), 1)
+            .register_source(MyInputFormat::new())
             .flat_map(MyFlatMapFunction::new())
             .assign_timestamps_and_watermarks(
                 DefaultWatermarkStrategy::new()
@@ -271,7 +271,7 @@ mod tests {
                     .for_timestamp_assigner(MyTimestampAssigner::new()),
             );
 
-        env.register_source(MyInputFormat::new(), 2)
+        env.register_source(MyInputFormat::new())
             .flat_map(MyFlatMapFunction::new())
             .assign_timestamps_and_watermarks(
                 DefaultWatermarkStrategy::new()
@@ -285,7 +285,7 @@ mod tests {
                 Duration::from_secs(20),
                 None,
             ))
-            .reduce(MyReduceFunction::new(), 3)
+            .reduce(MyReduceFunction::new())
             .flat_map(MyFlatMapFunction::new())
             .add_sink(MyOutputFormat::new(Properties::new()));
 
@@ -352,6 +352,10 @@ mod tests {
                 Field::new("a", DataType::Binary),
                 Field::new("b", DataType::Int64),
             ]))
+        }
+
+        fn parallelism(&self) -> u16 {
+            3
         }
     }
 
@@ -481,6 +485,10 @@ mod tests {
 
         fn schema(&self, _input_schema: FnSchema) -> FnSchema {
             FnSchema::Single(Schema::new(vec![Field::new("b", DataType::Int64)]))
+        }
+
+        fn parallelism(&self) -> u16 {
+            0
         }
     }
 

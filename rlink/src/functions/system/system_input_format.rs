@@ -116,6 +116,11 @@ impl InputFormat for SystemInputFormat {
     fn schema(&self, input_schema: FnSchema) -> FnSchema {
         input_schema
     }
+
+    /// ignore
+    fn parallelism(&self) -> u16 {
+        0
+    }
 }
 
 impl InputSplitSource for SystemInputFormat {}

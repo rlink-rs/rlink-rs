@@ -12,7 +12,6 @@ use crate::runtime::context::Context;
 use crate::runtime::ManagerType;
 use crate::utils;
 
-#[derive(Debug)]
 pub(crate) struct YarnResourceManager {
     context: Arc<Context>,
     cluster_descriptor: Option<ClusterDescriptor>,
@@ -112,7 +111,6 @@ fn parse_line(command_line: &std::io::Result<String>) -> Option<&str> {
         .unwrap_or(None)
 }
 
-#[derive(Debug)]
 struct YarnCliCommand {
     cmd_sender: Sender<String>,
     ret_receiver: Receiver<String>,

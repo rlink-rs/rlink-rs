@@ -68,7 +68,7 @@ impl Clone for OperatorCheckpoint {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub(crate) struct CheckpointAlignManager {
     application_name: String,
     application_id: String,

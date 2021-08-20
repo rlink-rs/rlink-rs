@@ -1,4 +1,3 @@
-use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -32,7 +31,7 @@ pub(crate) use source_runnable::SourceRunnable;
 pub(crate) use watermark_assigner_runnable::WatermarkAssignerRunnable;
 pub(crate) use window_assigner_runnable::WindowAssignerRunnable;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub(crate) struct RunnableContext {
     pub(crate) dag_metadata: Arc<DagMetadata>,
     pub(crate) cluster_descriptor: Arc<ClusterDescriptor>,
@@ -167,7 +166,7 @@ impl RunnableContext {
     }
 }
 
-pub(crate) trait Runnable: Debug {
+pub(crate) trait Runnable {
     fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()>;
     fn run(&mut self, element: Element);
     fn close(&mut self) -> anyhow::Result<()>;

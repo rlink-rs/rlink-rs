@@ -7,7 +7,7 @@ use rlink::channel::utils::handover::Handover;
 use rlink::core;
 use rlink::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
 use rlink::core::element::{FnSchema, Record};
-use rlink::core::function::{Context, InputFormat, InputSplit, InputSplitSource};
+use rlink::core::function::{Context, InputFormat, InputSplit, InputSplitSource, NamedFunction};
 use rlink::core::properties::Properties;
 use rlink::metrics::Tag;
 
@@ -15,20 +15,26 @@ use crate::source::checkpoint::KafkaCheckpointFunction;
 use crate::source::consumer::{create_kafka_consumer, ConsumerRange};
 use crate::source::deserializer::KafkaRecordDeserializerBuilder;
 use crate::source::iterator::KafkaRecordIterator;
-use crate::state::PartitionOffset;
-use crate::OffsetRange;
+use crate::source::offset_range::{OffsetRange, PartitionOffset};
+use crate::source::ConsumerRecord;
 
+/// Depending on whether the task has `InputSplit`, and whether the client needs to be created
 const CREATE_KAFKA_CONNECTION: &'static str = "create_kafka_connection";
 
-#[derive(NamedFunction)]
 pub struct KafkaInputFormat {
+    name: String,
+    parallelism: u16,
+
     client_config: ClientConfig,
     topics: Vec<String>,
+
+    task_topic: String,
+    task_partition: i32,
 
     buffer_size: usize,
     offset_range: OffsetRange,
 
-    handover: Option<Handover>,
+    handover: Option<Handover<ConsumerRecord>>,
 
     deserializer_builder: Box<dyn KafkaRecordDeserializerBuilder>,
     schema: FnSchema,
@@ -43,11 +49,17 @@ impl KafkaInputFormat {
         buffer_size: usize,
         offset_range: OffsetRange,
         deserializer_builder: Box<dyn KafkaRecordDeserializerBuilder>,
+        parallelism: u16,
+        fn_name: String,
     ) -> Self {
         let schema = deserializer_builder.schema();
         KafkaInputFormat {
+            name: fn_name,
+            parallelism,
             client_config,
             topics,
+            task_topic: "".to_string(),
+            task_partition: 0,
             buffer_size,
             offset_range,
             handover: None,
@@ -57,15 +69,14 @@ impl KafkaInputFormat {
         }
     }
 
-    fn consumer_ranges(
-        &mut self,
-        topic: String,
-        partition: i32,
-    ) -> KafkaResult<Vec<ConsumerRange>> {
+    fn consumer_ranges(&mut self, topic: String, partition: i32) -> KafkaResult<ConsumerRange> {
         let (begin_partition, end_partition) = match &self.offset_range {
             OffsetRange::None => {
-                let state = self.checkpoint.as_mut().unwrap().get_state();
-                (state.get(topic.as_str(), partition), None)
+                let state = self.checkpoint.as_mut().unwrap().as_state_mut();
+                let begin_offset = state
+                    .get()
+                    .map(|offset| PartitionOffset { partition, offset });
+                (begin_offset, None)
             }
             OffsetRange::Direct {
                 begin_offset,
@@ -137,14 +148,20 @@ impl KafkaInputFormat {
             }
         };
 
-        Ok(vec![ConsumerRange {
+        Ok(ConsumerRange {
             topic,
             partition,
             begin_offset: begin_partition
                 .map(|x| x.offset)
                 .unwrap_or(Offset::End.to_raw().unwrap()),
             end_offset: end_partition.map(|x| x.offset),
-        }])
+        })
+    }
+}
+
+impl NamedFunction for KafkaInputFormat {
+    fn name(&self) -> &str {
+        self.name.as_str()
     }
 }
 
@@ -152,20 +169,24 @@ impl InputFormat for KafkaInputFormat {
     fn open(&mut self, input_split: InputSplit, context: &Context) -> core::Result<()> {
         info!("kafka source open");
 
-        let kafka_checkpoint =
-            KafkaCheckpointFunction::new(context.application_id.clone(), context.task_id);
+        self.task_topic = input_split.properties().get_string("topic").unwrap();
+        self.task_partition = input_split.properties().get_i32("partition").unwrap();
+
+        let kafka_checkpoint = KafkaCheckpointFunction::new(
+            context.application_id.clone(),
+            context.task_id,
+            self.task_topic.as_str(),
+            self.task_partition,
+        );
         self.checkpoint = Some(kafka_checkpoint);
 
         self.initialize_state(&context.checkpoint_context(), &context.checkpoint_handle);
 
-        let topic = input_split.properties().get_string("topic").unwrap();
-        let partition = input_split.properties().get_i32("partition").unwrap();
-
         let tags = vec![
-            Tag::new("topic", topic.as_str()),
-            Tag::new("partition", partition),
+            Tag::new("topic", self.task_topic.as_str()),
+            Tag::new("partition", self.task_partition),
         ];
-        self.handover = Some(Handover::new(
+        self.handover = Some(Handover::<ConsumerRecord>::new(
             "KafkaSource_Handover",
             tags,
             self.buffer_size,
@@ -174,7 +195,9 @@ impl InputFormat for KafkaInputFormat {
         let client_config = self.client_config.clone();
         let handover = self.handover.as_ref().unwrap().clone();
 
-        let consumer_ranges = self.consumer_ranges(topic, partition).unwrap();
+        let consumer_ranges = self
+            .consumer_ranges(self.task_topic.to_string(), self.task_partition)
+            .unwrap();
         create_kafka_consumer(
             context.task_id.job_id(),
             context.task_id.task_number(),
@@ -191,7 +214,7 @@ impl InputFormat for KafkaInputFormat {
 
     fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record> + Send> {
         let handover = self.handover.as_ref().unwrap().clone();
-        let state_recorder = self.checkpoint.as_mut().unwrap().get_state().clone();
+        let state_recorder = self.checkpoint.as_mut().unwrap().as_state_mut().clone();
         Box::new(KafkaRecordIterator::new(handover, state_recorder))
     }
 
@@ -201,6 +224,10 @@ impl InputFormat for KafkaInputFormat {
 
     fn schema(&self, _input_schema: FnSchema) -> FnSchema {
         self.schema.clone()
+    }
+
+    fn parallelism(&self) -> u16 {
+        self.parallelism
     }
 }
 

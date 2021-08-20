@@ -49,7 +49,7 @@ impl Iterator for StateIterator {
 }
 
 /// See flink `ReducingState`
-pub trait TReducingState: Debug {
+pub trait TReducingState {
     fn get_mut(&mut self, key: &Record) -> Option<&mut Record>;
     fn insert(&mut self, key: Record, val: Record);
     fn flush(&mut self);
@@ -60,7 +60,6 @@ pub trait TReducingState: Debug {
     fn len(&self) -> usize;
 }
 
-#[derive(Debug)]
 pub enum ReducingState {
     MemoryReducingState(MemoryReducingState),
 }
@@ -124,7 +123,7 @@ impl TReducingState for ReducingState {
     }
 }
 
-pub trait TWindowState: Debug {
+pub trait TWindowState {
     fn windows(&self) -> Vec<Window>;
 
     fn merge<F>(&mut self, key: Record, record: Record, reduce_fun: F) -> usize
@@ -136,7 +135,6 @@ pub trait TWindowState: Debug {
     fn snapshot(&mut self, barrier: Barrier);
 }
 
-#[derive(Debug)]
 pub enum WindowState {
     MemoryWindowState(MemoryWindowState),
 }

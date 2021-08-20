@@ -10,6 +10,8 @@ use crate::core::cluster::MetadataStorageType;
 pub type ClusterMode = crate::runtime::ClusterMode;
 pub type ChannelBaseOn = crate::channel::ChannelBaseOn;
 
+pub const PARALLELISM: &'static str = "parallelism";
+
 pub(crate) trait InnerSystemProperties {
     fn set_cluster_mode(&mut self, cluster_mode: ClusterMode);
 }
@@ -40,31 +42,52 @@ pub trait SystemProperties {
 
     fn set_pub_sub_channel_base(&mut self, base_on: ChannelBaseOn);
     fn get_pub_sub_channel_base(&self) -> anyhow::Result<ChannelBaseOn>;
+}
 
-    fn set_speed_backpressure_interval(&mut self, interval: Duration);
-    fn get_speed_backpressure_interval(&self) -> anyhow::Result<Duration>;
+pub trait FunctionProperties {
+    fn to_source(&self, fn_name: &str) -> Properties;
+    fn extend_source(&mut self, fn_name: &str, properties: Properties);
 
-    fn set_speed_backpressure_max_times(&mut self, max_times: usize);
-    fn get_speed_backpressure_max_times(&self) -> anyhow::Result<usize>;
+    fn to_window(&self, fn_name: &str) -> Properties;
+    fn extend_window(&mut self, fn_name: &str, properties: Properties);
 
-    fn set_speed_backpressure_pause_time(&mut self, interval: Duration);
-    fn get_speed_backpressure_pause_time(&self) -> anyhow::Result<Duration>;
+    fn to_reduce(&self, fn_name: &str) -> Properties;
+    fn extend_reduce(&mut self, fn_name: &str, properties: Properties);
+
+    fn to_filter(&self, fn_name: &str) -> Properties;
+    fn extend_filter(&mut self, fn_name: &str, properties: Properties);
+
+    fn to_sink(&self, fn_name: &str) -> Properties;
+    fn extend_sink(&mut self, fn_name: &str, properties: Properties);
+
+    fn to_custom(&self, fn_name: &str) -> Properties;
+    fn extend_custom(&mut self, fn_name: &str, properties: Properties);
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Properties {
+    name: String,
     properties: HashMap<String, String>,
 }
 
 impl Properties {
     pub fn new() -> Self {
         Properties {
+            name: "".to_string(),
             properties: HashMap::new(),
         }
     }
 
+    pub fn name(&self) -> &str {
+        self.name.as_str()
+    }
+
     pub fn as_map(&self) -> &HashMap<String, String> {
         &self.properties
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.properties.is_empty()
     }
 
     pub fn set_str(&mut self, key: &str, value: &str) {
@@ -78,6 +101,28 @@ impl Properties {
     pub fn get_string(&self, key: &str) -> anyhow::Result<String> {
         match self.properties.get(key) {
             Some(v) => Ok(v.clone()),
+            None => Err(anyhow!("`{}` field not found", key)),
+        }
+    }
+
+    pub fn set_i16(&mut self, key: &str, value: i16) {
+        self.set_string(key.to_string(), value.to_string());
+    }
+
+    pub fn get_i16(&self, key: &str) -> anyhow::Result<i16> {
+        match self.properties.get(key) {
+            Some(v) => i16::from_str(v).map_err(|e| anyhow!(e)),
+            None => Err(anyhow!("`{}` field not found", key)),
+        }
+    }
+
+    pub fn set_u16(&mut self, key: &str, value: u16) {
+        self.set_string(key.to_string(), value.to_string());
+    }
+
+    pub fn get_u16(&self, key: &str) -> anyhow::Result<u16> {
+        match self.properties.get(key) {
+            Some(v) => u16::from_str(v).map_err(|e| anyhow!(e)),
             None => Err(anyhow!("`{}` field not found", key)),
         }
     }
@@ -154,46 +199,105 @@ impl Properties {
         Ok(Duration::from_millis(value))
     }
 
-    pub fn get_sub_properties(&self, pre_key: &str) -> Properties {
-        let pre_key = format!("{}.", pre_key);
+    pub fn to_sub_properties(&self, prefix_key: &str) -> Properties {
+        self.to_sub_properties_with_name(prefix_key, None)
+    }
+
+    pub fn to_sub_properties_with_name(&self, prefix_key: &str, name: Option<&str>) -> Properties {
         let mut properties = Properties::new();
+
+        if let Some(name) = name {
+            properties.name = name.to_string();
+        }
+
+        let pre_key = format!("{}.", prefix_key);
         for (key, value) in self.as_map() {
             if key.starts_with(pre_key.as_str()) {
                 let key = key.index(pre_key.len()..);
                 properties.set_string(key.to_owned(), value.to_owned());
             }
         }
+
         properties
     }
 
-    pub fn get_source_properties(&self, fn_name: &str) -> Properties {
-        let pre_key = format!("source.{fn_name}", fn_name = fn_name);
-        self.get_sub_properties(pre_key.as_str())
+    pub fn extend_sub_properties(&mut self, prefix_key: &str, properties: Properties) {
+        for (sub_key, sub_val) in properties.as_map() {
+            let key = format!("{}.{}", prefix_key, sub_key);
+            self.properties.insert(key, sub_val.to_string());
+        }
     }
 
-    pub fn get_window_properties(&self, fn_name: &str) -> Properties {
-        let pre_key = format!("window.{fn_name}", fn_name = fn_name);
-        self.get_sub_properties(pre_key.as_str())
+    pub fn to_lines_string(&self) -> String {
+        let mut lines: Vec<String> = self
+            .properties
+            .iter()
+            .map(|(k, v)| format!("{}:{}", k, v))
+            .collect();
+        lines.sort();
+        lines.join("\n")
+    }
+}
+
+impl FunctionProperties for Properties {
+    fn to_source(&self, fn_name: &str) -> Properties {
+        let prefix_key = format!("source.{fn_name}", fn_name = fn_name);
+        self.to_sub_properties_with_name(prefix_key.as_str(), Some(fn_name))
     }
 
-    pub fn get_reduce_properties(&self, fn_name: &str) -> Properties {
-        let pre_key = format!("reduce.{fn_name}", fn_name = fn_name);
-        self.get_sub_properties(pre_key.as_str())
+    fn extend_source(&mut self, fn_name: &str, properties: Properties) {
+        let prefix_key = format!("source.{fn_name}", fn_name = fn_name);
+        self.extend_sub_properties(prefix_key.as_str(), properties);
     }
 
-    pub fn get_filter_properties(&self, fn_name: &str) -> Properties {
+    fn to_window(&self, fn_name: &str) -> Properties {
+        let prefix_key = format!("window.{fn_name}", fn_name = fn_name);
+        self.to_sub_properties_with_name(prefix_key.as_str(), Some(fn_name))
+    }
+
+    fn extend_window(&mut self, fn_name: &str, properties: Properties) {
+        let prefix_key = format!("window.{fn_name}", fn_name = fn_name);
+        self.extend_sub_properties(prefix_key.as_str(), properties);
+    }
+
+    fn to_reduce(&self, fn_name: &str) -> Properties {
+        let prefix_key = format!("reduce.{fn_name}", fn_name = fn_name);
+        self.to_sub_properties_with_name(prefix_key.as_str(), Some(fn_name))
+    }
+
+    fn extend_reduce(&mut self, fn_name: &str, properties: Properties) {
+        let prefix_key = format!("reduce.{fn_name}", fn_name = fn_name);
+        self.extend_sub_properties(prefix_key.as_str(), properties);
+    }
+
+    fn to_filter(&self, fn_name: &str) -> Properties {
         let pre_key = format!("filter.{fn_name}", fn_name = fn_name);
-        self.get_sub_properties(pre_key.as_str())
+        self.to_sub_properties_with_name(pre_key.as_str(), Some(fn_name))
     }
 
-    pub fn get_sink_properties(&self, fn_name: &str) -> Properties {
-        let pre_key = format!("sink.{fn_name}", fn_name = fn_name);
-        self.get_sub_properties(pre_key.as_str())
+    fn extend_filter(&mut self, fn_name: &str, properties: Properties) {
+        let prefix_key = format!("filter.{fn_name}", fn_name = fn_name);
+        self.extend_sub_properties(prefix_key.as_str(), properties);
     }
 
-    pub fn get_custom_properties(&self, fn_name: &str) -> Properties {
-        let pre_key = format!("custom.{fn_name}", fn_name = fn_name);
-        self.get_sub_properties(pre_key.as_str())
+    fn to_sink(&self, fn_name: &str) -> Properties {
+        let prefix_key = format!("sink.{fn_name}", fn_name = fn_name);
+        self.to_sub_properties_with_name(prefix_key.as_str(), Some(fn_name))
+    }
+
+    fn extend_sink(&mut self, fn_name: &str, properties: Properties) {
+        let prefix_key = format!("sink.{fn_name}", fn_name = fn_name);
+        self.extend_sub_properties(prefix_key.as_str(), properties);
+    }
+
+    fn to_custom(&self, fn_name: &str) -> Properties {
+        let prefix_key = format!("custom.{fn_name}", fn_name = fn_name);
+        self.to_sub_properties_with_name(prefix_key.as_str(), Some(fn_name))
+    }
+
+    fn extend_custom(&mut self, fn_name: &str, properties: Properties) {
+        let prefix_key = format!("custom.{fn_name}", fn_name = fn_name);
+        self.extend_sub_properties(prefix_key.as_str(), properties);
     }
 }
 
@@ -206,9 +310,6 @@ const SYSTEM_CHECKPOINT_TTL: &str = "SYSTEM_CHECKPOINT_TTL";
 const SYSTEM_CLUSTER_MODE: &str = "SYSTEM_CLUSTER_MODE";
 const SYSTEM_PUB_SUB_CHANNEL_SIZE: &str = "SYSTEM_PUB_SUB_CHANNEL_SIZE";
 const SYSTEM_PUB_SUB_CHANNEL_BASE_ON: &str = "SYSTEM_PUB_SUB_CHANNEL_BASE_ON";
-const SYSTEM_SPEED_BACKPRESSURE_INTERVAL: &str = "SYSTEM_SPEED_BACKPRESSURE_INTERVAL";
-const SYSTEM_SPEED_BACKPRESSURE_MAX_TIMES: &str = "SYSTEM_SPEED_BACKPRESSURE_MAX_TIMES";
-const SYSTEM_SPEED_BACKPRESSURE_PAUSE_TIME: &str = "SYSTEM_SPEED_BACKPRESSURE_PAUSE_TIME";
 
 impl SystemProperties for Properties {
     fn set_application_name(&mut self, application_name: &str) {
@@ -295,30 +396,6 @@ impl SystemProperties for Properties {
         let value = self.get_string(SYSTEM_PUB_SUB_CHANNEL_BASE_ON)?;
         ChannelBaseOn::try_from(value.as_str()).map_err(|e| anyhow!(e))
     }
-
-    fn set_speed_backpressure_interval(&mut self, interval: Duration) {
-        self.set_duration(SYSTEM_SPEED_BACKPRESSURE_INTERVAL, interval);
-    }
-
-    fn get_speed_backpressure_interval(&self) -> anyhow::Result<Duration> {
-        self.get_duration(SYSTEM_SPEED_BACKPRESSURE_INTERVAL)
-    }
-
-    fn set_speed_backpressure_max_times(&mut self, max_times: usize) {
-        self.set_usize(SYSTEM_SPEED_BACKPRESSURE_MAX_TIMES, max_times);
-    }
-
-    fn get_speed_backpressure_max_times(&self) -> anyhow::Result<usize> {
-        self.get_usize(SYSTEM_SPEED_BACKPRESSURE_MAX_TIMES)
-    }
-
-    fn set_speed_backpressure_pause_time(&mut self, interval: Duration) {
-        self.set_duration(SYSTEM_SPEED_BACKPRESSURE_PAUSE_TIME, interval);
-    }
-
-    fn get_speed_backpressure_pause_time(&self) -> anyhow::Result<Duration> {
-        self.get_duration(SYSTEM_SPEED_BACKPRESSURE_PAUSE_TIME)
-    }
 }
 
 impl InnerSystemProperties for Properties {
@@ -347,7 +424,7 @@ mod tests {
         properties.set_str("a.b", "v");
         properties.set_str("a.b.c", "v");
         properties.set_str("a.b.c.d", "v");
-        let sub_properties = properties.get_sub_properties("a.b");
+        let sub_properties = properties.to_sub_properties("a.b");
         println!("{:?}", properties);
         println!("{:?}", sub_properties);
     }
