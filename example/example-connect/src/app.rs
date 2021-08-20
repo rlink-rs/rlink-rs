@@ -28,6 +28,7 @@ impl StreamApp for ConnectStreamApp0 {
         properties.set_keyed_state_backend(KeyedStateBackend::Memory);
         properties.set_pub_sub_channel_size(100000);
         properties.set_pub_sub_channel_base(ChannelBaseOn::Unbounded);
+        properties.set_checkpoint_interval(Duration::from_secs(15));
     }
 
     fn build_stream(&self, _properties: &Properties, env: &mut StreamExecutionEnvironment) {

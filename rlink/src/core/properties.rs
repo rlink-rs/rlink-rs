@@ -67,14 +67,20 @@ pub trait FunctionProperties {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Properties {
+    name: String,
     properties: HashMap<String, String>,
 }
 
 impl Properties {
     pub fn new() -> Self {
         Properties {
+            name: "".to_string(),
             properties: HashMap::new(),
         }
+    }
+
+    pub fn name(&self) -> &str {
+        self.name.as_str()
     }
 
     pub fn as_map(&self) -> &HashMap<String, String> {
@@ -195,14 +201,24 @@ impl Properties {
     }
 
     pub fn to_sub_properties(&self, prefix_key: &str) -> Properties {
-        let pre_key = format!("{}.", prefix_key);
+        self.to_sub_properties_with_name(prefix_key, None)
+    }
+
+    pub fn to_sub_properties_with_name(&self, prefix_key: &str, name: Option<&str>) -> Properties {
         let mut properties = Properties::new();
+
+        if let Some(name) = name {
+            properties.name = name.to_string();
+        }
+
+        let pre_key = format!("{}.", prefix_key);
         for (key, value) in self.as_map() {
             if key.starts_with(pre_key.as_str()) {
                 let key = key.index(pre_key.len()..);
                 properties.set_string(key.to_owned(), value.to_owned());
             }
         }
+
         properties
     }
 
@@ -227,7 +243,7 @@ impl Properties {
 impl FunctionProperties for Properties {
     fn to_source(&self, fn_name: &str) -> Properties {
         let prefix_key = format!("source.{fn_name}", fn_name = fn_name);
-        self.to_sub_properties(prefix_key.as_str())
+        self.to_sub_properties_with_name(prefix_key.as_str(), Some(fn_name))
     }
 
     fn extend_source(&mut self, fn_name: &str, properties: Properties) {
@@ -237,7 +253,7 @@ impl FunctionProperties for Properties {
 
     fn to_window(&self, fn_name: &str) -> Properties {
         let prefix_key = format!("window.{fn_name}", fn_name = fn_name);
-        self.to_sub_properties(prefix_key.as_str())
+        self.to_sub_properties_with_name(prefix_key.as_str(), Some(fn_name))
     }
 
     fn extend_window(&mut self, fn_name: &str, properties: Properties) {
@@ -247,7 +263,7 @@ impl FunctionProperties for Properties {
 
     fn to_reduce(&self, fn_name: &str) -> Properties {
         let prefix_key = format!("reduce.{fn_name}", fn_name = fn_name);
-        self.to_sub_properties(prefix_key.as_str())
+        self.to_sub_properties_with_name(prefix_key.as_str(), Some(fn_name))
     }
 
     fn extend_reduce(&mut self, fn_name: &str, properties: Properties) {
@@ -257,7 +273,7 @@ impl FunctionProperties for Properties {
 
     fn to_filter(&self, fn_name: &str) -> Properties {
         let pre_key = format!("filter.{fn_name}", fn_name = fn_name);
-        self.to_sub_properties(pre_key.as_str())
+        self.to_sub_properties_with_name(pre_key.as_str(), Some(fn_name))
     }
 
     fn extend_filter(&mut self, fn_name: &str, properties: Properties) {
@@ -267,7 +283,7 @@ impl FunctionProperties for Properties {
 
     fn to_sink(&self, fn_name: &str) -> Properties {
         let prefix_key = format!("sink.{fn_name}", fn_name = fn_name);
-        self.to_sub_properties(prefix_key.as_str())
+        self.to_sub_properties_with_name(prefix_key.as_str(), Some(fn_name))
     }
 
     fn extend_sink(&mut self, fn_name: &str, properties: Properties) {
@@ -277,7 +293,7 @@ impl FunctionProperties for Properties {
 
     fn to_custom(&self, fn_name: &str) -> Properties {
         let prefix_key = format!("custom.{fn_name}", fn_name = fn_name);
-        self.to_sub_properties(prefix_key.as_str())
+        self.to_sub_properties_with_name(prefix_key.as_str(), Some(fn_name))
     }
 
     fn extend_custom(&mut self, fn_name: &str, properties: Properties) {
