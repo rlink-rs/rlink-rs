@@ -146,7 +146,7 @@ fn waiting_all_task_manager_fine(metadata_loader: &mut MetadataLoader) -> Arc<Cl
 fn waiting_all_task_manager_fine0(metadata_loader: &mut MetadataLoader) -> ClusterDescriptor {
     loop {
         let cluster_descriptor = metadata_loader.get_cluster_descriptor();
-        match cluster_descriptor.coordinator_manager.coordinator_status {
+        match cluster_descriptor.coordinator_manager.status {
             ManagerStatus::Registered => {
                 return cluster_descriptor;
             }

@@ -128,6 +128,22 @@ impl<T> StdResponse<T> {
             data,
         }
     }
+
+    pub fn err<E: ToString>(err_msg: E) -> Self {
+        StdResponse {
+            code: ResponseCode::ERR(err_msg.to_string()),
+            data: None,
+        }
+    }
+}
+
+impl<T> Into<StdResponse<T>> for anyhow::Result<T> {
+    fn into(self) -> StdResponse<T> {
+        match self {
+            Ok(t) => StdResponse::ok(Some(t)),
+            Err(e) => StdResponse::err(e),
+        }
+    }
 }
 
 #[cfg(test)]

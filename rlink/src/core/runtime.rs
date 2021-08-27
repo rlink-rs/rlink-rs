@@ -224,7 +224,7 @@ impl<'a> TryFrom<&'a str> for HeartBeatStatus {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct WorkerManagerDescriptor {
-    pub task_status: ManagerStatus,
+    pub status: ManagerStatus,
     pub latest_heart_beat_ts: u64,
     pub latest_heart_beat_status: HeartBeatStatus,
     pub task_manager_id: String,
@@ -242,7 +242,7 @@ pub struct CoordinatorManagerDescriptor {
     pub application_properties: Properties,
     pub web_address: String,
     pub metrics_address: String,
-    pub coordinator_status: ManagerStatus,
+    pub status: ManagerStatus,
     pub v_cores: u32,
     pub memory_mb: u32,
     pub num_task_managers: u32,
@@ -283,9 +283,9 @@ impl ClusterDescriptor {
         }
 
         if task_count == terminated_count {
-            self.coordinator_manager.coordinator_status = ManagerStatus::Terminated;
+            self.coordinator_manager.status = ManagerStatus::Terminated;
         } else if terminated_count > 0 {
-            self.coordinator_manager.coordinator_status = ManagerStatus::Terminating;
+            self.coordinator_manager.status = ManagerStatus::Terminating;
         }
     }
 

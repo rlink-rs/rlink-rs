@@ -36,7 +36,7 @@ pub(crate) fn start_heartbeat_timer(metadata_storage_mode: MetadataStorageType) 
         let cluster_descriptor = loop_read_cluster_descriptor(&metadata_storage);
         update_global_cluster_descriptor(cluster_descriptor.clone());
 
-        if cluster_descriptor.coordinator_manager.coordinator_status == ManagerStatus::Terminated {
+        if cluster_descriptor.coordinator_manager.status == ManagerStatus::Terminated {
             return HeartbeatResult::End;
         }
 

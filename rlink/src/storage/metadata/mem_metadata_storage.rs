@@ -26,46 +26,36 @@ impl TMetadataStorage for MemoryMetadataStorage {
             .expect("METADATA_STORAGE lock failed");
         *lock = Some(metadata);
 
-        debug!("Save metadata {:?}", lock.clone().unwrap());
-        Ok(())
-    }
-
-    fn delete(&mut self) -> anyhow::Result<()> {
-        let mut lock = METADATA_STORAGE
-            .lock()
-            .expect("METADATA_STORAGE lock failed");
-        *lock = None;
-
-        debug!("Delete metadata {:?}", lock.clone().unwrap());
+        debug!("Save metadata {:?}", lock.as_ref());
         Ok(())
     }
 
     fn load(&self) -> anyhow::Result<ClusterDescriptor> {
-        let lock = METADATA_STORAGE
-            .lock()
-            .expect("METADATA_STORAGE lock failed");
-        Ok(lock.clone().unwrap())
+        let lock = METADATA_STORAGE.lock().unwrap();
+        lock.clone().ok_or(anyhow!("ClusterDescriptor not found"))
     }
 
-    fn update_application_status(&self, job_manager_status: ManagerStatus) -> anyhow::Result<()> {
-        let mut lock = METADATA_STORAGE
-            .lock()
-            .expect("METADATA_STORAGE lock failed");
-        let mut job_descriptor: ClusterDescriptor = lock.clone().unwrap();
-        job_descriptor.coordinator_manager.coordinator_status = job_manager_status;
+    fn update_coordinator_status(&self, status: ManagerStatus) -> anyhow::Result<()> {
+        let mut lock = METADATA_STORAGE.lock().unwrap();
 
-        *lock = Some(job_descriptor);
+        let cluster_descriptor = lock
+            .as_mut()
+            .ok_or(anyhow!("ClusterDescriptor not found"))?;
+        cluster_descriptor.coordinator_manager.status = status;
+
         Ok(())
     }
 
-    fn update_task_manager_status(
+    fn update_worker_status(
         &self,
         task_manager_id: String,
         heartbeat_items: Vec<HeartbeatItem>,
-        task_manager_status: ManagerStatus,
+        status: ManagerStatus,
     ) -> anyhow::Result<ManagerStatus> {
         let mut lock = METADATA_STORAGE.lock().unwrap();
-        let cluster_descriptor = (&mut *lock).as_mut().unwrap();
+        let cluster_descriptor = (&mut *lock)
+            .as_mut()
+            .ok_or(anyhow!("ClusterDescriptor not found"))?;
 
         let task_manager_descriptor = cluster_descriptor
             .borrow_mut()
@@ -77,7 +67,7 @@ impl TMetadataStorage for MemoryMetadataStorage {
                 task_manager_id
             ))?;
 
-        task_manager_descriptor.task_status = task_manager_status;
+        task_manager_descriptor.status = status;
         task_manager_descriptor.latest_heart_beat_ts = current_timestamp_millis();
 
         let mut exist_task_end_hb = false;
@@ -119,7 +109,7 @@ impl TMetadataStorage for MemoryMetadataStorage {
             cluster_descriptor.flush_coordinator_status();
             info!(
                 "Flush coordinator status: {:?}",
-                cluster_descriptor.coordinator_manager.coordinator_status
+                cluster_descriptor.coordinator_manager.status
             );
         }
 
@@ -128,6 +118,6 @@ impl TMetadataStorage for MemoryMetadataStorage {
             cluster_descriptor
         );
 
-        Ok(cluster_descriptor.coordinator_manager.coordinator_status)
+        Ok(cluster_descriptor.coordinator_manager.status)
     }
 }

@@ -217,11 +217,14 @@ async fn heartbeat(req: Request<Body>, context: Arc<WebContext>) -> anyhow::Resu
     } = serde_json::from_reader(whole_body.reader())?;
 
     let metadata_storage = MetadataStorage::new(&context.metadata_mode);
-    let coordinator_status = metadata_storage
-        .update_task_manager_status(task_manager_id, change_items, ManagerStatus::Registered)
-        .unwrap();
+    let coordinator_status = metadata_storage.update_worker_status(
+        task_manager_id,
+        change_items,
+        ManagerStatus::Registered,
+    );
 
-    as_ok_json(&StdResponse::ok(Some(coordinator_status)))
+    let resp: StdResponse<ManagerStatus> = coordinator_status.into();
+    as_ok_json(&resp)
 }
 
 async fn checkpoint(

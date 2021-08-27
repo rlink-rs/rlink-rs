@@ -9,15 +9,21 @@ pub mod metadata_loader;
 pub(crate) use metadata_loader::MetadataLoader;
 
 pub trait TMetadataStorage {
+    /// save metadata to storage
     fn save(&mut self, metadata: ClusterDescriptor) -> anyhow::Result<()>;
-    fn delete(&mut self) -> anyhow::Result<()>;
+
+    /// load metadata from storage
     fn load(&self) -> anyhow::Result<ClusterDescriptor>;
-    fn update_application_status(&self, job_manager_status: ManagerStatus) -> anyhow::Result<()>;
-    fn update_task_manager_status(
+
+    /// update coordinator status change
+    fn update_coordinator_status(&self, status: ManagerStatus) -> anyhow::Result<()>;
+
+    /// update worker status change, return the coordinator's status
+    fn update_worker_status(
         &self,
         task_manager_id: String,
         heartbeat_items: Vec<HeartbeatItem>,
-        task_manager_status: ManagerStatus,
+        worker_manager_status: ManagerStatus,
     ) -> anyhow::Result<ManagerStatus>;
 }
 
@@ -43,38 +49,30 @@ impl TMetadataStorage for MetadataStorage {
         }
     }
 
-    fn delete(&mut self) -> anyhow::Result<()> {
-        match self {
-            MetadataStorage::MemoryMetadataStorage(storage) => storage.delete(),
-        }
-    }
-
     fn load(&self) -> anyhow::Result<ClusterDescriptor> {
         match self {
             MetadataStorage::MemoryMetadataStorage(storage) => storage.load(),
         }
     }
 
-    fn update_application_status(&self, job_manager_status: ManagerStatus) -> anyhow::Result<()> {
+    fn update_coordinator_status(&self, status: ManagerStatus) -> anyhow::Result<()> {
         match self {
             MetadataStorage::MemoryMetadataStorage(storage) => {
-                storage.update_application_status(job_manager_status)
+                storage.update_coordinator_status(status)
             }
         }
     }
 
-    fn update_task_manager_status(
+    fn update_worker_status(
         &self,
         task_manager_id: String,
         heartbeat_items: Vec<HeartbeatItem>,
-        task_manager_status: ManagerStatus,
+        status: ManagerStatus,
     ) -> anyhow::Result<ManagerStatus> {
         match self {
-            MetadataStorage::MemoryMetadataStorage(storage) => storage.update_task_manager_status(
-                task_manager_id,
-                heartbeat_items,
-                task_manager_status,
-            ),
+            MetadataStorage::MemoryMetadataStorage(storage) => {
+                storage.update_worker_status(task_manager_id, heartbeat_items, status)
+            }
         }
     }
 }
@@ -95,16 +93,12 @@ pub(crate) fn loop_save_cluster_descriptor(
     );
 }
 
-pub(crate) fn loop_delete_cluster_descriptor(metadata_storage: &mut MetadataStorage) {
-    loop_fn!(metadata_storage.delete(), std::time::Duration::from_secs(2));
-}
-
 pub(crate) fn loop_update_application_status(
     metadata_storage: &mut MetadataStorage,
-    job_manager_status: ManagerStatus,
+    coordinator_status: ManagerStatus,
 ) {
     loop_fn!(
-        metadata_storage.update_application_status(job_manager_status.clone()),
+        metadata_storage.update_coordinator_status(coordinator_status.clone()),
         std::time::Duration::from_secs(2)
     );
 }

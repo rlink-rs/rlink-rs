@@ -43,7 +43,7 @@ pub(crate) fn build_cluster_descriptor(
         }
 
         let task_manager_descriptor = WorkerManagerDescriptor {
-            task_status: ManagerStatus::Pending,
+            status: ManagerStatus::Pending,
             latest_heart_beat_ts: 0,
             latest_heart_beat_status: HeartBeatStatus::Ok,
             task_manager_id: task_manager_instance.worker_manager_id.clone(),
@@ -61,7 +61,7 @@ pub(crate) fn build_cluster_descriptor(
         application_properties: application_properties.clone(),
         web_address: "".to_string(),
         metrics_address: context.metric_addr.clone(),
-        coordinator_status: ManagerStatus::Pending,
+        status: ManagerStatus::Pending,
         v_cores: context.v_cores,
         memory_mb: context.memory_mb,
         num_task_managers: context.num_task_managers,
