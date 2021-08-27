@@ -336,7 +336,7 @@ impl CheckpointManager {
     }
 
     pub fn apply(&self, ck: Checkpoint) -> anyhow::Result<()> {
-        self.sender.send_timeout(ck, Duration::from_secs(2))?;
+        self.sender.try_send(ck)?;
         Ok(())
     }
 
