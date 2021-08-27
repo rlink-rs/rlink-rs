@@ -145,8 +145,11 @@ impl CheckpointAlignManager {
                 let unreached_operators = self.unreached_operators();
                 if unreached_operators.len() > 0 {
                     warn!(
-                        "the new checkpoint reached, found un-align checkpoint_id={:?}, un-align operators: {}",
+                        "the new checkpoint reached, found un-align checkpoint_id={:?}",
                         self.current_ck_id,
+                    );
+                    debug!(
+                        "un-align operators: {}",
                         serde_json::to_string(&unreached_operators).unwrap()
                     );
                 }
