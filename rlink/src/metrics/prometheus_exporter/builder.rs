@@ -4,6 +4,8 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 // #[cfg(feature = "tokio-exporter")]
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
@@ -25,8 +27,7 @@ use crate::metrics::prometheus_exporter::common::InstallError;
 use crate::metrics::prometheus_exporter::common::Matcher;
 use crate::metrics::prometheus_exporter::distribution::DistributionBuilder;
 use crate::metrics::prometheus_exporter::recorder::{Inner, PrometheusRecorder};
-use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
+use crate::metrics::ProxyAddressLoader;
 
 /// Builder for creating and installing a Prometheus recorder/exporter.
 pub struct PrometheusBuilder {
@@ -156,7 +157,10 @@ impl PrometheusBuilder {
     /// An error will be returned if there's an issue with creating the HTTP server or with
     /// installing the recorder as the global recorder.
     // #[cfg(feature = "tokio-exporter")]
-    pub fn install(self, with_proxy: bool) -> Result<(), InstallError> {
+    pub fn install(
+        self,
+        proxy_address_loader: Arc<Box<dyn ProxyAddressLoader>>,
+    ) -> Result<(), InstallError> {
         let bind_notify = Arc::new(AtomicBool::new(false));
         let running = Arc::new(AtomicBool::new(true));
 
@@ -171,7 +175,7 @@ impl PrometheusBuilder {
                     .unwrap();
 
                 let n: Result<(), InstallError> = runtime.block_on(async move {
-                    let (recorder, exporter) = self.build_with_exporter(with_proxy)?;
+                    let (recorder, exporter) = self.build_with_exporter(proxy_address_loader)?;
                     metrics::set_boxed_recorder(Box::new(recorder))?;
                     bind_notify_c.store(true, std::sync::atomic::Ordering::SeqCst);
 
@@ -229,7 +233,7 @@ impl PrometheusBuilder {
     // #[cfg(feature = "tokio-exporter")]
     pub fn build_with_exporter(
         self,
-        with_proxy: bool,
+        proxy_address_loader: Arc<Box<dyn ProxyAddressLoader>>,
     ) -> Result<
         (
             PrometheusRecorder,
@@ -246,19 +250,25 @@ impl PrometheusBuilder {
         let exporter = async move {
             let make_svc = make_service_fn(move |_| {
                 let handle = handle.clone();
+                let proxy_address_loader = proxy_address_loader.clone();
 
                 async move {
                     Ok::<_, HyperError>(service_fn(move |_| {
                         let handle = handle.clone();
+                        let proxy_address_loader = proxy_address_loader.clone();
 
                         async move {
                             crate::metrics::metric::export();
 
                             let output = handle.render();
 
-                            let output = if with_proxy {
+                            let proxy_address = proxy_address_loader.load();
+                            let output = if !proxy_address.is_empty() {
                                 let proxy_metrics =
-                                    crate::metrics::worker_proxy::collect_worker_metrics().await;
+                                    crate::metrics::worker_proxy::collect_worker_metrics(
+                                        proxy_address,
+                                    )
+                                    .await;
                                 format!("{}\n{}", output, proxy_metrics)
                             } else {
                                 output

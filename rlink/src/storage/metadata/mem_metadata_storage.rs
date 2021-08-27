@@ -10,7 +10,7 @@ lazy_static! {
     pub static ref METADATA_STORAGE: Mutex<Option<ClusterDescriptor>> = Mutex::new(None);
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone)]
 pub struct MemoryMetadataStorage {}
 
 impl MemoryMetadataStorage {

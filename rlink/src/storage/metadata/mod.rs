@@ -27,6 +27,7 @@ pub trait TMetadataStorage {
     ) -> anyhow::Result<ManagerStatus>;
 }
 
+#[derive(Clone)]
 pub enum MetadataStorage {
     MemoryMetadataStorage(MemoryMetadataStorage),
 }

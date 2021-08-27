@@ -20,6 +20,15 @@ pub enum ClusterMode {
     Kubernetes = 3,
 }
 
+impl ClusterMode {
+    pub fn is_local(&self) -> bool {
+        match self {
+            ClusterMode::Local => true,
+            _ => false,
+        }
+    }
+}
+
 impl<'a> TryFrom<&'a str> for ClusterMode {
     type Error = anyhow::Error;
 
@@ -53,6 +62,15 @@ pub enum ManagerType {
     Coordinator = 1,
     /// Task Manager
     Worker = 3,
+}
+
+impl ManagerType {
+    pub fn is_coordinator(&self) -> bool {
+        match self {
+            ManagerType::Coordinator => true,
+            _ => false,
+        }
+    }
 }
 
 impl<'a> TryFrom<&'a str> for ManagerType {
