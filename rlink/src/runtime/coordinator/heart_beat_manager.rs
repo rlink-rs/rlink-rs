@@ -43,6 +43,10 @@ pub(crate) fn start_heartbeat_timer(metadata_storage_mode: MetadataStorageType) 
         let current_timestamp = utils::date_time::current_timestamp().as_millis() as u64;
         for task_manager_descriptor in &cluster_descriptor.worker_managers {
             if current_timestamp < task_manager_descriptor.latest_heart_beat_ts {
+                warn!(
+                    "The worker({}) time is too fast, check ntpd server",
+                    task_manager_descriptor.task_manager_address
+                );
                 continue;
             }
 
@@ -58,7 +62,8 @@ pub(crate) fn start_heartbeat_timer(metadata_storage_mode: MetadataStorageType) 
 
             if dur.as_secs() > 50 {
                 error!(
-                    "heart beat lag {}s from TaskManager {}, and break heartbeat",
+                    "heartbeat's timestamp {} lag {}s from TaskManager {}, and break heartbeat",
+                    task_manager_descriptor.latest_heart_beat_ts,
                     dur.as_secs(),
                     task_manager_descriptor.task_manager_address
                 );
