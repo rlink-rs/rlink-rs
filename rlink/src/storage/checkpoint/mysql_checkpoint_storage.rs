@@ -85,62 +85,7 @@ where application_name = :application_name
         Ok(())
     }
 
-    fn load(
-        &mut self,
-        application_name: &str,
-        job_id: JobId,
-        operator_id: OperatorId,
-    ) -> anyhow::Result<Vec<Checkpoint>> {
-        let pool = Pool::new(self.url.as_str())?;
-
-        let mut conn = pool.get_conn()?;
-
-        let stmt = conn.prep(
-            r"
-SELECT ck.job_id, ck.task_number, ck.num_tasks, ck.operator_id, ck.checkpoint_id, ck.completed_checkpoint_id, ck.handle
-from rlink_ck as ck
-         inner join (
-    SELECT max(checkpoint_id) as checkpoint_id
-    from rlink_ck
-    where application_name = :application_name
-        and job_id = :job_id
-        and operator_id = :operator_id
-) as t on t.checkpoint_id = ck.checkpoint_id
-where ck.application_name = :application_name
-    and ck.job_id = :job_id
-    and ck.operator_id = :operator_id"
-                .replace("rlink_ck", self.table.as_str()),
-        )?;
-
-        let selected_payments = conn.exec_map(
-            &stmt,
-            params! { "application_name" => application_name, "job_id" => job_id.0, "operator_id" => operator_id.0 },
-            |(job_id, task_number, num_tasks, operator_id, checkpoint_id, completed_checkpoint_id, handle)| {
-                let completed_checkpoint_id = if completed_checkpoint_id == 0 {
-                    None
-                } else {
-                    Some(CheckpointId(completed_checkpoint_id))
-                };
-
-                Checkpoint {
-                    operator_id: OperatorId(operator_id),
-                    task_id: TaskId {
-                        job_id: JobId(job_id),
-                        task_number,
-                        num_tasks,
-                    },
-                    checkpoint_id: CheckpointId(checkpoint_id),
-                    completed_checkpoint_id,
-                    handle: CheckpointHandle { handle },
-                }
-            },
-        )?;
-
-        info!("checkpoint load success");
-        Ok(selected_payments)
-    }
-
-    fn load_v2(&mut self, application_name: &str) -> anyhow::Result<Vec<Checkpoint>> {
+    fn load(&mut self, application_name: &str) -> anyhow::Result<Vec<Checkpoint>> {
         let pool = Pool::new(self.url.as_str())?;
 
         let mut conn = pool.get_conn()?;
@@ -309,9 +254,7 @@ mod tests {
             )
             .unwrap();
 
-        let cks = mysql_storage
-            .load(application_name, job_id, operator_id)
-            .unwrap();
+        let cks = mysql_storage.load(application_name).unwrap();
 
         for ck in cks {
             println!("{:?}", ck);
