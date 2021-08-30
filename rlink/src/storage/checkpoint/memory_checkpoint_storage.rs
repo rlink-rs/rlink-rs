@@ -59,13 +59,18 @@ impl TCheckpointStorage for MemoryCheckpointStorage {
         Ok(())
     }
 
-    fn load(&mut self, _application_name: &str) -> anyhow::Result<Vec<Checkpoint>> {
+    fn load(
+        &mut self,
+        _application_name: &str,
+        _application_id: &str,
+    ) -> anyhow::Result<Vec<Checkpoint>> {
         Ok(vec![])
     }
 
     fn load_by_checkpoint_id(
         &mut self,
         _application_name: &str,
+        _application_id: &str,
         _checkpoint_id: CheckpointId,
     ) -> anyhow::Result<Vec<Checkpoint>> {
         Ok(vec![])
