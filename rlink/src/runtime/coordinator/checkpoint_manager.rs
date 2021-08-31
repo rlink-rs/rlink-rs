@@ -242,7 +242,8 @@ impl CheckpointAlignManager {
         let mut operator_checkpoints = HashMap::new();
 
         if let Some(storage) = self.storage.as_mut() {
-            let mut checkpoints = storage.load(self.application_name.as_str())?;
+            let mut checkpoints =
+                storage.load(self.application_name.as_str(), self.application_id.as_str())?;
             let completed_checkpoint_id = checkpoints
                 .iter()
                 .filter(|c| {
@@ -259,6 +260,7 @@ impl CheckpointAlignManager {
             if !completed_checkpoint_id.is_default() {
                 checkpoints = storage.load_by_checkpoint_id(
                     self.application_name.as_str(),
+                    self.application_id.as_str(),
                     completed_checkpoint_id,
                 )?;
             }

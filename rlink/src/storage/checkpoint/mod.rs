@@ -17,10 +17,16 @@ pub trait TCheckpointStorage {
         ttl: u64,
     ) -> anyhow::Result<()>;
 
-    fn load(&mut self, application_name: &str) -> anyhow::Result<Vec<Checkpoint>>;
+    fn load(
+        &mut self,
+        application_name: &str,
+        application_id: &str,
+    ) -> anyhow::Result<Vec<Checkpoint>>;
+
     fn load_by_checkpoint_id(
         &mut self,
         application_name: &str,
+        application_id: &str,
         checkpoint_id: CheckpointId,
     ) -> anyhow::Result<Vec<Checkpoint>>;
 }
@@ -73,24 +79,33 @@ impl TCheckpointStorage for CheckpointStorage {
         }
     }
 
-    fn load(&mut self, application_name: &str) -> anyhow::Result<Vec<Checkpoint>> {
+    fn load(
+        &mut self,
+        application_name: &str,
+        application_id: &str,
+    ) -> anyhow::Result<Vec<Checkpoint>> {
         match self {
-            CheckpointStorage::MemoryCheckpointStorage(storage) => storage.load(application_name),
-            CheckpointStorage::MySqlCheckpointStorage(storage) => storage.load(application_name),
+            CheckpointStorage::MemoryCheckpointStorage(storage) => {
+                storage.load(application_name, application_id)
+            }
+            CheckpointStorage::MySqlCheckpointStorage(storage) => {
+                storage.load(application_name, application_id)
+            }
         }
     }
 
     fn load_by_checkpoint_id(
         &mut self,
         application_name: &str,
+        application_id: &str,
         checkpoint_id: CheckpointId,
     ) -> anyhow::Result<Vec<Checkpoint>> {
         match self {
             CheckpointStorage::MemoryCheckpointStorage(storage) => {
-                storage.load_by_checkpoint_id(application_name, checkpoint_id)
+                storage.load_by_checkpoint_id(application_name, application_id, checkpoint_id)
             }
             CheckpointStorage::MySqlCheckpointStorage(storage) => {
-                storage.load_by_checkpoint_id(application_name, checkpoint_id)
+                storage.load_by_checkpoint_id(application_name, application_id, checkpoint_id)
             }
         }
     }
