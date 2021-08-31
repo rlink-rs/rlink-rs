@@ -85,7 +85,11 @@ where application_name = :application_name
         Ok(())
     }
 
-    fn load(&mut self, application_name: &str) -> anyhow::Result<Vec<Checkpoint>> {
+    fn load(
+        &mut self,
+        application_name: &str,
+        application_id: &str,
+    ) -> anyhow::Result<Vec<Checkpoint>> {
         let pool = Pool::new(self.url.as_str())?;
 
         let mut conn = pool.get_conn()?;
@@ -99,14 +103,19 @@ from rlink_ck as ck
     SELECT max(checkpoint_id) as checkpoint_id
     from rlink_ck
     where application_name = :application_name
+    and application_id = :application_id
 ) as t on t.checkpoint_id = ck.checkpoint_id
-where ck.application_name = :application_name"
+where ck.application_name = :application_name 
+and ck.application_id = :application_id"
                 .replace("rlink_ck", self.table.as_str()),
         )?;
 
         let selected_payments = conn.exec_map(
             &stmt,
-            params! { "application_name" => application_name },
+            params! {
+            "application_name" => application_name,
+            "application_id" => application_id,
+             },
             |(
                 job_id,
                 task_number,
@@ -143,6 +152,7 @@ where ck.application_name = :application_name"
     fn load_by_checkpoint_id(
         &mut self,
         application_name: &str,
+        application_id: &str,
         checkpoint_id: CheckpointId,
     ) -> anyhow::Result<Vec<Checkpoint>> {
         let pool = Pool::new(self.url.as_str())?;
@@ -155,13 +165,17 @@ SELECT  ck.job_id, ck.task_number, ck.num_tasks, ck.operator_id,
         ck.checkpoint_id, ck.completed_checkpoint_id, ck.handle
 from rlink_ck as ck
 where ck.application_name = :application_name
+    and ck.application_id = :application_id
     and ck.checkpoint_id = :checkpoint_id"
                 .replace("rlink_ck", self.table.as_str()),
         )?;
 
         let selected_payments = conn.exec_map(
             &stmt,
-            params! { "application_name" => application_name, "checkpoint_id" => checkpoint_id.0},
+            params! {
+            "application_name" => application_name,
+            "application_id" => application_id,
+            "checkpoint_id" => checkpoint_id.0},
             |(
                 job_id,
                 task_number,
@@ -254,7 +268,9 @@ mod tests {
             )
             .unwrap();
 
-        let cks = mysql_storage.load(application_name).unwrap();
+        let cks = mysql_storage
+            .load(application_name, application_id)
+            .unwrap();
 
         for ck in cks {
             println!("{:?}", ck);
