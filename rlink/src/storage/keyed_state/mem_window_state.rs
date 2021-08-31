@@ -34,8 +34,17 @@ impl MemoryWindowState {
         match self.windows.get_mut(window) {
             Some(state) => {
                 let state_record = state.get_mut(&key);
-                let new_val = reduce_fun(state_record, record);
-                state.insert(key, new_val);
+
+                match state_record {
+                    Some(state_record) => {
+                        let new_val = reduce_fun(Some(state_record), record);
+                        *state_record = new_val;
+                    }
+                    None => {
+                        let new_val = reduce_fun(None, record);
+                        state.insert(key, new_val);
+                    }
+                }
             }
             None => {
                 let state_key = StateKey::new(window.clone(), self.job_id, self.task_number);
@@ -91,17 +100,4 @@ impl TWindowState for MemoryWindowState {
     }
 
     fn snapshot(&mut self, _barrier: Barrier) {}
-}
-
-#[cfg(test)]
-mod tests {
-
-    #[test]
-    pub fn dash_map_test() {
-        let map = dashmap::DashMap::new();
-        map.insert("a".to_string(), 1);
-
-        assert_eq!(map.len(), 1);
-        assert_eq!(map.get("a").unwrap().value().clone(), 1);
-    }
 }

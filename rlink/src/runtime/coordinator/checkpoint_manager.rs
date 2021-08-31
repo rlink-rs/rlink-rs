@@ -145,8 +145,11 @@ impl CheckpointAlignManager {
                 let unreached_operators = self.unreached_operators();
                 if unreached_operators.len() > 0 {
                     warn!(
-                        "the new checkpoint reached, found un-align checkpoint_id={:?}, un-align operators: {}",
+                        "the new checkpoint reached, found un-align checkpoint_id={:?}",
                         self.current_ck_id,
+                    );
+                    debug!(
+                        "un-align operators: {}",
                         serde_json::to_string(&unreached_operators).unwrap()
                     );
                 }
@@ -239,7 +242,8 @@ impl CheckpointAlignManager {
         let mut operator_checkpoints = HashMap::new();
 
         if let Some(storage) = self.storage.as_mut() {
-            let mut checkpoints = storage.load_v2(self.application_name.as_str())?;
+            let mut checkpoints =
+                storage.load(self.application_name.as_str(), self.application_id.as_str())?;
             let completed_checkpoint_id = checkpoints
                 .iter()
                 .filter(|c| {
@@ -256,6 +260,7 @@ impl CheckpointAlignManager {
             if !completed_checkpoint_id.is_default() {
                 checkpoints = storage.load_by_checkpoint_id(
                     self.application_name.as_str(),
+                    self.application_id.as_str(),
                     completed_checkpoint_id,
                 )?;
             }
@@ -333,7 +338,7 @@ impl CheckpointManager {
     }
 
     pub fn apply(&self, ck: Checkpoint) -> anyhow::Result<()> {
-        self.sender.send_timeout(ck, Duration::from_secs(2))?;
+        self.sender.try_send(ck)?;
         Ok(())
     }
 

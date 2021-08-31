@@ -1,6 +1,6 @@
 use crate::core::backend::CheckpointBackend;
 use crate::core::checkpoint::Checkpoint;
-use crate::core::runtime::{CheckpointId, JobId, OperatorId};
+use crate::core::runtime::CheckpointId;
 use crate::storage::checkpoint::memory_checkpoint_storage::MemoryCheckpointStorage;
 use crate::storage::checkpoint::mysql_checkpoint_storage::MySqlCheckpointStorage;
 
@@ -16,17 +16,17 @@ pub trait TCheckpointStorage {
         finish_cks: Vec<Checkpoint>,
         ttl: u64,
     ) -> anyhow::Result<()>;
+
     fn load(
         &mut self,
         application_name: &str,
-        job_id: JobId,
-        operator_id: OperatorId,
+        application_id: &str,
     ) -> anyhow::Result<Vec<Checkpoint>>;
 
-    fn load_v2(&mut self, application_name: &str) -> anyhow::Result<Vec<Checkpoint>>;
     fn load_by_checkpoint_id(
         &mut self,
         application_name: &str,
+        application_id: &str,
         checkpoint_id: CheckpointId,
     ) -> anyhow::Result<Vec<Checkpoint>>;
 }
@@ -82,39 +82,30 @@ impl TCheckpointStorage for CheckpointStorage {
     fn load(
         &mut self,
         application_name: &str,
-        job_id: JobId,
-        operator_id: OperatorId,
+        application_id: &str,
     ) -> anyhow::Result<Vec<Checkpoint>> {
         match self {
             CheckpointStorage::MemoryCheckpointStorage(storage) => {
-                storage.load(application_name, job_id, operator_id)
+                storage.load(application_name, application_id)
             }
             CheckpointStorage::MySqlCheckpointStorage(storage) => {
-                storage.load(application_name, job_id, operator_id)
+                storage.load(application_name, application_id)
             }
-        }
-    }
-
-    fn load_v2(&mut self, application_name: &str) -> anyhow::Result<Vec<Checkpoint>> {
-        match self {
-            CheckpointStorage::MemoryCheckpointStorage(storage) => {
-                storage.load_v2(application_name)
-            }
-            CheckpointStorage::MySqlCheckpointStorage(storage) => storage.load_v2(application_name),
         }
     }
 
     fn load_by_checkpoint_id(
         &mut self,
         application_name: &str,
+        application_id: &str,
         checkpoint_id: CheckpointId,
     ) -> anyhow::Result<Vec<Checkpoint>> {
         match self {
             CheckpointStorage::MemoryCheckpointStorage(storage) => {
-                storage.load_by_checkpoint_id(application_name, checkpoint_id)
+                storage.load_by_checkpoint_id(application_name, application_id, checkpoint_id)
             }
             CheckpointStorage::MySqlCheckpointStorage(storage) => {
-                storage.load_by_checkpoint_id(application_name, checkpoint_id)
+                storage.load_by_checkpoint_id(application_name, application_id, checkpoint_id)
             }
         }
     }

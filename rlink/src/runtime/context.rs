@@ -2,9 +2,11 @@ use std::convert::TryFrom;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use crate::core::cluster::{load_config, ClusterConfig};
+use crate::core::cluster::{load_config, ClusterConfig, MetadataStorageType};
 use crate::metrics::metric::set_manager_id;
+use crate::metrics::ProxyAddressLoader;
 use crate::runtime::{logger, ClusterMode, ManagerType};
+use crate::storage::metadata::{MetadataStorage, TMetadataStorage};
 use crate::utils;
 use crate::utils::process::{parse_arg, work_space};
 
@@ -241,7 +243,12 @@ impl Context {
             .unwrap_or(None);
         logger::init_log(log_config_path)?;
 
-        let metric_addr = metrics_serve(bind_ip.as_str(), &cluster_mode, &manager_type);
+        let metric_addr = metrics_serve(
+            bind_ip.as_str(),
+            &cluster_mode,
+            &manager_type,
+            &cluster_config.metadata_storage,
+        );
 
         let coordinator_address = match manager_type {
             ManagerType::Coordinator => "".to_string(),
@@ -277,15 +284,52 @@ impl Context {
     }
 }
 
-fn metrics_serve(bind_ip: &str, cluster_mode: &ClusterMode, manager_type: &ManagerType) -> String {
-    let with_proxy = if cluster_mode.clone() != ClusterMode::Local
-        && manager_type.clone() == ManagerType::Coordinator
-    {
-        true
-    } else {
-        false
-    };
+fn metrics_serve(
+    bind_ip: &str,
+    cluster_mode: &ClusterMode,
+    manager_type: &ManagerType,
+    metadata_storage_type: &MetadataStorageType,
+) -> String {
+    let with_proxy = !cluster_mode.is_local() && manager_type.is_coordinator();
 
-    let addr = crate::metrics::init_metrics(bind_ip, with_proxy).unwrap();
+    let addr = crate::metrics::init_metrics(
+        bind_ip,
+        Box::new(MetadataProxyAddressLoader::new(
+            with_proxy,
+            metadata_storage_type.clone(),
+        )),
+    )
+    .unwrap();
     format!("http://{}:{}", bind_ip, addr.port())
+}
+
+struct MetadataProxyAddressLoader {
+    with_proxy: bool,
+    metadata_storage_type: MetadataStorageType,
+}
+
+impl MetadataProxyAddressLoader {
+    pub fn new(with_proxy: bool, metadata_storage_type: MetadataStorageType) -> Self {
+        MetadataProxyAddressLoader {
+            with_proxy,
+            metadata_storage_type,
+        }
+    }
+}
+
+impl ProxyAddressLoader for MetadataProxyAddressLoader {
+    fn load(&self) -> Vec<String> {
+        if !self.with_proxy {
+            return vec![];
+        }
+
+        match MetadataStorage::new(&self.metadata_storage_type).load() {
+            Ok(cluster_descriptor) => cluster_descriptor
+                .worker_managers
+                .iter()
+                .map(|x| x.metrics_address.clone())
+                .collect(),
+            Err(_e) => vec![],
+        }
+    }
 }

@@ -1,21 +1,14 @@
 use tokio::task::JoinHandle;
 
-use crate::core::runtime::WorkerManagerDescriptor;
-use crate::runtime::coordinator::heart_beat_manager::global_cluster_descriptor;
 use crate::utils::http;
 
-pub(crate) async fn collect_worker_metrics() -> String {
-    let job_descriptor = global_cluster_descriptor();
-    match job_descriptor {
-        Some(job_descriptor) => collect_worker_metrics0(&job_descriptor.worker_managers).await,
-        None => "".to_string(),
-    }
-}
+pub(crate) async fn collect_worker_metrics(proxy_address: Vec<String>) -> String {
+    let mut result_handles = Vec::with_capacity(proxy_address.len());
+    for addr in proxy_address {
+        if addr.is_empty() {
+            continue;
+        }
 
-async fn collect_worker_metrics0(workers_address: &Vec<WorkerManagerDescriptor>) -> String {
-    let mut result_handles = Vec::new();
-    for task_manager_descriptor in workers_address {
-        let addr = task_manager_descriptor.metrics_address.clone();
         let r: JoinHandle<String> = tokio::spawn(async move {
             match http::client::get(addr.as_str()).await {
                 Ok(r) => r,

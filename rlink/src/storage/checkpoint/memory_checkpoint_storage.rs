@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::core::checkpoint::Checkpoint;
-use crate::core::runtime::{CheckpointId, JobId, OperatorId};
+use crate::core::runtime::CheckpointId;
 use crate::storage::checkpoint::TCheckpointStorage;
 
 pub struct MemoryCheckpointStorage {
@@ -62,19 +62,15 @@ impl TCheckpointStorage for MemoryCheckpointStorage {
     fn load(
         &mut self,
         _application_name: &str,
-        _job_id: JobId,
-        _operator_id: OperatorId,
+        _application_id: &str,
     ) -> anyhow::Result<Vec<Checkpoint>> {
-        Ok(vec![])
-    }
-
-    fn load_v2(&mut self, _application_name: &str) -> anyhow::Result<Vec<Checkpoint>> {
         Ok(vec![])
     }
 
     fn load_by_checkpoint_id(
         &mut self,
         _application_name: &str,
+        _application_id: &str,
         _checkpoint_id: CheckpointId,
     ) -> anyhow::Result<Vec<Checkpoint>> {
         Ok(vec![])

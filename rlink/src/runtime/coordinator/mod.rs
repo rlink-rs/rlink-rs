@@ -21,8 +21,8 @@ use crate::runtime::coordinator::heart_beat_manager::HeartbeatResult;
 use crate::runtime::coordinator::task_distribution::build_cluster_descriptor;
 use crate::runtime::coordinator::web_server::web_launch;
 use crate::storage::metadata::{
-    loop_delete_cluster_descriptor, loop_read_cluster_descriptor, loop_save_cluster_descriptor,
-    loop_update_application_status, MetadataStorage,
+    loop_read_cluster_descriptor, loop_save_cluster_descriptor, loop_update_application_status,
+    MetadataStorage,
 };
 use crate::utils::date_time::timestamp_str;
 
@@ -138,10 +138,6 @@ where
             self.stop_all_worker_tasks(worker_task_ids);
             info!("stop all workers");
 
-            // clear metadata from storage
-            self.clear_metadata();
-            info!("clear metadata from storage");
-
             if let HeartbeatResult::End = heartbeat_result {
                 return Ok(());
             }
@@ -187,10 +183,10 @@ where
         loop_save_cluster_descriptor(metadata_storage.borrow_mut(), cluster_descriptor.clone());
     }
 
-    fn clear_metadata(&self) {
-        let mut metadata_storage = MetadataStorage::new(&self.metadata_storage_mode);
-        loop_delete_cluster_descriptor(metadata_storage.borrow_mut());
-    }
+    // fn clear_metadata(&self) {
+    //     let mut metadata_storage = MetadataStorage::new(&self.metadata_storage_mode);
+    //     loop_delete_cluster_descriptor(metadata_storage.borrow_mut());
+    // }
 
     fn build_checkpoint_manager(
         &self,
@@ -273,7 +269,7 @@ where
             let unregister_worker = job_descriptor
                 .worker_managers
                 .iter()
-                .find(|x| x.task_status.ne(&ManagerStatus::Registered));
+                .find(|x| x.status.ne(&ManagerStatus::Registered));
 
             if unregister_worker.is_none() {
                 loop_update_application_status(
