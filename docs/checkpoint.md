@@ -32,6 +32,7 @@
    1. 把当前的活动窗口插入到map中，value为false。
    2. 遍历map检查是否存在所有窗口都已经drop的checkpoint_id
    3. 如果找到（假设为ck_m），把ck_m标记为ck_n的completed_checkpoint_id
+   4. 把ck_m从map中删除
 
 所以在ck_n触发时，发现之前ck_m时候的所有的active windows都已经完成drop输出；所以在ck_n完成后发生重启，计算任务会应用ck_m的快照数据，
 并且对ck_m时存在的active windows进行丢弃（因为在重启时，这些窗口数据已经不完整了）
