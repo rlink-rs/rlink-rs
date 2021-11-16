@@ -10,6 +10,12 @@ pure memory, zero copy. single cluster in the production environment stable hund
 
 Framework tested on Linux/MacOS/Windows, requires stable Rust.
 
+## Monitor
+![img.png](docs/imgs/grafana-monitor.png)
+
+## Job DAG
+![img.png](docs/imgs/job-dag.png)
+
 ## Example
 
 ```yaml
