@@ -46,3 +46,7 @@
 限制：
 * 不能应用于有状态计算，比如全局计数统计等
 * 窗口计算场景重启必须要经历一次`completed checkpoint_id`， 才能实现至少一次性
+
+### 示例
+Reduce算子的快照内容
+![img.png](imgs/completed_checkpoint_json.png)
