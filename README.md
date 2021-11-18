@@ -13,7 +13,12 @@ Framework tested on Linux/MacOS/Windows, requires stable Rust.
 ## Monitor
 ![img.png](docs/imgs/grafana-monitor.png)
 
-## Job DAG
+## Graph
+
+### Graph Evolution
+![img.png](docs/imgs/rlink-graph.png)
+
+### rlink Plan Visualizer
 ![img.png](docs/imgs/job-dag.png)
 
 ## Example
