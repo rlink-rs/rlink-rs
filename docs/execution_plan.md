@@ -75,7 +75,7 @@ env.register_source(RandInputFormat::new(), 3)
 **关注下红色标注的矩形节点，由StreamGraph构建时填充**
 ExecutionGraph和物理执行计划和Apache Flink类似
 
-![img.svg](imgs/rlink-graph.svg)
+![img.svg](imgs/rlink-graph.png)
 
 #### Apache Flink
 ![img.png](imgs/img.png)
