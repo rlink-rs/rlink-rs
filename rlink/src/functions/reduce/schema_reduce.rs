@@ -194,7 +194,7 @@ impl Display for BasicAggType {
 pub struct BasicAggregation<T: ValueAgg> {
     column_index: usize,
     agg_type: BasicAggType,
-    input_field: Field,
+    // input_field: Field,
     output_field: Field,
     value_agg: T,
 }
@@ -209,7 +209,7 @@ impl<T: ValueAgg> BasicAggregation<T> {
         BasicAggregation {
             column_index,
             agg_type,
-            input_field,
+            // input_field,
             output_field,
             value_agg: T::default(),
         }
@@ -416,7 +416,7 @@ pub struct PctAggregation {
     scale: &'static [f64],
     count_container: Vec<u8>,
 
-    input_field: Field,
+    // input_field: Field,
     output_field: Field,
 }
 
@@ -436,7 +436,7 @@ impl PctAggregation {
             column_index,
             scale,
             count_container,
-            input_field,
+            // input_field,
             output_field,
         }
     }

@@ -173,7 +173,6 @@ impl InputFormat for KafkaInputFormat {
         self.task_partition = input_split.properties().get_i32("partition").unwrap();
 
         let kafka_checkpoint = KafkaCheckpointFunction::new(
-            context.application_id.clone(),
             context.task_id,
             self.task_topic.as_str(),
             self.task_partition,

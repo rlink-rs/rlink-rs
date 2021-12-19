@@ -502,12 +502,14 @@ mod tests {
 
     #[derive(Debug)]
     pub struct MyOutputFormat {
-        properties: Properties,
+        _properties: Properties,
     }
 
     impl MyOutputFormat {
         pub fn new(properties: Properties) -> Self {
-            MyOutputFormat { properties }
+            MyOutputFormat {
+                _properties: properties,
+            }
         }
     }
 

@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::channel::{Receiver, RecvError, RecvTimeoutError, TryRecvError, CHANNEL_SIZE_PREFIX};
+use crate::channel::{Receiver, RecvError, RecvTimeoutError, TryRecvError};
 use crate::metrics::metric::{Counter, Gauge};
 
 #[derive(Clone)]
@@ -8,9 +8,8 @@ pub struct ChannelReceiver<T>
 where
     T: Sync + Send,
 {
-    name: String,
-    guava_size_name: String,
-
+    // name: String,
+    // guava_size_name: String,
     pub(crate) receiver: Receiver<T>,
 
     size: Gauge,
@@ -21,10 +20,10 @@ impl<T> ChannelReceiver<T>
 where
     T: Sync + Send,
 {
-    pub fn new(name: &str, receiver: Receiver<T>, size: Gauge, drain_counter: Counter) -> Self {
+    pub fn new(_name: &str, receiver: Receiver<T>, size: Gauge, drain_counter: Counter) -> Self {
         ChannelReceiver {
-            name: name.to_string(),
-            guava_size_name: CHANNEL_SIZE_PREFIX.to_owned() + name,
+            // name: name.to_string(),
+            // guava_size_name: CHANNEL_SIZE_PREFIX.to_owned() + name,
             receiver,
             size,
             drain_counter,

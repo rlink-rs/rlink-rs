@@ -14,16 +14,16 @@ use rlink_connector_kafka::buffer_gen::kafka_message;
 
 #[derive(Debug, Default, Function)]
 pub struct KafkaInputMapperFunction {
-    err_counter: u64,
-    topic: String,
+    // err_counter: u64,
+// topic: String,
 }
 
 impl KafkaInputMapperFunction {
     #[allow(dead_code)]
-    pub fn new(topic: String) -> Self {
+    pub fn new(_topic: String) -> Self {
         KafkaInputMapperFunction {
-            err_counter: 0,
-            topic,
+            // err_counter: 0,
+            // topic,
         }
     }
 }

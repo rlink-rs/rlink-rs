@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::channel::{ChannelBaseOn, SendError, Sender, TrySendError, CHANNEL_SIZE_PREFIX};
+use crate::channel::{ChannelBaseOn, SendError, Sender, TrySendError};
 use crate::metrics::metric::{Counter, Gauge};
 
 #[derive(Clone)]
@@ -9,8 +9,7 @@ where
     T: Sync + Send,
 {
     name: String,
-    guava_size_name: String,
-
+    // guava_size_name: String,
     sender: Sender<T>,
     base_on: ChannelBaseOn,
     cap: usize,
@@ -33,7 +32,7 @@ where
     ) -> Self {
         ChannelSender {
             name: name.to_string(),
-            guava_size_name: CHANNEL_SIZE_PREFIX.to_owned() + name,
+            // guava_size_name: CHANNEL_SIZE_PREFIX.to_owned() + name,
             sender,
             base_on,
             cap,
