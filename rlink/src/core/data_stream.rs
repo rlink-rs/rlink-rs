@@ -6,7 +6,7 @@ use crate::core::function::{
     CoProcessFunction, FilterFunction, FlatMapFunction, InputFormat, KeySelectorFunction,
     OutputFormat, ReduceFunction,
 };
-use crate::core::operator::{FunctionCreator, StreamOperator};
+use crate::core::operator::{FnOwner, StreamOperator};
 use crate::core::runtime::OperatorId;
 use crate::core::watermark::WatermarkStrategy;
 use crate::core::window::WindowAssigner;
@@ -260,8 +260,7 @@ impl StreamBuilder {
         source_func: Box<dyn InputFormat>,
         parallelism: u16,
     ) -> Self {
-        let source_operator =
-            StreamOperator::new_source(parallelism, FunctionCreator::User, source_func);
+        let source_operator = StreamOperator::new_source(parallelism, FnOwner::User, source_func);
         let operator_id = stream_manager.add_operator(source_operator, vec![]);
 
         StreamBuilder {
@@ -376,7 +375,7 @@ impl TDataStream for StreamBuilder {
         O: OutputFormat + 'static,
     {
         let sink_func = Box::new(output_format);
-        let stream_sink = StreamOperator::new_sink(FunctionCreator::User, sink_func);
+        let stream_sink = StreamOperator::new_sink(FnOwner::User, sink_func);
 
         self.cur_operator_id = self
             .stream_manager
@@ -404,7 +403,7 @@ impl TKeyedStream for StreamBuilder {
         O: OutputFormat + 'static,
     {
         let sink_func = Box::new(output_format);
-        let stream_sink = StreamOperator::new_sink(FunctionCreator::User, sink_func);
+        let stream_sink = StreamOperator::new_sink(FnOwner::User, sink_func);
 
         self.cur_operator_id = self
             .stream_manager

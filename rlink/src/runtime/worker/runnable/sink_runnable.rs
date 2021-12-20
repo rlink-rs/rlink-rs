@@ -1,7 +1,7 @@
 use crate::core::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
 use crate::core::element::{Element, Partition};
 use crate::core::function::OutputFormat;
-use crate::core::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
+use crate::core::operator::{DefaultStreamOperator, FnOwner, TStreamOperator};
 use crate::core::runtime::{OperatorId, TaskId};
 use crate::dag::job_graph::JobEdge;
 use crate::metrics::metric::Counter;
@@ -98,8 +98,8 @@ impl Runnable for SinkRunnable {
                     self.checkpoint(snapshot_context);
                 }
 
-                match self.stream_sink.fn_creator() {
-                    FunctionCreator::System => {
+                match self.stream_sink.fn_owner() {
+                    FnOwner::System => {
                         // distribution to downstream
                         if self.child_parallelism > 0 {
                             for index in 0..self.child_parallelism {
@@ -114,7 +114,7 @@ impl Runnable for SinkRunnable {
                             self.stream_sink.operator_fn.write_element(element);
                         }
                     }
-                    FunctionCreator::User => {}
+                    FnOwner::User => {}
                 }
             }
         }

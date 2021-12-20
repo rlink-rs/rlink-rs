@@ -6,7 +6,7 @@ use daggy::{Dag, EdgeIndex, NodeIndex};
 
 use crate::core::element::FnSchema;
 use crate::core::operator::{
-    DefaultStreamOperator, FunctionCreator, StreamOperator, TStreamOperator, DEFAULT_PARALLELISM,
+    DefaultStreamOperator, FnOwner, StreamOperator, TStreamOperator, DEFAULT_PARALLELISM,
 };
 use crate::core::runtime::OperatorId;
 use crate::dag::{DagError, OperatorType};
@@ -25,7 +25,7 @@ pub struct StreamNode {
 
     pub(crate) operator_name: String,
     pub(crate) operator_type: OperatorType,
-    pub(crate) fn_creator: FunctionCreator,
+    pub(crate) fn_owner: FnOwner,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -109,7 +109,7 @@ impl RawStreamGraph {
         let map_format = Box::new(KeyedStateFlatMapFunction::new());
         StreamOperator::StreamFlatMap(DefaultStreamOperator::new(
             parallelism,
-            FunctionCreator::System,
+            FnOwner::System,
             map_format,
         ))
     }
@@ -118,7 +118,7 @@ impl RawStreamGraph {
         let input_format = Box::new(SystemInputFormat::new());
         StreamOperator::StreamSource(DefaultStreamOperator::new(
             parallelism,
-            FunctionCreator::System,
+            FnOwner::System,
             input_format,
         ))
     }
@@ -127,7 +127,7 @@ impl RawStreamGraph {
         let output_format = Box::new(SystemOutputFormat::new());
         StreamOperator::StreamSink(DefaultStreamOperator::new(
             parallelism,
-            FunctionCreator::System,
+            FnOwner::System,
             output_format,
         ))
     }
@@ -166,7 +166,7 @@ impl RawStreamGraph {
             daemon: operator.is_daemon(),
             operator_name: operator.operator_name().to_string(),
             operator_type: OperatorType::from(&operator),
-            fn_creator: operator.fn_creator(),
+            fn_owner: operator.fn_owner(),
         };
 
         let node_index = self.dag.add_node(stream_node.clone());

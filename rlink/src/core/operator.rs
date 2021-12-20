@@ -12,7 +12,7 @@ use crate::core::window::WindowAssigner;
 pub const DEFAULT_PARALLELISM: u16 = 0;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum FunctionCreator {
+pub enum FnOwner {
     System = 0,
     User = 1,
 }
@@ -21,7 +21,7 @@ pub trait TStreamOperator: Debug {
     fn operator_name(&self) -> &str;
     fn parallelism(&self) -> u16;
     fn schema(&self, input_schema: FnSchema) -> FnSchema;
-    fn fn_creator(&self) -> FunctionCreator;
+    fn fn_owner(&self) -> FnOwner;
 }
 
 pub struct DefaultStreamOperator<T>
@@ -29,7 +29,7 @@ where
     T: ?Sized + NamedFunction,
 {
     parallelism: u16,
-    fn_creator: FunctionCreator,
+    fn_owner: FnOwner,
     pub(crate) operator_fn: Box<T>,
 }
 
@@ -37,10 +37,10 @@ impl<T> DefaultStreamOperator<T>
 where
     T: ?Sized + NamedFunction,
 {
-    pub fn new(parallelism: u16, fn_creator: FunctionCreator, operator_fn: Box<T>) -> Self {
+    pub fn new(parallelism: u16, fn_owner: FnOwner, operator_fn: Box<T>) -> Self {
         DefaultStreamOperator {
             parallelism,
-            fn_creator,
+            fn_owner,
             operator_fn,
         }
     }
@@ -62,8 +62,8 @@ where
         unimplemented!()
     }
 
-    fn fn_creator(&self) -> FunctionCreator {
-        self.fn_creator.clone()
+    fn fn_owner(&self) -> FnOwner {
+        self.fn_owner.clone()
     }
 }
 
@@ -74,7 +74,7 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("StreamOperator")
             .field("parallelism", &self.parallelism)
-            .field("fn_creator", &self.fn_creator)
+            .field("fn_owner", &self.fn_owner)
             .field("operator_fn", &self.operator_fn.name())
             .finish()
     }
@@ -96,59 +96,53 @@ pub(crate) enum StreamOperator {
 impl StreamOperator {
     pub fn new_source(
         parallelism: u16,
-        fn_creator: FunctionCreator,
+        fn_owner: FnOwner,
         source_fn: Box<dyn InputFormat>,
     ) -> Self {
-        let operator = DefaultStreamOperator::new(parallelism, fn_creator, source_fn);
+        let operator = DefaultStreamOperator::new(parallelism, fn_owner, source_fn);
         StreamOperator::StreamSource(operator)
     }
 
     pub fn new_map(map_fn: Box<dyn FlatMapFunction>) -> Self {
-        let operator =
-            DefaultStreamOperator::new(DEFAULT_PARALLELISM, FunctionCreator::User, map_fn);
+        let operator = DefaultStreamOperator::new(DEFAULT_PARALLELISM, FnOwner::User, map_fn);
         StreamOperator::StreamFlatMap(operator)
     }
 
     pub fn new_filter(filter_fn: Box<dyn FilterFunction>) -> Self {
-        let operator =
-            DefaultStreamOperator::new(DEFAULT_PARALLELISM, FunctionCreator::User, filter_fn);
+        let operator = DefaultStreamOperator::new(DEFAULT_PARALLELISM, FnOwner::User, filter_fn);
         StreamOperator::StreamFilter(operator)
     }
 
     pub fn new_co_process(co_process_fn: Box<dyn CoProcessFunction>) -> Self {
         let operator =
-            DefaultStreamOperator::new(DEFAULT_PARALLELISM, FunctionCreator::User, co_process_fn);
+            DefaultStreamOperator::new(DEFAULT_PARALLELISM, FnOwner::User, co_process_fn);
         StreamOperator::StreamCoProcess(operator)
     }
 
     pub fn new_key_by(key_by_fn: Box<dyn KeySelectorFunction>) -> Self {
-        let operator =
-            DefaultStreamOperator::new(DEFAULT_PARALLELISM, FunctionCreator::User, key_by_fn);
+        let operator = DefaultStreamOperator::new(DEFAULT_PARALLELISM, FnOwner::User, key_by_fn);
         StreamOperator::StreamKeyBy(operator)
     }
 
     pub fn new_reduce(parallelism: u16, reduce_fn: Box<dyn BaseReduceFunction>) -> Self {
-        let operator = DefaultStreamOperator::new(parallelism, FunctionCreator::User, reduce_fn);
+        let operator = DefaultStreamOperator::new(parallelism, FnOwner::User, reduce_fn);
         StreamOperator::StreamReduce(operator)
     }
 
     pub fn new_watermark_assigner(watermark_assigner: Box<dyn WatermarkStrategy>) -> Self {
-        let operator = DefaultStreamOperator::new(
-            DEFAULT_PARALLELISM,
-            FunctionCreator::User,
-            watermark_assigner,
-        );
+        let operator =
+            DefaultStreamOperator::new(DEFAULT_PARALLELISM, FnOwner::User, watermark_assigner);
         StreamOperator::StreamWatermarkAssigner(operator)
     }
 
     pub fn new_window_assigner(window_assigner: Box<dyn WindowAssigner>) -> Self {
         let operator =
-            DefaultStreamOperator::new(DEFAULT_PARALLELISM, FunctionCreator::User, window_assigner);
+            DefaultStreamOperator::new(DEFAULT_PARALLELISM, FnOwner::User, window_assigner);
         StreamOperator::StreamWindowAssigner(operator)
     }
 
-    pub fn new_sink(fn_creator: FunctionCreator, sink_fn: Box<dyn OutputFormat>) -> Self {
-        let operator = DefaultStreamOperator::new(DEFAULT_PARALLELISM, fn_creator, sink_fn);
+    pub fn new_sink(fn_owner: FnOwner, sink_fn: Box<dyn OutputFormat>) -> Self {
+        let operator = DefaultStreamOperator::new(DEFAULT_PARALLELISM, fn_owner, sink_fn);
         StreamOperator::StreamSink(operator)
     }
 
@@ -284,17 +278,17 @@ impl TStreamOperator for StreamOperator {
         }
     }
 
-    fn fn_creator(&self) -> FunctionCreator {
+    fn fn_owner(&self) -> FnOwner {
         match self {
-            StreamOperator::StreamSource(op) => op.fn_creator(),
-            StreamOperator::StreamFlatMap(op) => op.fn_creator(),
-            StreamOperator::StreamFilter(op) => op.fn_creator(),
-            StreamOperator::StreamCoProcess(op) => op.fn_creator(),
-            StreamOperator::StreamKeyBy(op) => op.fn_creator(),
-            StreamOperator::StreamReduce(op) => op.fn_creator(),
-            StreamOperator::StreamWatermarkAssigner(op) => op.fn_creator(),
-            StreamOperator::StreamWindowAssigner(op) => op.fn_creator(),
-            StreamOperator::StreamSink(op) => op.fn_creator(),
+            StreamOperator::StreamSource(op) => op.fn_owner(),
+            StreamOperator::StreamFlatMap(op) => op.fn_owner(),
+            StreamOperator::StreamFilter(op) => op.fn_owner(),
+            StreamOperator::StreamCoProcess(op) => op.fn_owner(),
+            StreamOperator::StreamKeyBy(op) => op.fn_owner(),
+            StreamOperator::StreamReduce(op) => op.fn_owner(),
+            StreamOperator::StreamWatermarkAssigner(op) => op.fn_owner(),
+            StreamOperator::StreamWindowAssigner(op) => op.fn_owner(),
+            StreamOperator::StreamSink(op) => op.fn_owner(),
         }
     }
 }

@@ -10,7 +10,7 @@ use crate::channel::utils::iter::ChannelIterator;
 use crate::core::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
 use crate::core::element::{Element, StreamStatus, Watermark};
 use crate::core::function::InputFormat;
-use crate::core::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
+use crate::core::operator::{DefaultStreamOperator, FnOwner, TStreamOperator};
 use crate::core::runtime::{CheckpointId, JobId, OperatorId, TaskId};
 use crate::core::watermark::MAX_WATERMARK;
 use crate::metrics::metric::Counter;
@@ -187,7 +187,7 @@ impl Runnable for SourceRunnable {
         let source_func = self.stream_source.operator_fn.as_mut();
         source_func.open(input_split, &fun_context)?;
 
-        if let FunctionCreator::User = self.stream_source.fn_creator() {
+        if let FnOwner::User = self.stream_source.fn_owner() {
             let stream_status_timer = context
                 .window_timer
                 .register("StreamStatus Event Timer", Duration::from_secs(10))
@@ -245,8 +245,8 @@ impl Runnable for SourceRunnable {
     fn run(&mut self, mut _element: Element) {
         info!("{} running...", self.stream_source.operator_fn.name());
 
-        let mut element_iter = match self.stream_source.fn_creator() {
-            FunctionCreator::User => {
+        let mut element_iter = match self.stream_source.fn_owner() {
+            FnOwner::User => {
                 let (sender, receiver) = named_channel(
                     format!("Source_{}", self.stream_source.operator_fn.as_ref().name()).as_str(),
                     self.task_id.to_tags(),
@@ -263,7 +263,7 @@ impl Runnable for SourceRunnable {
                     Box::new(ChannelIterator::new(receiver));
                 element_iter
             }
-            FunctionCreator::System => self.stream_source.operator_fn.element_iter(),
+            FnOwner::System => self.stream_source.operator_fn.element_iter(),
         };
 
         let mut end_flags = 0;
