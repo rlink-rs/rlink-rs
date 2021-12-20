@@ -19,4 +19,5 @@ pub mod channel;
 pub mod core;
 pub mod functions;
 pub mod metrics;
+pub mod sql;
 pub mod utils;
