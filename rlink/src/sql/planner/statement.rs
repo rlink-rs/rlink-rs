@@ -1,198 +1,172 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use sqlparser::ast::{
-    BinaryOperator, ColumnDef as SQLColumnDef, Expr as SQLExpr, Query, SetExpr, Statement,
-    TableFactor, TableWithJoins, Value,
+    BinaryOperator, Expr as SQLExpr, Query, SetExpr, Statement, TableFactor, TableWithJoins, Value,
 };
 use sqlparser::ast::{DataType as SQLDataType, Select};
 
-use crate::core::data_types::{DataType, Field, Schema};
-use crate::sql::catalog::TableReference;
-use crate::sql::datasource::TableProvider;
+use crate::core::data_types::{DataType, Schema};
 use crate::sql::error::DataFusionError;
 use crate::sql::logical_plain::expr::{lit, Column, Expr};
 use crate::sql::logical_plain::operators::Operator;
+use crate::sql::logical_plain::plan::Filter;
 use crate::sql::logical_plain::plan::LogicalPlan;
-use crate::sql::logical_plain::plan::{CreateExternalTable as PlanCreateExternalTable, Filter};
 use crate::sql::logical_plain::scalar::ScalarValue;
-use crate::sql::parser::{CreateExternalTable, Statement as DFStatement};
-use crate::sql::udf::{AggregateUDF, ScalarUDF};
+use crate::sql::planner::RegisterTables;
 
-/// The ContextProvider trait allows the query planner to obtain meta-data about tables and
-/// functions referenced in SQL statements
-pub trait ContextProvider {
-    /// Getter for a datasource
-    fn get_table_provider(&self, name: TableReference) -> Option<Arc<dyn TableProvider>>;
-    /// Getter for a UDF description
-    fn get_function_meta(&self, name: &str) -> Option<Arc<ScalarUDF>>;
-    /// Getter for a UDAF description
-    fn get_aggregate_meta(&self, name: &str) -> Option<Arc<AggregateUDF>>;
+pub struct StatementPlanner<'a, 'b> {
+    sql_statement: &'a Statement,
+    register_tables: &'b RegisterTables,
 }
 
-/// SQL query planner
-pub struct SqlToRel<'a, S: ContextProvider> {
-    schema_provider: &'a S,
-    register_tables: HashMap<String, LogicalPlan>,
-}
-
-impl<'a, S: ContextProvider> SqlToRel<'a, S> {
-    /// Create a new query planner
-    pub fn new(schema_provider: &'a S) -> Self {
-        SqlToRel {
-            schema_provider,
-            register_tables: Default::default(),
-        }
-    }
-
-    /// Generate a logical plan from an DataFusion SQL statement
-    pub fn statement_to_plan(
-        &mut self,
-        statement: &DFStatement,
-    ) -> crate::sql::error::Result<LogicalPlan> {
-        match statement {
-            DFStatement::CreateExternalTable(s) => {
-                let lp = self.external_table_to_plan(s)?;
-                self.register_tables.insert(s.name.clone(), lp.clone());
-                Ok(lp)
-            }
-            DFStatement::Statement(s) => self.sql_statement_to_plan(s),
-        }
-    }
-
-    /// Generate a logical plan from a CREATE EXTERNAL TABLE statement
-    pub fn external_table_to_plan(
-        &self,
-        statement: &CreateExternalTable,
-    ) -> crate::sql::error::Result<LogicalPlan> {
-        let CreateExternalTable {
-            name,
-            columns,
-            with_options,
-        } = statement;
-
-        let schema = self.build_schema(columns)?;
-
-        Ok(LogicalPlan::CreateExternalTable(PlanCreateExternalTable {
-            schema,
-            name: name.clone(),
-        }))
-    }
-
-    fn build_schema(&self, columns: &[SQLColumnDef]) -> crate::sql::error::Result<Schema> {
-        let mut fields = Vec::new();
-
-        for column in columns {
-            let data_type = self.make_data_type(&column.data_type)?;
-            fields.push(Field::new(&column.name.value, data_type));
-        }
-
-        Ok(Schema::new(fields))
-    }
-
-    /// Maps the SQL type to the corresponding Arrow `DataType`
-    fn make_data_type(&self, sql_type: &SQLDataType) -> crate::sql::error::Result<DataType> {
-        match sql_type {
-            SQLDataType::BigInt(_) => Ok(DataType::Int64),
-            SQLDataType::Int(_) => Ok(DataType::Int32),
-            SQLDataType::SmallInt(_) => Ok(DataType::Int16),
-            SQLDataType::Char(_) | SQLDataType::Varchar(_) | SQLDataType::Text => {
-                Ok(DataType::String)
-            }
-            SQLDataType::Float(_) => Ok(DataType::Float32),
-            SQLDataType::Real => Ok(DataType::Float32),
-            SQLDataType::Double => Ok(DataType::Float64),
-            SQLDataType::Boolean => Ok(DataType::Boolean),
-            _ => Err(DataFusionError::NotImplemented(format!(
-                "The SQL data type {:?} is not implemented",
-                sql_type
-            ))),
+impl<'a, 'b> StatementPlanner<'a, 'b> {
+    pub fn new(sql_statement: &'a Statement, register_tables: &'b RegisterTables) -> Self {
+        StatementPlanner {
+            sql_statement,
+            register_tables,
         }
     }
 
     /// Generate a logical plan from an SQL statement
-    pub fn sql_statement_to_plan(&self, sql: &Statement) -> crate::sql::error::Result<LogicalPlan> {
-        match sql {
-            Statement::Query(query) => self.query_to_plan(query),
+    pub fn plan(&self) -> crate::sql::error::Result<LogicalPlan> {
+        match self.sql_statement {
+            Statement::Query(query) => QueryPlanner::new(query, self.register_tables).plan(),
             _ => Err(DataFusionError::NotImplemented(format!(
                 "Unsupported SQL statement: {:?}",
-                sql
+                self.sql_statement
             ))),
+        }
+    }
+}
+
+struct QueryPlanner<'a, 'b> {
+    query: &'a Query,
+    register_tables: &'b RegisterTables,
+}
+
+impl<'a, 'b> QueryPlanner<'a, 'b> {
+    pub fn new(query: &'a Query, register_tables: &'b RegisterTables) -> Self {
+        QueryPlanner {
+            query,
+            register_tables,
         }
     }
 
     /// Generate a logic plan from an SQL query
-    pub fn query_to_plan(&self, query: &Query) -> crate::sql::error::Result<LogicalPlan> {
-        self.query_to_plan_with_alias(query, None, &mut HashMap::new())
+    pub fn plan(&self) -> crate::sql::error::Result<LogicalPlan> {
+        self.query_to_plan_with_alias(None)
     }
 
     /// Generate a logic plan from an SQL query with optional alias
     pub fn query_to_plan_with_alias(
         &self,
-        query: &Query,
         alias: Option<String>,
-        ctes: &mut HashMap<String, LogicalPlan>,
     ) -> crate::sql::error::Result<LogicalPlan> {
-        if let Some(with) = &query.with {
+        if let Some(with) = &self.query.with {
             return Err(DataFusionError::NotImplemented(with.to_string()));
         }
-        if let Some(limit) = &query.limit {
+        if let Some(limit) = &self.query.limit {
             return Err(DataFusionError::NotImplemented(limit.to_string()));
         }
-        if query.order_by.len() > 0 {
+        if self.query.order_by.len() > 0 {
             return Err(DataFusionError::NotImplemented("ORDER BY".to_string()));
         }
 
-        let set_expr = &query.body;
-        self.set_expr_to_plan(set_expr, alias, ctes)
+        let set_expr = &self.query.body;
+        self.set_expr_to_plan(set_expr, alias)
     }
 
     fn set_expr_to_plan(
         &self,
         set_expr: &SetExpr,
         alias: Option<String>,
-        ctes: &mut HashMap<String, LogicalPlan>,
     ) -> crate::sql::error::Result<LogicalPlan> {
         match set_expr {
-            SetExpr::Select(s) => self.select_to_plan(s.as_ref(), ctes, alias),
+            SetExpr::Select(s) => QuerySelectPlanner::new(s, self.register_tables).plan(alias),
             _ => Err(DataFusionError::NotImplemented(format!(
                 "Query {} not implemented yet",
                 set_expr
             ))),
         }
     }
+}
+
+struct QuerySelectPlanner<'a, 'b> {
+    select: &'a Select,
+    register_tables: &'b RegisterTables,
+}
+
+impl<'a, 'b> QuerySelectPlanner<'a, 'b> {
+    pub fn new(select: &'a Select, register_tables: &'b RegisterTables) -> Self {
+        QuerySelectPlanner {
+            select,
+            register_tables,
+        }
+    }
+
+    /// Generate a logic plan from an SQL select
+    pub fn plan(&self, alias: Option<String>) -> crate::sql::error::Result<LogicalPlan> {
+        // from
+        let plan = QuerySelectFromPlanner::new(&self.select.from, self.register_tables).plan()?;
+
+        // selection
+        let plan = if let Some(predicate_expr) = &self.select.selection {
+            QuerySelectSelectionPlanner::new(predicate_expr, &plan).plan()
+        } else {
+            Ok(plan)
+        }?;
+
+        // group_by
+        // let plan = { for n in &select.group_by {} };
+
+        Ok(plan)
+    }
+}
+
+struct QuerySelectFromPlanner<'a, 'b> {
+    from: &'a [TableWithJoins],
+    register_tables: &'b RegisterTables,
+}
+
+impl<'a, 'b> QuerySelectFromPlanner<'a, 'b> {
+    pub fn new(from: &'a [TableWithJoins], register_tables: &'b RegisterTables) -> Self {
+        QuerySelectFromPlanner {
+            from,
+            register_tables,
+        }
+    }
+
+    pub fn plan(&self) -> crate::sql::error::Result<LogicalPlan> {
+        let plans = self.plan_from_tables(&self.from)?;
+        if plans.len() != 1 {
+            Err(DataFusionError::NotImplemented("Join".to_string()))
+        } else {
+            Ok(plans[0].clone())
+        }
+    }
 
     fn plan_from_tables(
         &self,
         from: &[TableWithJoins],
-        ctes: &mut HashMap<String, LogicalPlan>,
     ) -> crate::sql::error::Result<Vec<LogicalPlan>> {
         match from.len() {
             0 => Ok(vec![]),
             _ => from
                 .iter()
-                .map(|t| self.plan_table_with_joins(t, ctes))
+                .map(|t| self.plan_table_with_joins(t))
                 .collect::<crate::sql::error::Result<Vec<_>>>(),
         }
     }
 
-    fn plan_table_with_joins(
-        &self,
-        t: &TableWithJoins,
-        ctes: &mut HashMap<String, LogicalPlan>,
-    ) -> crate::sql::error::Result<LogicalPlan> {
-        let left = self.create_relation(&t.relation, ctes)?;
+    fn plan_table_with_joins(&self, t: &TableWithJoins) -> crate::sql::error::Result<LogicalPlan> {
+        let left = self.create_relation(&t.relation)?;
         match t.joins.len() {
             0 => Ok(left),
             _n => Err(DataFusionError::NotImplemented("JOIN".to_string())),
         }
     }
 
-    fn create_relation(
-        &self,
-        relation: &TableFactor,
-        ctes: &mut HashMap<String, LogicalPlan>,
-    ) -> crate::sql::error::Result<LogicalPlan> {
+    fn create_relation(&self, relation: &TableFactor) -> crate::sql::error::Result<LogicalPlan> {
         let (plan, alias) = match relation {
             TableFactor::Table { name, alias, .. } => {
                 let table_name = name.to_string();
@@ -228,39 +202,27 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
             Ok(plan)
         }
     }
+}
 
-    /// Generate a logic plan from an SQL select
-    fn select_to_plan(
-        &self,
-        select: &Select,
-        ctes: &mut HashMap<String, LogicalPlan>,
-        alias: Option<String>,
-    ) -> crate::sql::error::Result<LogicalPlan> {
-        // from
-        let plan = {
-            let plans = self.plan_from_tables(&select.from, ctes)?;
-            if plans.len() != 1 {
-                Err(DataFusionError::NotImplemented("Join".to_string()))
-            } else {
-                Ok(plans[0].clone())
-            }
-        }?;
+struct QuerySelectSelectionPlanner<'a, 'b> {
+    selection: &'a SQLExpr,
+    from_plan: &'b LogicalPlan,
+}
 
-        // selection
-        let plan = if let Some(predicate_expr) = &select.selection {
-            let filter_expr = self.sql_to_rex(predicate_expr, plan.schema())?;
-            LogicalPlan::Filter(Filter {
-                predicate: filter_expr,
-                input: Arc::new(plan.clone()),
-            })
-        } else {
-            plan
-        };
+impl<'a, 'b> QuerySelectSelectionPlanner<'a, 'b> {
+    pub fn new(selection: &'a SQLExpr, from_plan: &'b LogicalPlan) -> Self {
+        QuerySelectSelectionPlanner {
+            selection,
+            from_plan,
+        }
+    }
 
-        // group_by
-        // let plan = { for n in &select.group_by {} };
-
-        Ok(plan)
+    pub fn plan(&self) -> crate::sql::error::Result<LogicalPlan> {
+        let filter_expr = self.sql_to_rex(self.selection, self.from_plan.schema())?;
+        Ok(LogicalPlan::Filter(Filter {
+            predicate: filter_expr,
+            input: Arc::new(self.from_plan.clone()),
+        }))
     }
 
     /// Generate a relational expression from a SQL expression
@@ -427,6 +389,8 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
     }
 }
 
+struct QuerySelectGroupByPlanner {}
+
 fn parse_sql_number(n: &str) -> crate::sql::error::Result<Expr> {
     match n.parse::<i64>() {
         Ok(n) => Ok(lit(n)),
@@ -449,66 +413,5 @@ pub fn convert_data_type(sql_type: &SQLDataType) -> crate::sql::error::Result<Da
             "Unsupported SQL type {:?}",
             other
         ))),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::sync::Arc;
-
-    use sqlparser::parser::ParserError;
-
-    use crate::sql::catalog::TableReference;
-    use crate::sql::datasource::TableProvider;
-    use crate::sql::parser::DFParser;
-    use crate::sql::planner::{ContextProvider, SqlToRel};
-    use crate::sql::udf::{AggregateUDF, ScalarUDF};
-
-    #[test]
-    fn create_external_table() -> Result<(), ParserError> {
-        // positive case
-        let sql = r#"
-CREATE EXTERNAL TABLE table_1(a varchar(50), b varchar(50))
-    WITH (
-    'connector' = 'kafka',
-    'topic' = 'a',
-    'broker-servers' = '192.168.1.1:9200',
-    'startup-mode' = 'earliest-offset',
-    'decode-mode' = 'java|json',
-    'decode-java-class' = 'x.b.C'
-);
-
-SELECT TUMBLE_START(t, INTERVAL '1' minute) as wStart,
-       TUMBLE_END(t, INTERVAL '1' minute) as wEnd,
-       a, b, myfunc(b), 
-       count(*)
-FROM table_1 
-WHERE a > b AND b < 100 
-GROUP BY TUMBLE(t, INTERVAL '1' minute), a, b"#;
-
-        let statements = DFParser::parse_sql(sql)?;
-        let mut sql_to_rel = SqlToRel::new(&MockContextProvider);
-
-        for statement in &statements {
-            sql_to_rel.statement_to_plan(statement);
-        }
-
-        Ok(())
-    }
-
-    struct MockContextProvider;
-
-    impl ContextProvider for MockContextProvider {
-        fn get_table_provider(&self, name: TableReference) -> Option<Arc<dyn TableProvider>> {
-            None
-        }
-
-        fn get_function_meta(&self, name: &str) -> Option<Arc<ScalarUDF>> {
-            None
-        }
-
-        fn get_aggregate_meta(&self, name: &str) -> Option<Arc<AggregateUDF>> {
-            None
-        }
     }
 }
