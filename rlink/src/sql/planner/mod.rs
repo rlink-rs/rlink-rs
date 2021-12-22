@@ -18,7 +18,7 @@ pub trait ContextProvider {
     /// Getter for a datasource
     fn get_table_provider(&self, name: TableReference) -> Option<Arc<dyn TableProvider>>;
     /// Getter for a UDF description
-    fn get_function_meta(&self, name: &str) -> Option<Arc<ScalarUDF>>;
+    fn get_scalar_meta(&self, name: &str) -> Option<Arc<ScalarUDF>>;
     /// Getter for a UDAF description
     fn get_aggregate_meta(&self, name: &str) -> Option<Arc<AggregateUDF>>;
 }
@@ -44,19 +44,29 @@ impl RegisterTables {
     }
 }
 
-/// SQL query planner
-pub struct SqlToRel<'a, S: ContextProvider> {
-    schema_provider: &'a S,
+pub struct PlanContext {
+    context_provider: Box<dyn ContextProvider>,
     register_tables: RegisterTables,
 }
 
-impl<'a, S: ContextProvider> SqlToRel<'a, S> {
-    /// Create a new query planner
-    pub fn new(schema_provider: &'a S) -> Self {
-        SqlToRel {
-            schema_provider,
+impl PlanContext {
+    pub fn new(context_provider: Box<dyn ContextProvider>) -> Self {
+        PlanContext {
+            context_provider,
             register_tables: Default::default(),
         }
+    }
+}
+
+/// SQL query planner
+pub struct SqlToRel {
+    context: PlanContext,
+}
+
+impl SqlToRel {
+    /// Create a new query planner
+    pub fn new(context: PlanContext) -> Self {
+        SqlToRel { context }
     }
 
     /// Generate a logical plan from an DataFusion SQL statement
@@ -67,11 +77,12 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
         match statement {
             DFStatement::CreateExternalTable(s) => {
                 let cet_plan = CreateExternalTablePlanner::new(s).plan()?;
-                self.register_tables
+                self.context
+                    .register_tables
                     .register(s.name.as_str(), cet_plan.clone());
                 Ok(cet_plan)
             }
-            DFStatement::Statement(s) => StatementPlanner::new(s, &self.register_tables).plan(),
+            DFStatement::Statement(s) => StatementPlanner::new(s, &self.context).plan(),
         }
     }
 }
@@ -85,7 +96,7 @@ mod tests {
     use crate::sql::catalog::TableReference;
     use crate::sql::datasource::TableProvider;
     use crate::sql::parser::DFParser;
-    use crate::sql::planner::{ContextProvider, SqlToRel};
+    use crate::sql::planner::{ContextProvider, PlanContext, SqlToRel};
     use crate::sql::udf::{AggregateUDF, ScalarUDF};
 
     #[test]
@@ -104,17 +115,20 @@ CREATE EXTERNAL TABLE table_1(a varchar(50), b varchar(50))
 
 SELECT TUMBLE_START(t, INTERVAL '1' minute) as wStart,
        TUMBLE_END(t, INTERVAL '1' minute) as wEnd,
-       a, b, myfunc(b), 
+       tb.a, 
+       b, 
+       myfunc(b), 
        count(*)
-FROM table_1 
-WHERE a > b AND b < 100 
-GROUP BY TUMBLE(t, INTERVAL '1' minute), a, b"#;
+FROM   table_1 as tb
+WHERE  tb.a > tb.b AND b < 100 
+GROUP BY TUMBLE(t, INTERVAL '1' minute), tb.a, b"#;
 
         let statements = DFParser::parse_sql(sql)?;
-        let mut sql_to_rel = SqlToRel::new(&MockContextProvider);
+        let mut sql_to_rel = SqlToRel::new(PlanContext::new(Box::new(MockContextProvider)));
 
         for statement in &statements {
-            sql_to_rel.statement_to_plan(statement);
+            let plan = sql_to_rel.statement_to_plan(statement).unwrap();
+            println!("{:?}", plan.schema());
         }
 
         Ok(())
@@ -127,7 +141,7 @@ GROUP BY TUMBLE(t, INTERVAL '1' minute), a, b"#;
             None
         }
 
-        fn get_function_meta(&self, name: &str) -> Option<Arc<ScalarUDF>> {
+        fn get_scalar_meta(&self, name: &str) -> Option<Arc<ScalarUDF>> {
             None
         }
 

@@ -1,10 +1,23 @@
 use std::cmp::Ordering;
 use std::convert::{From, TryFrom};
 use std::fmt;
+use std::time::Duration;
 
 use sqlparser::ast;
 
 use crate::sql::error::DataFusionError;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
+pub enum BoundedWindow {
+    HOP {
+        size: Duration,
+        side: Duration,
+    },
+    Tumble {
+        size: Duration,
+        offset: Option<Duration>,
+    },
+}
 
 /// The frame-spec determines which output rows are read by an aggregate window function.
 ///

@@ -1,7 +1,10 @@
 use crate::core::data_types::DataType;
 use crate::sql::logical_plain::operators::Operator;
 use crate::sql::logical_plain::scalar::ScalarValue;
-use crate::sql::logical_plain::window_frames::WindowFrame;
+use crate::sql::logical_plain::window_frames::BoundedWindow;
+use crate::sql::logical_plain::{aggregates, functions};
+use crate::sql::udf::{AggregateFunction, ScalarFunction};
+use std::sync::Arc;
 
 /// A named reference to a qualified field in a schema.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -12,7 +15,16 @@ pub struct Column {
     pub name: String,
 }
 
-#[derive(Clone, PartialEq, PartialOrd, Debug)]
+impl std::fmt::Display for Column {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.relation {
+            Some(r) => write!(f, "#{}.{}", r, self.name),
+            None => write!(f, "#{}", self.name),
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, PartialOrd)]
 pub enum Expr {
     /// An expression with a specific name.
     Alias(Box<Expr>, String),
@@ -67,15 +79,15 @@ pub enum Expr {
     },
     /// Represents the call of a built-in scalar function with a set of arguments.
     ScalarFunction {
-        // /// The function
-        // fun: functions::BuiltinScalarFunction,
+        /// The function
+        fun: functions::BuiltinScalarFunction,
         /// List of expressions to feed to the functions as arguments
         args: Vec<Expr>,
     },
     /// Represents the call of an aggregate built-in function with arguments.
     AggregateFunction {
-        // /// Name of the function
-        // fun: aggregates::AggregateFunction,
+        /// Name of the function
+        fun: aggregates::AggregateFunction,
         /// List of expressions to feed to the functions as arguments
         args: Vec<Expr>,
         /// Whether this is a DISTINCT aggregation or not
@@ -83,16 +95,10 @@ pub enum Expr {
     },
     /// Represents the call of a window function with arguments.
     WindowFunction {
-        // /// Name of the function
-        // fun: window_functions::WindowFunction,
         /// List of expressions to feed to the functions as arguments
         args: Vec<Expr>,
-        /// List of partition by expressions
-        partition_by: Vec<Expr>,
-        /// List of order by expressions
-        order_by: Vec<Expr>,
         /// Window frame
-        window_frame: Option<WindowFrame>,
+        window_frame: BoundedWindow,
     },
     /// Returns whether the list contains the expr value.
     InList {
@@ -105,6 +111,126 @@ pub enum Expr {
     },
     /// Represents a reference to all fields in a schema.
     Wildcard,
+}
+
+impl std::fmt::Display for Expr {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Expr::BinaryExpr {
+                ref left,
+                ref right,
+                ref op,
+            } => write!(f, "{} {} {}", left, op, right),
+            Expr::AggregateFunction {
+                /// Name of the function
+                ref fun,
+                /// List of expressions to feed to the functions as arguments
+                ref args,
+                /// Whether this is a DISTINCT aggregation or not
+                ref distinct,
+            } => fmt_function(f, &fun.to_string(), *distinct, args, true),
+            Expr::ScalarFunction {
+                /// Name of the function
+                ref fun,
+                /// List of expressions to feed to the functions as arguments
+                ref args,
+            } => fmt_function(f, &fun.to_string(), false, args, true),
+            _ => write!(f, "{:?}", self),
+        }
+    }
+}
+
+impl std::fmt::Debug for Expr {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Expr::Alias(expr, alias) => write!(f, "{:?} AS {}", expr, alias),
+            Expr::Column(c) => write!(f, "{}", c),
+            Expr::ScalarVariable(var_names) => write!(f, "{}", var_names.join(".")),
+            Expr::Literal(v) => write!(f, "{:?}", v),
+            Expr::Cast { expr, data_type } => {
+                write!(f, "CAST({:?} AS {:?})", expr, data_type)
+            }
+            Expr::Not(expr) => write!(f, "NOT {:?}", expr),
+            Expr::IsNull(expr) => write!(f, "{:?} IS NULL", expr),
+            Expr::IsNotNull(expr) => write!(f, "{:?} IS NOT NULL", expr),
+            Expr::BinaryExpr { left, op, right } => {
+                write!(f, "{:?} {} {:?}", left, op, right)
+            }
+            Expr::Sort {
+                expr,
+                asc,
+                nulls_first,
+            } => {
+                if *asc {
+                    write!(f, "{:?} ASC", expr)?;
+                } else {
+                    write!(f, "{:?} DESC", expr)?;
+                }
+                if *nulls_first {
+                    write!(f, " NULLS FIRST")
+                } else {
+                    write!(f, " NULLS LAST")
+                }
+            }
+            Expr::ScalarFunction { fun, args, .. } => {
+                fmt_function(f, &fun.to_string(), false, args, false)
+            }
+            Expr::WindowFunction { args, window_frame } => {
+                write!(f, "{:?}({:?})", window_frame, args);
+                Ok(())
+            }
+            Expr::AggregateFunction {
+                fun,
+                distinct,
+                ref args,
+                ..
+            } => fmt_function(f, &fun.to_string(), *distinct, args, true),
+            Expr::Between {
+                expr,
+                negated,
+                low,
+                high,
+            } => {
+                if *negated {
+                    write!(f, "{:?} NOT BETWEEN {:?} AND {:?}", expr, low, high)
+                } else {
+                    write!(f, "{:?} BETWEEN {:?} AND {:?}", expr, low, high)
+                }
+            }
+            Expr::InList {
+                expr,
+                list,
+                negated,
+            } => {
+                if *negated {
+                    write!(f, "{:?} NOT IN ({:?})", expr, list)
+                } else {
+                    write!(f, "{:?} IN ({:?})", expr, list)
+                }
+            }
+            Expr::Wildcard => write!(f, "*"),
+        }
+    }
+}
+
+fn fmt_function(
+    f: &mut std::fmt::Formatter,
+    fun: &str,
+    distinct: bool,
+    args: &[Expr],
+    display: bool,
+) -> std::fmt::Result {
+    let args: Vec<String> = match display {
+        true => args.iter().map(|arg| format!("{}", arg)).collect(),
+        false => args.iter().map(|arg| format!("{:?}", arg)).collect(),
+    };
+
+    // let args: Vec<String> = args.iter().map(|arg| format!("{:?}", arg)).collect();
+    let distinct_str = match distinct {
+        true => "DISTINCT ",
+        false => "",
+    };
+    write!(f, "{}({}{})", fun, distinct_str, args.join(", "))
 }
 
 /// return a new expression l <op> r
