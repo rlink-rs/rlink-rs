@@ -28,8 +28,12 @@ pub enum DataType {
     Float64,
     /// Opaque binary data of variable length.
     Binary,
+    /// Opaque binary data of variable length and 64-bit offsets.
+    LargeBinary,
     /// A variable-length string in Unicode with UTF-8 encoding.
-    String,
+    Utf8,
+    /// A variable-length string in Unicode with UFT-8 encoding and 64-bit offsets.
+    LargeUtf8,
 }
 
 impl DataType {
@@ -47,7 +51,9 @@ impl DataType {
             Self::Float32 => 4,
             Self::Float64 => 8,
             Self::Binary => 0,
-            Self::String => 0,
+            Self::LargeBinary => 0,
+            Self::Utf8 => 0,
+            Self::LargeUtf8 => 0,
         }
     }
 
@@ -65,7 +71,9 @@ impl DataType {
             Self::Float32 => types::F32,
             Self::Float64 => types::F64,
             Self::Binary => types::BINARY,
-            Self::String => types::STRING,
+            Self::LargeBinary => types::BINARY,
+            Self::Utf8 => types::STRING,
+            Self::LargeUtf8 => types::STRING,
         }
     }
 }
@@ -87,7 +95,7 @@ impl TryFrom<u8> for DataType {
             types::F32 => Ok(Self::Float32),
             types::F64 => Ok(Self::Float64),
             types::BINARY => Ok(Self::Binary),
-            types::STRING => Ok(Self::String),
+            types::STRING => Ok(Self::Utf8),
             _ => Err(crate::core::Error::from("unknown type")),
         }
     }

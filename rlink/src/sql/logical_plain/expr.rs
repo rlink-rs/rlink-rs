@@ -1,9 +1,11 @@
-use crate::core::data_types::DataType;
+use crate::core::data_types::{DataType, Schema};
+use crate::sql::error::DataFusionError;
 use crate::sql::logical_plain::operators::Operator;
 use crate::sql::logical_plain::scalar::ScalarValue;
 use crate::sql::logical_plain::window_frames::BoundedWindow;
 use crate::sql::logical_plain::{aggregates, functions};
 use crate::sql::udf::{AggregateFunction, ScalarFunction};
+use serde_json::error::Category::Data;
 use std::sync::Arc;
 
 /// A named reference to a qualified field in a schema.
@@ -111,6 +113,61 @@ pub enum Expr {
     },
     /// Represents a reference to all fields in a schema.
     Wildcard,
+}
+
+impl Expr {
+    /// Returns the [arrow::datatypes::DataType] of the expression based on [arrow::datatypes::Schema].
+    ///
+    /// # Errors
+    ///
+    /// This function errors when it is not possible to compute its [arrow::datatypes::DataType].
+    /// This happens when e.g. the expression refers to a column that does not exist in the schema, or when
+    /// the expression is incorrectly typed (e.g. `[utf8] + [bool]`).
+    pub fn get_type(&self, schema: &Schema) -> crate::sql::error::Result<DataType> {
+        match self {
+            Expr::Alias(expr, _) => expr.get_type(schema),
+            Expr::Column(c) => Ok(schema.field_from_column(c)?.data_type().clone()),
+            Expr::ScalarVariable(_) => Ok(DataType::Utf8),
+            Expr::Literal(l) => Ok(l.get_datatype()),
+            Expr::Cast { data_type, .. } => Ok(data_type.clone()),
+            Expr::ScalarFunction { fun, args } => {
+                let data_types = args
+                    .iter()
+                    .map(|e| e.get_type(schema))
+                    .collect::<crate::sql::error::Result<Vec<_>>>()?;
+                functions::return_type(fun, &data_types)
+            }
+            Expr::WindowFunction { .. } => {
+                // let data_types = args
+                //     .iter()
+                //     .map(|e| e.get_type(schema))
+                //     .collect::<crate::sql::error::Result<Vec<_>>>()?;
+                // window_functions::return_type(fun, &data_types)
+                Ok(DataType::UInt64)
+            }
+            Expr::AggregateFunction { fun, args, .. } => {
+                let data_types = args
+                    .iter()
+                    .map(|e| e.get_type(schema))
+                    .collect::<crate::sql::error::Result<Vec<_>>>()?;
+                aggregates::return_type(fun, &data_types)
+            }
+            Expr::Not(_) => Ok(DataType::Boolean),
+            Expr::IsNull(_) => Ok(DataType::Boolean),
+            Expr::IsNotNull(_) => Ok(DataType::Boolean),
+            Expr::BinaryExpr {
+                ref left,
+                ref right,
+                ref op,
+            } => binary_operator_data_type(&left.get_type(schema)?, op, &right.get_type(schema)?),
+            Expr::Sort { ref expr, .. } => expr.get_type(schema),
+            Expr::Between { .. } => Ok(DataType::Boolean),
+            Expr::InList { .. } => Ok(DataType::Boolean),
+            Expr::Wildcard => Err(DataFusionError::Internal(
+                "Wildcard expressions are not valid in a logical query plan".to_owned(),
+            )),
+        }
+    }
 }
 
 impl std::fmt::Display for Expr {

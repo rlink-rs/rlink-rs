@@ -32,6 +32,19 @@ impl StreamApp for SimpleStreamApp {
     }
 
     fn build_stream(&self, _properties: &Properties, env: &mut StreamExecutionEnvironment) {
+        // let t1 = TagSource{};
+        // let t2 = TagSource{};
+        // let t3 = TagSource{};
+        //
+        // let ds = env
+        //     .register_source(vec_source(
+        //         gen_records(),
+        //         Schema::from(&model::FIELD_METADATA),
+        //         3,
+        //     ))
+        //     .flat_map(MyFlatMapFunction::new())
+        //     .as_split_sources(fun, vec![t1,t2,t3])
+        //     .as_source();
         env.register_source(vec_source(
             gen_records(),
             Schema::from(&model::FIELD_METADATA),
