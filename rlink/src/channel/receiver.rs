@@ -8,7 +8,9 @@ pub struct ChannelReceiver<T>
 where
     T: Sync + Send,
 {
+    #[allow(dead_code)]
     name: String,
+    #[allow(dead_code)]
     guava_size_name: String,
 
     pub(crate) receiver: Receiver<T>,

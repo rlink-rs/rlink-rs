@@ -501,6 +501,7 @@ mod tests {
     impl CheckpointFunction for MyReduceFunction {}
 
     #[derive(Debug)]
+    #[allow(dead_code)]
     pub struct MyOutputFormat {
         properties: Properties,
     }
