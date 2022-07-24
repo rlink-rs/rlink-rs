@@ -54,7 +54,7 @@ impl StreamGraph {
 
 #[derive(Debug)]
 pub(crate) struct RawStreamGraph {
-    stream_nodes: Vec<NodeIndex>,
+    // stream_nodes: Vec<NodeIndex>,
     stream_edges: Vec<EdgeIndex>,
 
     id_gen: OperatorId,
@@ -63,21 +63,20 @@ pub(crate) struct RawStreamGraph {
     pub(crate) sources: Vec<NodeIndex>,
     pub(crate) user_sources: Vec<NodeIndex>,
 
-    sinks: Vec<NodeIndex>,
-
+    // sinks: Vec<NodeIndex>,
     pub(crate) dag: Dag<StreamNode, StreamEdge>,
 }
 
 impl RawStreamGraph {
     pub fn new() -> Self {
         RawStreamGraph {
-            stream_nodes: Vec::new(),
+            // stream_nodes: Vec::new(),
             stream_edges: Vec::new(),
             id_gen: OperatorId::default(),
             operators: HashMap::new(),
             sources: Vec::new(),
             user_sources: Vec::new(),
-            sinks: Vec::new(),
+            // sinks: Vec::new(),
             dag: Dag::new(),
         }
     }

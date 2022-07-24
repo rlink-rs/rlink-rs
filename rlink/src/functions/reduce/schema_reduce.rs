@@ -194,8 +194,11 @@ impl Display for BasicAggType {
 pub struct BasicAggregation<T: ValueAgg> {
     column_index: usize,
     agg_type: BasicAggType,
+
+    #[allow(dead_code)]
     input_field: Field,
     output_field: Field,
+
     value_agg: T,
 }
 
@@ -416,6 +419,7 @@ pub struct PctAggregation {
     scale: &'static [f64],
     count_container: Vec<u8>,
 
+    #[allow(dead_code)]
     input_field: Field,
     output_field: Field,
 }

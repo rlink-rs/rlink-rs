@@ -9,6 +9,7 @@ where
     T: Sync + Send,
 {
     name: String,
+    #[allow(dead_code)]
     guava_size_name: String,
 
     sender: Sender<T>,

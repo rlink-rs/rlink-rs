@@ -10,6 +10,7 @@ use crate::storage::keyed_state::{StateKey, TReducingState, TWindowState};
 
 #[derive(Clone)]
 pub struct MemoryWindowState {
+    #[allow(dead_code)]
     application_id: String,
     job_id: JobId,
     task_number: u16,

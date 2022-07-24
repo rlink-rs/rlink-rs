@@ -13,6 +13,7 @@ use crate::buffer_gen::checkpoint_data;
 use rlink_connector_kafka::buffer_gen::kafka_message;
 
 #[derive(Debug, Default, Function)]
+#[allow(dead_code)]
 pub struct KafkaInputMapperFunction {
     err_counter: u64,
     topic: String,

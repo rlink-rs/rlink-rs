@@ -7,7 +7,9 @@ use rlink::core::runtime::TaskId;
 #[derive(Debug, Clone)]
 pub struct KafkaCheckpointFunction {
     pub(crate) state_recorder: Option<KafkaSourceStateRecorder>,
+    #[allow(dead_code)]
     pub(crate) application_id: String,
+    #[allow(dead_code)]
     pub(crate) task_id: TaskId,
     topic: String,
     partition: i32,

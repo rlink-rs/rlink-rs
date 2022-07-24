@@ -158,6 +158,7 @@ impl TDataStream for DataStream {
 #[derive(Debug)]
 pub struct ConnectedStreams {
     co_stream: StreamBuilder,
+    #[allow(dead_code)]
     parent_pipeline_ids: Vec<OperatorId>,
 }
 
@@ -235,6 +236,7 @@ impl TWindowedStream for WindowedStream {
 
 #[derive(Debug)]
 pub struct SinkStream {
+    #[allow(dead_code)]
     end_stream: StreamBuilder,
 }
 
@@ -249,8 +251,6 @@ impl SinkStream {
 
 #[derive(Debug)]
 pub(crate) struct StreamBuilder {
-    current_id: u32,
-
     cur_operator_id: OperatorId,
     stream_manager: Rc<StreamManager>,
 }
@@ -266,7 +266,6 @@ impl StreamBuilder {
         let operator_id = stream_manager.add_operator(source_operator, vec![]);
 
         StreamBuilder {
-            current_id: 0,
             cur_operator_id: operator_id,
             stream_manager,
         }
@@ -281,7 +280,6 @@ impl StreamBuilder {
         let operator_id = stream_manager.add_operator(co_operator, parent_ids);
 
         StreamBuilder {
-            current_id: 0,
             cur_operator_id: operator_id,
             stream_manager,
         }
