@@ -1,10 +1,10 @@
 use rlink::core::element::{Element, FnSchema, Record};
 use rlink::core::function::{Context, FlatMapFunction, SendableElementStream};
 use rlink::utils::stream::MemoryStream;
+use rlink_connector_kafka::buffer_gen::kafka_message;
 use rlink_example_utils::buffer_gen::model;
 
 use crate::entry::SerDeEntity;
-use rlink_connector_kafka::buffer_gen::kafka_message;
 
 #[derive(Debug, Default, Function)]
 pub struct InputMapperFunction {}

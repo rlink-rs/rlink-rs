@@ -22,5 +22,3 @@ pub mod core;
 pub mod functions;
 pub mod metrics;
 pub mod utils;
-
-pub use ::core::*;

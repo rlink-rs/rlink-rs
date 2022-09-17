@@ -24,7 +24,7 @@ log = "0.4"
 anyhow = "1.0.31"
 
 chrono = "0.4"
-chrono-tz = "0.5"
+chrono-tz = "0.6"
 
 async-trait = "0.1"
 tokio = "1"

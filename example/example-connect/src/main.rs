@@ -12,5 +12,5 @@ mod percentile;
 
 #[tokio::main]
 async fn main() {
-    rlink::env::execute(app::ConnectStreamApp1 {}).await;
+    rlink::core::env::execute(app::ConnectStreamApp1 {}).await;
 }
