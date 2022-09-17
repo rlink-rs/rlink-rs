@@ -3,7 +3,6 @@ use std::sync::Arc;
 use crate::core::cluster::TaskResourceInfo;
 use crate::core::env::StreamApp;
 use crate::core::runtime::ClusterDescriptor;
-#[cfg(feature = "k8s")]
 use crate::deployment::kubernetes::KubernetesResourceManager;
 use crate::deployment::local::LocalResourceManager;
 use crate::deployment::standalone::StandaloneResourceManager;
@@ -11,7 +10,6 @@ use crate::deployment::yarn::YarnResourceManager;
 use crate::runtime::context::Context;
 use crate::runtime::ClusterMode;
 
-#[cfg(feature = "k8s")]
 pub mod kubernetes;
 pub mod local;
 pub mod standalone;
@@ -45,7 +43,6 @@ pub(crate) enum ResourceManager {
     LocalResourceManager(LocalResourceManager),
     StandaloneResourceManager(StandaloneResourceManager),
     YarnResourceManager(YarnResourceManager),
-    #[cfg(feature = "k8s")]
     KubernetesResourceManager(KubernetesResourceManager),
 }
 
@@ -61,12 +58,9 @@ impl ResourceManager {
             ClusterMode::YARN => {
                 ResourceManager::YarnResourceManager(YarnResourceManager::new(context.clone()))
             }
-            #[cfg(feature = "k8s")]
             ClusterMode::Kubernetes => ResourceManager::KubernetesResourceManager(
                 KubernetesResourceManager::new(context.clone()),
             ),
-            #[cfg(not(feature = "k8s"))]
-            ClusterMode::Kubernetes => unimplemented!(),
         }
     }
 }
@@ -78,7 +72,6 @@ impl TResourceManager for ResourceManager {
             ResourceManager::LocalResourceManager(rm) => rm.prepare(context, job_descriptor),
             ResourceManager::StandaloneResourceManager(rm) => rm.prepare(context, job_descriptor),
             ResourceManager::YarnResourceManager(rm) => rm.prepare(context, job_descriptor),
-            #[cfg(feature = "k8s")]
             ResourceManager::KubernetesResourceManager(rm) => rm.prepare(context, job_descriptor),
         }
     }
@@ -91,7 +84,6 @@ impl TResourceManager for ResourceManager {
             ResourceManager::LocalResourceManager(rm) => rm.worker_allocate(stream_app).await,
             ResourceManager::StandaloneResourceManager(rm) => rm.worker_allocate(stream_app).await,
             ResourceManager::YarnResourceManager(rm) => rm.worker_allocate(stream_app).await,
-            #[cfg(feature = "k8s")]
             ResourceManager::KubernetesResourceManager(rm) => rm.worker_allocate(stream_app).await,
         }
     }
@@ -101,7 +93,6 @@ impl TResourceManager for ResourceManager {
             ResourceManager::LocalResourceManager(rm) => rm.stop_workers(task_ids).await,
             ResourceManager::StandaloneResourceManager(rm) => rm.stop_workers(task_ids).await,
             ResourceManager::YarnResourceManager(rm) => rm.stop_workers(task_ids).await,
-            #[cfg(feature = "k8s")]
             ResourceManager::KubernetesResourceManager(rm) => rm.stop_workers(task_ids).await,
         }
     }

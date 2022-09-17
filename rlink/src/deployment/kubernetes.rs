@@ -8,13 +8,9 @@ use kube::{
 use serde_json::json;
 
 use crate::core::runtime::ClusterDescriptor;
-use crate::core::{
-    cluster::TaskResourceInfo,
-    env::{StreamApp, StreamExecutionEnvironment},
-};
+use crate::core::{cluster::TaskResourceInfo, env::StreamApp};
 use crate::deployment::TResourceManager;
 use crate::runtime::context::Context;
-use crate::runtime::ClusterDescriptor;
 
 #[derive(Clone)]
 pub(crate) struct KubernetesResourceManager {
@@ -58,7 +54,7 @@ impl TResourceManager for KubernetesResourceManager {
         let application_id = coordinator_manager.application_id.as_str();
         let job_deploy_id = get_job_deploy_id(namespace, application_id).await.unwrap();
 
-        let coordinator_address = coordinator_manager.coordinator_address.as_str();
+        let coordinator_address = coordinator_manager.web_address.as_str();
 
         for task_manager_descriptor in &cluster_descriptor.worker_managers {
             let task_manager_id = task_manager_descriptor.task_manager_id.clone();
