@@ -1,5 +1,6 @@
-use rlink::core::element::{FnSchema, Record};
-use rlink::core::function::{Context, FlatMapFunction};
+use rlink::core::element::{Element, FnSchema, Record};
+use rlink::core::function::{Context, FlatMapFunction, SendableElementStream};
+use rlink::utils::stream::MemoryStream;
 use rlink_example_utils::buffer_gen::model;
 
 use crate::entry::SerDeEntity;
@@ -14,12 +15,14 @@ impl InputMapperFunction {
     }
 }
 
+#[async_trait]
 impl FlatMapFunction for InputMapperFunction {
-    fn open(&mut self, _context: &Context) -> rlink::core::Result<()> {
+    async fn open(&mut self, _context: &Context) -> rlink::core::Result<()> {
         Ok(())
     }
 
-    fn flat_map(&mut self, mut record: Record) -> Box<dyn Iterator<Item = Record>> {
+    async fn flat_map_element(&mut self, element: Element) -> SendableElementStream {
+        let mut record = element.into_record();
         let kafka_message::Entity { payload, .. } =
             kafka_message::Entity::parse(record.as_buffer()).unwrap();
 
@@ -33,10 +36,10 @@ impl FlatMapFunction for InputMapperFunction {
         let mut new_record = Record::new();
         entry.to_buffer(new_record.as_buffer()).unwrap();
 
-        Box::new(vec![new_record].into_iter())
+        Box::pin(MemoryStream::new(vec![new_record]))
     }
 
-    fn close(&mut self) -> rlink::core::Result<()> {
+    async fn close(&mut self) -> rlink::core::Result<()> {
         Ok(())
     }
 

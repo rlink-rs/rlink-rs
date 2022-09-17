@@ -2,6 +2,10 @@
 extern crate log;
 #[macro_use]
 extern crate rlink_derive;
+#[macro_use]
+extern crate async_trait;
+#[macro_use]
+extern crate anyhow;
 
 pub mod clickhouse_sink;
 

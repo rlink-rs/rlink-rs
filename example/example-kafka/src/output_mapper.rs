@@ -1,11 +1,12 @@
-use rlink::core::element::{FnSchema, Record};
-use rlink::core::function::{Context, FlatMapFunction};
+use rlink::core::element::{Element, FnSchema};
+use rlink::core::function::{Context, FlatMapFunction, SendableElementStream};
 use rlink::utils::date_time::current_timestamp_millis;
+use rlink::utils::stream::MemoryStream;
+use rlink_connector_kafka::buffer_gen::kafka_message;
 use rlink_connector_kafka::build_kafka_record;
 use rlink_example_utils::buffer_gen::model;
 
 use crate::entry::SerDeEntity;
-use rlink_connector_kafka::buffer_gen::kafka_message;
 
 #[derive(Debug, Default, Function)]
 pub struct OutputMapperFunction {}
@@ -16,12 +17,14 @@ impl OutputMapperFunction {
     }
 }
 
+#[async_trait]
 impl FlatMapFunction for OutputMapperFunction {
-    fn open(&mut self, _context: &Context) -> rlink::core::Result<()> {
+    async fn open(&mut self, _context: &Context) -> rlink::core::Result<()> {
         Ok(())
     }
 
-    fn flat_map(&mut self, mut record: Record) -> Box<dyn Iterator<Item = Record>> {
+    async fn flat_map_element(&mut self, element: Element) -> SendableElementStream {
+        let mut record = element.into_record();
         let entry = model::Entity::parse(record.as_buffer()).unwrap();
         let entry = SerDeEntity {
             timestamp: entry.timestamp,
@@ -40,10 +43,10 @@ impl FlatMapFunction for OutputMapperFunction {
             0,
         )
         .unwrap();
-        Box::new(vec![new_record].into_iter())
+        Box::pin(MemoryStream::new(vec![new_record]))
     }
 
-    fn close(&mut self) -> rlink::core::Result<()> {
+    async fn close(&mut self) -> rlink::core::Result<()> {
         Ok(())
     }
 

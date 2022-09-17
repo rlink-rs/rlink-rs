@@ -44,7 +44,7 @@ impl PartialEq for Watermark {
 ///
 /// Timestamps can be an arbitrary `u64` value, but all built-in implementations represent it as the
 /// milliseconds since the Epoch (midnight, January 1, 1970 UTC).
-pub trait TimestampAssigner: Debug {
+pub trait TimestampAssigner: Debug + Send + Sync {
     fn open(&mut self, context: &Context) -> crate::core::Result<()>;
 
     /// Assigns a timestamp to an element, in milliseconds since the Epoch. This is independent of
@@ -52,7 +52,7 @@ pub trait TimestampAssigner: Debug {
     fn extract_timestamp(&mut self, row: &mut Record, previous_element_timestamp: u64) -> u64;
 }
 
-pub trait WatermarkGenerator: Debug {
+pub trait WatermarkGenerator: Debug + Send + Sync {
     /// Called for every event, allows the watermark generator to examine and remember the event
     /// timestamps, or to emit a watermark based on the event itself.
     fn on_event(&mut self, record: &mut Record, event_timestamp: u64) -> Option<Watermark>;
@@ -67,7 +67,7 @@ pub trait WatermarkGenerator: Debug {
 /// The WatermarkStrategy defines how to generate `Watermark`s in the stream sources. The
 /// WatermarkStrategy is a builder/factory for the `WatermarkGenerator` that generates the watermarks
 /// and the `TimestampAssigner` which assigns the internal timestamp of a record.
-pub trait WatermarkStrategy: NamedFunction + CheckpointFunction + Debug {
+pub trait WatermarkStrategy: NamedFunction + CheckpointFunction + Debug + Send + Sync {
     /// Instantiates a `WatermarkGenerator` that generates watermarks according to this strategy.
     fn create_watermark_generator(&mut self) -> Box<dyn WatermarkGenerator>;
 

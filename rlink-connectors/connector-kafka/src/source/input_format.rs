@@ -3,20 +3,22 @@ use std::time::Duration;
 use rdkafka::consumer::{BaseConsumer, Consumer, DefaultConsumerContext};
 use rdkafka::error::KafkaResult;
 use rdkafka::{ClientConfig, Offset, TopicPartitionList};
-use rlink::channel::utils::handover::Handover;
+use rlink::channel::named_channel;
 use rlink::core;
 use rlink::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
-use rlink::core::element::{FnSchema, Record};
-use rlink::core::function::{Context, InputFormat, InputSplit, InputSplitSource, NamedFunction};
+use rlink::core::element::FnSchema;
+use rlink::core::function::{
+    Context, InputFormat, InputSplit, InputSplitSource, NamedFunction, SendableElementStream,
+};
 use rlink::core::properties::Properties;
+use rlink::core::runtime::TaskId;
 use rlink::metrics::Tag;
 
 use crate::source::checkpoint::KafkaCheckpointFunction;
 use crate::source::consumer::{create_kafka_consumer, ConsumerRange};
 use crate::source::deserializer::KafkaRecordDeserializerBuilder;
-use crate::source::iterator::KafkaRecordIterator;
 use crate::source::offset_range::{OffsetRange, PartitionOffset};
-use crate::source::ConsumerRecord;
+use crate::source::stream::KafkaRecordStream;
 
 /// Depending on whether the task has `InputSplit`, and whether the client needs to be created
 const CREATE_KAFKA_CONNECTION: &'static str = "create_kafka_connection";
@@ -28,13 +30,14 @@ pub struct KafkaInputFormat {
     client_config: ClientConfig,
     topics: Vec<String>,
 
+    task_id: TaskId,
     task_topic: String,
     task_partition: i32,
 
     buffer_size: usize,
     offset_range: OffsetRange,
 
-    handover: Option<Handover<ConsumerRecord>>,
+    tags: Vec<Tag>,
 
     deserializer_builder: Box<dyn KafkaRecordDeserializerBuilder>,
     schema: FnSchema,
@@ -58,14 +61,15 @@ impl KafkaInputFormat {
             parallelism,
             client_config,
             topics,
+            task_id: Default::default(),
             task_topic: "".to_string(),
             task_partition: 0,
             buffer_size,
             offset_range,
-            handover: None,
             checkpoint: None,
             deserializer_builder,
             schema,
+            tags: vec![],
         }
     }
 
@@ -165,10 +169,12 @@ impl NamedFunction for KafkaInputFormat {
     }
 }
 
+#[async_trait]
 impl InputFormat for KafkaInputFormat {
-    fn open(&mut self, input_split: InputSplit, context: &Context) -> core::Result<()> {
+    async fn open(&mut self, input_split: InputSplit, context: &Context) -> core::Result<()> {
         info!("kafka source open");
 
+        self.task_id = context.task_id.clone();
         self.task_topic = input_split.properties().get_string("topic").unwrap();
         self.task_partition = input_split.properties().get_i32("partition").unwrap();
 
@@ -180,45 +186,40 @@ impl InputFormat for KafkaInputFormat {
         );
         self.checkpoint = Some(kafka_checkpoint);
 
-        self.initialize_state(&context.checkpoint_context(), &context.checkpoint_handle);
+        self.initialize_state(&context.checkpoint_context(), &context.checkpoint_handle)
+            .await;
 
-        let tags = vec![
-            Tag::new("topic", self.task_topic.as_str()),
-            Tag::new("partition", self.task_partition),
-        ];
-        self.handover = Some(Handover::<ConsumerRecord>::new(
-            "KafkaSource_Handover",
-            tags,
-            self.buffer_size,
-        ));
-
-        let client_config = self.client_config.clone();
-        let handover = self.handover.as_ref().unwrap().clone();
-
-        let consumer_ranges = self
-            .consumer_ranges(self.task_topic.to_string(), self.task_partition)
-            .unwrap();
-        create_kafka_consumer(
-            context.task_id.job_id(),
-            context.task_id.task_number(),
-            client_config,
-            consumer_ranges,
-            handover,
-            self.deserializer_builder.build(),
-        );
+        self.tags.push(Tag::new("topic", self.task_topic.as_str()));
+        self.tags.push(Tag::new("partition", self.task_partition));
 
         info!("start with consumer and operator mode");
 
         Ok(())
     }
 
-    fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record> + Send> {
-        let handover = self.handover.as_ref().unwrap().clone();
+    async fn element_stream(&mut self) -> SendableElementStream {
+        let (sender, receiver) =
+            named_channel("KafkaSource_Handover", self.tags.clone(), self.buffer_size);
+
+        let client_config = self.client_config.clone();
+        let consumer_ranges = self
+            .consumer_ranges(self.task_topic.to_string(), self.task_partition)
+            .unwrap();
+        create_kafka_consumer(
+            self.task_id.job_id(),
+            self.task_id.task_number(),
+            client_config,
+            consumer_ranges,
+            sender,
+            self.deserializer_builder.build(),
+        )
+        .await;
+
         let state_recorder = self.checkpoint.as_mut().unwrap().as_state_mut().clone();
-        Box::new(KafkaRecordIterator::new(handover, state_recorder))
+        Box::pin(KafkaRecordStream::new(receiver, state_recorder))
     }
 
-    fn close(&mut self) -> core::Result<()> {
+    async fn close(&mut self) -> core::Result<()> {
         Ok(())
     }
 
@@ -231,8 +232,9 @@ impl InputFormat for KafkaInputFormat {
     }
 }
 
+#[async_trait]
 impl CheckpointFunction for KafkaInputFormat {
-    fn initialize_state(
+    async fn initialize_state(
         &mut self,
         context: &FunctionSnapshotContext,
         handle: &Option<CheckpointHandle>,
@@ -240,13 +242,17 @@ impl CheckpointFunction for KafkaInputFormat {
         self.checkpoint
             .as_mut()
             .unwrap()
-            .initialize_state(context, handle);
+            .initialize_state(context, handle)
+            .await;
     }
 
     /// trigger the method when the `operator` operate a `Barrier` event
-    fn snapshot_state(&mut self, context: &FunctionSnapshotContext) -> Option<CheckpointHandle> {
+    async fn snapshot_state(
+        &mut self,
+        context: &FunctionSnapshotContext,
+    ) -> Option<CheckpointHandle> {
         match self.checkpoint.as_mut() {
-            Some(checkpoint) => checkpoint.snapshot_state(context),
+            Some(checkpoint) => checkpoint.snapshot_state(context).await,
             None => None,
         }
     }

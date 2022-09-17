@@ -1,15 +1,18 @@
 use std::collections::HashMap;
+use std::pin::Pin;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
+use futures::StreamExt;
+
 use crate::channel::named_channel;
 use crate::channel::sender::ChannelSender;
-use crate::channel::utils::iter::ChannelIterator;
+use crate::channel::utils::ChannelStream;
 use crate::core::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
 use crate::core::element::{Element, StreamStatus, Watermark};
-use crate::core::function::InputFormat;
+use crate::core::function::{ElementStream, InputFormat, SendableElementStream};
 use crate::core::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
 use crate::core::runtime::{CheckpointId, JobId, OperatorId, TaskId};
 use crate::core::watermark::MAX_WATERMARK;
@@ -68,61 +71,85 @@ impl SourceRunnable {
         }
     }
 
-    fn poll_input_element(
+    async fn poll_input_element(
         &mut self,
         sender: ChannelSender<Element>,
         running: Arc<AtomicBool>,
         daemon_task: bool,
     ) {
-        let iterator = self.stream_source.operator_fn.element_iter();
-        crate::utils::thread::spawn("poll_input_element", move || {
-            match SourceRunnable::poll_input_element0(iterator, sender, running, daemon_task) {
+        let stream = self.stream_source.operator_fn.element_stream().await;
+
+        tokio::spawn(async move {
+            match SourceRunnable::poll_input_element0(stream, sender, running, daemon_task).await {
                 Ok(_) => info!("poll input_element task finish"),
                 Err(e) => panic!("poll_input_element thread error. {}", e),
             }
         });
+
+        // crate::utils::thread::spawn("poll_input_element", move || {
+        //     match SourceRunnable::poll_input_element0(iterator, sender, running, daemon_task) {
+        //         Ok(_) => info!("poll input_element task finish"),
+        //         Err(e) => panic!("poll_input_element thread error. {}", e),
+        //     }
+        // });
     }
 
-    fn poll_input_element0(
-        iterator: Box<dyn Iterator<Item = Element> + Send>,
+    async fn poll_input_element0(
+        mut iterator: SendableElementStream,
         sender: ChannelSender<Element>,
         running: Arc<AtomicBool>,
         daemon_task: bool,
     ) -> anyhow::Result<()> {
-        for record in iterator {
-            sender.send(record).map_err(|e| anyhow!(e))?;
+        while let Some(element) = iterator.next().await {
+            sender.send(element).await.map_err(|e| anyhow!(e))?;
 
             if daemon_task && get_coordinator_status().is_terminating() {
                 info!("daemon source stop by coordinator stop");
                 break;
             }
         }
+        // for record in iterator {
+        //     sender.send(record).map_err(|e| anyhow!(e))?;
+        //
+        //     if daemon_task && get_coordinator_status().is_terminating() {
+        //         info!("daemon source stop by coordinator stop");
+        //         break;
+        //     }
+        // }
 
         running.store(false, Ordering::Relaxed);
         Ok(())
     }
 
-    fn poll_stream_status(&mut self, sender: ChannelSender<Element>, running: Arc<AtomicBool>) {
-        let stream_status_timer = self.stream_status_timer.as_ref().unwrap().clone();
-        crate::utils::thread::spawn("poll_stream_status", move || {
-            match SourceRunnable::poll_stream_status0(stream_status_timer, sender, running) {
+    async fn poll_stream_status(
+        &mut self,
+        sender: ChannelSender<Element>,
+        running: Arc<AtomicBool>,
+    ) {
+        let stream_status_timer = self.stream_status_timer.take().unwrap();
+        // let stream_status_timer = self.stream_status_timer.as_ref().unwrap().clone();
+        tokio::spawn(async move {
+            match SourceRunnable::poll_stream_status0(stream_status_timer, sender, running).await {
                 Ok(_) => info!("poll stream_status task finish"),
                 Err(e) => warn!("poll stream_status thread error. {}", e),
             }
         });
     }
 
-    fn poll_stream_status0(
-        stream_status_timer: TimerChannel,
+    async fn poll_stream_status0(
+        mut stream_status_timer: TimerChannel,
         sender: ChannelSender<Element>,
         running: Arc<AtomicBool>,
     ) -> anyhow::Result<()> {
         loop {
             let running = running.load(Ordering::Relaxed);
 
-            let window_time = stream_status_timer.recv().map_err(|e| anyhow!(e))?;
+            let window_time = stream_status_timer
+                .recv()
+                .await
+                .ok_or(anyhow!("timer closed"))?;
             let stream_status = Element::new_stream_status(window_time, !running);
-            sender.send(stream_status).map_err(|e| anyhow!(e))?;
+            sender.send(stream_status).await.map_err(|e| anyhow!(e))?;
 
             if !running {
                 info!("StreamStatus WindowTimer stop");
@@ -134,25 +161,28 @@ impl SourceRunnable {
         Ok(())
     }
 
-    fn poll_checkpoint(&mut self, sender: ChannelSender<Element>, running: Arc<AtomicBool>) {
-        let checkpoint_timer = self.checkpoint_timer.as_ref().unwrap().clone();
-        crate::utils::thread::spawn("poll_checkpoint", move || {
-            match SourceRunnable::poll_checkpoint0(checkpoint_timer, sender, running) {
+    async fn poll_checkpoint(&mut self, sender: ChannelSender<Element>, running: Arc<AtomicBool>) {
+        let checkpoint_timer = self.checkpoint_timer.take().unwrap();
+        tokio::spawn(async move {
+            match SourceRunnable::poll_checkpoint0(checkpoint_timer, sender, running).await {
                 Ok(_) => info!("poll checkpoint task finish"),
                 Err(e) => warn!("poll checkpoint thread error. {}", e),
             }
         });
     }
 
-    fn poll_checkpoint0(
-        checkpoint_timer: TimerChannel,
+    async fn poll_checkpoint0(
+        mut checkpoint_timer: TimerChannel,
         sender: ChannelSender<Element>,
         running: Arc<AtomicBool>,
     ) -> anyhow::Result<()> {
         loop {
-            let window_time = checkpoint_timer.recv().map_err(|e| anyhow!(e))?;
+            let window_time = checkpoint_timer
+                .recv()
+                .await
+                .ok_or(anyhow!("timer closed"))?;
             let barrier = Element::new_barrier(CheckpointId(window_time));
-            sender.send(barrier).map_err(|e| anyhow!(e))?;
+            sender.send(barrier).await.map_err(|e| anyhow!(e))?;
 
             let running = running.load(Ordering::Relaxed);
             if !running {
@@ -172,20 +202,21 @@ impl SourceRunnable {
     }
 }
 
+#[async_trait]
 impl Runnable for SourceRunnable {
-    fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
+    async fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
         self.context = Some(context.clone());
 
         self.task_id = context.task_descriptor.task_id;
         self.daemon_task = context.task_descriptor.daemon;
 
         // first open next, then open self
-        self.next_runnable.as_mut().unwrap().open(context)?;
+        self.next_runnable.as_mut().unwrap().open(context).await?;
 
         let input_split = context.task_descriptor.input_split.clone();
         let fun_context = context.to_fun_context(self.operator_id);
         let source_func = self.stream_source.operator_fn.as_mut();
-        source_func.open(input_split, &fun_context)?;
+        source_func.open(input_split, &fun_context).await?;
 
         if let FunctionCreator::User = self.stream_source.fn_creator() {
             let stream_status_timer = context
@@ -242,7 +273,7 @@ impl Runnable for SourceRunnable {
         Ok(())
     }
 
-    fn run(&mut self, mut _element: Element) {
+    async fn run(&mut self, mut _element: Element) {
         info!("{} running...", self.stream_source.operator_fn.name());
 
         let mut element_iter = match self.stream_source.fn_creator() {
@@ -254,23 +285,28 @@ impl Runnable for SourceRunnable {
                 );
                 let running = Arc::new(AtomicBool::new(true));
 
-                self.poll_input_element(sender.clone(), running.clone(), self.daemon_task);
+                self.poll_input_element(sender.clone(), running.clone(), self.daemon_task)
+                    .await;
 
-                self.poll_stream_status(sender.clone(), running.clone());
-                self.poll_checkpoint(sender.clone(), running.clone());
+                self.poll_stream_status(sender.clone(), running.clone())
+                    .await;
+                self.poll_checkpoint(sender.clone(), running.clone()).await;
 
-                let element_iter: Box<dyn Iterator<Item = Element> + Send> =
-                    Box::new(ChannelIterator::new(receiver));
-                element_iter
+                let stream: Pin<Box<dyn ElementStream + Send>> =
+                    Box::pin(ChannelStream::new(receiver));
+                stream
+                // let element_iter: Box<dyn Iterator<Item = Element> + Send> =
+                //     Box::new(ChannelIterator::new(receiver));
+                // element_iter
             }
-            FunctionCreator::System => self.stream_source.operator_fn.element_iter(),
+            FunctionCreator::System => self.stream_source.operator_fn.element_stream().await,
         };
 
         let mut end_flags = 0;
-        while let Some(element) = element_iter.next() {
+        while let Some(element) = element_iter.next().await {
             match element {
                 Element::Record(_) => {
-                    self.next_runnable.as_mut().unwrap().run(element);
+                    self.next_runnable.as_mut().unwrap().run(element).await;
                     self.counter.fetch_add(1);
                 }
                 Element::Barrier(barrier) => {
@@ -282,12 +318,13 @@ impl Runnable for SourceRunnable {
                             let context = self.context.as_ref().unwrap();
                             context.checkpoint_context(self.operator_id, checkpoint_id, None)
                         };
-                        self.checkpoint(snapshot_context);
+                        self.checkpoint(snapshot_context).await;
 
                         self.next_runnable
                             .as_mut()
                             .unwrap()
-                            .run(Element::Barrier(barrier));
+                            .run(Element::Barrier(barrier))
+                            .await;
                     }
                 }
                 Element::Watermark(watermark) => match self.watermark_manager.apply(watermark) {
@@ -300,6 +337,7 @@ impl Runnable for SourceRunnable {
                             .as_mut()
                             .unwrap()
                             .run(Element::Watermark(min_watermark.clone()))
+                            .await
                     }
                     None => {}
                 },
@@ -320,7 +358,11 @@ impl Runnable for SourceRunnable {
                             stream_status.timestamp,
                             parent_job_terminated,
                         );
-                        self.next_runnable.as_mut().unwrap().run(stream_status);
+                        self.next_runnable
+                            .as_mut()
+                            .unwrap()
+                            .run(stream_status)
+                            .await;
                     }
 
                     if parent_job_terminated {
@@ -332,23 +374,24 @@ impl Runnable for SourceRunnable {
         }
     }
 
-    fn close(&mut self) -> anyhow::Result<()> {
+    async fn close(&mut self) -> anyhow::Result<()> {
         let source_func = self.stream_source.operator_fn.as_mut();
-        source_func.close()?;
+        source_func.close().await?;
 
         // first close self, then close next
-        self.next_runnable.as_mut().unwrap().close()
+        self.next_runnable.as_mut().unwrap().close().await
     }
 
     fn set_next_runnable(&mut self, next_runnable: Option<Box<dyn Runnable>>) {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext) {
+    async fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext) {
         let handle = self
             .stream_source
             .operator_fn
             .snapshot_state(&snapshot_context)
+            .await
             .unwrap_or(CheckpointHandle::default());
 
         let ck = Checkpoint {

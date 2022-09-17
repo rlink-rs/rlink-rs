@@ -2,7 +2,7 @@
 name = "rlink-connector-clickhouse"
 version = "0.6.2"
 authors = ["yorkart <wangyue11.4@163.com>"]
-edition = "2018"
+edition = "2021"
 description = "High performance Stream Processing Framework"
 keywords = ["stream", "window", "flink", "clickhouse"]
 repository = "https://github.com/rlink-rs/rlink-rs.git"
@@ -25,5 +25,8 @@ anyhow = "1.0.31"
 
 chrono = "0.4"
 chrono-tz = "0.5"
+
+async-trait = "0.1"
+tokio = "1"
 
 clickhouse-rs = "1.0.0-alpha.1"

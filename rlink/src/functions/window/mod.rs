@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::core::checkpoint::CheckpointFunction;
+use crate::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
 use crate::core::function::NamedFunction;
 use crate::core::window::{TWindow, TimeWindow, Window, WindowAssigner, WindowAssignerContext};
 
@@ -83,7 +83,22 @@ impl NamedFunction for SlidingEventTimeWindows {
     }
 }
 
-impl CheckpointFunction for SlidingEventTimeWindows {}
+#[async_trait]
+impl CheckpointFunction for SlidingEventTimeWindows {
+    async fn initialize_state(
+        &mut self,
+        _context: &FunctionSnapshotContext,
+        _handle: &Option<CheckpointHandle>,
+    ) {
+    }
+
+    async fn snapshot_state(
+        &mut self,
+        _context: &FunctionSnapshotContext,
+    ) -> Option<CheckpointHandle> {
+        None
+    }
+}
 
 #[cfg(test)]
 mod tests {

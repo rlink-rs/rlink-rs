@@ -2,7 +2,7 @@
 name = "rlink-derive"
 version = "0.3.0"
 authors = ["yorkart <wangyue11.4@163.com>"]
-edition = "2018"
+edition = "2021"
 description = "High performance Stream Processing Framework"
 keywords = ["stream", "window", "flink"]
 repository = "https://github.com/rlink-rs/rlink-rs.git"

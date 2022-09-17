@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 use std::sync::Arc;
 
-use crate::core::env::{StreamApp, StreamExecutionEnvironment};
+use crate::core::env::StreamApp;
 use crate::core::runtime::{HeartBeatStatus, TaskId};
 use crate::utils::panic::panic_notify;
 
@@ -111,7 +111,7 @@ pub(crate) struct HeartbeatRequest {
     pub change_items: Vec<HeartbeatItem>,
 }
 
-pub fn run<S>(stream_env: StreamExecutionEnvironment, stream_app: S) -> anyhow::Result<()>
+pub async fn run<S>(stream_app: S) -> anyhow::Result<()>
 where
     S: StreamApp + 'static,
 {
@@ -120,5 +120,5 @@ where
     let context = context::Context::parse_node_arg()?;
     info!("Context: {:?}", context);
 
-    cluster::run_task(Arc::new(context), stream_env, stream_app)
+    cluster::run_task(Arc::new(context), stream_app).await
 }

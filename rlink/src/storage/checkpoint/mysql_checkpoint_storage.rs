@@ -1,9 +1,9 @@
-use mysql::prelude::*;
-use mysql::*;
+use mysql_async::prelude::*;
+use mysql_async::Params;
 
 use crate::core::checkpoint::{Checkpoint, CheckpointHandle};
 use crate::core::runtime::{CheckpointId, JobId, OperatorId, TaskId};
-use crate::storage::checkpoint::TCheckpointStorage;
+use crate::storage::checkpoint::{CheckpointEntity, TCheckpointStorage};
 use crate::utils::date_time::{current_timestamp, fmt_date_time};
 
 const DEFAULT_TABLE_NAME: &'static str = "rlink_ck";
@@ -20,32 +20,79 @@ impl MySqlCheckpointStorage {
             table: table.unwrap_or(DEFAULT_TABLE_NAME.to_string()),
         }
     }
+
+    async fn query<P>(&mut self, sql: String, p: P) -> anyhow::Result<Vec<Checkpoint>>
+    where
+        P: Into<Params> + Send,
+    {
+        let pool = mysql_async::Pool::new(self.url.as_str());
+        let mut conn = pool.get_conn().await?;
+
+        let selected_payments = sql
+            .with(p)
+            .map(
+                &mut conn,
+                |(
+                    job_id,
+                    task_number,
+                    num_tasks,
+                    operator_id,
+                    checkpoint_id,
+                    completed_checkpoint_id,
+                    handle,
+                )| {
+                    let completed_checkpoint_id = if completed_checkpoint_id == 0 {
+                        None
+                    } else {
+                        Some(CheckpointId(completed_checkpoint_id))
+                    };
+
+                    Checkpoint {
+                        operator_id: OperatorId(operator_id),
+                        task_id: TaskId {
+                            job_id: JobId(job_id),
+                            task_number,
+                            num_tasks,
+                        },
+                        checkpoint_id: CheckpointId(checkpoint_id),
+                        completed_checkpoint_id,
+                        handle: CheckpointHandle { handle },
+                    }
+                },
+            )
+            .await?;
+
+        info!("checkpoint load success");
+        Ok(selected_payments)
+    }
 }
 
+#[async_trait]
 impl TCheckpointStorage for MySqlCheckpointStorage {
-    fn save(
-        &mut self,
-        application_name: &str,
-        application_id: &str,
-        checkpoint_id: CheckpointId,
-        finish_cks: Vec<Checkpoint>,
-        ttl: u64,
-    ) -> anyhow::Result<()> {
-        let pool = Pool::new(self.url.as_str())?;
+    async fn save(&mut self, ck: CheckpointEntity) -> anyhow::Result<()> {
+        let CheckpointEntity {
+            application_name,
+            application_id,
+            checkpoint_id,
+            finish_cks,
+            ttl,
+            ..
+        } = ck;
 
-        let mut conn = pool.get_conn()?;
-        conn.exec_batch(
-            r"
-insert into rlink_ck 
+        let pool = mysql_async::Pool::new(self.url.as_str());
+        let mut conn = pool.get_conn().await?;
+
+        r"
+insert into rlink_ck
   (application_name, application_id, job_id, task_number, num_tasks, operator_id, checkpoint_id, completed_checkpoint_id, handle, create_time)
-values 
+values
   (:application_name, :application_id, :job_id, :task_number, :num_tasks, :operator_id, :checkpoint_id, :completed_checkpoint_id, :handle, :create_time)"
-                .replace("rlink_ck", self.table.as_str()),
-            finish_cks.iter().map(|p| {
+            .replace("rlink_ck", self.table.as_str())
+            .with(finish_cks.iter().map(|p| {
                 let completed_checkpoint_id = p.completed_checkpoint_id.unwrap_or_default();
                 params! {
-                    "application_name" => application_name,
-                    "application_id" => application_id,
+                    "application_name" => application_name.as_str(),
+                    "application_id" => application_id.as_str(),
                     "job_id" => p.task_id.job_id.0,
                     "task_number" => p.task_id.task_number,
                     "num_tasks" => p.task_id.num_tasks,
@@ -55,28 +102,30 @@ values
                     "handle" => &p.handle.handle,
                     "create_time" => fmt_date_time(current_timestamp(), "%Y-%m-%d %T"),
                 }
-            }),
-        )?;
+            }))
+            .batch(&mut conn)
+            .await?;
 
         if checkpoint_id.0 < ttl {
             return Ok(());
         }
 
         let checkpoint_id_ttl = checkpoint_id.0 - ttl;
-        let _n: Option<usize> = conn.exec_first(
-            r"
+
+        let _n: Option<usize> = r"
 delete
 from rlink_ck
 where application_name = :application_name
   and application_id = :application_id
   and checkpoint_id < :checkpoint_id"
-                .replace("rlink_ck", self.table.as_str()),
-            params! {
-                "application_name" => application_name,
-                "application_id" => application_id,
+            .replace("rlink_ck", self.table.as_str())
+            .with(params! {
+                "application_name" => application_name.as_str(),
+                "application_id" => application_id.as_str(),
                 "checkpoint_id" => checkpoint_id_ttl
-            },
-        )?;
+            })
+            .first(&mut conn)
+            .await?;
 
         info!(
             "checkpoint save success, application_name={:?}, checkpoint_id={:?}",
@@ -85,18 +134,14 @@ where application_name = :application_name
         Ok(())
     }
 
-    fn load(
+    async fn load(
         &mut self,
         application_name: &str,
         application_id: &str,
     ) -> anyhow::Result<Vec<Checkpoint>> {
-        let pool = Pool::new(self.url.as_str())?;
-
-        let mut conn = pool.get_conn()?;
-
-        let stmt = conn.prep(
+        self.query(
             r"
-SELECT  ck.job_id, ck.task_number, ck.num_tasks, ck.operator_id, 
+SELECT  ck.job_id, ck.task_number, ck.num_tasks, ck.operator_id,
         ck.checkpoint_id, ck.completed_checkpoint_id, ck.handle
 from rlink_ck as ck
         inner join (
@@ -105,61 +150,24 @@ from rlink_ck as ck
     where application_name = :application_name
     and application_id = :application_id
 ) as t on t.checkpoint_id = ck.checkpoint_id
-where ck.application_name = :application_name 
+where ck.application_name = :application_name
 and ck.application_id = :application_id"
                 .replace("rlink_ck", self.table.as_str()),
-        )?;
-
-        let selected_payments = conn.exec_map(
-            &stmt,
             params! {
-            "application_name" => application_name,
-            "application_id" => application_id,
-             },
-            |(
-                job_id,
-                task_number,
-                num_tasks,
-                operator_id,
-                checkpoint_id,
-                completed_checkpoint_id,
-                handle,
-            )| {
-                let completed_checkpoint_id = if completed_checkpoint_id == 0 {
-                    None
-                } else {
-                    Some(CheckpointId(completed_checkpoint_id))
-                };
-
-                Checkpoint {
-                    operator_id: OperatorId(operator_id),
-                    task_id: TaskId {
-                        job_id: JobId(job_id),
-                        task_number,
-                        num_tasks,
-                    },
-                    checkpoint_id: CheckpointId(checkpoint_id),
-                    completed_checkpoint_id,
-                    handle: CheckpointHandle { handle },
-                }
+               "application_name" => application_name,
+               "application_id" => application_id,
             },
-        )?;
-
-        info!("checkpoint load success");
-        Ok(selected_payments)
+        )
+        .await
     }
 
-    fn load_by_checkpoint_id(
+    async fn load_by_checkpoint_id(
         &mut self,
         application_name: &str,
         application_id: &str,
         checkpoint_id: CheckpointId,
     ) -> anyhow::Result<Vec<Checkpoint>> {
-        let pool = Pool::new(self.url.as_str())?;
-
-        let mut conn = pool.get_conn()?;
-
-        let stmt = conn.prep(
+        self.query(
             r"
 SELECT  ck.job_id, ck.task_number, ck.num_tasks, ck.operator_id, 
         ck.checkpoint_id, ck.completed_checkpoint_id, ck.handle
@@ -168,45 +176,13 @@ where ck.application_name = :application_name
     and ck.application_id = :application_id
     and ck.checkpoint_id = :checkpoint_id"
                 .replace("rlink_ck", self.table.as_str()),
-        )?;
-
-        let selected_payments = conn.exec_map(
-            &stmt,
             params! {
-            "application_name" => application_name,
-            "application_id" => application_id,
-            "checkpoint_id" => checkpoint_id.0},
-            |(
-                job_id,
-                task_number,
-                num_tasks,
-                operator_id,
-                checkpoint_id,
-                completed_checkpoint_id,
-                handle,
-            )| {
-                let completed_checkpoint_id = if completed_checkpoint_id == 0 {
-                    None
-                } else {
-                    Some(CheckpointId(completed_checkpoint_id))
-                };
-
-                Checkpoint {
-                    operator_id: OperatorId(operator_id),
-                    task_id: TaskId {
-                        job_id: JobId(job_id),
-                        task_number,
-                        num_tasks,
-                    },
-                    checkpoint_id: CheckpointId(checkpoint_id),
-                    completed_checkpoint_id,
-                    handle: CheckpointHandle { handle },
-                }
+                "application_name" => application_name,
+                "application_id" => application_id,
+                "checkpoint_id" => checkpoint_id.0
             },
-        )?;
-
-        info!("checkpoint load success");
-        Ok(selected_payments)
+        )
+        .await
     }
 }
 
@@ -215,10 +191,10 @@ mod tests {
     use crate::core::checkpoint::{Checkpoint, CheckpointHandle};
     use crate::core::runtime::{CheckpointId, JobId, OperatorId, TaskId};
     use crate::storage::checkpoint::mysql_checkpoint_storage::MySqlCheckpointStorage;
-    use crate::storage::checkpoint::TCheckpointStorage;
+    use crate::storage::checkpoint::{CheckpointEntity, TCheckpointStorage};
 
-    #[test]
-    pub fn mysql_storage_test() {
+    #[tokio::test]
+    pub async fn mysql_storage_test() {
         let application_name = "test_app_name";
         let application_id = "test_app_id";
         let job_id = JobId(5u32);
@@ -236,44 +212,51 @@ mod tests {
         let checkpoint_id = CheckpointId(crate::utils::date_time::current_timestamp_millis());
 
         let mut mysql_storage = MySqlCheckpointStorage::new(
-            "mysql://rlink:123456@localhost:3304/rlink".to_string(),
+            "mysql://root:mysqlpw@localhost:55000/rlink".to_string(),
             None,
         );
-        mysql_storage
-            .save(
-                application_name,
-                application_id,
-                checkpoint_id,
-                vec![
-                    Checkpoint {
-                        operator_id,
-                        task_id: task_id0,
-                        checkpoint_id,
-                        completed_checkpoint_id: None,
-                        handle: CheckpointHandle {
-                            handle: "h0".to_string(),
-                        },
+        let ck = CheckpointEntity::new(
+            application_name.to_string(),
+            application_id.to_string(),
+            checkpoint_id,
+            vec![
+                Checkpoint {
+                    operator_id,
+                    task_id: task_id0,
+                    checkpoint_id,
+                    completed_checkpoint_id: None,
+                    handle: CheckpointHandle {
+                        handle: "h0".to_string(),
                     },
-                    Checkpoint {
-                        operator_id,
-                        task_id: task_id1,
-                        checkpoint_id,
-                        completed_checkpoint_id: None,
-                        handle: CheckpointHandle {
-                            handle: "h1".to_string(),
-                        },
+                },
+                Checkpoint {
+                    operator_id,
+                    task_id: task_id1,
+                    checkpoint_id,
+                    completed_checkpoint_id: None,
+                    handle: CheckpointHandle {
+                        handle: "h1".to_string(),
                     },
-                ],
-                1000 * 60 * 60 * 24 * 3,
-            )
-            .unwrap();
+                },
+            ],
+            1000 * 60 * 60 * 24 * 3,
+        );
+        mysql_storage.save(ck).await.unwrap();
 
         let cks = mysql_storage
             .load(application_name, application_id)
+            .await
             .unwrap();
 
-        for ck in cks {
+        for ck in &cks {
             println!("{:?}", ck);
         }
+        assert_eq!(cks.len(), 2);
+
+        let cks = mysql_storage
+            .load_by_checkpoint_id(application_name, application_id, checkpoint_id)
+            .await
+            .unwrap();
+        assert_eq!(cks.len(), 2);
     }
 }

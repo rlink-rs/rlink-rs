@@ -77,6 +77,7 @@ impl RunnableContext {
 
             parents,
             children,
+            cluster_descriptor: self.cluster_descriptor.clone(),
         }
     }
 
@@ -166,10 +167,11 @@ impl RunnableContext {
     }
 }
 
-pub(crate) trait Runnable {
-    fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()>;
-    fn run(&mut self, element: Element);
-    fn close(&mut self) -> anyhow::Result<()>;
+#[async_trait]
+pub(crate) trait Runnable: Send + Sync {
+    async fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()>;
+    async fn run(&mut self, element: Element);
+    async fn close(&mut self) -> anyhow::Result<()>;
     fn set_next_runnable(&mut self, next_runnable: Option<Box<dyn Runnable>>);
-    fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext);
+    async fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext);
 }

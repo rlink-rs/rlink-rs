@@ -33,9 +33,10 @@ impl WindowAssignerRunnable {
     }
 }
 
+#[async_trait]
 impl Runnable for WindowAssignerRunnable {
-    fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
-        self.next_runnable.as_mut().unwrap().open(context)?;
+    async fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
+        self.next_runnable.as_mut().unwrap().open(context).await?;
         info!(
             "WindowAssignerRunnable({}) opened",
             self.stream_window.operator_fn.name()
@@ -46,7 +47,7 @@ impl Runnable for WindowAssignerRunnable {
         Ok(())
     }
 
-    fn run(&mut self, mut element: Element) {
+    async fn run(&mut self, mut element: Element) {
         match element.borrow_mut() {
             Element::Record(record) => {
                 let windows = self
@@ -55,7 +56,7 @@ impl Runnable for WindowAssignerRunnable {
                     .assign_windows(record.timestamp, WindowAssignerContext {});
                 record.set_location_windows(windows);
 
-                self.next_runnable.as_mut().unwrap().run(element);
+                self.next_runnable.as_mut().unwrap().run(element).await;
             }
             Element::Watermark(watermark) => {
                 let windows = self
@@ -64,7 +65,7 @@ impl Runnable for WindowAssignerRunnable {
                     .assign_windows(watermark.timestamp, WindowAssignerContext {});
                 watermark.set_location_windows(windows);
 
-                self.next_runnable.as_mut().unwrap().run(element);
+                self.next_runnable.as_mut().unwrap().run(element).await;
             }
             Element::Barrier(barrier) => {
                 let checkpoint_id = barrier.checkpoint_id;
@@ -72,30 +73,31 @@ impl Runnable for WindowAssignerRunnable {
                     let context = self.context.as_ref().unwrap();
                     context.checkpoint_context(self.operator_id, checkpoint_id, None)
                 };
-                self.checkpoint(snapshot_context);
+                self.checkpoint(snapshot_context).await;
 
-                self.next_runnable.as_mut().unwrap().run(element);
+                self.next_runnable.as_mut().unwrap().run(element).await;
             }
             Element::StreamStatus(_stream_status) => {
                 // error!("unreachable element");
-                self.next_runnable.as_mut().unwrap().run(element);
+                self.next_runnable.as_mut().unwrap().run(element).await;
             }
         }
     }
 
-    fn close(&mut self) -> anyhow::Result<()> {
-        self.next_runnable.as_mut().unwrap().close()
+    async fn close(&mut self) -> anyhow::Result<()> {
+        self.next_runnable.as_mut().unwrap().close().await
     }
 
     fn set_next_runnable(&mut self, next_runnable: Option<Box<dyn Runnable>>) {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext) {
+    async fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext) {
         let handle = self
             .stream_window
             .operator_fn
             .snapshot_state(&snapshot_context)
+            .await
             .unwrap_or(CheckpointHandle::default());
 
         let ck = Checkpoint {

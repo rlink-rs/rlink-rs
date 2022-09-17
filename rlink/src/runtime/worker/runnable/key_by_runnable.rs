@@ -42,16 +42,17 @@ impl KeyByRunnable {
     }
 }
 
+#[async_trait]
 impl Runnable for KeyByRunnable {
-    fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
-        self.next_runnable.as_mut().unwrap().open(context)?;
+    async fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
+        self.next_runnable.as_mut().unwrap().open(context).await?;
 
         self.context = Some(context.clone());
 
         self.task_id = context.task_descriptor.task_id;
 
         let fun_context = context.to_fun_context(self.operator_id);
-        self.stream_key_by.operator_fn.open(&fun_context)?;
+        self.stream_key_by.operator_fn.open(&fun_context).await?;
 
         // todo set self.partition_size = Reduce.partition
         self.partition_size = context.child_parallelism() as u16;
@@ -64,14 +65,15 @@ impl Runnable for KeyByRunnable {
         Ok(())
     }
 
-    fn run(&mut self, mut element: Element) {
+    async fn run(&mut self, mut element: Element) {
         match element.borrow_mut() {
             Element::Record(record) => {
                 let key_row = self
                     .stream_key_by
                     .operator_fn
                     .as_mut()
-                    .get_key(record.borrow_mut());
+                    .get_key(record.borrow_mut())
+                    .await;
 
                 let hash_code = utils::hash::hash_code(key_row.values.as_slice()).unwrap_or(0);
                 let partition_num = hash_code % self.partition_size as u32;
@@ -83,7 +85,7 @@ impl Runnable for KeyByRunnable {
                 // );
                 record.set_partition(partition_num as u16);
 
-                self.next_runnable.as_mut().unwrap().run(element);
+                self.next_runnable.as_mut().unwrap().run(element).await;
 
                 self.counter.fetch_add(1);
             }
@@ -93,30 +95,31 @@ impl Runnable for KeyByRunnable {
                     let context = self.context.as_ref().unwrap();
                     context.checkpoint_context(self.operator_id, checkpoint_id, None)
                 };
-                self.checkpoint(snapshot_context);
+                self.checkpoint(snapshot_context).await;
 
-                self.next_runnable.as_mut().unwrap().run(element);
+                self.next_runnable.as_mut().unwrap().run(element).await;
             }
             _ => {
-                self.next_runnable.as_mut().unwrap().run(element);
+                self.next_runnable.as_mut().unwrap().run(element).await;
             }
         }
     }
 
-    fn close(&mut self) -> anyhow::Result<()> {
-        self.stream_key_by.operator_fn.close()?;
-        self.next_runnable.as_mut().unwrap().close()
+    async fn close(&mut self) -> anyhow::Result<()> {
+        self.stream_key_by.operator_fn.close().await?;
+        self.next_runnable.as_mut().unwrap().close().await
     }
 
     fn set_next_runnable(&mut self, next_runnable: Option<Box<dyn Runnable>>) {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext) {
+    async fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext) {
         let handle = self
             .stream_key_by
             .operator_fn
             .snapshot_state(&snapshot_context)
+            .await
             .unwrap_or(CheckpointHandle::default());
 
         let ck = Checkpoint {

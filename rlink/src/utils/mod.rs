@@ -6,6 +6,7 @@ pub mod http;
 pub mod ip;
 pub mod panic;
 pub mod process;
+pub mod stream;
 pub mod thread;
 
 pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");

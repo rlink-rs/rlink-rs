@@ -16,19 +16,14 @@ use tokio::net::TcpStream;
 use tokio_util::codec::FramedRead;
 use tokio_util::codec::LengthDelimitedCodec;
 
-use crate::channel::{
-    bounded, named_channel_with_base, ElementReceiver, ElementSender, Receiver, Sender,
-    TryRecvError, TrySendError,
-};
+use crate::channel::{named_channel, ElementReceiver, ElementSender, TrySendError};
 use crate::core::element::Element;
-use crate::core::properties::ChannelBaseOn;
 use crate::core::runtime::{ChannelKey, ClusterDescriptor, TaskId};
 use crate::metrics::{register_counter, Tag};
 use crate::pub_sub::network::{
     new_framed_read, new_framed_write, ElementRequest, ElementResponse, ResponseCode,
 };
 use crate::runtime::worker::heart_beat::get_coordinator_status;
-use crate::utils::thread::{async_runtime_multi, async_sleep};
 
 pub(crate) static ENABLE_LOG: AtomicBool = AtomicBool::new(false);
 
@@ -49,20 +44,21 @@ pub(crate) fn disable_log() {
 
 const BATCH_PULL_SIZE: u16 = 6000;
 
-lazy_static! {
-    static ref C: (
-        Sender<(ChannelKey, ElementSender)>,
-        Receiver<(ChannelKey, ElementSender)>
-    ) = bounded(32);
-}
+// lazy_static! {
+//     static ref C: (
+//         Sender<(ChannelKey, ElementSender)>,
+//         Receiver<(ChannelKey, ElementSender)>
+//     ) = bounded(32);
+// }
 
 pub(crate) fn subscribe(
+    cluster_descriptor: Arc<ClusterDescriptor>,
     source_task_ids: &Vec<TaskId>,
     target_task_id: &TaskId,
     channel_size: usize,
-    channel_base_on: ChannelBaseOn,
+    // channel_base_on: ChannelBaseOn,
 ) -> ElementReceiver {
-    let (sender, receiver) = named_channel_with_base(
+    let (sender, receiver) = named_channel(
         "NetworkSubscribe",
         vec![
             Tag::new("source_job_id", source_task_ids[0].job_id.0),
@@ -70,7 +66,6 @@ pub(crate) fn subscribe(
             Tag::new("target_task_number", target_task_id.task_number),
         ],
         channel_size,
-        channel_base_on,
     );
 
     for source_task_id in source_task_ids {
@@ -79,74 +74,83 @@ pub(crate) fn subscribe(
             target_task_id: target_task_id.clone(),
         };
 
-        subscribe_post(sub_key, sender.clone());
+        subscribe_post(cluster_descriptor.clone(), sub_key, sender.clone());
     }
 
     receiver
 }
 
-fn subscribe_post(channel_key: ChannelKey, sender: ElementSender) {
-    let c: &(
-        Sender<(ChannelKey, ElementSender)>,
-        Receiver<(ChannelKey, ElementSender)>,
-    ) = &*C;
-    c.0.send((channel_key, sender)).unwrap()
+fn subscribe_post(
+    cluster_descriptor: Arc<ClusterDescriptor>,
+    channel_key: ChannelKey,
+    sender: ElementSender,
+) {
+    let worker_manager_descriptor = cluster_descriptor
+        .get_worker_manager(&channel_key.source_task_id)
+        .expect("WorkerManagerDescriptor not found");
+    let addr = SocketAddr::from_str(&worker_manager_descriptor.task_manager_address)
+        .expect("parse address error");
+
+    tokio::spawn(async move {
+        loop_client_task(channel_key.clone(), sender, addr, BATCH_PULL_SIZE).await;
+        channel_key
+    });
 }
 
-pub(crate) fn run_subscribe(cluster_descriptor: Arc<ClusterDescriptor>) {
-    async_runtime_multi("client", 4).block_on(subscribe_listen(cluster_descriptor));
-    info!("network subscribe task stop");
-}
-
-async fn subscribe_listen(cluster_descriptor: Arc<ClusterDescriptor>) {
-    let c: &(
-        Sender<(ChannelKey, ElementSender)>,
-        Receiver<(ChannelKey, ElementSender)>,
-    ) = &*C;
-
-    let delay = Duration::from_millis(50);
-    let mut idle_counter = 0usize;
-    let mut join_handles = Vec::new();
-    loop {
-        match c.1.try_recv() {
-            Ok((channel_key, sender)) => {
-                let worker_manager_descriptor = cluster_descriptor
-                    .get_worker_manager(&channel_key.source_task_id)
-                    .expect("WorkerManagerDescriptor not found");
-                let addr = SocketAddr::from_str(&worker_manager_descriptor.task_manager_address)
-                    .expect("parse address error");
-
-                let join_handle = tokio::spawn(async move {
-                    loop_client_task(channel_key.clone(), sender, addr, BATCH_PULL_SIZE).await;
-                    channel_key
-                });
-                join_handles.push(join_handle);
-
-                idle_counter = 0;
-            }
-            Err(TryRecvError::Empty) => {
-                idle_counter += 1;
-                if idle_counter < 20 * 10 {
-                    async_sleep(delay).await;
-                } else {
-                    // all task registration must be completed within 10 seconds
-                    info!("subscribe listen task finish");
-                    break;
-                }
-            }
-            Err(TryRecvError::Disconnected) => {
-                info!("subscribe_listen channel is Disconnected")
-            }
-        }
-    }
-
-    for join_handle in join_handles {
-        match join_handle.await {
-            Ok(channel_key) => info!("channel({:?}) network subscribe stop", channel_key),
-            Err(e) => error!("Client task error. {}", e),
-        }
-    }
-}
+// pub(crate) fn run_subscribe(cluster_descriptor: Arc<ClusterDescriptor>) {
+//     async_runtime_multi("client", 4).block_on(subscribe_listen(cluster_descriptor));
+//     info!("network subscribe task stop");
+// }
+//
+// async fn subscribe_listen(cluster_descriptor: Arc<ClusterDescriptor>) {
+//     let mut c: &(
+//         Sender<(ChannelKey, ElementSender)>,
+//         Receiver<(ChannelKey, ElementSender)>,
+//     ) = &*C;
+//
+//     let delay = Duration::from_millis(50);
+//     let mut idle_counter = 0usize;
+//     let mut join_handles = Vec::new();
+//     loop {
+//         match c.1.try_recv() {
+//             Ok((channel_key, sender)) => {
+//                 let worker_manager_descriptor = cluster_descriptor
+//                     .get_worker_manager(&channel_key.source_task_id)
+//                     .expect("WorkerManagerDescriptor not found");
+//                 let addr = SocketAddr::from_str(&worker_manager_descriptor.task_manager_address)
+//                     .expect("parse address error");
+//
+//                 let join_handle = tokio::spawn(async move {
+//                     loop_client_task(channel_key.clone(), sender, addr, BATCH_PULL_SIZE).await;
+//                     channel_key
+//                 });
+//                 join_handles.push(join_handle);
+//
+//                 idle_counter = 0;
+//             }
+//             Err(TryRecvError::Empty) => {
+//                 idle_counter += 1;
+//                 if idle_counter < 20 * 10 {
+//                     async_sleep(delay).await;
+//                 } else {
+//                     // all task registration must be completed within 10 seconds
+//                     info!("subscribe listen task finish");
+//                     break;
+//                 }
+//             }
+//             Err(TryRecvError::Disconnected) => {
+//                 info!("subscribe_listen channel is Disconnected")
+//             }
+//         }
+//     }
+//
+//     for join_handle in join_handles {
+//         match join_handle.await {
+//             Ok(channel_key) => info!("channel({:?}) network subscribe stop", channel_key),
+//             Err(e) => error!("Client task error. {}", e),
+//         }
+//     }
+// }
 
 async fn loop_client_task(
     channel_key: ChannelKey,
@@ -168,7 +172,7 @@ async fn loop_client_task(
             }
         }
 
-        async_sleep(Duration::from_secs(3)).await;
+        tokio::time::sleep(Duration::from_secs(3)).await;
     }
 }
 
@@ -273,7 +277,7 @@ impl Client {
                 counter.fetch_add(len as u64);
             }
             if len < 100 {
-                async_sleep(Duration::from_secs(3)).await;
+                tokio::time::sleep(Duration::from_secs(3)).await;
             }
         }
     }
@@ -378,12 +382,12 @@ async fn send_to_channel(sender: &ElementSender, element: Element) -> anyhow::Re
                 }
                 loops += 1;
 
-                async_sleep(Duration::from_secs(1)).await;
+                tokio::time::sleep(Duration::from_secs(1)).await;
                 error!("< net input channel block, channel: {:?}", ele);
 
                 ele
             }
-            Err(TrySendError::Disconnected(_)) => {
+            Err(TrySendError::Closed(_)) => {
                 return Err(anyhow!("client network send to input channel Disconnected. the next job channel must live longer than the client or the application has `Terminated`"));
             }
         }
@@ -411,9 +415,9 @@ mod tests {
                 num_tasks: 30,
             },
         };
-        let (sender, receiver) = named_channel::<Element>("test", vec![], 10000);
-        std::thread::spawn(move || {
-            while let Ok(v) = receiver.recv() {
+        let (sender, mut receiver) = named_channel::<Element>("test", vec![], 10000);
+        tokio::spawn(async move {
+            while let Some(v) = receiver.recv().await {
                 println!("{:?}", v);
             }
         });

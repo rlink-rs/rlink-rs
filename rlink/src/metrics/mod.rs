@@ -56,7 +56,7 @@ pub(crate) fn init_metrics(
 ) -> Option<SocketAddr> {
     let proxy_address_loader = Arc::new(proxy_address_loader);
 
-    let mut rng = rand::thread_rng();
+    let mut rng = thread_rng();
     let loops = 30;
     for _index in 0..loops {
         let port = rng.gen_range(10000..30000);

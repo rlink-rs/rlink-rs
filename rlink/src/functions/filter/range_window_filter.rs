@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 
-use crate::core::checkpoint::CheckpointFunction;
+use crate::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
 use crate::core::element::Record;
 use crate::core::function::{Context, FilterFunction, NamedFunction};
 use crate::core::properties::Properties;
@@ -20,12 +20,13 @@ impl RangeWindowFilter {
     }
 }
 
+#[async_trait]
 impl FilterFunction for RangeWindowFilter {
-    fn open(&mut self, _context: &Context) -> crate::core::Result<()> {
+    async fn open(&mut self, _context: &Context) -> crate::core::Result<()> {
         Ok(())
     }
 
-    fn filter(&self, record: &mut Record) -> bool {
+    async fn filter(&self, record: &mut Record) -> bool {
         if let Some(window) = &record.trigger_window {
             if window.min_timestamp() < self.window_start_timestamp
                 || window.max_timestamp() > self.window_stop_timestamp
@@ -37,7 +38,7 @@ impl FilterFunction for RangeWindowFilter {
         true
     }
 
-    fn close(&mut self) -> crate::core::Result<()> {
+    async fn close(&mut self) -> crate::core::Result<()> {
         Ok(())
     }
 }
@@ -48,7 +49,22 @@ impl NamedFunction for RangeWindowFilter {
     }
 }
 
-impl CheckpointFunction for RangeWindowFilter {}
+#[async_trait]
+impl CheckpointFunction for RangeWindowFilter {
+    async fn initialize_state(
+        &mut self,
+        _context: &FunctionSnapshotContext,
+        _handle: &Option<CheckpointHandle>,
+    ) {
+    }
+
+    async fn snapshot_state(
+        &mut self,
+        _context: &FunctionSnapshotContext,
+    ) -> Option<CheckpointHandle> {
+        None
+    }
+}
 
 impl TryFrom<Properties> for RangeWindowFilter {
     type Error = crate::core::Error;

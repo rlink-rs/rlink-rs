@@ -16,7 +16,7 @@ pub trait KafkaRecordDeserializer: Sync + Send {
     ) -> Vec<Record>;
 }
 
-pub trait KafkaRecordDeserializerBuilder {
+pub trait KafkaRecordDeserializerBuilder: Send + Sync {
     fn build(&self) -> Box<dyn KafkaRecordDeserializer>;
     fn schema(&self) -> FnSchema;
 }

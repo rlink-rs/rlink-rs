@@ -3,40 +3,27 @@ use std::convert::TryFrom;
 use crate::channel::receiver::ChannelReceiver;
 use crate::channel::sender::ChannelSender;
 use crate::core::element::Element;
-use crate::metrics::metric::Tag;
-use crate::metrics::{register_counter, register_gauge};
+use crate::metrics::{register_counter, register_gauge, Tag};
 
 pub const CHANNEL_CAPACITY_PREFIX: &str = "Channel.Capacity.";
 pub const CHANNEL_SIZE_PREFIX: &str = "Channel.Size.";
 pub const CHANNEL_ACCEPTED_PREFIX: &str = "Channel.Accepted.";
 pub const CHANNEL_DRAIN_PREFIX: &str = "Channel.Drain.";
 
-pub type TrySendError<T> = crossbeam::channel::TrySendError<T>;
-pub type TryRecvError = crossbeam::channel::TryRecvError;
-pub type RecvTimeoutError = crossbeam::channel::RecvTimeoutError;
-pub type SendTimeoutError<T> = crossbeam::channel::SendTimeoutError<T>;
-pub type RecvError = crossbeam::channel::RecvError;
-pub type SendError<T> = crossbeam::channel::SendError<T>;
-
-pub type Receiver<T> = crossbeam::channel::Receiver<T>;
-pub type Sender<T> = crossbeam::channel::Sender<T>;
-pub type Select<'a> = crossbeam::channel::Select<'a>;
-
-pub fn unbounded<T>() -> (Sender<T>, Receiver<T>) {
-    crossbeam::channel::unbounded()
-}
-
-pub fn bounded<T>(cap: usize) -> (Sender<T>, Receiver<T>) {
-    crossbeam::channel::bounded(cap)
-}
-
-pub mod receiver;
-pub mod select;
-pub mod sender;
-pub mod utils;
+pub type TrySendError<T> = tokio::sync::mpsc::error::TrySendError<T>;
+pub type TryRecvError = tokio::sync::mpsc::error::TryRecvError;
+pub type SendTimeoutError<T> = tokio::sync::mpsc::error::SendTimeoutError<T>;
+pub type SendError<T> = tokio::sync::mpsc::error::SendError<T>;
 
 pub type ElementReceiver = ChannelReceiver<Element>;
 pub type ElementSender = ChannelSender<Element>;
+
+pub type Receiver<T> = tokio::sync::mpsc::Receiver<T>;
+pub type Sender<T> = tokio::sync::mpsc::Sender<T>;
+
+pub mod receiver;
+pub mod sender;
+pub mod utils;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum ChannelBaseOn {
@@ -66,6 +53,10 @@ impl std::fmt::Display for ChannelBaseOn {
     }
 }
 
+pub fn bounded<T>(cap: usize) -> (Sender<T>, Receiver<T>) {
+    tokio::sync::mpsc::channel(cap)
+}
+
 pub fn named_channel<T>(
     name: &str,
     tags: Vec<Tag>,
@@ -74,7 +65,7 @@ pub fn named_channel<T>(
 where
     T: Sync + Send,
 {
-    named_channel_with_base(name, tags, cap, ChannelBaseOn::Unbounded)
+    named_channel_with_base(name, tags, cap, ChannelBaseOn::Bounded)
 }
 
 pub fn named_channel_with_base<T>(
@@ -93,7 +84,7 @@ where
 
     let (sender, receiver) = match base_on {
         ChannelBaseOn::Bounded => bounded(cap),
-        ChannelBaseOn::Unbounded => unbounded(),
+        ChannelBaseOn::Unbounded => unimplemented!(), // unbounded(),
     };
 
     // add_channel_metric(name.to_string(), size.clone(), capacity.clone());
@@ -112,22 +103,22 @@ where
 mod tests {
     use std::time::Duration;
 
-    use crate::channel::{named_channel_with_base, ChannelBaseOn};
+    use crate::channel::ChannelBaseOn;
+    use crate::channel::{bounded, named_channel_with_base};
     use crate::utils::date_time::current_timestamp;
-    use crate::utils::thread::spawn;
 
-    #[test]
-    pub fn bounded_test() {
-        let (sender, receiver) = crate::channel::unbounded();
-        // let (sender, receiver) = crate::channel::bounded(10000 * 100);
+    #[tokio::test]
+    pub async fn bounded_test() {
+        // let (sender, receiver) = crate::channel::unbounded();
+        let (sender, mut receiver) = bounded(10000 * 100);
 
-        std::thread::sleep(Duration::from_secs(2));
+        tokio::time::sleep(Duration::from_secs(2)).await;
 
-        for n in 0..100 {
+        for _n in 0..100 {
             let sender = sender.clone();
-            spawn(n.to_string().as_str(), move || {
+            tokio::spawn(async move {
                 for i in 0..10000 {
-                    sender.send(i.to_string()).unwrap();
+                    sender.send(i.to_string()).await.unwrap();
                 }
             });
         }
@@ -136,7 +127,7 @@ mod tests {
         }
 
         let mut begin = Duration::default();
-        while let Ok(_n) = receiver.recv() {
+        while let Some(_n) = receiver.recv().await {
             if begin.as_nanos() == 0 {
                 begin = current_timestamp();
             }
@@ -146,16 +137,17 @@ mod tests {
         println!("{}", end.checked_sub(begin).unwrap().as_nanos());
     }
 
-    #[test]
-    pub fn channel_sender_test() {
+    #[tokio::test]
+    pub async fn channel_sender_test() {
         let cap = 1 * 1;
-        let (sender, receiver) = named_channel_with_base("", vec![], cap, ChannelBaseOn::Bounded);
+        let (sender, mut receiver) =
+            named_channel_with_base("", vec![], cap, ChannelBaseOn::Bounded);
 
-        let recv_thread_handle = spawn("recv_thread", move || {
-            std::thread::sleep(Duration::from_secs(1));
+        let recv_thread_handle = tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_secs(1)).await;
 
             let begin = current_timestamp();
-            while let Ok(_n) = receiver.recv() {}
+            while let Some(_n) = receiver.recv().await {}
             let end = current_timestamp();
 
             println!("{}", end.checked_sub(begin).unwrap().as_nanos());
@@ -167,20 +159,19 @@ mod tests {
         }
         let s = String::from_utf8(bs).unwrap();
 
-        let send_thread_handle = spawn("send_thread", move || {
+        let send_thread_handle = tokio::spawn(async move {
             for _n in 0..100 * 10000 {
-                sender.send(s.clone()).unwrap();
+                sender.send(s.clone()).await.unwrap();
             }
 
-            std::thread::sleep(Duration::from_secs(10));
+            tokio::time::sleep(Duration::from_secs(10)).await;
             for _n in 0..cap {
-                sender.send("".to_string()).unwrap();
+                sender.send("".to_string()).await.unwrap();
             }
         });
 
-        send_thread_handle.join().unwrap();
-        recv_thread_handle.join().unwrap();
+        send_thread_handle.await.unwrap();
+        recv_thread_handle.await.unwrap();
         println!("finish");
-        std::thread::park();
     }
 }

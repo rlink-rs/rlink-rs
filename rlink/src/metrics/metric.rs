@@ -164,6 +164,7 @@ impl Recorder {
             raw: Arc::new(RwLock::new(RecorderRaw::new())),
         }
     }
+
     pub fn register_counter<K>(&self, name: K, tags: Vec<Tag>) -> Counter
     where
         K: ToString,

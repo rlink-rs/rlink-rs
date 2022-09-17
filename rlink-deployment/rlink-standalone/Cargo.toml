@@ -2,7 +2,7 @@
 name = "rlink-standalone"
 version = "0.6.0"
 authors = ["yorkart <wangyue11.4@163.com>"]
-edition = "2018"
+edition = "2021"
 description = "High performance Stream Processing Framework"
 keywords = ["stream", "window", "flink", "spark", "standalone"]
 repository = "https://github.com/rlink-rs/rlink-rs.git"
@@ -21,13 +21,13 @@ log = "0.4"
 log4rs = "1.0"
 
 # randomness
-rand = "0.7"
+rand = "0.8"
 
 # serialization
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
-serde_yaml = "0.8"
+serde_yaml = "0.9"
 
 crossbeam = "0.8"
 
@@ -44,4 +44,4 @@ awc = "2.0"
 
 sanitize-filename = "0.2"
 
-uuid = { version = "0.8", features = ["serde", "v4"] }
+uuid = { version = "1.1", features = ["serde", "v4"] }

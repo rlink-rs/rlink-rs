@@ -31,8 +31,9 @@ impl KafkaCheckpointFunction {
     }
 }
 
+#[async_trait]
 impl CheckpointFunction for KafkaCheckpointFunction {
-    fn initialize_state(
+    async fn initialize_state(
         &mut self,
         context: &FunctionSnapshotContext,
         handle: &Option<CheckpointHandle>,
@@ -60,7 +61,10 @@ impl CheckpointFunction for KafkaCheckpointFunction {
         );
     }
 
-    fn snapshot_state(&mut self, context: &FunctionSnapshotContext) -> Option<CheckpointHandle> {
+    async fn snapshot_state(
+        &mut self,
+        context: &FunctionSnapshotContext,
+    ) -> Option<CheckpointHandle> {
         let handle = self.state_recorder.as_ref().unwrap().snapshot();
         debug!("Checkpoint snapshot: {:?}, context: {:?}", handle, context);
 

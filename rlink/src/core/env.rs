@@ -10,11 +10,12 @@ use crate::dag::RawStreamGraph;
 use crate::runtime;
 
 /// define a stream application
+#[async_trait]
 pub trait StreamApp: Send + Sync + Clone {
     /// prepare job properties,
     /// only invoke once on the `Coordinator`,
     /// All initialization operations should be handled in this method.
-    fn prepare_properties(&self, properties: &mut Properties);
+    async fn prepare_properties(&self, properties: &mut Properties);
 
     /// build application stream,
     /// will invoke multiple times on the `Coordinator` and `Worker`,
@@ -22,7 +23,7 @@ pub trait StreamApp: Send + Sync + Clone {
     fn build_stream(&self, properties: &Properties, env: &mut StreamExecutionEnvironment);
 
     /// Coordinator startup event. Called before Worker's resource allocation and startup
-    fn pre_worker_startup(&self, _cluster_descriptor: &ClusterDescriptor) {}
+    async fn pre_worker_startup(&self, _cluster_descriptor: &ClusterDescriptor);
 }
 
 #[derive(Debug)]
@@ -51,12 +52,12 @@ impl StreamExecutionEnvironment {
     }
 }
 
-pub fn execute<S>(stream_app: S)
+pub async fn execute<S>(stream_app: S)
 where
     S: StreamApp + 'static,
 {
-    let stream_env = StreamExecutionEnvironment::new();
-    match runtime::run(stream_env, stream_app) {
+    // let stream_env = StreamExecutionEnvironment::new();
+    match runtime::run(stream_app).await {
         Ok(_) => {}
         Err(e) => {
             panic!(

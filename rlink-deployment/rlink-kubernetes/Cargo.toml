@@ -2,7 +2,7 @@
 name = "rlink-kubernetes"
 version = "0.6.0"
 authors = ["rlink-rs <rlink-rs@163.com>"]
-edition = "2018"
+edition = "2021"
 description = "High performance Stream Processing Framework"
 keywords = ["stream", "window", "flink", "kubernetes"]
 repository = "https://github.com/rlink-rs/rlink-rs.git"

@@ -1,7 +1,8 @@
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::thread::JoinHandle;
+
+use tokio::task::JoinHandle;
 
 use crate::core::element::{Element, Record};
 use crate::core::env::{StreamApp, StreamExecutionEnvironment};
@@ -27,42 +28,60 @@ pub mod web_server;
 
 pub(crate) type FunctionContext = crate::core::function::Context;
 
-pub(crate) fn run<S>(
+pub(crate) async fn run<S>(
     _context: Arc<Context>,
     dag_metadata: Arc<DagMetadata>,
     cluster_descriptor: Arc<ClusterDescriptor>,
     task_descriptor: TaskDescriptor,
     stream_app: S,
-    _stream_env: &StreamExecutionEnvironment,
+    // _stream_env: &StreamExecutionEnvironment,
     window_timer: WindowTimer,
 ) -> JoinHandle<()>
 where
     S: StreamApp + 'static,
 {
-    std::thread::Builder::new()
-        .name(format!(
-            "RM-Task-{}-{}",
-            task_descriptor.task_id.job_id.0, task_descriptor.task_id.task_number,
-        ))
-        .spawn(move || {
-            submit_heartbeat(HeartbeatItem::TaskThreadId {
-                task_id: task_descriptor.task_id.clone(),
-                thread_id: thread_id::get() as u64,
-            });
+    tokio::spawn(async move {
+        submit_heartbeat(HeartbeatItem::TaskThreadId {
+            task_id: task_descriptor.task_id.clone(),
+            thread_id: thread_id::get() as u64,
+        });
 
-            let stream_env = StreamExecutionEnvironment::new();
-            let worker_task = WorkerTask::new(
-                dag_metadata,
-                cluster_descriptor,
-                task_descriptor,
-                stream_app,
-                stream_env,
-                window_timer,
-            );
-            // todo error handle
-            worker_task.run().unwrap();
-        })
-        .unwrap()
+        // let stream_env = StreamExecutionEnvironment::new();
+        let worker_task = WorkerTask::new(
+            dag_metadata,
+            cluster_descriptor,
+            task_descriptor,
+            stream_app,
+            // stream_env,
+            window_timer,
+        );
+        // todo error handle
+        worker_task.run().await.unwrap();
+    })
+    // std::thread::Builder::new()
+    //     .name(format!(
+    //         "RM-Task-{}-{}",
+    //         task_descriptor.task_id.job_id.0, task_descriptor.task_id.task_number,
+    //     ))
+    //     .spawn(move || {
+    //         submit_heartbeat(HeartbeatItem::TaskThreadId {
+    //             task_id: task_descriptor.task_id.clone(),
+    //             thread_id: thread_id::get() as u64,
+    //         });
+    //
+    //         let stream_env = StreamExecutionEnvironment::new();
+    //         let worker_task = WorkerTask::new(
+    //             dag_metadata,
+    //             cluster_descriptor,
+    //             task_descriptor,
+    //             stream_app,
+    //             stream_env,
+    //             window_timer,
+    //         );
+    //         // todo error handle
+    //         worker_task.run().await.unwrap();
+    //     })
+    //     .unwrap()
 }
 
 pub struct WorkerTask<S>
@@ -74,7 +93,7 @@ where
     cluster_descriptor: Arc<ClusterDescriptor>,
     task_descriptor: TaskDescriptor,
     stream_app: S,
-    stream_env: StreamExecutionEnvironment,
+    // stream_env: StreamExecutionEnvironment,
     window_timer: WindowTimer,
 }
 
@@ -88,7 +107,7 @@ where
         cluster_descriptor: Arc<ClusterDescriptor>,
         task_descriptor: TaskDescriptor,
         stream_app: S,
-        stream_env: StreamExecutionEnvironment,
+        // stream_env: StreamExecutionEnvironment,
         window_timer: WindowTimer,
     ) -> Self {
         WorkerTask {
@@ -97,21 +116,24 @@ where
             cluster_descriptor,
             task_descriptor,
             stream_app,
-            stream_env,
+            // stream_env,
             window_timer,
         }
     }
 
-    pub fn run(mut self) -> anyhow::Result<()> {
+    pub async fn run(self) -> anyhow::Result<()> {
         let application_properties = &self
             .cluster_descriptor
             .coordinator_manager
             .application_properties;
-        self.stream_app
-            .build_stream(application_properties, self.stream_env.borrow_mut());
+        let operators = {
+            let mut stream_env = StreamExecutionEnvironment::new();
+            self.stream_app
+                .build_stream(application_properties, stream_env.borrow_mut());
 
-        let mut raw_stream_graph = self.stream_env.stream_manager.stream_graph.borrow_mut();
-        let operators = raw_stream_graph.pop_operators();
+            let mut raw_stream_graph = stream_env.stream_manager.stream_graph.borrow_mut();
+            raw_stream_graph.pop_operators()
+        };
 
         let mut operator_invoke_chain = self.build_invoke_chain(operators);
         // debug!("Invoke: {:?}", operator_invoke_chain);
@@ -124,13 +146,15 @@ where
         };
 
         info!("open Operator Chain");
-        operator_invoke_chain.open(&runnable_context)?;
+        operator_invoke_chain.open(&runnable_context).await?;
 
         info!("run Operator Chain");
-        operator_invoke_chain.run(Element::Record(Record::new()));
+        operator_invoke_chain
+            .run(Element::Record(Record::new()))
+            .await;
 
         info!("close Operator Chain");
-        operator_invoke_chain.close()?;
+        operator_invoke_chain.close().await?;
 
         Ok(())
     }

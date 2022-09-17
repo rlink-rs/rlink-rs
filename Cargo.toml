@@ -6,7 +6,6 @@ members = [
     "rlink-connectors/connector-clickhouse",
     "rlink-connectors/connector-kafka",
     "rlink-connectors/connector-elasticsearch",
-    "rlink-connectors/connector-files",
 
     "rlink-deployment/rlink-standalone",
     "rlink-deployment/rlink-kubernetes",
@@ -14,6 +13,5 @@ members = [
     "example/example-utils",
     "example/example-simple",
     "example/example-connect",
-    "example/example-files",
     "example/example-kafka",
 ]

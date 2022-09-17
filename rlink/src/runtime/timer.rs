@@ -4,105 +4,107 @@ use tokio::time::{interval_at, Duration, Instant};
 
 use crate::channel::receiver::ChannelReceiver;
 use crate::channel::sender::ChannelSender;
-use crate::channel::{named_channel, RecvError, TryRecvError, TrySendError};
+use crate::channel::{named_channel, TryRecvError};
 use crate::utils;
 
 #[derive(Clone)]
-pub struct TimerChannel {
+struct TimerSender {
     name: String,
     sender: ChannelSender<u64>,
-    receiver: ChannelReceiver<u64>,
     interval: Duration,
     front_window: u64,
 }
 
-impl TimerChannel {
-    pub fn new(name: &str, interval: Duration) -> Self {
-        let (sender, receiver) = named_channel("TimerChannelNotify", vec![], 1);
-        TimerChannel {
+impl TimerSender {
+    pub fn new(name: &str, interval: Duration, sender: ChannelSender<u64>) -> Self {
+        Self {
             name: name.to_string(),
             sender,
-            receiver,
             interval,
             front_window: 0,
         }
     }
 
-    pub fn _try_recv(&self) -> Result<u64, TryRecvError> {
-        self.receiver.try_recv()
-    }
-
-    pub fn recv(&self) -> Result<u64, RecvError> {
-        self.receiver.recv()
+    pub fn name(&self) -> &str {
+        self.name.as_str()
     }
 
     pub fn interval(&self) -> Duration {
         self.interval
     }
+}
 
-    pub fn name(&self) -> &str {
-        self.name.as_str()
+pub struct TimerChannel {
+    receiver: ChannelReceiver<u64>,
+}
+
+impl TimerChannel {
+    pub fn new(receiver: ChannelReceiver<u64>) -> Self {
+        TimerChannel { receiver }
+    }
+
+    pub async fn recv(&mut self) -> Option<u64> {
+        self.receiver.recv().await
     }
 }
 
 #[derive(Clone)]
 pub struct WindowTimer {
-    sender: ChannelSender<TimerChannel>,
+    sender: ChannelSender<TimerSender>,
 }
 
 impl WindowTimer {
-    pub fn new(sender: ChannelSender<TimerChannel>) -> Self {
+    fn new(sender: ChannelSender<TimerSender>) -> Self {
         WindowTimer { sender }
     }
 
-    pub fn register(
-        &self,
-        name: &str,
-        interval: Duration,
-    ) -> Result<TimerChannel, TrySendError<TimerChannel>> {
+    pub fn register(&self, name: &str, interval: Duration) -> anyhow::Result<TimerChannel> {
         info!("begin register channel: {}", interval.as_millis());
-        let timer_channel = TimerChannel::new(name, interval);
+
+        let (sender, receiver) = named_channel("TimerChannelNotify", vec![], 1);
+        let timer_sender = TimerSender::new(name, interval, sender);
         self.sender
-            .try_send(timer_channel.clone())
-            .map(|_| timer_channel)
+            .try_send(timer_sender)
+            .map_err(|_e| anyhow!("register TimerSender error"))?;
+
+        let timer_channel = TimerChannel::new(receiver);
+        Ok(timer_channel)
     }
 }
 
-pub fn start_window_timer() -> WindowTimer {
-    let (sender, receiver): (ChannelSender<TimerChannel>, ChannelReceiver<TimerChannel>) =
+pub async fn start_window_timer() -> WindowTimer {
+    let (sender, mut receiver): (ChannelSender<TimerSender>, ChannelReceiver<TimerSender>) =
         named_channel("WindowTimerRegister", vec![], 1000);
 
-    utils::thread::spawn("window-timer", move || {
-        utils::thread::async_runtime_single().block_on(async move {
-            let start = Instant::now() + Duration::from_secs(2);
-            let mut interval = interval_at(start, Duration::from_secs(2));
+    tokio::spawn(async move {
+        let start = Instant::now() + Duration::from_secs(2);
+        let mut interval = interval_at(start, Duration::from_secs(2));
 
-            let mut timer_channels: Vec<TimerChannel> = Vec::new();
+        let mut timer_senders: Vec<TimerSender> = Vec::new();
+        loop {
+            // delay first
+            interval.tick().await;
+
             loop {
-                // delay first
-                interval.tick().await;
-
-                loop {
-                    match receiver.try_recv() {
-                        Ok(timer_channel) => {
-                            info!(
-                                "register {}ms window timer [{}], start scheduling",
-                                &timer_channel.interval().as_millis(),
-                                timer_channel.name(),
-                            );
-                            timer_channels.push(timer_channel)
-                        }
-                        Err(TryRecvError::Empty) => break,
-                        Err(TryRecvError::Disconnected) => {
-                            info!("window timer channel disconnected");
-                            return;
-                        }
+                match receiver.try_recv() {
+                    Ok(timer_sender) => {
+                        info!(
+                            "register {}ms window timer [{}], start scheduling",
+                            &timer_sender.interval().as_millis(),
+                            timer_sender.name(),
+                        );
+                        timer_senders.push(timer_sender)
+                    }
+                    Err(TryRecvError::Empty) => break,
+                    Err(TryRecvError::Disconnected) => {
+                        info!("window timer channel disconnected");
+                        return;
                     }
                 }
-
-                check_window(timer_channels.borrow_mut());
             }
-        });
+
+            check_window(timer_senders.borrow_mut());
+        }
     });
 
     WindowTimer::new(sender)
@@ -114,10 +116,10 @@ fn get_window_start_with_offset(timestamp: u64, window_size: u64) -> u64 {
     (timestamp - (timestamp + window_size) % window_size) as u64
 }
 
-fn check_window(timer_channels: &mut Vec<TimerChannel>) {
+fn check_window(timer_senders: &mut Vec<TimerSender>) {
     let mut full_errs = 0;
     let ts = utils::date_time::current_timestamp_millis();
-    for timer_channel in timer_channels {
+    for timer_channel in timer_senders {
         let window_start =
             get_window_start_with_offset(ts, timer_channel.interval.as_millis() as u64);
         if window_start != timer_channel.front_window {

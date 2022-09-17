@@ -1,7 +1,7 @@
 use crate::core::cluster::{ResponseCode, StdResponse};
 use crate::core::runtime::ClusterDescriptor;
 use crate::dag::metadata::DagMetadata;
-use crate::utils::http::client::get_sync;
+use crate::utils::http::client::get;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub(crate) struct MetadataLoader {
@@ -19,10 +19,10 @@ impl MetadataLoader {
         }
     }
 
-    pub fn get_cluster_descriptor(&mut self) -> ClusterDescriptor {
+    pub async fn get_cluster_descriptor(&mut self) -> ClusterDescriptor {
         let url = format!("{}/api/cluster_metadata", self.coordinator_address);
         loop {
-            match get_sync(url.as_str()) {
+            match get(url.as_str()).await {
                 Ok(resp) => {
                     let resp_model: StdResponse<ClusterDescriptor> =
                         serde_json::from_str(resp.as_str()).unwrap();
@@ -38,16 +38,16 @@ impl MetadataLoader {
                 }
                 Err(e) => {
                     error!("get metadata(`JobDescriptor`) error. {}", e);
-                    std::thread::sleep(std::time::Duration::from_secs(2));
+                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
                 }
             }
         }
     }
 
-    pub fn get_dag_metadata(&mut self) -> DagMetadata {
+    pub async fn get_dag_metadata(&mut self) -> DagMetadata {
         let url = format!("{}/api/dag_metadata", self.coordinator_address);
         loop {
-            match get_sync(url.as_str()) {
+            match get(url.as_str()).await {
                 Ok(resp) => {
                     let resp_model: StdResponse<DagMetadata> =
                         serde_json::from_str(resp.as_str()).unwrap();
@@ -63,7 +63,7 @@ impl MetadataLoader {
                 }
                 Err(e) => {
                     error!("get metadata(`JobDescriptor`) error. {}", e);
-                    std::thread::sleep(std::time::Duration::from_secs(2));
+                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
                 }
             }
         }

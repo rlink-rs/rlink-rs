@@ -2,7 +2,10 @@ use std::time::Duration;
 
 use rlink::core;
 use rlink::core::element::{FnSchema, Record};
-use rlink::core::function::{Context, InputFormat, InputSplit, InputSplitSource};
+use rlink::core::function::{
+    Context, InputFormat, InputSplit, InputSplitSource, SendableElementStream,
+};
+use rlink::utils::stream::IteratorStream;
 
 use crate::buffer_gen::config;
 
@@ -43,16 +46,18 @@ impl ConfigInputFormat {
 
 impl InputSplitSource for ConfigInputFormat {}
 
+#[async_trait]
 impl InputFormat for ConfigInputFormat {
-    fn open(&mut self, _input_split: InputSplit, _context: &Context) -> core::Result<()> {
+    async fn open(&mut self, _input_split: InputSplit, _context: &Context) -> core::Result<()> {
         Ok(())
     }
 
-    fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record> + Send> {
-        Box::new(ConfigIterator::new(self.gen_row()))
+    async fn element_stream(&mut self) -> SendableElementStream {
+        let itr = IteratorStream::new(Box::new(ConfigIterator::new(self.gen_row())));
+        Box::pin(itr)
     }
 
-    fn close(&mut self) -> core::Result<()> {
+    async fn close(&mut self) -> core::Result<()> {
         Ok(())
     }
 

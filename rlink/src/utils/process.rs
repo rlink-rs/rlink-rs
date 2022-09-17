@@ -50,7 +50,7 @@ pub(crate) fn sys_info_metric_task(global_tag: Tag) {
         // system.refresh_cpu();
         system.refresh_memory();
 
-        let load_avg = system.get_load_average();
+        let load_avg = system.load_average();
         {
             let mut labels = labels.clone();
             labels.push(("minute".to_owned(), "one".to_owned()));
@@ -68,7 +68,7 @@ pub(crate) fn sys_info_metric_task(global_tag: Tag) {
         }
 
         let (cpu_usage, used_memory) = system
-            .get_process(pid)
+            .process(pid)
             .map(|p| (p.cpu_usage(), p.memory()))
             .unwrap_or_default();
         {
@@ -80,7 +80,7 @@ pub(crate) fn sys_info_metric_task(global_tag: Tag) {
             labels.push(("type".to_owned(), "used_memory".to_owned()));
             gauge!("sys_memory", used_memory as f64, &labels,);
         }
-        let used_swap = system.get_used_swap();
+        let used_swap = system.used_swap();
         {
             let mut labels = labels.clone();
             labels.push(("type".to_owned(), "used_swap".to_owned()));

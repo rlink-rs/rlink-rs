@@ -1,5 +1,7 @@
 #[macro_use]
 extern crate rlink_derive;
+#[macro_use]
+extern crate async_trait;
 
 pub mod config_input_format;
 pub mod gen_record;

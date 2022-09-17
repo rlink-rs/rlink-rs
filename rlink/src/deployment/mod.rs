@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::core::cluster::TaskResourceInfo;
-use crate::core::env::{StreamApp, StreamExecutionEnvironment};
+use crate::core::env::StreamApp;
 use crate::core::runtime::ClusterDescriptor;
 #[cfg(feature = "k8s")]
 use crate::deployment::kubernetes::KubernetesResourceManager;
@@ -28,20 +28,17 @@ impl Resource {
     }
 }
 
+#[async_trait]
 pub(crate) trait TResourceManager {
     fn prepare(&mut self, context: &Context, job_descriptor: &ClusterDescriptor);
 
     /// worker resource allocate
     /// Return a resource location.
-    fn worker_allocate<S>(
-        &self,
-        stream_app: &S,
-        stream_env: &StreamExecutionEnvironment,
-    ) -> anyhow::Result<Vec<TaskResourceInfo>>
+    async fn worker_allocate<S>(&self, stream_app: &S) -> anyhow::Result<Vec<TaskResourceInfo>>
     where
         S: StreamApp + 'static;
 
-    fn stop_workers(&self, task_ids: Vec<TaskResourceInfo>) -> anyhow::Result<()>;
+    async fn stop_workers(&self, task_ids: Vec<TaskResourceInfo>) -> anyhow::Result<()>;
 }
 
 pub(crate) enum ResourceManager {
@@ -74,6 +71,7 @@ impl ResourceManager {
     }
 }
 
+#[async_trait]
 impl TResourceManager for ResourceManager {
     fn prepare(&mut self, context: &Context, job_descriptor: &ClusterDescriptor) {
         match self {
@@ -85,34 +83,26 @@ impl TResourceManager for ResourceManager {
         }
     }
 
-    fn worker_allocate<S>(
-        &self,
-        stream_app: &S,
-        stream_env: &StreamExecutionEnvironment,
-    ) -> anyhow::Result<Vec<TaskResourceInfo>>
+    async fn worker_allocate<S>(&self, stream_app: &S) -> anyhow::Result<Vec<TaskResourceInfo>>
     where
         S: StreamApp + 'static,
     {
         match self {
-            ResourceManager::LocalResourceManager(rm) => rm.worker_allocate(stream_app, stream_env),
-            ResourceManager::StandaloneResourceManager(rm) => {
-                rm.worker_allocate(stream_app, stream_env)
-            }
-            ResourceManager::YarnResourceManager(rm) => rm.worker_allocate(stream_app, stream_env),
+            ResourceManager::LocalResourceManager(rm) => rm.worker_allocate(stream_app).await,
+            ResourceManager::StandaloneResourceManager(rm) => rm.worker_allocate(stream_app).await,
+            ResourceManager::YarnResourceManager(rm) => rm.worker_allocate(stream_app).await,
             #[cfg(feature = "k8s")]
-            ResourceManager::KubernetesResourceManager(rm) => {
-                rm.worker_allocate(stream_app, stream_env)
-            }
+            ResourceManager::KubernetesResourceManager(rm) => rm.worker_allocate(stream_app).await,
         }
     }
 
-    fn stop_workers(&self, task_ids: Vec<TaskResourceInfo>) -> anyhow::Result<()> {
+    async fn stop_workers(&self, task_ids: Vec<TaskResourceInfo>) -> anyhow::Result<()> {
         match self {
-            ResourceManager::LocalResourceManager(rm) => rm.stop_workers(task_ids),
-            ResourceManager::StandaloneResourceManager(rm) => rm.stop_workers(task_ids),
-            ResourceManager::YarnResourceManager(rm) => rm.stop_workers(task_ids),
+            ResourceManager::LocalResourceManager(rm) => rm.stop_workers(task_ids).await,
+            ResourceManager::StandaloneResourceManager(rm) => rm.stop_workers(task_ids).await,
+            ResourceManager::YarnResourceManager(rm) => rm.stop_workers(task_ids).await,
             #[cfg(feature = "k8s")]
-            ResourceManager::KubernetesResourceManager(rm) => rm.stop_workers(task_ids),
+            ResourceManager::KubernetesResourceManager(rm) => rm.stop_workers(task_ids).await,
         }
     }
 }

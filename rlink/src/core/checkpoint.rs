@@ -55,6 +55,7 @@ pub struct Checkpoint {
     pub handle: CheckpointHandle,
 }
 
+#[async_trait]
 pub trait CheckpointFunction {
     fn consult_version(
         &mut self,
@@ -65,15 +66,15 @@ pub trait CheckpointFunction {
     }
 
     /// trigger the method when a `operator` initialization
-    fn initialize_state(
+    async fn initialize_state(
         &mut self,
         _context: &FunctionSnapshotContext,
         _handle: &Option<CheckpointHandle>,
-    ) {
-    }
+    );
 
     /// trigger the method when the `operator` operate a `Barrier` event
-    fn snapshot_state(&mut self, _context: &FunctionSnapshotContext) -> Option<CheckpointHandle> {
-        None
-    }
+    async fn snapshot_state(
+        &mut self,
+        _context: &FunctionSnapshotContext,
+    ) -> Option<CheckpointHandle>;
 }

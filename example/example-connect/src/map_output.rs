@@ -1,8 +1,9 @@
 use rlink::core;
 use rlink::core::data_types::Schema;
-use rlink::core::element::{FnSchema, Record};
-use rlink::core::function::{Context, FlatMapFunction};
+use rlink::core::element::{Element, FnSchema, Record};
+use rlink::core::function::{Context, FlatMapFunction, SendableElementStream};
 use rlink::functions::percentile::PercentileReader;
+use rlink::utils::stream::MemoryStream;
 use rlink_example_utils::buffer_gen::output;
 
 #[derive(Debug, Function)]
@@ -20,13 +21,15 @@ impl OutputMapFunction {
     }
 }
 
+#[async_trait]
 impl FlatMapFunction for OutputMapFunction {
-    fn open(&mut self, context: &Context) -> core::Result<()> {
+    async fn open(&mut self, context: &Context) -> core::Result<()> {
         self.data_type = context.input_schema.first().clone();
         Ok(())
     }
 
-    fn flat_map(&mut self, mut record: Record) -> Box<dyn Iterator<Item = Record>> {
+    async fn flat_map_element(&mut self, element: Element) -> SendableElementStream {
+        let mut record = element.into_record();
         let reader = record.as_reader(self.data_type.as_type_ids());
 
         let percentile_buffer = reader.get_binary(2).unwrap();
@@ -44,10 +47,10 @@ impl FlatMapFunction for OutputMapFunction {
         output.to_buffer(output_record.as_buffer()).unwrap();
         output_record.set_window_trigger(record.trigger_window().unwrap());
 
-        Box::new(vec![output_record].into_iter())
+        Box::pin(MemoryStream::new(vec![output_record]))
     }
 
-    fn close(&mut self) -> core::Result<()> {
+    async fn close(&mut self) -> core::Result<()> {
         Ok(())
     }
 

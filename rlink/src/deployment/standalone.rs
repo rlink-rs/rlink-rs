@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::core::cluster::{BatchExecuteRequest, ResponseCode, StdResponse, TaskResourceInfo};
-use crate::core::env::{StreamApp, StreamExecutionEnvironment};
+use crate::core::env::StreamApp;
 use crate::core::runtime::ClusterDescriptor;
 use crate::deployment::{Resource, TResourceManager};
 use crate::runtime::context::Context;
@@ -24,15 +24,15 @@ impl StandaloneResourceManager {
     }
 }
 
+#[async_trait]
 impl TResourceManager for StandaloneResourceManager {
     fn prepare(&mut self, _context: &Context, cluster_descriptor: &ClusterDescriptor) {
         self.cluster_descriptor = Some(cluster_descriptor.clone());
     }
 
-    fn worker_allocate<S>(
+    async fn worker_allocate<S>(
         &self,
         _stream_app_clone: &S,
-        _stream_env: &StreamExecutionEnvironment,
     ) -> anyhow::Result<Vec<TaskResourceInfo>>
     where
         S: StreamApp + 'static,
@@ -80,17 +80,21 @@ impl TResourceManager for StandaloneResourceManager {
 
             task_args.push(args);
         }
-        cluster_client.allocate_worker(application_id, task_args)
+        cluster_client
+            .allocate_worker(application_id, task_args)
+            .await
     }
 
-    fn stop_workers(&self, task_ids: Vec<TaskResourceInfo>) -> anyhow::Result<()> {
+    async fn stop_workers(&self, task_ids: Vec<TaskResourceInfo>) -> anyhow::Result<()> {
         let cluster_client = StandaloneClusterClient::new(
             self.context
                 .cluster_config
                 .application_manager_address
                 .clone(),
         );
-        cluster_client.stop_all_workers(self.context.application_id.as_str(), task_ids)
+        cluster_client
+            .stop_all_workers(self.context.application_id.as_str(), task_ids)
+            .await
     }
 }
 
@@ -105,17 +109,20 @@ impl StandaloneClusterClient {
         }
     }
 
-    pub fn allocate_worker(
+    pub async fn allocate_worker(
         &self,
         application_id: &str,
         args: Vec<HashMap<String, String>>,
     ) -> anyhow::Result<Vec<TaskResourceInfo>> {
         for application_manager_address in &self.application_manager_address {
-            match self.allocate_worker0(
-                application_manager_address.as_str(),
-                application_id,
-                args.clone(),
-            ) {
+            let rt = self
+                .allocate_worker0(
+                    application_manager_address.as_str(),
+                    application_id,
+                    args.clone(),
+                )
+                .await;
+            match rt {
                 Ok(rt) => {
                     return Ok(rt);
                 }
@@ -125,10 +132,10 @@ impl StandaloneClusterClient {
             }
         }
 
-        Err(anyhow::Error::msg("No available JobManager"))
+        Err(anyhow!("No available JobManager"))
     }
 
-    pub fn allocate_worker0(
+    pub async fn allocate_worker0(
         &self,
         application_manager_address: &str,
         application_id: &str,
@@ -143,7 +150,7 @@ impl StandaloneClusterClient {
 
         let request_body = BatchExecuteRequest { batch_args: args };
         let body = serde_json::to_string(&request_body).unwrap();
-        let result: StdResponse<String> = http::client::post_sync(url, body)?;
+        let result: StdResponse<String> = http::client::post(url, body).await?;
 
         info!("allocation success. `code`={:?}", result.code);
 
@@ -151,17 +158,20 @@ impl StandaloneClusterClient {
         Ok(data)
     }
 
-    pub fn stop_all_workers(
+    pub async fn stop_all_workers(
         &self,
         application_id: &str,
         task_ids: Vec<TaskResourceInfo>,
     ) -> anyhow::Result<()> {
         for application_manager_address in &self.application_manager_address {
-            match self.stop_all_workers0(
-                application_manager_address.as_str(),
-                application_id,
-                &task_ids,
-            ) {
+            match self
+                .stop_all_workers0(
+                    application_manager_address.as_str(),
+                    application_id,
+                    &task_ids,
+                )
+                .await
+            {
                 Ok(rt) => {
                     return Ok(rt);
                 }
@@ -171,10 +181,10 @@ impl StandaloneClusterClient {
             }
         }
 
-        Err(anyhow::Error::msg("No available JobManager"))
+        Err(anyhow!("No available JobManager"))
     }
 
-    pub fn stop_all_workers0(
+    pub async fn stop_all_workers0(
         &self,
         application_manager_address: &str,
         application_id: &str,
@@ -189,7 +199,7 @@ impl StandaloneClusterClient {
 
         info!("stop all workers, url={}, body={:?}", url, body.as_str());
 
-        let result: StdResponse<String> = http::client::post_sync(url, body)?;
+        let result: StdResponse<String> = http::client::post(url, body).await?;
 
         match &result.code {
             ResponseCode::OK => {

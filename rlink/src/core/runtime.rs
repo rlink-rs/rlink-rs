@@ -293,3 +293,24 @@ impl ClusterDescriptor {
         serde_json::to_string(self).unwrap()
     }
 }
+
+impl Default for ClusterDescriptor {
+    fn default() -> Self {
+        ClusterDescriptor {
+            coordinator_manager: CoordinatorManagerDescriptor {
+                version: "".to_string(),
+                application_id: "".to_string(),
+                application_properties: Properties::new(),
+                web_address: "".to_string(),
+                metrics_address: "".to_string(),
+                status: ManagerStatus::Pending,
+                v_cores: 0,
+                memory_mb: 0,
+                num_task_managers: 0,
+                uptime: 0,
+                startup_number: 0,
+            },
+            worker_managers: vec![],
+        }
+    }
+}

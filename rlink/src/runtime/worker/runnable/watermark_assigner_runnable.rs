@@ -62,9 +62,10 @@ impl WatermarkAssignerRunnable {
     }
 }
 
+#[async_trait]
 impl Runnable for WatermarkAssignerRunnable {
-    fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
-        self.next_runnable.as_mut().unwrap().open(context)?;
+    async fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
+        self.next_runnable.as_mut().unwrap().open(context).await?;
 
         self.context = Some(context.clone());
 
@@ -85,7 +86,7 @@ impl Runnable for WatermarkAssignerRunnable {
         Ok(())
     }
 
-    fn run(&mut self, mut element: Element) {
+    async fn run(&mut self, mut element: Element) {
         match element.borrow_mut() {
             Element::Record(record) => {
                 let timestamp = self.timestamp_assigner.extract_timestamp(record, 0);
@@ -107,19 +108,27 @@ impl Runnable for WatermarkAssignerRunnable {
                     return;
                 }
 
-                self.next_runnable.as_mut().unwrap().run(element);
+                self.next_runnable.as_mut().unwrap().run(element).await;
 
                 if let Some(watermark) = watermark {
                     self.update_watermark_progress(watermark);
 
                     let watermark_ele = Element::new_watermark(self.watermark.timestamp);
-                    self.next_runnable.as_mut().unwrap().run(watermark_ele);
+                    self.next_runnable
+                        .as_mut()
+                        .unwrap()
+                        .run(watermark_ele)
+                        .await;
                 }
             }
             Element::StreamStatus(stream_status) => {
                 if stream_status.end {
                     let watermark_ele = Element::max_watermark();
-                    self.next_runnable.as_mut().unwrap().run(watermark_ele);
+                    self.next_runnable
+                        .as_mut()
+                        .unwrap()
+                        .run(watermark_ele)
+                        .await;
                 } else {
                     let watermark = self
                         .watermark_generator
@@ -128,11 +137,15 @@ impl Runnable for WatermarkAssignerRunnable {
                     self.update_watermark_progress(watermark);
 
                     let watermark_ele = Element::new_watermark(self.watermark.timestamp);
-                    self.next_runnable.as_mut().unwrap().run(watermark_ele);
+                    self.next_runnable
+                        .as_mut()
+                        .unwrap()
+                        .run(watermark_ele)
+                        .await;
                 }
 
                 // must send after the `Watermark`
-                self.next_runnable.as_mut().unwrap().run(element);
+                self.next_runnable.as_mut().unwrap().run(element).await;
             }
             Element::Barrier(barrier) => {
                 let checkpoint_id = barrier.checkpoint_id;
@@ -140,30 +153,31 @@ impl Runnable for WatermarkAssignerRunnable {
                     let context = self.context.as_ref().unwrap();
                     context.checkpoint_context(self.operator_id, checkpoint_id, None)
                 };
-                self.checkpoint(snapshot_context);
+                self.checkpoint(snapshot_context).await;
 
-                self.next_runnable.as_mut().unwrap().run(element);
+                self.next_runnable.as_mut().unwrap().run(element).await;
             }
             Element::Watermark(watermark) => {
                 error!("unreachable Watermark, {:?}", watermark);
-                self.next_runnable.as_mut().unwrap().run(element);
+                self.next_runnable.as_mut().unwrap().run(element).await;
             }
         }
     }
 
-    fn close(&mut self) -> anyhow::Result<()> {
-        self.next_runnable.as_mut().unwrap().close()
+    async fn close(&mut self) -> anyhow::Result<()> {
+        self.next_runnable.as_mut().unwrap().close().await
     }
 
     fn set_next_runnable(&mut self, next_runnable: Option<Box<dyn Runnable>>) {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext) {
+    async fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext) {
         let handle = self
             .watermark_strategy
             .operator_fn
             .snapshot_state(&snapshot_context)
+            .await
             .unwrap_or(CheckpointHandle::default());
 
         let ck = Checkpoint {

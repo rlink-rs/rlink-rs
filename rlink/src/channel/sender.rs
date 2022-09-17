@@ -1,6 +1,10 @@
 use std::time::Duration;
 
-use crate::channel::{ChannelBaseOn, SendError, Sender, TrySendError, CHANNEL_SIZE_PREFIX};
+use tokio::sync::mpsc::Sender;
+use tokio::time::sleep;
+
+use crate::channel::{ChannelBaseOn, CHANNEL_SIZE_PREFIX};
+use crate::channel::{SendError, TrySendError};
 use crate::metrics::metric::{Counter, Gauge};
 
 #[derive(Clone)]
@@ -47,26 +51,17 @@ where
     fn on_success(&self) {
         self.size.fetch_add(1 as i64);
         self.counter.fetch_add(1 as u64);
-
-        // gauge!(
-        //     self.guava_capacity_name.clone(),
-        //     self.capacity.load(Ordering::Relaxed) as i64
-        // );
-        // gauge!(
-        //     self.guava_size_name.clone(),
-        //     self.size.load(Ordering::Relaxed) as i64
-        // );
     }
 
-    pub fn send(&self, event: T) -> Result<(), SendError<T>> {
+    pub async fn send(&self, event: T) -> Result<(), SendError<T>> {
         if self.base_on == ChannelBaseOn::Unbounded {
             if self.size.load() > self.cap as i64 {
                 let mut times = 0;
                 loop {
                     if times < 100 {
-                        std::thread::sleep(Duration::from_millis(10));
+                        sleep(Duration::from_millis(10)).await;
                     } else {
-                        std::thread::sleep(Duration::from_secs(1));
+                        sleep(Duration::from_secs(1)).await;
 
                         if times == 130 {
                             warn!("death loop in {} over {} times", self.name, times,);
@@ -82,7 +77,7 @@ where
             }
         }
 
-        self.sender.send(event).map(|r| {
+        self.sender.send(event).await.map(|r| {
             self.on_success();
             r
         })
@@ -106,7 +101,7 @@ where
         match self.try_send(event) {
             Ok(_) => None,
             Err(TrySendError::Full(t)) => Some(t),
-            Err(TrySendError::Disconnected(t)) => Some(t),
+            Err(TrySendError::Closed(t)) => Some(t),
         }
     }
 }

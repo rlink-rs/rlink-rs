@@ -11,16 +11,17 @@ impl MyFilterFunction {
     }
 }
 
+#[async_trait]
 impl FilterFunction for MyFilterFunction {
-    fn open(&mut self, _context: &Context) -> core::Result<()> {
+    async fn open(&mut self, _context: &Context) -> core::Result<()> {
         Ok(())
     }
 
-    fn filter(&self, _t: &mut Record) -> bool {
+    async fn filter(&self, _t: &mut Record) -> bool {
         true
     }
 
-    fn close(&mut self) -> core::Result<()> {
+    async fn close(&mut self) -> core::Result<()> {
         Ok(())
     }
 }

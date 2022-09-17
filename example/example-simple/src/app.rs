@@ -21,14 +21,16 @@ use crate::mapper::MyFilterFunction;
 #[derive(Clone, Debug)]
 pub struct SimpleStreamApp {}
 
+#[async_trait]
 impl StreamApp for SimpleStreamApp {
-    fn prepare_properties(&self, properties: &mut Properties) {
+    async fn prepare_properties(&self, properties: &mut Properties) {
         // the `application_name` must be set in `prepare_properties`
         properties.set_application_name("rlink-simple");
 
         properties.set_keyed_state_backend(KeyedStateBackend::Memory);
         properties.set_checkpoint_interval(Duration::from_secs(15));
         properties.set_checkpoint(CheckpointBackend::Memory);
+        properties.set_pub_sub_channel_size(10000);
     }
 
     fn build_stream(&self, _properties: &Properties, env: &mut StreamExecutionEnvironment) {
@@ -63,7 +65,7 @@ impl StreamApp for SimpleStreamApp {
         .add_sink(print_sink());
     }
 
-    fn pre_worker_startup(&self, cluster_descriptor: &ClusterDescriptor) {
+    async fn pre_worker_startup(&self, cluster_descriptor: &ClusterDescriptor) {
         println!("{}", cluster_descriptor.coordinator_manager.metrics_address);
     }
 }

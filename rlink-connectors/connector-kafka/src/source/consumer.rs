@@ -1,10 +1,9 @@
 use futures::StreamExt;
 use rdkafka::consumer::{Consumer, DefaultConsumerContext, StreamConsumer};
 use rdkafka::{ClientConfig, Message, Offset, TopicPartitionList};
-use rlink::channel::utils::handover::Handover;
+use rlink::channel::sender::ChannelSender;
 use rlink::core::runtime::JobId;
 use rlink::utils;
-use rlink::utils::thread::async_runtime;
 
 use crate::source::deserializer::KafkaRecordDeserializer;
 use crate::source::{empty_record, ConsumerRecord};
@@ -17,31 +16,29 @@ pub(crate) struct ConsumerRange {
     pub(crate) end_offset: Option<i64>,
 }
 
-pub(crate) fn create_kafka_consumer(
+pub(crate) async fn create_kafka_consumer(
     job_id: JobId,
     task_number: u16,
     client_config: ClientConfig,
     consumer_ranges: ConsumerRange,
-    handover: Handover<ConsumerRecord>,
+    handover: ChannelSender<ConsumerRecord>,
     deserializer: Box<dyn KafkaRecordDeserializer>,
 ) {
-    utils::thread::spawn("kafka-source-block", move || {
-        async_runtime("kafka_source").block_on(async {
-            let mut kafka_consumer = KafkaConsumerThread::new(
-                job_id,
-                task_number,
-                client_config,
-                consumer_ranges,
-                handover,
-                deserializer,
-            );
-            match kafka_consumer.run().await {
-                Ok(()) => {}
-                Err(e) => {
-                    error!("run consumer error. {}", e);
-                }
+    tokio::spawn(async move {
+        let mut kafka_consumer = KafkaConsumerThread::new(
+            job_id,
+            task_number,
+            client_config,
+            consumer_ranges,
+            handover,
+            deserializer,
+        );
+        match kafka_consumer.run().await {
+            Ok(()) => {}
+            Err(e) => {
+                error!("run consumer error. {}", e);
             }
-        });
+        }
     });
 }
 
@@ -53,7 +50,7 @@ pub(crate) struct KafkaConsumerThread {
     consumer_ranges: ConsumerRange,
     with_end_consumer_ranges: bool,
 
-    handover: Handover<ConsumerRecord>,
+    sender: ChannelSender<ConsumerRecord>,
     deserializer: Box<dyn KafkaRecordDeserializer>,
 }
 
@@ -63,7 +60,7 @@ impl KafkaConsumerThread {
         task_number: u16,
         client_config: ClientConfig,
         consumer_ranges: ConsumerRange,
-        handover: Handover<ConsumerRecord>,
+        sender: ChannelSender<ConsumerRecord>,
         deserializer: Box<dyn KafkaRecordDeserializer>,
     ) -> Self {
         let with_end_consumer_ranges = consumer_ranges.end_offset.is_some();
@@ -73,7 +70,7 @@ impl KafkaConsumerThread {
             client_config,
             consumer_ranges,
             with_end_consumer_ranges,
-            handover,
+            sender,
             deserializer,
         }
     }
@@ -128,8 +125,9 @@ impl KafkaConsumerThread {
                     let payload = borrowed_message.payload().unwrap_or(&utils::EMPTY_SLICE);
 
                     if self.end_check(topic, partition, offset) {
-                        self.handover
-                            .produce(ConsumerRecord::new(empty_record(), 0))
+                        self.sender
+                            .send(ConsumerRecord::new(empty_record(), 0))
+                            .await
                             .expect("kafka consumer handover `Disconnected`");
                         info!(
                             "kafka end offset reached. job_id: {}, task_num: {}",
@@ -143,8 +141,9 @@ impl KafkaConsumerThread {
                         .deserialize(timestamp, key, payload, topic, partition, offset);
 
                     for record in records {
-                        self.handover
-                            .produce(ConsumerRecord::new(record, offset))
+                        self.sender
+                            .send(ConsumerRecord::new(record, offset))
+                            .await
                             .expect("kafka consumer handover `Disconnected`");
                     }
                 }

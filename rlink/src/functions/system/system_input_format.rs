@@ -1,10 +1,17 @@
-use crate::channel::select::ChannelSelect;
-use crate::channel::{ElementReceiver, TryRecvError};
+use std::pin::Pin;
+use std::task::Poll;
+
+use futures::Stream;
+
+use crate::channel::ElementReceiver;
 use crate::core;
-use crate::core::checkpoint::CheckpointFunction;
-use crate::core::element::{Element, FnSchema, Record};
-use crate::core::function::{Context, InputFormat, InputSplit, InputSplitSource, NamedFunction};
-use crate::core::properties::{ChannelBaseOn, SystemProperties};
+use crate::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
+use crate::core::element::{Element, FnSchema};
+use crate::core::function::{
+    Context, ElementStream, InputFormat, InputSplit, InputSplitSource, NamedFunction,
+    SendableElementStream,
+};
+use crate::core::properties::SystemProperties;
 use crate::core::runtime::TaskId;
 use crate::dag::execution_graph::ExecutionEdge;
 use crate::pub_sub::{memory, network, DEFAULT_CHANNEL_SIZE};
@@ -42,8 +49,9 @@ impl SystemInputFormat {
     }
 }
 
+#[async_trait]
 impl InputFormat for SystemInputFormat {
-    fn open(&mut self, _input_split: InputSplit, context: &Context) -> core::Result<()> {
+    async fn open(&mut self, _input_split: InputSplit, context: &Context) -> core::Result<()> {
         self.subscribe_log(context);
 
         self.task_id = context.task_id.clone();
@@ -52,10 +60,10 @@ impl InputFormat for SystemInputFormat {
             .application_properties
             .get_pub_sub_channel_size()
             .unwrap_or(DEFAULT_CHANNEL_SIZE);
-        let channel_base_on = context
-            .application_properties
-            .get_pub_sub_channel_base()
-            .unwrap_or(ChannelBaseOn::Unbounded);
+        // let channel_base_on = context
+        //     .application_properties
+        //     .get_pub_sub_channel_base()
+        //     .unwrap_or(ChannelBaseOn::Bounded);
 
         let mut memory_jobs = Vec::new();
         let mut network_jobs = Vec::new();
@@ -68,20 +76,15 @@ impl InputFormat for SystemInputFormat {
             });
 
         if memory_jobs.len() > 0 {
-            let rx = memory::subscribe(
-                &memory_jobs,
-                &context.task_id,
-                channel_size,
-                channel_base_on,
-            );
+            let rx = memory::subscribe(&memory_jobs, &context.task_id, channel_size);
             self.memory_receiver = Some(rx);
         }
         if network_jobs.len() > 0 {
             let rx = network::subscribe(
+                context.cluster_descriptor.clone(),
                 &network_jobs,
                 &context.task_id,
                 channel_size,
-                channel_base_on,
             );
             self.network_receiver = Some(rx);
         }
@@ -89,27 +92,25 @@ impl InputFormat for SystemInputFormat {
         Ok(())
     }
 
-    fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record> + Send> {
-        unimplemented!()
-    }
-
-    fn element_iter(&mut self) -> Box<dyn Iterator<Item = Element> + Send> {
+    async fn element_stream(&mut self) -> SendableElementStream {
         let mut receivers = Vec::new();
-        if let Some(n) = &self.memory_receiver {
-            receivers.push(n.clone());
+        if let Some(n) = self.memory_receiver.take() {
+            receivers.push(n);
         }
-        if let Some(n) = &self.network_receiver {
-            receivers.push(n.clone());
+        if let Some(n) = self.network_receiver.take() {
+            receivers.push(n);
         }
 
-        match receivers.len() {
-            0 => panic!("unsupported"),
-            1 => Box::new(ChannelIterator::new(receivers.remove(0))),
-            _ => Box::new(MultiChannelIterator::new(receivers)),
-        }
+        // todo impl
+        Box::pin(ElementReceiverStream::new(receivers))
+        // match receivers.len() {
+        //     0 => panic!("unsupported"),
+        //     1 => Box::new(ChannelIterator::new(receivers.remove(0))),
+        //     _ => Box::new(MultiChannelIterator::new(receivers)),
+        // }
     }
 
-    fn close(&mut self) -> crate::core::Result<()> {
+    async fn close(&mut self) -> core::Result<()> {
         Ok(())
     }
 
@@ -131,73 +132,125 @@ impl NamedFunction for SystemInputFormat {
     }
 }
 
-impl CheckpointFunction for SystemInputFormat {}
+#[async_trait]
+impl CheckpointFunction for SystemInputFormat {
+    async fn initialize_state(
+        &mut self,
+        _context: &FunctionSnapshotContext,
+        _handle: &Option<CheckpointHandle>,
+    ) {
+    }
 
-struct ChannelIterator {
-    receiver: ElementReceiver,
-}
-
-impl ChannelIterator {
-    pub fn new(receiver: ElementReceiver) -> Self {
-        ChannelIterator { receiver }
+    async fn snapshot_state(
+        &mut self,
+        _context: &FunctionSnapshotContext,
+    ) -> Option<CheckpointHandle> {
+        None
     }
 }
 
-impl Iterator for ChannelIterator {
+// struct ChannelIterator {
+//     receiver: ElementReceiver,
+// }
+//
+// impl ChannelIterator {
+//     pub fn new(receiver: ElementReceiver) -> Self {
+//         ChannelIterator { receiver }
+//     }
+// }
+//
+// impl Iterator for ChannelIterator {
+//     type Item = Element;
+//
+//     fn next(&mut self) -> Option<Self::Item> {
+//         match self.receiver.recv() {
+//             Ok(element) => {
+//                 if get_coordinator_status().is_terminated() {
+//                     info!("ChannelIterator finish");
+//                     return None;
+//                 }
+//                 return Some(element);
+//             }
+//             Err(_e) => {
+//                 panic!("network_receiver Disconnected");
+//             }
+//         }
+//     }
+// }
+//
+// pub struct MultiChannelIterator {
+//     receivers: Vec<ElementReceiver>,
+// }
+//
+// impl MultiChannelIterator {
+//     pub fn new(receivers: Vec<ElementReceiver>) -> Self {
+//         MultiChannelIterator { receivers }
+//     }
+// }
+//
+// impl Iterator for MultiChannelIterator {
+//     type Item = Element;
+//
+//     fn next(&mut self) -> Option<Self::Item> {
+//         // Build a list of operations.
+//         let mut sel = ChannelSelect::new();
+//         for r in &self.receivers {
+//             sel.recv(r);
+//         }
+//
+//         loop {
+//             // Wait until a receive operation becomes ready and try executing it.
+//             let index = sel.ready();
+//             let res = self.receivers[index].try_recv();
+//
+//             match res {
+//                 Ok(element) => {
+//                     if get_coordinator_status().is_terminated() {
+//                         info!("MultiChannelIterator finish");
+//                         return None;
+//                     }
+//                     return Some(element);
+//                 }
+//                 Err(TryRecvError::Empty) => continue,
+//                 Err(TryRecvError::Disconnected) => panic!("the channel is Disconnected"),
+//             }
+//         }
+//     }
+// }
+
+struct ElementReceiverStream {
+    receiver: Vec<ElementReceiver>,
+}
+
+impl ElementReceiverStream {
+    pub fn new(receiver: Vec<ElementReceiver>) -> Self {
+        Self { receiver }
+    }
+}
+
+impl ElementStream for ElementReceiverStream {}
+
+impl Stream for ElementReceiverStream {
     type Item = Element;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.receiver.recv() {
-            Ok(element) => {
-                if get_coordinator_status().is_terminated() {
-                    info!("ChannelIterator finish");
-                    return None;
+    fn poll_next(
+        self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        if get_coordinator_status().is_terminated() {
+            info!("MultiChannelIterator finish");
+            return Poll::Ready(None);
+        }
+
+        for receiver in self.get_mut().receiver.as_mut_slice() {
+            match receiver.poll_recv(cx) {
+                Poll::Ready(t) => {
+                    return Poll::Ready(t);
                 }
-                return Some(element);
-            }
-            Err(_e) => {
-                panic!("network_receiver Disconnected");
+                _ => {}
             }
         }
-    }
-}
 
-pub struct MultiChannelIterator {
-    receivers: Vec<ElementReceiver>,
-}
-
-impl MultiChannelIterator {
-    pub fn new(receivers: Vec<ElementReceiver>) -> Self {
-        MultiChannelIterator { receivers }
-    }
-}
-
-impl Iterator for MultiChannelIterator {
-    type Item = Element;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        // Build a list of operations.
-        let mut sel = ChannelSelect::new();
-        for r in &self.receivers {
-            sel.recv(r);
-        }
-
-        loop {
-            // Wait until a receive operation becomes ready and try executing it.
-            let index = sel.ready();
-            let res = self.receivers[index].try_recv();
-
-            match res {
-                Ok(element) => {
-                    if get_coordinator_status().is_terminated() {
-                        info!("MultiChannelIterator finish");
-                        return None;
-                    }
-                    return Some(element);
-                }
-                Err(TryRecvError::Empty) => continue,
-                Err(TryRecvError::Disconnected) => panic!("the channel is Disconnected"),
-            }
-        }
+        Poll::Pending
     }
 }

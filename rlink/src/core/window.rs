@@ -93,7 +93,7 @@ impl WindowAssignerContext {
 /// A `WindowAssigner` assigns zero or more `Window`s to an element.
 pub trait WindowAssigner
 where
-    Self: NamedFunction + CheckpointFunction + Debug,
+    Self: NamedFunction + CheckpointFunction + Debug + Send + Sync,
 {
     /// Returns a collection of windows that should be assigned to the element.
     fn assign_windows(&self, timestamp: u64, context: WindowAssignerContext) -> Vec<Window>;

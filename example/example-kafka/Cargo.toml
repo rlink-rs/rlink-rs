@@ -2,7 +2,7 @@
 name = "rlink-example-kafka"
 version = "0.6.0"
 authors = ["rlink-rs <rlink_rs@163.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies.rlink]
 version = "0.6"
@@ -11,10 +11,6 @@ path = "../../rlink"
 [dependencies.rlink-derive]
 version = "0.3"
 path = "../../rlink-derive"
-
-[dependencies.rlink-connector-files]
-version = "0.6"
-path = "../../rlink-connectors/connector-files"
 
 [dependencies.rlink-connector-kafka]
 version = "0.6"
@@ -34,11 +30,13 @@ serde_json = "1.0"
 anyhow = "1.0"
 uuid ={version="0.8",features=["v4"]}
 
-parquet= "4.0"
+async-trait = "0.1"
+tokio = "1"
+
 webhdfs="0.3"
 
 # kafka
-rdkafka = { version = "0.25", features = ["cmake-build"] }
+rdkafka = { version = "0.28.0", features = ["cmake-build"] }
 
 [build-dependencies]
 serbuffer-gen = "1.3"

@@ -4,30 +4,33 @@ use std::time::Duration;
 
 use rdkafka::producer::{FutureProducer, FutureRecord, Producer};
 use rdkafka::ClientConfig;
-use rlink::channel::utils::handover::Handover;
+use rlink::channel::receiver::ChannelReceiver;
 use rlink::channel::TryRecvError;
-use rlink::utils::thread::async_sleep;
+use rlink::core::element::Record;
 
 use crate::buffer_gen::kafka_message;
 
-#[derive(Clone)]
 pub struct KafkaProducerThread {
     topic: Option<String>,
     producer: FutureProducer,
-    handover: Handover,
+    receiver: ChannelReceiver<Record>,
 
     drain_counter: Arc<AtomicU64>,
     discard_counter: Arc<AtomicU64>,
 }
 
 impl KafkaProducerThread {
-    pub fn new(topic: Option<String>, client_config: ClientConfig, handover: Handover) -> Self {
+    pub fn new(
+        topic: Option<String>,
+        client_config: ClientConfig,
+        receiver: ChannelReceiver<Record>,
+    ) -> Self {
         let producer: FutureProducer = client_config.create().expect("Consumer creation failed");
 
         KafkaProducerThread {
             topic,
             producer,
-            handover,
+            receiver,
             drain_counter: Arc::new(AtomicU64::new(0)),
             discard_counter: Arc::new(AtomicU64::new(0)),
         }
@@ -44,7 +47,7 @@ impl KafkaProducerThread {
             let mut future_queue = Vec::with_capacity(batch);
             let mut discard_counter = 0;
             for _n in 0..batch {
-                match self.handover.try_poll_next() {
+                match self.receiver.try_recv() {
                     Ok(mut record) => {
                         let kafka_message::Entity {
                             timestamp,
@@ -87,9 +90,9 @@ impl KafkaProducerThread {
             if future_queue.len() == 0 {
                 idle_counter += 1;
                 if idle_counter < 30 {
-                    async_sleep(idle_delay_10).await;
+                    tokio::time::sleep(idle_delay_10).await;
                 } else {
-                    async_sleep(idle_delay_300).await;
+                    tokio::time::sleep(idle_delay_300).await;
                 }
             } else {
                 idle_counter = 0;
@@ -129,7 +132,7 @@ mod tests {
     use std::sync::atomic::Ordering;
 
     use rdkafka::ClientConfig;
-    use rlink::channel::utils::handover::Handover;
+    use rlink::channel::named_channel;
     use rlink::core::element::Record;
     use rlink::utils::date_time::current_timestamp_millis;
 
@@ -155,35 +158,28 @@ mod tests {
         let mut client_config = ClientConfig::new();
         client_config.set(BOOTSTRAP_SERVERS, "localhost:9092");
 
-        let handover = Handover::new("test", vec![], 32);
+        let (sender, receiver) = named_channel("test", vec![], 100);
 
-        let handover_c = handover.clone();
-        std::thread::spawn(move || {
+        tokio::spawn(async move {
             let record = get_record();
             for _n in 0..1000000 {
-                handover_c.produce(record.clone()).unwrap();
+                sender.send(record.clone()).await.unwrap();
             }
             println!("finish");
         });
 
         let mut kafka_producer =
-            KafkaProducerThread::new(Some(topic.to_string()), client_config, handover);
+            KafkaProducerThread::new(Some(topic.to_string()), client_config, receiver);
 
-        let kafka_producer_clone = kafka_producer.clone();
+        let drain_counter = kafka_producer.drain_counter.clone();
         std::thread::spawn(move || loop {
-            if kafka_producer_clone.drain_counter.load(Ordering::Relaxed) == 1000000 {
-                println!(
-                    "end... {}",
-                    rlink::utils::date_time::current_timestamp_millis()
-                );
+            if drain_counter.load(Ordering::Relaxed) == 1000000 {
+                println!("end... {}", current_timestamp_millis());
                 break;
             }
         });
 
-        println!(
-            "being... {}",
-            rlink::utils::date_time::current_timestamp_millis()
-        );
+        println!("being... {}", current_timestamp_millis());
 
         kafka_producer.run().await;
     }

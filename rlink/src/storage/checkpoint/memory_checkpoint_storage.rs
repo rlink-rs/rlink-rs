@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::core::checkpoint::Checkpoint;
 use crate::core::runtime::CheckpointId;
-use crate::storage::checkpoint::TCheckpointStorage;
+use crate::storage::checkpoint::{CheckpointEntity, TCheckpointStorage};
 
 pub struct MemoryCheckpointStorage {
     history_cks: HashMap<CheckpointId, Vec<Checkpoint>>,
@@ -16,15 +16,15 @@ impl MemoryCheckpointStorage {
     }
 }
 
+#[async_trait]
 impl TCheckpointStorage for MemoryCheckpointStorage {
-    fn save(
-        &mut self,
-        _application_name: &str,
-        _application_id: &str,
-        checkpoint_id: CheckpointId,
-        finish_cks: Vec<Checkpoint>,
-        ttl: u64,
-    ) -> anyhow::Result<()> {
+    async fn save(&mut self, ck: CheckpointEntity) -> anyhow::Result<()> {
+        let CheckpointEntity {
+            checkpoint_id,
+            finish_cks,
+            ttl,
+            ..
+        } = ck;
         self.history_cks.insert(checkpoint_id, finish_cks);
 
         if checkpoint_id.0 < ttl {
@@ -59,7 +59,7 @@ impl TCheckpointStorage for MemoryCheckpointStorage {
         Ok(())
     }
 
-    fn load(
+    async fn load(
         &mut self,
         _application_name: &str,
         _application_id: &str,
@@ -67,7 +67,7 @@ impl TCheckpointStorage for MemoryCheckpointStorage {
         Ok(vec![])
     }
 
-    fn load_by_checkpoint_id(
+    async fn load_by_checkpoint_id(
         &mut self,
         _application_name: &str,
         _application_id: &str,

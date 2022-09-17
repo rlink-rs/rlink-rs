@@ -8,7 +8,6 @@ use crate::core::backend::{CheckpointBackend, KeyedStateBackend};
 use crate::core::cluster::MetadataStorageType;
 
 pub type ClusterMode = crate::runtime::ClusterMode;
-pub type ChannelBaseOn = crate::channel::ChannelBaseOn;
 
 pub const PARALLELISM: &'static str = "parallelism";
 
@@ -39,9 +38,6 @@ pub trait SystemProperties {
 
     fn set_pub_sub_channel_size(&mut self, channel_size: usize);
     fn get_pub_sub_channel_size(&self) -> anyhow::Result<usize>;
-
-    fn set_pub_sub_channel_base(&mut self, base_on: ChannelBaseOn);
-    fn get_pub_sub_channel_base(&self) -> anyhow::Result<ChannelBaseOn>;
 }
 
 pub trait FunctionProperties {
@@ -309,7 +305,6 @@ const SYSTEM_CHECKPOINT_INTERVAL: &str = "SYSTEM_CHECKPOINT_INTERVAL";
 const SYSTEM_CHECKPOINT_TTL: &str = "SYSTEM_CHECKPOINT_TTL";
 const SYSTEM_CLUSTER_MODE: &str = "SYSTEM_CLUSTER_MODE";
 const SYSTEM_PUB_SUB_CHANNEL_SIZE: &str = "SYSTEM_PUB_SUB_CHANNEL_SIZE";
-const SYSTEM_PUB_SUB_CHANNEL_BASE_ON: &str = "SYSTEM_PUB_SUB_CHANNEL_BASE_ON";
 
 impl SystemProperties for Properties {
     fn set_application_name(&mut self, application_name: &str) {
@@ -385,16 +380,6 @@ impl SystemProperties for Properties {
 
     fn get_pub_sub_channel_size(&self) -> anyhow::Result<usize> {
         self.get_usize(SYSTEM_PUB_SUB_CHANNEL_SIZE)
-    }
-
-    fn set_pub_sub_channel_base(&mut self, base_on: ChannelBaseOn) {
-        let value = format!("{}", base_on);
-        self.set_string(SYSTEM_PUB_SUB_CHANNEL_BASE_ON.to_string(), value);
-    }
-
-    fn get_pub_sub_channel_base(&self) -> anyhow::Result<ChannelBaseOn> {
-        let value = self.get_string(SYSTEM_PUB_SUB_CHANNEL_BASE_ON)?;
-        ChannelBaseOn::try_from(value.as_str()).map_err(|e| anyhow!(e))
     }
 }
 

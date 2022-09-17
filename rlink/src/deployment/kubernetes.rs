@@ -15,7 +15,6 @@ use crate::core::{
 use crate::deployment::TResourceManager;
 use crate::runtime::context::Context;
 use crate::runtime::ClusterDescriptor;
-use crate::utils::thread::async_runtime_single;
 
 #[derive(Clone)]
 pub(crate) struct KubernetesResourceManager {
@@ -32,15 +31,15 @@ impl KubernetesResourceManager {
     }
 }
 
+#[async_trait]
 impl TResourceManager for KubernetesResourceManager {
     fn prepare(&mut self, _context: &Context, job_descriptor: &ClusterDescriptor) {
         self.cluster_descriptor = Some(job_descriptor.clone());
     }
 
-    fn worker_allocate<S>(
+    async fn worker_allocate<S>(
         &self,
         _stream_app_clone: &S,
-        _stream_env: &StreamExecutionEnvironment,
     ) -> anyhow::Result<Vec<TaskResourceInfo>>
     where
         S: StreamApp + 'static,
@@ -57,9 +56,7 @@ impl TResourceManager for KubernetesResourceManager {
         };
 
         let application_id = coordinator_manager.application_id.as_str();
-        let rt = tokio::runtime::Runtime::new()?;
-        let job_deploy_id =
-            rt.block_on(async { get_job_deploy_id(namespace, application_id).await.unwrap() });
+        let job_deploy_id = get_job_deploy_id(namespace, application_id).await.unwrap();
 
         let coordinator_address = coordinator_manager.coordinator_address.as_str();
 
@@ -70,43 +67,43 @@ impl TResourceManager for KubernetesResourceManager {
                 application_id,
                 parse_name(task_manager_id.as_str())
             );
-            rt.block_on(async {
-                match allocate_worker(
-                    coordinator_address,
-                    task_manager_id.as_str(),
-                    task_manager_name.as_str(),
-                    application_id,
-                    namespace,
-                    job_deploy_id.as_str(),
-                    image_path,
-                    limits,
-                )
-                .await
-                {
-                    Ok(o) => {
-                        let pod_uid = o.clone();
-                        let mut task_info =
-                            TaskResourceInfo::new(pod_uid, String::new(), task_manager_id.clone());
-                        task_info
-                            .resource_info
-                            .insert("task_manager_name".to_string(), task_manager_name);
-                        task_infos.push(task_info);
-                        info!(
-                            "worker id :{}, task_manager_id {} allocate success",
-                            task_manager_id.clone(),
-                            o.clone()
-                        );
-                    }
-                    _ => {
-                        error!("worker {} allocate failed", task_manager_id)
-                    }
+            let pod_uid = allocate_worker(
+                coordinator_address,
+                task_manager_id.as_str(),
+                task_manager_name.as_str(),
+                application_id,
+                namespace,
+                job_deploy_id.as_str(),
+                image_path,
+                limits,
+            )
+            .await;
+            match pod_uid {
+                Ok(pod_uid) => {
+                    let mut task_info = TaskResourceInfo::new(
+                        pod_uid.clone(),
+                        String::new(),
+                        task_manager_id.clone(),
+                    );
+                    task_info
+                        .resource_info
+                        .insert("task_manager_name".to_string(), task_manager_name);
+                    task_infos.push(task_info);
+                    info!(
+                        "worker id :{}, task_manager_id {} allocate success",
+                        task_manager_id.clone(),
+                        pod_uid
+                    );
                 }
-            });
+                _ => {
+                    error!("worker {} allocate failed", task_manager_id)
+                }
+            }
         }
         Ok(task_infos)
     }
 
-    fn stop_workers(&self, task_ids: Vec<TaskResourceInfo>) -> anyhow::Result<()> {
+    async fn stop_workers(&self, task_ids: Vec<TaskResourceInfo>) -> anyhow::Result<()> {
         let mut tasks: Vec<String> = Vec::new();
         for task in task_ids {
             if let Some(task_id) = task.task_id() {
@@ -116,7 +113,7 @@ impl TResourceManager for KubernetesResourceManager {
         }
 
         let namespace = "default";
-        return async_runtime_single().block_on(async { stop_worker(namespace, tasks).await });
+        stop_worker(namespace, tasks).await
     }
 }
 

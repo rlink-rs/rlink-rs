@@ -2,12 +2,12 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::time::Duration;
 
-use rlink::channel::ChannelBaseOn;
 use rlink::core::backend::KeyedStateBackend;
 use rlink::core::data_stream::{TDataStream, TKeyedStream, TWindowedStream};
 use rlink::core::data_types::Schema;
 use rlink::core::env::{StreamApp, StreamExecutionEnvironment};
 use rlink::core::properties::{FunctionProperties, Properties, SystemProperties};
+use rlink::core::runtime::ClusterDescriptor;
 use rlink::functions::key_selector::SchemaKeySelector;
 use rlink::functions::reduce::{sum, SchemaReduceFunction};
 use rlink::functions::sink::print::print_sink;
@@ -37,12 +37,12 @@ impl KafkaGenAppStream {
     }
 }
 
+#[async_trait]
 impl StreamApp for KafkaGenAppStream {
-    fn prepare_properties(&self, properties: &mut Properties) {
+    async fn prepare_properties(&self, properties: &mut Properties) {
         properties.set_application_name("kafka-gen-example");
 
         properties.set_pub_sub_channel_size(1024 * 1000);
-        properties.set_pub_sub_channel_base(ChannelBaseOn::Unbounded);
         properties.set_checkpoint_interval(Duration::from_secs(2 * 60));
         properties.set_keyed_state_backend(KeyedStateBackend::Memory);
 
@@ -78,6 +78,8 @@ impl StreamApp for KafkaGenAppStream {
         .flat_map(OutputMapperFunction::new())
         .add_sink(sink);
     }
+
+    async fn pre_worker_startup(&self, _cluster_descriptor: &ClusterDescriptor) {}
 }
 
 #[derive(Clone, Debug)]
@@ -90,12 +92,12 @@ impl KafkaOffsetRangeAppStream {
     }
 }
 
+#[async_trait]
 impl StreamApp for KafkaOffsetRangeAppStream {
-    fn prepare_properties(&self, properties: &mut Properties) {
+    async fn prepare_properties(&self, properties: &mut Properties) {
         properties.set_application_name("kafka-offset-range-example");
 
         properties.set_pub_sub_channel_size(1024 * 1000);
-        properties.set_pub_sub_channel_base(ChannelBaseOn::Unbounded);
         properties.set_checkpoint_interval(Duration::from_secs(2 * 60));
         properties.set_keyed_state_backend(KeyedStateBackend::Memory);
 
@@ -131,6 +133,8 @@ impl StreamApp for KafkaOffsetRangeAppStream {
 
         env.register_source(source).add_sink(print_sink());
     }
+
+    async fn pre_worker_startup(&self, _cluster_descriptor: &ClusterDescriptor) {}
 }
 
 #[derive(Clone, Debug)]
@@ -143,8 +147,9 @@ impl KafkaReplayAppStream {
     }
 }
 
+#[async_trait]
 impl StreamApp for KafkaReplayAppStream {
-    fn prepare_properties(&self, properties: &mut Properties) {
+    async fn prepare_properties(&self, properties: &mut Properties) {
         properties.set_application_name("kafka-replay-example");
 
         // properties.set_checkpoint(CheckpointBackend::MySql {
@@ -152,7 +157,6 @@ impl StreamApp for KafkaReplayAppStream {
         //     table: Some("rlink_ck".to_string()),
         // });
         properties.set_pub_sub_channel_size(1024 * 1000);
-        properties.set_pub_sub_channel_base(ChannelBaseOn::Unbounded);
         properties.set_checkpoint_interval(Duration::from_secs(2 * 60));
         properties.set_keyed_state_backend(KeyedStateBackend::Memory);
 
@@ -200,6 +204,8 @@ impl StreamApp for KafkaReplayAppStream {
             .reduce(SchemaReduceFunction::new(vec![sum(model::index::value)], 2))
             .add_sink(print_sink());
     }
+
+    async fn pre_worker_startup(&self, _cluster_descriptor: &ClusterDescriptor) {}
 }
 
 fn gen_kafka_offset_range(topic: &str) -> OffsetRange {

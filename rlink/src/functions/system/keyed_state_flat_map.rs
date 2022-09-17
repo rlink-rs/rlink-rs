@@ -1,11 +1,12 @@
 use crate::core::backend::KeyedStateBackend;
-use crate::core::checkpoint::CheckpointFunction;
+use crate::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
 use crate::core::data_types::Schema;
-use crate::core::element::{Element, FnSchema, Record};
-use crate::core::function::{Context, FlatMapFunction, NamedFunction};
+use crate::core::element::{Element, FnSchema};
+use crate::core::function::{Context, FlatMapFunction, NamedFunction, SendableElementStream};
 use crate::core::properties::SystemProperties;
 use crate::core::runtime::JobId;
 use crate::storage::keyed_state::{ReducingState, StateKey, TReducingState};
+use crate::utils::stream::{IteratorStream, MemoryStream};
 
 pub(crate) struct KeyedStateFlatMapFunction {
     parent_job_id: JobId,
@@ -24,8 +25,9 @@ impl KeyedStateFlatMapFunction {
     }
 }
 
+#[async_trait]
 impl FlatMapFunction for KeyedStateFlatMapFunction {
-    fn open(&mut self, context: &Context) -> crate::core::Result<()> {
+    async fn open(&mut self, context: &Context) -> crate::core::Result<()> {
         if context.parents.len() != 1 {
             panic!("KeyedStateMap job can only one parent");
         }
@@ -40,11 +42,7 @@ impl FlatMapFunction for KeyedStateFlatMapFunction {
         Ok(())
     }
 
-    fn flat_map(&mut self, _record: Record) -> Box<dyn Iterator<Item = Record>> {
-        unimplemented!()
-    }
-
-    fn flat_map_element(&mut self, element: Element) -> Box<dyn Iterator<Item = Element>> {
+    async fn flat_map_element(&mut self, element: Element) -> SendableElementStream {
         let record = element.into_record();
         if record.len() > 0 {
             panic!("drop window's Record is no value");
@@ -60,14 +58,15 @@ impl FlatMapFunction for KeyedStateFlatMapFunction {
         match reducing_state {
             Some(reducing_state) => {
                 let state_iter = reducing_state.iter();
-                Box::new(state_iter.map(|record| Element::Record(record)))
+                Box::pin(IteratorStream::new(Box::new(state_iter)))
+                // Box::new(state_iter.map(|record| Element::Record(record)))
                 // Box::new(BatchIterator::new(state_iter, window))
             }
-            None => Box::new(vec![].into_iter()),
+            None => Box::pin(MemoryStream::new(vec![])), //Box::new(vec![].into_iter()),
         }
     }
 
-    fn close(&mut self) -> crate::core::Result<()> {
+    async fn close(&mut self) -> crate::core::Result<()> {
         Ok(())
     }
 
@@ -83,7 +82,22 @@ impl NamedFunction for KeyedStateFlatMapFunction {
     }
 }
 
-impl CheckpointFunction for KeyedStateFlatMapFunction {}
+#[async_trait]
+impl CheckpointFunction for KeyedStateFlatMapFunction {
+    async fn initialize_state(
+        &mut self,
+        _context: &FunctionSnapshotContext,
+        _handle: &Option<CheckpointHandle>,
+    ) {
+    }
+
+    async fn snapshot_state(
+        &mut self,
+        _context: &FunctionSnapshotContext,
+    ) -> Option<CheckpointHandle> {
+        None
+    }
+}
 
 // pub(crate) struct BatchIterator<T>
 // where

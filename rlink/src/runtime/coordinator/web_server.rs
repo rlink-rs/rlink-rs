@@ -10,7 +10,8 @@ use hyper::http::header;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response};
 use hyper::{Server, StatusCode};
-use rand::Rng;
+use rand::prelude::StdRng;
+use rand::{Rng, SeedableRng};
 
 use crate::channel::{bounded, Sender};
 use crate::core::checkpoint::Checkpoint;
@@ -22,33 +23,27 @@ use crate::runtime::HeartbeatRequest;
 use crate::storage::metadata::{MetadataStorage, TMetadataStorage};
 use crate::utils::fs::read_binary;
 use crate::utils::http::server::{as_ok_json, page_not_found};
-use crate::utils::thread::async_runtime_multi;
 
-pub(crate) fn web_launch(
+pub(crate) async fn web_launch(
     context: Arc<crate::runtime::context::Context>,
     metadata_mode: MetadataStorageType,
     checkpoint_manager: CheckpointManager,
     dag_metadata: DagMetadata,
 ) -> String {
-    let (tx, rx) = bounded(1);
+    let (tx, mut rx) = bounded(1);
 
-    std::thread::Builder::new()
-        .name("WebUI".to_string())
-        .spawn(move || {
-            async_runtime_multi("web", 4).block_on(async move {
-                let ip = context.bind_ip.clone();
-                let web_context = Arc::new(WebContext {
-                    context,
-                    metadata_mode,
-                    checkpoint_manager,
-                    dag_metadata,
-                });
-                serve_with_rand_port(web_context, ip, tx).await;
-            });
-        })
-        .unwrap();
+    tokio::spawn(async move {
+        let ip = context.bind_ip.clone();
+        let web_context = Arc::new(WebContext {
+            context,
+            metadata_mode,
+            checkpoint_manager,
+            dag_metadata,
+        });
+        serve_with_rand_port(web_context, ip, tx).await;
+    });
 
-    let bind_addr: SocketAddr = rx.recv().unwrap();
+    let bind_addr: SocketAddr = rx.recv().await.unwrap();
     format!("http://{}", bind_addr.to_string())
 }
 
@@ -64,7 +59,7 @@ async fn serve_with_rand_port(
     bind_id: String,
     bind_addr_tx: Sender<SocketAddr>,
 ) {
-    let mut rng = rand::thread_rng();
+    let mut rng: StdRng = SeedableRng::from_entropy();
     for _ in 0..30 {
         let port = rng.gen_range(10000..30000);
         let address = format!("{}:{}", bind_id.as_str(), port);
@@ -99,7 +94,7 @@ async fn serve(
     // Then bind and serve...
     let server = Server::try_bind(bind_addr)?.serve(make_service);
 
-    bind_addr_tx.send(bind_addr.clone()).unwrap();
+    bind_addr_tx.send(bind_addr.clone()).await.unwrap();
 
     // And run forever...
     if let Err(e) = server.await {
@@ -165,7 +160,7 @@ async fn get_checkpoint(
     _req: Request<Body>,
     context: Arc<WebContext>,
 ) -> anyhow::Result<Response<Body>> {
-    let cks = context.checkpoint_manager.get();
+    let cks = context.checkpoint_manager.get().await;
     as_ok_json(&StdResponse::ok(Some(cks)))
 }
 
@@ -215,6 +210,11 @@ async fn heartbeat(req: Request<Body>, context: Arc<WebContext>) -> anyhow::Resu
         task_manager_id,
         change_items,
     } = serde_json::from_reader(whole_body.reader())?;
+
+    info!(
+        "heartbeat from {}, items: {:?}",
+        task_manager_id, change_items
+    );
 
     let metadata_storage = MetadataStorage::new(&context.metadata_mode);
     let coordinator_status = metadata_storage.update_worker_status(

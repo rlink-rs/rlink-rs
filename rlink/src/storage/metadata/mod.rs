@@ -78,13 +78,13 @@ impl TMetadataStorage for MetadataStorage {
     }
 }
 
-pub(crate) fn loop_read_cluster_descriptor(
+pub(crate) async fn loop_read_cluster_descriptor(
     metadata_storage: &MetadataStorage,
 ) -> ClusterDescriptor {
     loop_fn!(metadata_storage.load(), std::time::Duration::from_secs(2))
 }
 
-pub(crate) fn loop_save_cluster_descriptor(
+pub(crate) async fn loop_save_cluster_descriptor(
     metadata_storage: &mut MetadataStorage,
     cluster_descriptor: ClusterDescriptor,
 ) {
@@ -94,7 +94,7 @@ pub(crate) fn loop_save_cluster_descriptor(
     );
 }
 
-pub(crate) fn loop_update_application_status(
+pub(crate) async fn loop_update_application_status(
     metadata_storage: &mut MetadataStorage,
     coordinator_status: ManagerStatus,
 ) {
