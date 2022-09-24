@@ -6,7 +6,6 @@ use crate::core::element::Element;
 use crate::core::function::CoProcessFunction;
 use crate::core::operator::DefaultStreamOperator;
 use crate::core::runtime::{JobId, OperatorId};
-use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
 pub(crate) struct CoProcessRunnable {
@@ -144,7 +143,7 @@ impl Runnable for CoProcessRunnable {
             completed_checkpoint_id: snapshot_context.completed_checkpoint_id,
             handle,
         };
-        submit_checkpoint(ck).map(|ck| {
+        snapshot_context.report(ck).map(|ck| {
             error!(
                 "{:?} submit checkpoint error. maybe report channel is full, checkpoint: {:?}",
                 snapshot_context.operator_id, ck

@@ -6,7 +6,6 @@ use crate::core::runtime::{OperatorId, TaskId};
 use crate::dag::job_graph::JobEdge;
 use crate::metrics::metric::Counter;
 use crate::metrics::register_counter;
-use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
 pub(crate) struct SinkRunnable {
@@ -44,7 +43,7 @@ impl Runnable for SinkRunnable {
     async fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
         self.context = Some(context.clone());
 
-        self.task_id = context.task_descriptor.task_id;
+        self.task_id = context.task_context.task_descriptor.task_id;
         let child_jobs = context.child_jobs();
         self.child_parallelism = if child_jobs.len() > 1 {
             unimplemented!()
@@ -146,7 +145,7 @@ impl Runnable for SinkRunnable {
             completed_checkpoint_id: snapshot_context.completed_checkpoint_id,
             handle,
         };
-        submit_checkpoint(ck).map(|ck| {
+        snapshot_context.report(ck).map(|ck| {
             error!(
                 "{:?} submit checkpoint error. maybe report channel is full, checkpoint: {:?}",
                 snapshot_context.operator_id, ck

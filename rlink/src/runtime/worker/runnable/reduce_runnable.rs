@@ -8,7 +8,6 @@ use crate::core::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::core::window::{TWindow, Window};
 use crate::metrics::metric::Counter;
 use crate::metrics::register_counter;
-use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
 pub(crate) struct ReduceRunnable {
@@ -56,7 +55,7 @@ impl Runnable for ReduceRunnable {
     async fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
         self.next_runnable.as_mut().unwrap().open(context).await?;
 
-        self.task_id = context.task_descriptor.task_id;
+        self.task_id = context.task_context.task_descriptor.task_id;
 
         self.context = Some(context.clone());
 
@@ -205,7 +204,7 @@ impl Runnable for ReduceRunnable {
                 handle: fn_handle.to_windows_string(),
             },
         };
-        submit_checkpoint(ck).map(|ck| {
+        snapshot_context.report(ck).map(|ck| {
             error!(
                 "{:?} submit checkpoint error. maybe report channel is full, checkpoint: {:?}",
                 snapshot_context.operator_id, ck

@@ -18,12 +18,12 @@ use tokio_util::codec::LengthDelimitedCodec;
 
 use crate::channel::{named_channel, ElementReceiver, ElementSender, TrySendError};
 use crate::core::element::Element;
-use crate::core::runtime::{ChannelKey, ClusterDescriptor, TaskId};
+use crate::core::runtime::{ChannelKey, TaskId};
 use crate::metrics::{register_counter, Tag};
 use crate::pub_sub::network::{
     new_framed_read, new_framed_write, ElementRequest, ElementResponse, ResponseCode,
 };
-use crate::runtime::worker::heart_beat::get_coordinator_status;
+use crate::runtime::worker::WorkerTaskContext;
 
 pub(crate) static ENABLE_LOG: AtomicBool = AtomicBool::new(false);
 
@@ -44,15 +44,8 @@ pub(crate) fn disable_log() {
 
 const BATCH_PULL_SIZE: u16 = 6000;
 
-// lazy_static! {
-//     static ref C: (
-//         Sender<(ChannelKey, ElementSender)>,
-//         Receiver<(ChannelKey, ElementSender)>
-//     ) = bounded(32);
-// }
-
 pub(crate) fn subscribe(
-    cluster_descriptor: Arc<ClusterDescriptor>,
+    task_context: Arc<WorkerTaskContext>,
     source_task_ids: &Vec<TaskId>,
     target_task_id: &TaskId,
     channel_size: usize,
@@ -74,17 +67,18 @@ pub(crate) fn subscribe(
             target_task_id: target_task_id.clone(),
         };
 
-        subscribe_post(cluster_descriptor.clone(), sub_key, sender.clone());
+        subscribe_post(task_context.clone(), sub_key, sender.clone());
     }
 
     receiver
 }
 
 fn subscribe_post(
-    cluster_descriptor: Arc<ClusterDescriptor>,
+    task_context: Arc<WorkerTaskContext>,
     channel_key: ChannelKey,
     sender: ElementSender,
 ) {
+    let cluster_descriptor = task_context.cluster_descriptor();
     let worker_manager_descriptor = cluster_descriptor
         .get_worker_manager(&channel_key.source_task_id)
         .expect("WorkerManagerDescriptor not found");
@@ -92,71 +86,24 @@ fn subscribe_post(
         .expect("parse address error");
 
     tokio::spawn(async move {
-        loop_client_task(channel_key.clone(), sender, addr, BATCH_PULL_SIZE).await;
+        loop_client_task(
+            channel_key.clone(),
+            sender,
+            addr,
+            BATCH_PULL_SIZE,
+            task_context,
+        )
+        .await;
         channel_key
     });
 }
-
-// pub(crate) fn run_subscribe(cluster_descriptor: Arc<ClusterDescriptor>) {
-//     async_runtime_multi("client", 4).block_on(subscribe_listen(cluster_descriptor));
-//     info!("network subscribe task stop");
-// }
-//
-// async fn subscribe_listen(cluster_descriptor: Arc<ClusterDescriptor>) {
-//     let mut c: &(
-//         Sender<(ChannelKey, ElementSender)>,
-//         Receiver<(ChannelKey, ElementSender)>,
-//     ) = &*C;
-//
-//     let delay = Duration::from_millis(50);
-//     let mut idle_counter = 0usize;
-//     let mut join_handles = Vec::new();
-//     loop {
-//         match c.1.try_recv() {
-//             Ok((channel_key, sender)) => {
-//                 let worker_manager_descriptor = cluster_descriptor
-//                     .get_worker_manager(&channel_key.source_task_id)
-//                     .expect("WorkerManagerDescriptor not found");
-//                 let addr = SocketAddr::from_str(&worker_manager_descriptor.task_manager_address)
-//                     .expect("parse address error");
-//
-//                 let join_handle = tokio::spawn(async move {
-//                     loop_client_task(channel_key.clone(), sender, addr, BATCH_PULL_SIZE).await;
-//                     channel_key
-//                 });
-//                 join_handles.push(join_handle);
-//
-//                 idle_counter = 0;
-//             }
-//             Err(TryRecvError::Empty) => {
-//                 idle_counter += 1;
-//                 if idle_counter < 20 * 10 {
-//                     async_sleep(delay).await;
-//                 } else {
-//                     // all task registration must be completed within 10 seconds
-//                     info!("subscribe listen task finish");
-//                     break;
-//                 }
-//             }
-//             Err(TryRecvError::Disconnected) => {
-//                 info!("subscribe_listen channel is Disconnected")
-//             }
-//         }
-//     }
-//
-//     for join_handle in join_handles {
-//         match join_handle.await {
-//             Ok(channel_key) => info!("channel({:?}) network subscribe stop", channel_key),
-//             Err(e) => error!("Client task error. {}", e),
-//         }
-//     }
-// }
 
 async fn loop_client_task(
     channel_key: ChannelKey,
     sender: ElementSender,
     addr: SocketAddr,
     batch_pull_size: u16,
+    task_context: Arc<WorkerTaskContext>,
 ) {
     loop {
         match client_task(channel_key, sender.clone(), addr, batch_pull_size).await {
@@ -166,7 +113,11 @@ async fn loop_client_task(
             }
             Err(e) => {
                 error!("client({}) task error. {}", addr, e);
-                if get_coordinator_status().is_terminated() {
+                if task_context
+                    .heartbeat_publish()
+                    .get_coordinator_status()
+                    .is_terminated()
+                {
                     break;
                 }
             }

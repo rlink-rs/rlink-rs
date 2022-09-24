@@ -32,14 +32,23 @@ pub(crate) fn subscribe(
     source_task_ids: &Vec<TaskId>,
     target_task_id: &TaskId,
     channel_size: usize,
-    // channel_base_on: ChannelBaseOn,
 ) -> ElementReceiver {
+    info!(
+        "subscribe from {:?} to {:?}",
+        source_task_ids, target_task_id
+    );
     if source_task_ids.len() == 0 {
         panic!("source TaskId not found");
     }
 
     insert(*target_task_id, channel_size);
-    get_receiver(target_task_id).expect("receiver not found, maybe a duplicate subscribe")
+    get_receiver(target_task_id).expect(
+        format!(
+            "receiver not found, maybe a duplicate subscribe: {:?}",
+            target_task_id
+        )
+        .as_str(),
+    )
 }
 
 pub(crate) fn insert(target_task_id: TaskId, channel_size: usize) {

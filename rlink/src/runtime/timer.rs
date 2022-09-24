@@ -1,4 +1,5 @@
 use std::borrow::BorrowMut;
+use std::fmt::{Debug, Formatter};
 
 use tokio::time::{interval_at, Duration, Instant};
 
@@ -51,6 +52,12 @@ impl TimerChannel {
 #[derive(Clone)]
 pub struct WindowTimer {
     sender: ChannelSender<TimerSender>,
+}
+
+impl Debug for WindowTimer {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("WindowTimer").finish()
+    }
 }
 
 impl WindowTimer {

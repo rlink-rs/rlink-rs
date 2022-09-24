@@ -12,7 +12,6 @@ use crate::core::{cluster::TaskResourceInfo, env::StreamApp};
 use crate::deployment::TResourceManager;
 use crate::runtime::context::Context;
 
-#[derive(Clone)]
 pub(crate) struct KubernetesResourceManager {
     context: Arc<Context>,
     cluster_descriptor: Option<ClusterDescriptor>,

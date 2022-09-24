@@ -1,6 +1,8 @@
 use std::fmt::Debug;
+use std::sync::Arc;
 
 use crate::core::runtime::{CheckpointId, OperatorId, TaskId};
+use crate::runtime::worker::WorkerTaskContext;
 
 /// This struct provides a context in which user functions that use managed state metadata
 #[derive(Clone, Debug)]
@@ -9,21 +11,29 @@ pub struct FunctionSnapshotContext {
     pub task_id: TaskId,
     pub checkpoint_id: CheckpointId,
     pub completed_checkpoint_id: Option<CheckpointId>,
+
+    pub(crate) task_context: Arc<WorkerTaskContext>,
 }
 
 impl FunctionSnapshotContext {
-    pub fn new(
+    pub(crate) fn new(
         operator_id: OperatorId,
         task_id: TaskId,
         checkpoint_id: CheckpointId,
         completed_checkpoint_id: Option<CheckpointId>,
+        task_context: Arc<WorkerTaskContext>,
     ) -> Self {
         FunctionSnapshotContext {
             operator_id,
             task_id,
             checkpoint_id,
             completed_checkpoint_id,
+            task_context,
         }
+    }
+
+    pub(crate) fn report(&self, ck: Checkpoint) -> Option<Checkpoint> {
+        self.task_context.checkpoint_publish().report(ck)
     }
 }
 

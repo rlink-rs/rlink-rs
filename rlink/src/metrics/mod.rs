@@ -15,8 +15,9 @@ pub use metric::register_counter;
 pub use metric::register_gauge;
 pub use metric::Tag;
 
+#[async_trait]
 pub trait ProxyAddressLoader: Sync + Send {
-    fn load(&self) -> Vec<String>;
+    async fn load(&self) -> Vec<String>;
 }
 
 pub struct DefaultProxyAddressLoader {
@@ -29,8 +30,9 @@ impl DefaultProxyAddressLoader {
     }
 }
 
+#[async_trait]
 impl ProxyAddressLoader for DefaultProxyAddressLoader {
-    fn load(&self) -> Vec<String> {
+    async fn load(&self) -> Vec<String> {
         self.proxy_address.clone()
     }
 }

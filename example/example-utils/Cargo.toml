@@ -27,7 +27,10 @@ anyhow = "1.0"
 rand = "0.8"
 chrono = "0.4"
 
+futures = "0.3"
 async-trait = "0.1"
+tokio = { version = "1" }
+tokio-stream = {version = "0.1", features = ["time"]}
 
 [build-dependencies]
 serbuffer-gen = "1.3"

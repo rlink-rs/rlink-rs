@@ -262,7 +262,7 @@ impl PrometheusBuilder {
 
                             let output = handle.render();
 
-                            let proxy_address = proxy_address_loader.load();
+                            let proxy_address = proxy_address_loader.load().await;
                             let output = if !proxy_address.is_empty() {
                                 let proxy_metrics =
                                     crate::metrics::worker_proxy::collect_worker_metrics(

@@ -7,8 +7,9 @@ use futures::Stream;
 use crate::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
 use crate::core::element::{Element, FnSchema, Record};
 use crate::core::properties::Properties;
-use crate::core::runtime::{CheckpointId, ClusterDescriptor, OperatorId, TaskId};
+use crate::core::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::dag::execution_graph::{ExecutionEdge, ExecutionNode};
+use crate::runtime::worker::WorkerTaskContext;
 
 /// Base class of all operators in the Rust API.
 pub trait NamedFunction {
@@ -32,8 +33,12 @@ pub struct Context {
     pub(crate) children: Vec<(ExecutionNode, ExecutionEdge)>,
     pub(crate) parents: Vec<(ExecutionNode, ExecutionEdge)>,
 
+    // #[serde(skip)]
+    // pub(crate) cluster_descriptor: Arc<ClusterDescriptor>,
+    // #[serde(skip)]
+    // pub(crate) checkpoint_publish: Arc<CheckpointPublish>,
     #[serde(skip)]
-    pub(crate) cluster_descriptor: Arc<ClusterDescriptor>,
+    pub(crate) task_context: Option<Arc<WorkerTaskContext>>,
 }
 
 impl Context {
@@ -43,7 +48,12 @@ impl Context {
             self.task_id,
             self.checkpoint_id,
             self.completed_checkpoint_id,
+            self.task_context(),
         )
+    }
+
+    pub(crate) fn task_context(&self) -> Arc<WorkerTaskContext> {
+        self.task_context.as_ref().unwrap().clone()
     }
 }
 

@@ -1,4 +1,5 @@
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::Poll;
 
 use futures::Stream;
@@ -15,13 +16,14 @@ use crate::core::properties::SystemProperties;
 use crate::core::runtime::TaskId;
 use crate::dag::execution_graph::ExecutionEdge;
 use crate::pub_sub::{memory, network, DEFAULT_CHANNEL_SIZE};
-use crate::runtime::worker::heart_beat::get_coordinator_status;
+use crate::runtime::worker::WorkerTaskContext;
 
 pub(crate) struct SystemInputFormat {
     memory_receiver: Option<ElementReceiver>,
     network_receiver: Option<ElementReceiver>,
 
     task_id: TaskId,
+    context: Option<Context>,
 }
 
 impl SystemInputFormat {
@@ -30,6 +32,7 @@ impl SystemInputFormat {
             memory_receiver: None,
             network_receiver: None,
             task_id: TaskId::default(),
+            context: None,
         }
     }
 
@@ -55,15 +58,12 @@ impl InputFormat for SystemInputFormat {
         self.subscribe_log(context);
 
         self.task_id = context.task_id.clone();
+        self.context = Some(context.clone());
 
         let channel_size = context
             .application_properties
             .get_pub_sub_channel_size()
             .unwrap_or(DEFAULT_CHANNEL_SIZE);
-        // let channel_base_on = context
-        //     .application_properties
-        //     .get_pub_sub_channel_base()
-        //     .unwrap_or(ChannelBaseOn::Bounded);
 
         let mut memory_jobs = Vec::new();
         let mut network_jobs = Vec::new();
@@ -81,7 +81,7 @@ impl InputFormat for SystemInputFormat {
         }
         if network_jobs.len() > 0 {
             let rx = network::subscribe(
-                context.cluster_descriptor.clone(),
+                context.task_context(),
                 &network_jobs,
                 &context.task_id,
                 channel_size,
@@ -93,6 +93,20 @@ impl InputFormat for SystemInputFormat {
     }
 
     async fn element_stream(&mut self) -> SendableElementStream {
+        // if self.memory_receiver.is_none() && self.network_receiver.is_none() {
+        //     panic!("unsupported")
+        // } else if self.memory_receiver.is_some() && self.network_receiver.is_some() {
+        //     let m = self.memory_receiver.take().unwrap();
+        //     let n = self.network_receiver.take().unwrap();
+        //     Box::pin(ChannelReceiverStream::new(m).merge(ChannelReceiverStream::new(n)))
+        // } else if self.memory_receiver.is_some() {
+        //     let m = self.memory_receiver.take().unwrap();
+        //     Box::pin(ChannelReceiverStream::new(m))
+        // } else {
+        //     let n = self.network_receiver.take().unwrap();
+        //     Box::pin(ChannelReceiverStream::new(n))
+        // }
+
         let mut receivers = Vec::new();
         if let Some(n) = self.memory_receiver.take() {
             receivers.push(n);
@@ -101,8 +115,10 @@ impl InputFormat for SystemInputFormat {
             receivers.push(n);
         }
 
-        // todo impl
-        Box::pin(ElementReceiverStream::new(receivers))
+        Box::pin(InputChannelStream::new(
+            receivers,
+            self.context.as_ref().unwrap().task_context(),
+        ))
         // match receivers.len() {
         //     0 => panic!("unsupported"),
         //     1 => Box::new(ChannelIterator::new(receivers.remove(0))),
@@ -218,31 +234,59 @@ impl CheckpointFunction for SystemInputFormat {
 //     }
 // }
 
-struct ElementReceiverStream {
+struct InputChannelStream {
+    n: usize,
     receiver: Vec<ElementReceiver>,
+    task_context: Arc<WorkerTaskContext>,
 }
 
-impl ElementReceiverStream {
-    pub fn new(receiver: Vec<ElementReceiver>) -> Self {
-        Self { receiver }
+impl InputChannelStream {
+    pub fn new(receiver: Vec<ElementReceiver>, task_context: Arc<WorkerTaskContext>) -> Self {
+        Self {
+            n: 0,
+            receiver,
+            task_context,
+        }
     }
 }
 
-impl ElementStream for ElementReceiverStream {}
+impl ElementStream for InputChannelStream {}
 
-impl Stream for ElementReceiverStream {
+impl Stream for InputChannelStream {
     type Item = Element;
 
     fn poll_next(
         self: Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> Poll<Option<Self::Item>> {
-        if get_coordinator_status().is_terminated() {
+        if self.task_context.get_coordinator_status().is_terminated() {
             info!("MultiChannelIterator finish");
             return Poll::Ready(None);
         }
 
-        for receiver in self.get_mut().receiver.as_mut_slice() {
+        let s = self.get_mut();
+
+        let len = s.receiver.len();
+        let first = {
+            let first = s.n;
+            s.n = first + 1;
+            if s.n == len {
+                s.n = 0;
+            }
+            first
+        };
+
+        for i in first..len {
+            let receiver = s.receiver.get_mut(i).unwrap();
+            match receiver.poll_recv(cx) {
+                Poll::Ready(t) => {
+                    return Poll::Ready(t);
+                }
+                _ => {}
+            }
+        }
+        for i in 0..first {
+            let receiver = s.receiver.get_mut(i).unwrap();
             match receiver.poll_recv(cx) {
                 Poll::Ready(t) => {
                     return Poll::Ready(t);

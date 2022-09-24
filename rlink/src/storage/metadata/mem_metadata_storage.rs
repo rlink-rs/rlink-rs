@@ -1,5 +1,6 @@
 use std::borrow::BorrowMut;
-use std::sync::Mutex;
+
+use tokio::sync::Mutex;
 
 use crate::core::runtime::{ClusterDescriptor, ManagerStatus};
 use crate::runtime::HeartbeatItem;
@@ -19,24 +20,23 @@ impl MemoryMetadataStorage {
     }
 }
 
+#[async_trait]
 impl TMetadataStorage for MemoryMetadataStorage {
-    fn save(&mut self, metadata: ClusterDescriptor) -> anyhow::Result<()> {
-        let mut lock = METADATA_STORAGE
-            .lock()
-            .expect("METADATA_STORAGE lock failed");
+    async fn save(&mut self, metadata: ClusterDescriptor) -> anyhow::Result<()> {
+        let mut lock = METADATA_STORAGE.lock().await;
         *lock = Some(metadata);
 
-        debug!("Save metadata {:?}", lock.as_ref());
+        info!("Save metadata {:?}", lock.as_ref());
         Ok(())
     }
 
-    fn load(&self) -> anyhow::Result<ClusterDescriptor> {
-        let lock = METADATA_STORAGE.lock().unwrap();
+    async fn load(&self) -> anyhow::Result<ClusterDescriptor> {
+        let lock = METADATA_STORAGE.lock().await;
         lock.clone().ok_or(anyhow!("ClusterDescriptor not found"))
     }
 
-    fn update_coordinator_status(&self, status: ManagerStatus) -> anyhow::Result<()> {
-        let mut lock = METADATA_STORAGE.lock().unwrap();
+    async fn update_coordinator_status(&self, status: ManagerStatus) -> anyhow::Result<()> {
+        let mut lock = METADATA_STORAGE.lock().await;
 
         let cluster_descriptor = lock
             .as_mut()
@@ -46,13 +46,13 @@ impl TMetadataStorage for MemoryMetadataStorage {
         Ok(())
     }
 
-    fn update_worker_status(
+    async fn update_worker_status(
         &self,
         task_manager_id: String,
         heartbeat_items: Vec<HeartbeatItem>,
         status: ManagerStatus,
     ) -> anyhow::Result<ManagerStatus> {
-        let mut lock = METADATA_STORAGE.lock().unwrap();
+        let mut lock = METADATA_STORAGE.lock().await;
         let cluster_descriptor = (&mut *lock)
             .as_mut()
             .ok_or(anyhow!("ClusterDescriptor not found"))?;

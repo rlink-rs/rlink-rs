@@ -10,7 +10,6 @@ use crate::core::watermark::{
 };
 use crate::metrics::metric::{Counter, Gauge};
 use crate::metrics::{register_counter, register_gauge};
-use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
 pub(crate) struct WatermarkAssignerRunnable {
@@ -69,7 +68,7 @@ impl Runnable for WatermarkAssignerRunnable {
 
         self.context = Some(context.clone());
 
-        self.task_id = context.task_descriptor.task_id;
+        self.task_id = context.task_context.task_descriptor.task_id;
 
         let fn_name = self.watermark_strategy.operator_fn.as_ref().name();
         self.watermark_gauge =
@@ -187,7 +186,7 @@ impl Runnable for WatermarkAssignerRunnable {
             completed_checkpoint_id: snapshot_context.completed_checkpoint_id,
             handle,
         };
-        submit_checkpoint(ck).map(|ck| {
+        snapshot_context.report(ck).map(|ck| {
             error!(
                 "{:?} submit checkpoint error. maybe report channel is full, checkpoint: {:?}",
                 snapshot_context.operator_id, ck

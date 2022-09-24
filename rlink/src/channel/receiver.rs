@@ -6,6 +6,7 @@ use crate::channel::TryRecvError;
 use crate::channel::CHANNEL_SIZE_PREFIX;
 use crate::metrics::metric::{Counter, Gauge};
 
+#[derive(Debug)]
 pub struct ChannelReceiver<T>
 where
     T: Sync + Send,
@@ -66,5 +67,9 @@ where
             }
             Poll::Pending => Poll::Pending,
         }
+    }
+
+    pub fn close(&mut self) {
+        self.receiver.close();
     }
 }

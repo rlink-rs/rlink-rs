@@ -152,7 +152,7 @@ async fn get_cluster_metadata(
     context: Arc<WebContext>,
 ) -> anyhow::Result<Response<Body>> {
     let metadata_storage = MetadataStorage::new(&context.metadata_mode);
-    let cluster_descriptor = metadata_storage.load().unwrap();
+    let cluster_descriptor = metadata_storage.load().await.unwrap();
     as_ok_json(&StdResponse::ok(Some(cluster_descriptor)))
 }
 
@@ -212,16 +212,14 @@ async fn heartbeat(req: Request<Body>, context: Arc<WebContext>) -> anyhow::Resu
     } = serde_json::from_reader(whole_body.reader())?;
 
     info!(
-        "heartbeat from {}, items: {:?}",
+        "<heartbeat> from {}, items: {:?}",
         task_manager_id, change_items
     );
 
     let metadata_storage = MetadataStorage::new(&context.metadata_mode);
-    let coordinator_status = metadata_storage.update_worker_status(
-        task_manager_id,
-        change_items,
-        ManagerStatus::Registered,
-    );
+    let coordinator_status = metadata_storage
+        .update_worker_status(task_manager_id, change_items, ManagerStatus::Registered)
+        .await;
 
     let resp: StdResponse<ManagerStatus> = coordinator_status.into();
     as_ok_json(&resp)

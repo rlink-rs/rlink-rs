@@ -5,7 +5,6 @@ use crate::core::element::Element;
 use crate::core::function::FilterFunction;
 use crate::core::operator::DefaultStreamOperator;
 use crate::core::runtime::OperatorId;
-use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
 pub(crate) struct FilterRunnable {
@@ -93,7 +92,7 @@ impl Runnable for FilterRunnable {
             completed_checkpoint_id: snapshot_context.completed_checkpoint_id,
             handle,
         };
-        submit_checkpoint(ck).map(|ck| {
+        snapshot_context.report(ck).map(|ck| {
             error!(
                 "{:?} submit checkpoint error. maybe report channel is full, checkpoint: {:?}",
                 snapshot_context.operator_id, ck

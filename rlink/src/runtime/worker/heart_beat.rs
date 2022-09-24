@@ -1,84 +1,93 @@
-use crate::channel::{bounded, Sender, TrySendError};
+use std::fmt::{Debug, Formatter};
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
+
+use crate::channel::{bounded, Receiver, Sender, TrySendError};
 use crate::core::cluster::StdResponse;
+use crate::core::runtime::AtomicManagerStatus;
 use crate::core::runtime::{HeartBeatStatus, ManagerStatus};
 use crate::runtime::{HeartbeatItem, HeartbeatRequest};
 use crate::utils::http::client::post;
 use crate::utils::{date_time, panic};
 
-static mut COORDINATOR_STATUS: ManagerStatus = ManagerStatus::Pending;
-
-fn update_coordinator_status(coordinator_status: ManagerStatus) {
-    unsafe {
-        COORDINATOR_STATUS = coordinator_status;
-    }
-}
-
-pub(crate) fn get_coordinator_status() -> ManagerStatus {
-    unsafe { COORDINATOR_STATUS }
-}
-
-pub struct HeartbeatChannel {
+#[derive(Clone)]
+pub struct HeartbeatPublish {
     sender: Option<Sender<HeartbeatItem>>,
+    coordinator_status: Arc<AtomicManagerStatus>,
 }
 
-static mut HB_CHANNEL: HeartbeatChannel = HeartbeatChannel { sender: None };
-
-pub(crate) fn submit_heartbeat(ck: HeartbeatItem) {
-    let hb_channel = unsafe { &HB_CHANNEL };
-
-    info!("report heartbeat change item: {:?}", &ck);
-    match hb_channel.sender.as_ref().unwrap().try_send(ck) {
-        Ok(_) => {}
-        Err(TrySendError::Full(_ck)) => {
-            unreachable!()
-        }
-        Err(TrySendError::Closed(_ck)) => panic!("the Heartbeat channel is disconnected"),
+impl Debug for HeartbeatPublish {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("CheckpointPublish").finish()
     }
 }
 
-pub(crate) async fn start_heartbeat_timer(coordinator_address: String, task_manager_id: String) {
-    info!("heartbeat loop starting...");
+impl HeartbeatPublish {
+    pub async fn new(coordinator_address: String, task_manager_id: String) -> Self {
+        let (sender, receiver) = bounded::<HeartbeatItem>(100);
 
-    let (sender, mut receiver) = bounded::<HeartbeatItem>(100);
+        let heartbeat_publish = Self {
+            sender: Some(sender),
+            coordinator_status: Arc::new(AtomicManagerStatus::new(ManagerStatus::Pending)),
+        };
 
-    let hb_channel = unsafe { &mut HB_CHANNEL };
-    hb_channel.sender = Some(sender);
+        Self::start_heartbeat_timer(
+            coordinator_address,
+            task_manager_id,
+            receiver,
+            heartbeat_publish.clone(),
+        )
+        .await;
 
-    tokio::spawn(async move {
-        while let Some(hi) = receiver.recv().await {
-            report_heartbeat(
-                coordinator_address.as_str(),
-                task_manager_id.as_str(),
-                vec![hi],
-            )
-            .await;
+        heartbeat_publish
+    }
+
+    async fn start_heartbeat_timer(
+        coordinator_address: String,
+        task_manager_id: String,
+        mut receiver: Receiver<HeartbeatItem>,
+        heartbeat_publish: HeartbeatPublish,
+    ) {
+        info!("heartbeat loop starting...");
+        tokio::spawn(async move {
+            while let Some(hi) = receiver.recv().await {
+                report_heartbeat(
+                    coordinator_address.as_str(),
+                    task_manager_id.as_str(),
+                    vec![hi],
+                    heartbeat_publish.clone(),
+                )
+                .await;
+            }
+        });
+    }
+
+    pub fn report(&self, ck: HeartbeatItem) {
+        info!("report heartbeat change item: {:?}", &ck);
+        match self.sender.as_ref().unwrap().try_send(ck) {
+            Ok(_) => {}
+            Err(TrySendError::Full(_ck)) => {
+                unreachable!()
+            }
+            Err(TrySendError::Closed(_ck)) => panic!("the Heartbeat channel is disconnected"),
         }
+    }
 
-        // loop {
-        //     let change_items = {
-        //         let mut change_items = Vec::new();
-        //         while let Ok(ci) = receiver.try_recv() {
-        //             change_items.push(ci);
-        //         }
-        //         change_items
-        //     };
-        //
-        //     report_heartbeat(
-        //         coordinator_address.as_str(),
-        //         task_manager_id.as_str(),
-        //         change_items,
-        //     )
-        //     .await;
-        //
-        //     tokio::time::sleep(Duration::from_secs(10)).await;
-        // }
-    });
+    pub(crate) fn get_coordinator_status(&self) -> ManagerStatus {
+        self.coordinator_status.load(Ordering::Relaxed)
+    }
+
+    fn update_coordinator_status(&self, coordinator_status: ManagerStatus) {
+        self.coordinator_status
+            .store(coordinator_status, Ordering::Relaxed);
+    }
 }
 
 pub(crate) async fn report_heartbeat(
     coordinator_address: &str,
     task_manager_id: &str,
     mut change_items: Vec<HeartbeatItem>,
+    heartbeat_publish: HeartbeatPublish,
 ) {
     let url = format!("{}/api/heartbeat", coordinator_address);
 
@@ -106,6 +115,8 @@ pub(crate) async fn report_heartbeat(
     };
     let body = serde_json::to_string(&request).unwrap();
 
+    info!("<heartbeat> report {}", body);
+
     let begin_time = date_time::current_timestamp_millis();
     let resp = post::<StdResponse<ManagerStatus>>(url, body).await;
     let end_time = date_time::current_timestamp_millis();
@@ -125,7 +136,7 @@ pub(crate) async fn report_heartbeat(
                     _ => {}
                 }
 
-                update_coordinator_status(coordinator_status);
+                heartbeat_publish.update_coordinator_status(coordinator_status);
             }
         }
         Err(e) => {

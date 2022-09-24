@@ -1,6 +1,7 @@
 use std::convert::TryFrom;
 use std::ops::Deref;
 
+use atomic_enum::atomic_enum;
 use bytes::{Buf, BufMut, BytesMut};
 
 use crate::core::checkpoint::CheckpointHandle;
@@ -162,7 +163,8 @@ pub struct TaskDescriptor {
     pub terminated: bool,
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq)]
+#[atomic_enum]
+#[derive(Serialize, Deserialize, PartialEq)]
 pub enum ManagerStatus {
     /// Waiting for the TaskManager register
     Pending = 0,
