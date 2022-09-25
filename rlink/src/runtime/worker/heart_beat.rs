@@ -31,35 +31,58 @@ impl HeartbeatPublish {
             coordinator_status: Arc::new(AtomicManagerStatus::new(ManagerStatus::Pending)),
         };
 
-        Self::start_heartbeat_timer(
-            coordinator_address,
-            task_manager_id,
-            receiver,
-            heartbeat_publish.clone(),
-        )
-        .await;
+        heartbeat_publish
+            .start_heartbeat_timer(coordinator_address, task_manager_id, receiver)
+            .await;
 
         heartbeat_publish
     }
 
     async fn start_heartbeat_timer(
+        &self,
         coordinator_address: String,
         task_manager_id: String,
         mut receiver: Receiver<HeartbeatItem>,
-        heartbeat_publish: HeartbeatPublish,
     ) {
         info!("heartbeat loop starting...");
-        tokio::spawn(async move {
-            while let Some(hi) = receiver.recv().await {
-                report_heartbeat(
-                    coordinator_address.as_str(),
-                    task_manager_id.as_str(),
-                    vec![hi],
-                    heartbeat_publish.clone(),
-                )
-                .await;
-            }
-        });
+        {
+            let heartbeat_publish = self.clone();
+            let coordinator_address = coordinator_address.clone();
+            let task_manager_id = task_manager_id.clone();
+            tokio::spawn(async move {
+                while let Some(hi) = receiver.recv().await {
+                    report_heartbeat(
+                        coordinator_address.as_str(),
+                        task_manager_id.as_str(),
+                        vec![hi],
+                        heartbeat_publish.clone(),
+                    )
+                    .await;
+                }
+            });
+        }
+
+        {
+            let heartbeat_publish = self.clone();
+            let coordinator_address = coordinator_address.clone();
+            let task_manager_id = task_manager_id.clone();
+            tokio::spawn(async move {
+                loop {
+                    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                    if ManagerStatus::Registered != heartbeat_publish.get_coordinator_status() {
+                        continue;
+                    }
+
+                    report_heartbeat(
+                        coordinator_address.as_str(),
+                        task_manager_id.as_str(),
+                        vec![HeartbeatItem::HeartBeatStatus(HeartBeatStatus::Ok)],
+                        heartbeat_publish.clone(),
+                    )
+                    .await;
+                }
+            });
+        }
     }
 
     pub fn report(&self, ck: HeartbeatItem) {
@@ -115,7 +138,7 @@ pub(crate) async fn report_heartbeat(
     };
     let body = serde_json::to_string(&request).unwrap();
 
-    info!("<heartbeat> report {}", body);
+    debug!("<heartbeat> report {}", body);
 
     let begin_time = date_time::current_timestamp_millis();
     let resp = post::<StdResponse<ManagerStatus>>(url, body).await;

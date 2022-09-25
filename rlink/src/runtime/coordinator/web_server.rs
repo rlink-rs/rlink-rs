@@ -211,7 +211,7 @@ async fn heartbeat(req: Request<Body>, context: Arc<WebContext>) -> anyhow::Resu
         change_items,
     } = serde_json::from_reader(whole_body.reader())?;
 
-    info!(
+    debug!(
         "<heartbeat> from {}, items: {:?}",
         task_manager_id, change_items
     );
