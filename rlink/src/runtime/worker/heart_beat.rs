@@ -37,18 +37,17 @@ impl HeartbeatPublish {
         let heartbeat_publish = self.clone();
         tokio::spawn(async move {
             loop {
-                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                let status = HeartbeatItem::HeartBeatStatus(HeartBeatStatus::Ok);
+                heartbeat_publish.report_heartbeat(vec![status]).await;
 
-                heartbeat_publish
-                    .report_heartbeat(vec![HeartbeatItem::HeartBeatStatus(HeartBeatStatus::Ok)])
-                    .await;
+                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
             }
         });
     }
 
-    pub async fn report(&self, ck: HeartbeatItem) {
-        info!("report heartbeat change item: {:?}", &ck);
-        self.report_heartbeat(vec![ck]).await;
+    pub async fn report(&self, heartbeat_item: HeartbeatItem) {
+        info!("report heartbeat change item: {:?}", &heartbeat_item);
+        self.report_heartbeat(vec![heartbeat_item]).await;
     }
 
     pub(crate) fn get_coordinator_status(&self) -> ManagerStatus {

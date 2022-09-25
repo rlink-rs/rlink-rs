@@ -212,11 +212,10 @@ impl SourceRunnable {
 
     async fn report_end_status(&self) {
         let heartbeat_publish = self.task_context().heartbeat_publish();
-        heartbeat_publish
-            .report(HeartbeatItem::TaskEnd {
-                task_id: self.task_id,
-            })
-            .await;
+        let status = HeartbeatItem::TaskEnd {
+            task_id: self.task_id,
+        };
+        heartbeat_publish.report(status).await;
     }
 }
 

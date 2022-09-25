@@ -124,13 +124,13 @@ async fn start_heartbeat_task(
     let heartbeat_publish =
         HeartbeatPublish::new(coordinator_address.clone(), task_manager_id.clone()).await;
 
-    heartbeat_publish
-        .report(HeartbeatItem::WorkerAddrs {
-            address: bind_addr.to_string(),
-            web_address: web_addr.to_string(),
-            metrics_address: context.metric_addr.clone(),
-        })
-        .await;
+    let status = HeartbeatItem::WorkerAddrs {
+        address: bind_addr.to_string(),
+        web_address: web_addr.to_string(),
+        metrics_address: context.metric_addr.clone(),
+    };
+    heartbeat_publish.report(status).await;
+
     heartbeat_publish.start_heartbeat_timer().await;
 
     Arc::new(heartbeat_publish)
@@ -143,9 +143,8 @@ async fn start_checkpoint_task(cluster_descriptor: &ClusterDescriptor) -> Arc<Ch
 }
 
 async fn stop_heartbeat_timer(heartbeat_publish: &HeartbeatPublish) {
-    heartbeat_publish
-        .report(HeartbeatItem::HeartBeatStatus(HeartBeatStatus::End))
-        .await;
+    let status = HeartbeatItem::HeartBeatStatus(HeartBeatStatus::End);
+    heartbeat_publish.report(status).await;
 }
 
 async fn waiting_all_task_manager_fine(
