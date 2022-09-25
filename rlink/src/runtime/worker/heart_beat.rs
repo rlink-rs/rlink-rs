@@ -69,9 +69,6 @@ impl HeartbeatPublish {
             tokio::spawn(async move {
                 loop {
                     tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-                    if ManagerStatus::Registered != heartbeat_publish.get_coordinator_status() {
-                        continue;
-                    }
 
                     report_heartbeat(
                         coordinator_address.as_str(),

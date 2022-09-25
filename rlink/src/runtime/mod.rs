@@ -101,7 +101,6 @@ pub enum HeartbeatItem {
     WorkerManagerWebAddress(String),
     MetricsAddress(String),
     HeartBeatStatus(HeartBeatStatus),
-    TaskThreadId { task_id: TaskId, thread_id: u64 },
     TaskEnd { task_id: TaskId },
 }
 

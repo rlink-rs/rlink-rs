@@ -20,7 +20,6 @@ use crate::runtime::worker::runnable::{
     FilterRunnable, FlatMapRunnable, KeyByRunnable, ReduceRunnable, Runnable, RunnableContext,
     SinkRunnable, SourceRunnable, WatermarkAssignerRunnable, WindowAssignerRunnable,
 };
-use crate::runtime::HeartbeatItem;
 
 pub mod checkpoint;
 pub mod heart_beat;
@@ -105,14 +104,6 @@ where
     S: StreamApp + 'static,
 {
     tokio::spawn(async move {
-        task_context
-            .heartbeat_publish()
-            .report(HeartbeatItem::TaskThreadId {
-                task_id: task_context.task_descriptor.task_id.clone(),
-                thread_id: thread_id::get() as u64,
-            });
-
-        // let stream_env = StreamExecutionEnvironment::new();
         let worker_task = WorkerTask::new(task_context, stream_app);
         // todo error handle
         worker_task.run().await.unwrap();

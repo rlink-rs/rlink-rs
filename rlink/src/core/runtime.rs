@@ -158,7 +158,6 @@ pub struct TaskDescriptor {
     pub operators: Vec<OperatorDescriptor>,
     pub input_split: InputSplit,
     pub daemon: bool,
-    pub thread_id: String,
     /// mark the task is `Terminated` status
     pub terminated: bool,
 }

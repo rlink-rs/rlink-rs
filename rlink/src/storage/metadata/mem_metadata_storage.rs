@@ -85,13 +85,6 @@ impl TMetadataStorage for MemoryMetadataStorage {
                 HeartbeatItem::HeartBeatStatus(status) => {
                     task_manager_descriptor.latest_heart_beat_status = status;
                 }
-                HeartbeatItem::TaskThreadId { task_id, thread_id } => {
-                    for task_descriptor in &mut task_manager_descriptor.task_descriptors {
-                        if task_descriptor.task_id.eq(&task_id) {
-                            task_descriptor.thread_id = format!("0x{:x}", thread_id);
-                        }
-                    }
-                }
                 HeartbeatItem::TaskEnd { task_id } => {
                     for task_descriptor in &mut task_manager_descriptor.task_descriptors {
                         if task_descriptor.task_id.eq(&task_id) {
