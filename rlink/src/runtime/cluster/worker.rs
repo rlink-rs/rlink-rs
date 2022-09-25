@@ -34,29 +34,26 @@ where
     let web_address = web_serve(context.clone()).await;
     info!("serve worker web ui {}", web_address);
 
-    let (heartbeat_publish, checkpoint_publish) =
-        start_timing_task(&cluster_descriptor, context.deref()).await;
-    info!("start timing task");
+    let checkpoint_publish = start_checkpoint_task(&cluster_descriptor).await;
+    info!("start checkpoint timer");
 
     let window_timer = start_window_timer().await;
     info!("bootstrap window timer");
 
-    register_worker(
-        heartbeat_publish.deref(),
+    let heartbeat_publish = start_heartbeat_task(
+        &cluster_descriptor,
         context.deref(),
         server_addr,
         web_address.as_str(),
-    );
-    info!("register worker to coordinator");
+    )
+    .await;
+    info!("start heartbeat timer and register worker to coordinator");
 
     let cluster_descriptor = waiting_all_task_manager_fine(metadata_loader.borrow_mut()).await;
     info!("all task manager is fine");
 
     let dag_metadata = load_dag_metadata(metadata_loader.borrow_mut()).await;
     info!("load dag metadata success");
-
-    bootstrap_subscribe_client(cluster_descriptor.clone());
-    info!("bootstrap subscribe client");
 
     let join_handles = run_tasks(
         cluster_descriptor.clone(),
@@ -73,9 +70,6 @@ where
     for join_handle in join_handles {
         join_handle.await.unwrap();
     }
-    // join_handles.into_iter().for_each(|join_handle| {
-    //     join_handle.join().unwrap();
-    // });
 
     stop_heartbeat_timer(heartbeat_publish.deref()).await;
     info!("work end");
@@ -113,45 +107,45 @@ async fn bootstrap_publish_serve(bind_ip: String) -> SocketAddr {
     }
 }
 
-fn bootstrap_subscribe_client(_cluster_descriptor: Arc<ClusterDescriptor>) {
-    // utils::thread::spawn("subscribe_client", move || {
-    //     network::run_subscribe(cluster_descriptor)
-    // });
-}
-
 async fn web_serve(context: Arc<Context>) -> String {
     let address = web_launch(context).await;
     address
 }
 
-async fn start_timing_task(
+async fn start_heartbeat_task(
     cluster_descriptor: &ClusterDescriptor,
     context: &Context,
-    // bind_addr: SocketAddr,
-) -> (Arc<HeartbeatPublish>, Arc<CheckpointPublish>) {
+    bind_addr: SocketAddr,
+    web_addr: &str,
+) -> Arc<HeartbeatPublish> {
     let coordinator_address = cluster_descriptor.coordinator_manager.web_address.clone();
     let task_manager_id = context.task_manager_id.clone();
 
     let heartbeat_publish =
         HeartbeatPublish::new(coordinator_address.clone(), task_manager_id.clone()).await;
-    let checkpoint_publish = CheckpointPublish::new(coordinator_address.clone()).await;
 
-    (Arc::new(heartbeat_publish), Arc::new(checkpoint_publish))
+    heartbeat_publish
+        .report(HeartbeatItem::WorkerAddrs {
+            address: bind_addr.to_string(),
+            web_address: web_addr.to_string(),
+            metrics_address: context.metric_addr.clone(),
+        })
+        .await;
+    heartbeat_publish.start_heartbeat_timer().await;
+
+    Arc::new(heartbeat_publish)
+}
+
+async fn start_checkpoint_task(cluster_descriptor: &ClusterDescriptor) -> Arc<CheckpointPublish> {
+    let coordinator_address = cluster_descriptor.coordinator_manager.web_address.clone();
+    let checkpoint_publish = CheckpointPublish::new(coordinator_address).await;
+    Arc::new(checkpoint_publish)
 }
 
 async fn stop_heartbeat_timer(heartbeat_publish: &HeartbeatPublish) {
-    heartbeat_publish.report(HeartbeatItem::HeartBeatStatus(HeartBeatStatus::End));
-}
-
-fn register_worker(
-    heartbeat_publish: &HeartbeatPublish,
-    context: &Context,
-    bind_addr: SocketAddr,
-    web_addr: &str,
-) {
-    heartbeat_publish.report(HeartbeatItem::WorkerManagerWebAddress(web_addr.to_string()));
-    heartbeat_publish.report(HeartbeatItem::WorkerManagerAddress(bind_addr.to_string()));
-    heartbeat_publish.report(HeartbeatItem::MetricsAddress(context.metric_addr.clone()));
+    heartbeat_publish
+        .report(HeartbeatItem::HeartBeatStatus(HeartBeatStatus::End))
+        .await;
 }
 
 async fn waiting_all_task_manager_fine(

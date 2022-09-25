@@ -73,14 +73,14 @@ impl TMetadataStorage for MemoryMetadataStorage {
         let mut exist_task_end_hb = false;
         for heartbeat_item in heartbeat_items {
             match heartbeat_item {
-                HeartbeatItem::MetricsAddress(addr) => {
-                    task_manager_descriptor.metrics_address = addr;
-                }
-                HeartbeatItem::WorkerManagerAddress(addr) => {
-                    task_manager_descriptor.task_manager_address = addr;
-                }
-                HeartbeatItem::WorkerManagerWebAddress(addr) => {
-                    task_manager_descriptor.web_address = addr;
+                HeartbeatItem::WorkerAddrs {
+                    address,
+                    web_address,
+                    metrics_address,
+                } => {
+                    task_manager_descriptor.task_manager_address = address;
+                    task_manager_descriptor.web_address = web_address;
+                    task_manager_descriptor.metrics_address = metrics_address;
                 }
                 HeartbeatItem::HeartBeatStatus(status) => {
                     task_manager_descriptor.latest_heart_beat_status = status;

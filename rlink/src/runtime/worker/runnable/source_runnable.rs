@@ -206,15 +206,17 @@ impl SourceRunnable {
         Ok(())
     }
 
-    fn report_end_status(&self) {
-        self.context
-            .as_ref()
-            .unwrap()
-            .task_context
-            .heartbeat_publish()
+    fn task_context(&self) -> Arc<WorkerTaskContext> {
+        self.context.as_ref().unwrap().task_context.clone()
+    }
+
+    async fn report_end_status(&self) {
+        let heartbeat_publish = self.task_context().heartbeat_publish();
+        heartbeat_publish
             .report(HeartbeatItem::TaskEnd {
                 task_id: self.task_id,
-            });
+            })
+            .await;
     }
 }
 
@@ -389,7 +391,7 @@ impl Runnable for SourceRunnable {
 
                     if parent_job_terminated {
                         info!("all parents job stop on stream_status event");
-                        self.report_end_status();
+                        self.report_end_status().await;
                     }
                 }
             }

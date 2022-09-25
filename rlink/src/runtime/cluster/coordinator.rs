@@ -7,7 +7,6 @@ use crate::runtime::coordinator::CoordinatorTask;
 
 pub(crate) async fn run<S, R>(
     context: Arc<Context>,
-    // stream_env: StreamExecutionEnvironment,
     stream_app: S,
     resource_manager: R,
 ) -> anyhow::Result<()>

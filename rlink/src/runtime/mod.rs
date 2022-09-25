@@ -97,11 +97,15 @@ impl std::fmt::Display for ManagerType {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum HeartbeatItem {
-    WorkerManagerAddress(String),
-    WorkerManagerWebAddress(String),
-    MetricsAddress(String),
+    WorkerAddrs {
+        address: String,
+        web_address: String,
+        metrics_address: String,
+    },
     HeartBeatStatus(HeartBeatStatus),
-    TaskEnd { task_id: TaskId },
+    TaskEnd {
+        task_id: TaskId,
+    },
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
