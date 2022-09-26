@@ -317,13 +317,17 @@ impl MetadataProxyAddressLoader {
     }
 }
 
+#[async_trait]
 impl ProxyAddressLoader for MetadataProxyAddressLoader {
-    fn load(&self) -> Vec<String> {
+    async fn load(&self) -> Vec<String> {
         if !self.with_proxy {
             return vec![];
         }
 
-        match MetadataStorage::new(&self.metadata_storage_type).load() {
+        match MetadataStorage::new(&self.metadata_storage_type)
+            .load()
+            .await
+        {
             Ok(cluster_descriptor) => cluster_descriptor
                 .worker_managers
                 .iter()

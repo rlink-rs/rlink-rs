@@ -4,8 +4,6 @@ use crate::core::element::Record;
 use crate::storage::keyed_state::mem_storage::remove_drop_window;
 use crate::storage::keyed_state::{StateIterator, StateKey, TReducingState};
 
-// type RecordBuildHasher = std::hash::BuildHasherDefault<RecordHasher>;
-
 #[derive(Clone)]
 pub struct MemoryReducingState {
     state_key: StateKey,

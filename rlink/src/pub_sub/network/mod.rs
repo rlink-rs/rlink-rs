@@ -11,7 +11,6 @@ use crate::core::runtime::ChannelKey;
 pub(crate) mod client;
 pub(crate) mod server;
 
-pub(crate) use client::run_subscribe;
 pub(crate) use client::subscribe;
 pub(crate) use server::publish;
 pub(crate) use server::Server;

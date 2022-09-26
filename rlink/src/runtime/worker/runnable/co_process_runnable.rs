@@ -1,3 +1,4 @@
+use futures::StreamExt;
 use std::collections::HashMap;
 
 use crate::core::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
@@ -5,7 +6,6 @@ use crate::core::element::Element;
 use crate::core::function::CoProcessFunction;
 use crate::core::operator::DefaultStreamOperator;
 use crate::core::runtime::{JobId, OperatorId};
-use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
 pub(crate) struct CoProcessRunnable {
@@ -38,9 +38,10 @@ impl CoProcessRunnable {
     }
 }
 
+#[async_trait]
 impl Runnable for CoProcessRunnable {
-    fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
-        self.next_runnable.as_mut().unwrap().open(context)?;
+    async fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
+        self.next_runnable.as_mut().unwrap().open(context).await?;
 
         self.context = Some(context.clone());
 
@@ -64,12 +65,15 @@ impl Runnable for CoProcessRunnable {
         }
 
         let fun_context = context.to_fun_context(self.operator_id);
-        self.stream_co_process.operator_fn.open(&fun_context)?;
+        self.stream_co_process
+            .operator_fn
+            .open(&fun_context)
+            .await?;
 
         Ok(())
     }
 
-    fn run(&mut self, element: Element) {
+    async fn run(&mut self, element: Element) {
         match element {
             Element::Record(record) => {
                 let stream_seq = *self
@@ -77,23 +81,22 @@ impl Runnable for CoProcessRunnable {
                     .get(&record.channel_key.source_task_id.job_id)
                     .expect("parent job not found");
 
-                let records = if stream_seq == self.parent_jobs.len() - 1 {
+                let mut element_stream = if stream_seq == self.parent_jobs.len() - 1 {
                     self.stream_co_process
                         .operator_fn
                         .as_mut()
                         .process_left(record)
+                        .await
                 } else {
                     self.stream_co_process
                         .operator_fn
                         .as_mut()
                         .process_right(stream_seq, record)
+                        .await
                 };
 
-                for record in records {
-                    self.next_runnable
-                        .as_mut()
-                        .unwrap()
-                        .run(Element::Record(record));
+                while let Some(element) = element_stream.next().await {
+                    self.next_runnable.as_mut().unwrap().run(element).await;
                 }
             }
             Element::Barrier(barrier) => {
@@ -102,33 +105,35 @@ impl Runnable for CoProcessRunnable {
                     let context = self.context.as_ref().unwrap();
                     context.checkpoint_context(self.operator_id, checkpoint_id, None)
                 };
-                self.checkpoint(snapshot_context);
+                self.checkpoint(snapshot_context).await;
 
                 self.next_runnable
                     .as_mut()
                     .unwrap()
-                    .run(Element::Barrier(barrier));
+                    .run(Element::Barrier(barrier))
+                    .await;
             }
             _ => {
-                self.next_runnable.as_mut().unwrap().run(element);
+                self.next_runnable.as_mut().unwrap().run(element).await;
             }
         }
     }
 
-    fn close(&mut self) -> anyhow::Result<()> {
-        self.stream_co_process.operator_fn.close()?;
-        self.next_runnable.as_mut().unwrap().close()
+    async fn close(&mut self) -> anyhow::Result<()> {
+        self.stream_co_process.operator_fn.close().await?;
+        self.next_runnable.as_mut().unwrap().close().await
     }
 
     fn set_next_runnable(&mut self, next_runnable: Option<Box<dyn Runnable>>) {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext) {
+    async fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext) {
         let handle = self
             .stream_co_process
             .operator_fn
             .snapshot_state(&snapshot_context)
+            .await
             .unwrap_or(CheckpointHandle::default());
 
         let ck = Checkpoint {
@@ -138,7 +143,7 @@ impl Runnable for CoProcessRunnable {
             completed_checkpoint_id: snapshot_context.completed_checkpoint_id,
             handle,
         };
-        submit_checkpoint(ck).map(|ck| {
+        snapshot_context.report(ck).map(|ck| {
             error!(
                 "{:?} submit checkpoint error. maybe report channel is full, checkpoint: {:?}",
                 snapshot_context.operator_id, ck

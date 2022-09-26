@@ -2,72 +2,76 @@ use std::borrow::{Borrow, BorrowMut};
 use std::net::SocketAddr;
 use std::ops::Deref;
 use std::sync::Arc;
-use std::thread::JoinHandle;
 use std::time::Duration;
 
-use crate::core::env::{StreamApp, StreamExecutionEnvironment};
+use tokio::task::JoinHandle;
+
+use crate::core::env::StreamApp;
 use crate::core::runtime::{ClusterDescriptor, ManagerStatus, WorkerManagerDescriptor};
 use crate::dag::metadata::DagMetadata;
 use crate::pub_sub::network;
 use crate::runtime::context::Context;
 use crate::runtime::timer::{start_window_timer, WindowTimer};
-use crate::runtime::worker::checkpoint::start_report_checkpoint;
-use crate::runtime::worker::heart_beat::{start_heartbeat_timer, submit_heartbeat};
+use crate::runtime::worker::checkpoint::CheckpointPublish;
+use crate::runtime::worker::heart_beat::HeartbeatPublish;
 use crate::runtime::worker::web_server::web_launch;
+use crate::runtime::worker::WorkerTaskContext;
 use crate::runtime::{worker, HeartBeatStatus, HeartbeatItem};
 use crate::storage::metadata::MetadataLoader;
-use crate::utils;
-use crate::utils::thread::async_runtime_single;
 
-pub(crate) fn run<S>(
-    context: Arc<Context>,
-    stream_env: StreamExecutionEnvironment,
-    stream_app: S,
-) -> anyhow::Result<()>
+pub(crate) async fn run<S>(context: Arc<Context>, stream_app: S) -> anyhow::Result<()>
 where
     S: StreamApp + 'static,
 {
     let mut metadata_loader = MetadataLoader::new(context.coordinator_address.as_str());
 
-    let cluster_descriptor = metadata_loader.get_cluster_descriptor();
+    let cluster_descriptor = metadata_loader.get_cluster_descriptor().await;
     info!("preload `ClusterDescriptor`");
 
-    let server_addr = bootstrap_publish_serve(context.bind_ip.to_string());
+    let server_addr = bootstrap_publish_serve(context.bind_ip.to_string()).await;
     info!("bootstrap publish server, listen: {}", server_addr);
 
-    let web_address = web_serve(context.clone());
+    let web_address = web_serve(context.clone()).await;
     info!("serve worker web ui {}", web_address);
 
-    start_timing_task(&cluster_descriptor, context.deref(), server_addr);
-    info!("start timing task");
+    let checkpoint_publish = start_checkpoint_task(&cluster_descriptor).await;
+    info!("start checkpoint timer");
 
-    let window_timer = start_window_timer();
+    let window_timer = start_window_timer().await;
     info!("bootstrap window timer");
 
-    let cluster_descriptor = waiting_all_task_manager_fine(metadata_loader.borrow_mut());
+    let heartbeat_publish = start_heartbeat_task(
+        &cluster_descriptor,
+        context.deref(),
+        server_addr,
+        web_address.as_str(),
+    )
+    .await;
+    info!("start heartbeat timer and register worker to coordinator");
+
+    let cluster_descriptor = waiting_all_task_manager_fine(metadata_loader.borrow_mut()).await;
     info!("all task manager is fine");
 
-    let dag_metadata = load_dag_metadata(metadata_loader.borrow_mut());
+    let dag_metadata = load_dag_metadata(metadata_loader.borrow_mut()).await;
     info!("load dag metadata success");
-
-    bootstrap_subscribe_client(cluster_descriptor.clone());
-    info!("bootstrap subscribe client");
 
     let join_handles = run_tasks(
         cluster_descriptor.clone(),
         dag_metadata,
         context.clone(),
         window_timer,
-        stream_env,
+        checkpoint_publish,
+        heartbeat_publish.clone(),
         stream_app,
-    );
+    )
+    .await;
     info!("all task has bootstrap");
 
-    join_handles.into_iter().for_each(|join_handle| {
-        join_handle.join().unwrap();
-    });
+    for join_handle in join_handles {
+        join_handle.await.unwrap();
+    }
 
-    stop_heartbeat_timer();
+    stop_heartbeat_timer(heartbeat_publish.deref()).await;
     info!("work end");
 
     Ok(())
@@ -86,85 +90,92 @@ fn get_worker_manager_descriptor(
     None
 }
 
-fn bootstrap_publish_serve(bind_ip: String) -> SocketAddr {
+async fn bootstrap_publish_serve(bind_ip: String) -> SocketAddr {
     let worker_service = network::Server::new(bind_ip);
     let worker_service_clone = worker_service.clone();
-    utils::thread::spawn("publish_serve", move || worker_service_clone.serve_sync());
+    tokio::spawn(async move {
+        // TODO error handle
+        worker_service_clone.serve().await.unwrap();
+    });
     loop {
-        match worker_service.bind_addr_sync() {
+        match worker_service.bind_addr().await {
             Some(addr) => {
                 return addr;
             }
-            None => std::thread::sleep(Duration::from_secs(1)),
+            None => tokio::time::sleep(Duration::from_secs(1)).await,
         }
     }
 }
 
-fn bootstrap_subscribe_client(cluster_descriptor: Arc<ClusterDescriptor>) {
-    utils::thread::spawn("subscribe_client", move || {
-        network::run_subscribe(cluster_descriptor)
-    });
-}
-
-fn web_serve(context: Arc<Context>) -> String {
-    let address = web_launch(context);
-    submit_heartbeat(HeartbeatItem::WorkerManagerWebAddress(address.clone()));
+async fn web_serve(context: Arc<Context>) -> String {
+    let address = web_launch(context).await;
     address
 }
 
-fn start_timing_task(
+async fn start_heartbeat_task(
     cluster_descriptor: &ClusterDescriptor,
     context: &Context,
     bind_addr: SocketAddr,
-) {
-    submit_heartbeat(HeartbeatItem::WorkerManagerAddress(bind_addr.to_string()));
-    submit_heartbeat(HeartbeatItem::MetricsAddress(context.metric_addr.clone()));
-
+    web_addr: &str,
+) -> Arc<HeartbeatPublish> {
     let coordinator_address = cluster_descriptor.coordinator_manager.web_address.clone();
     let task_manager_id = context.task_manager_id.clone();
 
-    crate::utils::thread::spawn("timer", move || {
-        async_runtime_single().block_on(async move {
-            let j1 = tokio::spawn(start_heartbeat_timer(
-                coordinator_address.clone(),
-                task_manager_id.clone(),
-            ));
-            let j2 = tokio::spawn(start_report_checkpoint(coordinator_address.clone()));
-            let _ = tokio::join!(j1, j2);
-        });
-    });
+    let heartbeat_publish =
+        HeartbeatPublish::new(coordinator_address.clone(), task_manager_id.clone()).await;
+
+    let status = HeartbeatItem::WorkerAddrs {
+        address: bind_addr.to_string(),
+        web_address: web_addr.to_string(),
+        metrics_address: context.metric_addr.clone(),
+    };
+    heartbeat_publish.report(status).await;
+
+    heartbeat_publish.start_heartbeat_timer().await;
+
+    Arc::new(heartbeat_publish)
 }
 
-fn stop_heartbeat_timer() {
-    submit_heartbeat(HeartbeatItem::HeartBeatStatus(HeartBeatStatus::End));
+async fn start_checkpoint_task(cluster_descriptor: &ClusterDescriptor) -> Arc<CheckpointPublish> {
+    let coordinator_address = cluster_descriptor.coordinator_manager.web_address.clone();
+    let checkpoint_publish = CheckpointPublish::new(coordinator_address).await;
+    Arc::new(checkpoint_publish)
 }
 
-fn waiting_all_task_manager_fine(metadata_loader: &mut MetadataLoader) -> Arc<ClusterDescriptor> {
-    Arc::new(waiting_all_task_manager_fine0(metadata_loader))
+async fn stop_heartbeat_timer(heartbeat_publish: &HeartbeatPublish) {
+    let status = HeartbeatItem::HeartBeatStatus(HeartBeatStatus::End);
+    heartbeat_publish.report(status).await;
 }
 
-fn waiting_all_task_manager_fine0(metadata_loader: &mut MetadataLoader) -> ClusterDescriptor {
+async fn waiting_all_task_manager_fine(
+    metadata_loader: &mut MetadataLoader,
+) -> Arc<ClusterDescriptor> {
+    Arc::new(waiting_all_task_manager_fine0(metadata_loader).await)
+}
+
+async fn waiting_all_task_manager_fine0(metadata_loader: &mut MetadataLoader) -> ClusterDescriptor {
     loop {
-        let cluster_descriptor = metadata_loader.get_cluster_descriptor();
+        let cluster_descriptor = metadata_loader.get_cluster_descriptor().await;
         match cluster_descriptor.coordinator_manager.status {
             ManagerStatus::Registered => {
                 return cluster_descriptor;
             }
-            _ => std::thread::sleep(Duration::from_secs(2)),
+            _ => tokio::time::sleep(Duration::from_secs(2)).await,
         }
     }
 }
 
-fn load_dag_metadata(metadata_loader: &mut MetadataLoader) -> Arc<DagMetadata> {
-    Arc::new(metadata_loader.get_dag_metadata())
+async fn load_dag_metadata(metadata_loader: &mut MetadataLoader) -> Arc<DagMetadata> {
+    Arc::new(metadata_loader.get_dag_metadata().await)
 }
 
-fn run_tasks<S>(
+async fn run_tasks<S>(
     cluster_descriptor: Arc<ClusterDescriptor>,
     dag_metadata: Arc<DagMetadata>,
     context: Arc<Context>,
     window_timer: WindowTimer,
-    stream_env: StreamExecutionEnvironment,
+    checkpoint_publish: Arc<CheckpointPublish>,
+    heartbeat_publish: Arc<HeartbeatPublish>,
     stream_app: S,
 ) -> Vec<JoinHandle<()>>
 where
@@ -175,19 +186,21 @@ where
     let task_manager_descriptors =
         get_worker_manager_descriptor(task_manager_id, cluster_descriptor.borrow()).unwrap();
 
-    task_manager_descriptors
-        .task_descriptors
-        .iter()
-        .map(|task_descriptor| {
-            worker::run(
-                context.clone(),
-                dag_metadata.clone(),
-                cluster_descriptor.clone(),
-                task_descriptor.clone(),
-                stream_app.clone(),
-                &stream_env,
-                window_timer.clone(),
-            )
-        })
-        .collect()
+    let mut join_handles = Vec::with_capacity(task_manager_descriptors.task_descriptors.len());
+    for task_descriptor in &task_manager_descriptors.task_descriptors {
+        let task_context = WorkerTaskContext::new(
+            context.clone(),
+            dag_metadata.clone(),
+            cluster_descriptor.clone(),
+            task_descriptor.clone(),
+            window_timer.clone(),
+            checkpoint_publish.clone(),
+            heartbeat_publish.clone(),
+        );
+
+        let join_handle = worker::run(Arc::new(task_context), stream_app.clone()).await;
+        join_handles.push(join_handle);
+    }
+
+    join_handles
 }

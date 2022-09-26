@@ -9,14 +9,14 @@ use elasticsearch::http::request::JsonBody;
 use elasticsearch::http::transport::{SingleNodeConnectionPool, TransportBuilder};
 use elasticsearch::http::Url;
 use elasticsearch::{BulkParts, Elasticsearch};
-use rlink::channel::utils::handover::Handover;
-use rlink::core::checkpoint::CheckpointFunction;
-use rlink::core::element::{FnSchema, Record};
+use rlink::channel::receiver::ChannelReceiver;
+use rlink::channel::sender::ChannelSender;
+use rlink::channel::{named_channel, TryRecvError};
+use rlink::core;
+use rlink::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
+use rlink::core::element::{Element, FnSchema, Record};
 use rlink::core::function::{Context, NamedFunction, OutputFormat};
-use rlink::utils::thread::{async_runtime, async_sleep, async_spawn};
-use rlink::{core, utils};
 use serde_json::Value;
-use thiserror::Error;
 
 pub struct ElasticsearchModel {
     pub index: String,
@@ -59,7 +59,7 @@ pub struct ElasticsearchOutputFormat {
     headers: HashMap<String, String>,
 
     builder: Arc<Box<dyn ElasticsearchConverter>>,
-    handover: Option<Handover>,
+    sender: Option<ChannelSender<Record>>,
 }
 
 impl ElasticsearchOutputFormat {
@@ -72,38 +72,43 @@ impl ElasticsearchOutputFormat {
             address: address.to_string(),
             headers,
             builder: Arc::new(builder),
-            handover: None,
+            sender: None,
         }
     }
 }
 
+#[async_trait]
 impl OutputFormat for ElasticsearchOutputFormat {
-    fn open(&mut self, context: &Context) -> core::Result<()> {
-        self.handover = Some(Handover::new(self.name(), context.task_id.to_tags(), 10000));
+    async fn open(&mut self, context: &Context) -> core::Result<()> {
+        let (sender, receiver) = named_channel(self.name(), context.task_id.to_tags(), 10000);
+        self.sender = Some(sender);
 
         let mut write_thead = ElasticsearchWriteThread::new(
             self.address.as_str(),
             self.headers.clone(),
-            self.handover.as_ref().unwrap().clone(),
+            receiver,
             3000,
         )
         .expect("build elasticsearch connection error");
 
         let convert = self.builder.clone();
-        utils::thread::spawn("elastic-sink-block", move || {
-            async_runtime("es_sink").block_on(async {
-                write_thead.run(convert, 5).await;
-            });
+        tokio::spawn(async move {
+            write_thead.run(convert).await;
         });
 
         Ok(())
     }
 
-    fn write_record(&mut self, record: Record) {
-        self.handover.as_ref().unwrap().produce(record).unwrap();
+    async fn write_element(&mut self, element: Element) {
+        self.sender
+            .as_ref()
+            .unwrap()
+            .send(element.into_record())
+            .await
+            .unwrap();
     }
 
-    fn close(&mut self) -> core::Result<()> {
+    async fn close(&mut self) -> core::Result<()> {
         Ok(())
     }
 
@@ -112,20 +117,34 @@ impl OutputFormat for ElasticsearchOutputFormat {
     }
 }
 
-impl CheckpointFunction for ElasticsearchOutputFormat {}
+#[async_trait]
+impl CheckpointFunction for ElasticsearchOutputFormat {
+    async fn initialize_state(
+        &mut self,
+        _context: &FunctionSnapshotContext,
+        _handle: &Option<CheckpointHandle>,
+    ) {
+    }
 
-#[derive(Clone)]
+    async fn snapshot_state(
+        &mut self,
+        _context: &FunctionSnapshotContext,
+    ) -> Option<CheckpointHandle> {
+        None
+    }
+}
+
 pub struct ElasticsearchWriteThread {
     client: Elasticsearch,
     batch_size: usize,
-    handover: Handover,
+    receiver: ChannelReceiver<Record>,
 }
 
 impl ElasticsearchWriteThread {
     pub fn new(
         address: &str,
         headers: HashMap<String, String>,
-        handover: Handover,
+        receiver: ChannelReceiver<Record>,
         batch_size: usize,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let mut header_map = HeaderMap::new();
@@ -144,30 +163,13 @@ impl ElasticsearchWriteThread {
         Ok(ElasticsearchWriteThread {
             client,
             batch_size,
-            handover,
+            receiver,
         })
     }
 
-    pub async fn run(
-        &mut self,
-        converters: Arc<Box<dyn ElasticsearchConverter>>,
-        parallelism: usize,
-    ) {
-        let mut join_handlers = Vec::new();
-        for _ in 0..parallelism {
-            let mut self_clone = self.clone();
-            let converter = converters.clone();
-
-            let handler = async_spawn(async move {
-                self_clone.run0(converter).await;
-            });
-
-            join_handlers.push(handler);
-        }
-
-        for handler in join_handlers {
-            handler.await.unwrap();
-        }
+    pub async fn run(&mut self, converters: Arc<Box<dyn ElasticsearchConverter>>) {
+        let converter = converters.clone();
+        self.run0(converter).await;
     }
 
     pub async fn run0(&mut self, converter: Arc<Box<dyn ElasticsearchConverter>>) {
@@ -175,24 +177,24 @@ impl ElasticsearchWriteThread {
             match self.batch_send(&converter).await {
                 Ok(len) => {
                     if len == 0 {
-                        async_sleep(Duration::from_secs(1)).await;
+                        tokio::time::sleep(Duration::from_secs(1)).await;
                     }
                 }
                 Err(e) => {
                     error!("write elasticsearch error. {}", e);
-                    async_sleep(Duration::from_millis(100)).await;
+                    tokio::time::sleep(Duration::from_millis(100)).await;
                 }
             }
         }
     }
 
     async fn batch_send(
-        &self,
+        &mut self,
         converter: &Box<dyn ElasticsearchConverter>,
-    ) -> Result<usize, Box<dyn std::error::Error + Send>> {
+    ) -> anyhow::Result<usize> {
         let mut bulk_bodies = Vec::with_capacity(self.batch_size);
         for _ in 0..self.batch_size {
-            match self.handover.try_poll_next() {
+            match self.receiver.try_recv() {
                 Ok(mut record) => {
                     let ElasticsearchModel {
                         index,
@@ -207,26 +209,22 @@ impl ElasticsearchWriteThread {
 
                     bulk_bodies.push(JsonBody::new(body));
                 }
-                Err(_e) => {
+                Err(TryRecvError::Empty) => {
                     break;
+                }
+                Err(TryRecvError::Disconnected) => {
+                    return Err(anyhow!("clickhouse channel has been disconnected"));
                 }
             }
         }
 
         let len = bulk_bodies.len();
-        self.flush(bulk_bodies).await.map_err(|e| {
-            let err = std::io::Error::new(std::io::ErrorKind::Other, format!("{}", e));
-            let source: Box<dyn std::error::Error + Send> = Box::new(err);
-            source
-        })?;
+        self.flush(bulk_bodies).await?;
 
         Ok(len)
     }
 
-    async fn flush(
-        &self,
-        body_bulk: Vec<JsonBody<Value>>,
-    ) -> Result<bool, Box<dyn std::error::Error>> {
+    async fn flush(&self, body_bulk: Vec<JsonBody<Value>>) -> anyhow::Result<bool> {
         if body_bulk.len() == 0 {
             return Ok(true);
         }
@@ -242,18 +240,9 @@ impl ElasticsearchWriteThread {
             .ok_or(anyhow!("no errors field in es response"))?;
 
         if errors {
-            let err = std::io::Error::new(std::io::ErrorKind::Other, "");
-            let source: Box<dyn std::error::Error + Send> = Box::new(err);
-            Err(source)
+            Err(anyhow!("elasticsearch send error, {}", response_body))
         } else {
             Ok(true)
         }
     }
-}
-
-#[derive(Error, Debug)]
-#[error("boxed source")]
-pub struct BoxedSource {
-    #[source]
-    source: Box<dyn std::error::Error + Send + 'static>,
 }

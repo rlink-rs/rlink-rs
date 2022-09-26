@@ -1,9 +1,12 @@
-use std::time::Duration;
+use std::task::{Context, Poll};
 
-use crate::channel::{Receiver, RecvError, RecvTimeoutError, TryRecvError, CHANNEL_SIZE_PREFIX};
+use tokio::sync::mpsc::Receiver;
+
+use crate::channel::TryRecvError;
+use crate::channel::CHANNEL_SIZE_PREFIX;
 use crate::metrics::metric::{Counter, Gauge};
 
-#[derive(Clone)]
+#[derive(Debug)]
 pub struct ChannelReceiver<T>
 where
     T: Sync + Send,
@@ -39,24 +42,34 @@ where
         self.drain_counter.fetch_add(1 as u64);
     }
 
-    pub fn try_recv(&self) -> Result<T, TryRecvError> {
+    pub fn try_recv(&mut self) -> Result<T, TryRecvError> {
         self.receiver.try_recv().map(|event| {
             self.on_success();
             event
         })
     }
 
-    pub fn recv(&self) -> Result<T, RecvError> {
-        self.receiver.recv().map(|event| {
+    pub async fn recv(&mut self) -> Option<T> {
+        let t = self.receiver.recv().await;
+        if t.is_some() {
             self.on_success();
-            event
-        })
+        }
+        t
     }
 
-    pub fn recv_timeout(&self, timeout: Duration) -> Result<T, RecvTimeoutError> {
-        self.receiver.recv_timeout(timeout).map(|event| {
-            self.on_success();
-            event
-        })
+    pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
+        match self.receiver.poll_recv(cx) {
+            Poll::Ready(t) => {
+                if t.is_some() {
+                    self.on_success();
+                }
+                Poll::Ready(t)
+            }
+            Poll::Pending => Poll::Pending,
+        }
+    }
+
+    pub fn close(&mut self) {
+        self.receiver.close();
     }
 }

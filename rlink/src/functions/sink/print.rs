@@ -1,8 +1,8 @@
 use std::time::Duration;
 
-use crate::core::checkpoint::CheckpointFunction;
+use crate::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
 use crate::core::data_types::{DataType, Schema};
-use crate::core::element::{FnSchema, Record};
+use crate::core::element::{Element, FnSchema};
 use crate::core::function::{Context, NamedFunction, OutputFormat};
 use crate::core::runtime::TaskId;
 use crate::core::window::TWindow;
@@ -30,8 +30,9 @@ impl PrintOutputFormat {
     }
 }
 
+#[async_trait]
 impl OutputFormat for PrintOutputFormat {
-    fn open(&mut self, context: &Context) -> crate::core::Result<()> {
+    async fn open(&mut self, context: &Context) -> crate::core::Result<()> {
         self.task_id = context.task_id;
         self.schema = context.input_schema.clone().into();
 
@@ -47,7 +48,8 @@ impl OutputFormat for PrintOutputFormat {
         Ok(())
     }
 
-    fn write_record(&mut self, mut record: Record) {
+    async fn write_element(&mut self, element: Element) {
+        let mut record = element.into_record();
         let reader = record.as_buffer().as_reader(self.schema.as_type_ids());
         let mut field_str_vec = Vec::new();
         for i in 0..self.schema.fields().len() {
@@ -101,7 +103,7 @@ impl OutputFormat for PrintOutputFormat {
         );
     }
 
-    fn close(&mut self) -> crate::core::Result<()> {
+    async fn close(&mut self) -> crate::core::Result<()> {
         Ok(())
     }
 
@@ -116,4 +118,19 @@ impl NamedFunction for PrintOutputFormat {
     }
 }
 
-impl CheckpointFunction for PrintOutputFormat {}
+#[async_trait]
+impl CheckpointFunction for PrintOutputFormat {
+    async fn initialize_state(
+        &mut self,
+        _context: &FunctionSnapshotContext,
+        _handle: &Option<CheckpointHandle>,
+    ) {
+    }
+
+    async fn snapshot_state(
+        &mut self,
+        _context: &FunctionSnapshotContext,
+    ) -> Option<CheckpointHandle> {
+        None
+    }
+}

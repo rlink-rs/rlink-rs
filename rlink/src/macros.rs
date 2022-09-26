@@ -15,7 +15,7 @@ macro_rules! loop_fn {
                 }
                 std::result::Result::Err(err) => {
                     error!("loop function({}) error. {}", stringify!($expr), err);
-                    std::thread::sleep($dur);
+                    tokio::time::sleep($dur).await;
                 }
             }
         }
@@ -59,8 +59,8 @@ mod tests {
         }
     }
 
-    #[test]
-    pub fn loop_result_test() {
+    #[tokio::test]
+    pub async fn loop_result_test() {
         let mut value = 0i64;
         let n: String = loop_fn!(
             mock(value.borrow_mut()),

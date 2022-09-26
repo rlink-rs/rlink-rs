@@ -6,6 +6,8 @@ extern crate log;
 extern crate rlink_derive;
 #[macro_use]
 extern crate anyhow;
+#[macro_use]
+extern crate async_trait;
 
 pub mod sink;
 pub mod source;

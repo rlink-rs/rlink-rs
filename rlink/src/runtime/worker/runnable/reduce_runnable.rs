@@ -8,7 +8,6 @@ use crate::core::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::core::window::{TWindow, Window};
 use crate::metrics::metric::Counter;
 use crate::metrics::register_counter;
-use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
 pub(crate) struct ReduceRunnable {
@@ -51,19 +50,26 @@ impl ReduceRunnable {
     }
 }
 
+#[async_trait]
 impl Runnable for ReduceRunnable {
-    fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
-        self.next_runnable.as_mut().unwrap().open(context)?;
+    async fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
+        self.next_runnable.as_mut().unwrap().open(context).await?;
 
-        self.task_id = context.task_descriptor.task_id;
+        self.task_id = context.task_context.task_descriptor.task_id;
 
         self.context = Some(context.clone());
 
         let fun_context = context.to_fun_context(self.operator_id);
-        self.stream_reduce.operator_fn.open(&fun_context)?;
-        self.stream_key_by
-            .as_mut()
-            .map(|s| s.operator_fn.open(&fun_context));
+        self.stream_reduce.operator_fn.open(&fun_context).await?;
+        match self.stream_key_by.as_mut() {
+            Some(s) => {
+                s.operator_fn.open(&fun_context).await?;
+            }
+            None => {}
+        }
+        // self.stream_key_by
+        //     .as_mut()
+        //     .map(|s| s.operator_fn.open(&fun_context).await);
 
         let fn_name = self.stream_reduce.operator_fn.as_ref().name();
 
@@ -76,7 +82,7 @@ impl Runnable for ReduceRunnable {
         Ok(())
     }
 
-    fn run(&mut self, element: Element) {
+    async fn run(&mut self, element: Element) {
         match element {
             Element::Record(mut record) => {
                 // Record expiration check
@@ -98,11 +104,17 @@ impl Runnable for ReduceRunnable {
                 }
 
                 let key = match &self.stream_key_by {
-                    Some(stream_key_by) => stream_key_by.operator_fn.get_key(record.borrow_mut()),
+                    Some(stream_key_by) => {
+                        stream_key_by.operator_fn.get_key(record.borrow_mut()).await
+                    }
                     None => Record::with_capacity(0),
                 };
 
-                self.stream_reduce.operator_fn.as_mut().reduce(key, record);
+                self.stream_reduce
+                    .operator_fn
+                    .as_mut()
+                    .reduce(key, record)
+                    .await;
 
                 self.counter.fetch_add(1);
             }
@@ -115,12 +127,14 @@ impl Runnable for ReduceRunnable {
                         .stream_reduce
                         .operator_fn
                         .as_mut()
-                        .drop_state(min_watermark_window.min_timestamp());
+                        .drop_state(min_watermark_window.min_timestamp())
+                        .await;
                     for drop_event in drop_events {
                         self.next_runnable
                             .as_mut()
                             .unwrap()
-                            .run(Element::from(drop_event));
+                            .run(Element::from(drop_event))
+                            .await;
                     }
                 }
                 None => {
@@ -133,7 +147,7 @@ impl Runnable for ReduceRunnable {
                     let context = self.context.as_ref().unwrap();
                     context.checkpoint_context(self.operator_id, checkpoint_id, None)
                 };
-                self.checkpoint(snapshot_context);
+                self.checkpoint(snapshot_context).await;
 
                 if let Some(completed_checkpoint_id) = self.completed_checkpoint_id {
                     barrier.set_completed_checkpoint_id(completed_checkpoint_id);
@@ -141,32 +155,41 @@ impl Runnable for ReduceRunnable {
                 self.next_runnable
                     .as_mut()
                     .unwrap()
-                    .run(Element::Barrier(barrier));
+                    .run(Element::Barrier(barrier))
+                    .await;
             }
             Element::StreamStatus(stream_status) => {
                 self.next_runnable
                     .as_mut()
                     .unwrap()
-                    .run(Element::StreamStatus(stream_status));
+                    .run(Element::StreamStatus(stream_status))
+                    .await;
             }
         }
     }
 
-    fn close(&mut self) -> anyhow::Result<()> {
-        self.stream_key_by.as_mut().map(|s| s.operator_fn.close());
-        self.stream_reduce.operator_fn.close()?;
-        self.next_runnable.as_mut().unwrap().close()
+    async fn close(&mut self) -> anyhow::Result<()> {
+        match self.stream_key_by.as_mut() {
+            Some(s) => {
+                s.operator_fn.close().await?;
+            }
+            None => {}
+        }
+        // self.stream_key_by.as_mut().map(|s| s.operator_fn.close().await);
+        self.stream_reduce.operator_fn.close().await?;
+        self.next_runnable.as_mut().unwrap().close().await
     }
 
     fn set_next_runnable(&mut self, next_runnable: Option<Box<dyn Runnable>>) {
         self.next_runnable = next_runnable;
     }
 
-    fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext) {
+    async fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext) {
         let handle = self
             .stream_reduce
             .operator_fn
             .snapshot_state(&snapshot_context)
+            .await
             .unwrap_or(CheckpointHandle::default());
 
         let fn_handle = ReduceCheckpointHandle::from(handle.handle.as_str());
@@ -181,7 +204,7 @@ impl Runnable for ReduceRunnable {
                 handle: fn_handle.to_windows_string(),
             },
         };
-        submit_checkpoint(ck).map(|ck| {
+        snapshot_context.report(ck).map(|ck| {
             error!(
                 "{:?} submit checkpoint error. maybe report channel is full, checkpoint: {:?}",
                 snapshot_context.operator_id, ck

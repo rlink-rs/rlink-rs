@@ -55,8 +55,9 @@ impl WindowBaseReduceFunction {
     }
 }
 
+#[async_trait]
 impl BaseReduceFunction for WindowBaseReduceFunction {
-    fn open(&mut self, context: &Context) -> crate::core::Result<()> {
+    async fn open(&mut self, context: &Context) -> crate::core::Result<()> {
         let task_id = context.task_id;
         let application_id = context.application_id.clone();
 
@@ -73,12 +74,13 @@ impl BaseReduceFunction for WindowBaseReduceFunction {
             task_id.task_number(),
             state_mode,
         ));
-        self.initialize_state(&context.checkpoint_context(), &context.checkpoint_handle);
+        self.initialize_state(&context.checkpoint_context(), &context.checkpoint_handle)
+            .await;
 
-        self.reduce.open(context)
+        self.reduce.open(context).await
     }
 
-    fn reduce(&mut self, key: Record, mut record: Record) {
+    async fn reduce(&mut self, key: Record, mut record: Record) {
         // check skip window
         if self.skip_windows.len() > 0 {
             if let Some(windows) = record.location_windows.borrow_mut() {
@@ -97,7 +99,7 @@ impl BaseReduceFunction for WindowBaseReduceFunction {
         self.windows_gauge.store(window_count as i64);
     }
 
-    fn drop_state(&mut self, watermark_timestamp: u64) -> Vec<Record> {
+    async fn drop_state(&mut self, watermark_timestamp: u64) -> Vec<Record> {
         let state = self.state.as_mut().unwrap();
         let mut drop_windows = Vec::new();
         let mut window_count = 0;
@@ -140,7 +142,7 @@ impl BaseReduceFunction for WindowBaseReduceFunction {
         }
     }
 
-    fn close(&mut self) -> crate::core::Result<()> {
+    async fn close(&mut self) -> crate::core::Result<()> {
         Ok(())
     }
 
@@ -165,8 +167,9 @@ impl NamedFunction for WindowBaseReduceFunction {
     }
 }
 
+#[async_trait]
 impl CheckpointFunction for WindowBaseReduceFunction {
-    fn initialize_state(
+    async fn initialize_state(
         &mut self,
         _context: &FunctionSnapshotContext,
         handle: &Option<CheckpointHandle>,
@@ -180,7 +183,10 @@ impl CheckpointFunction for WindowBaseReduceFunction {
         }
     }
 
-    fn snapshot_state(&mut self, context: &FunctionSnapshotContext) -> Option<CheckpointHandle> {
+    async fn snapshot_state(
+        &mut self,
+        context: &FunctionSnapshotContext,
+    ) -> Option<CheckpointHandle> {
         let windows = self.state.as_ref().unwrap().windows();
         let mut windows_map = HashMap::with_capacity(windows.len());
         windows.iter().for_each(|w| {

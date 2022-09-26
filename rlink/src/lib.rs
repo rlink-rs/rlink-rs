@@ -6,6 +6,8 @@ extern crate log;
 extern crate lazy_static;
 #[macro_use]
 extern crate anyhow;
+#[macro_use]
+extern crate async_trait;
 
 #[macro_use]
 mod macros;

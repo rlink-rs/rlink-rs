@@ -11,12 +11,14 @@ pub enum HeartbeatResult {
 }
 
 /// heartbeat timeout check
-pub(crate) fn start_heartbeat_timer(metadata_storage_mode: MetadataStorageType) -> HeartbeatResult {
+pub(crate) async fn start_heartbeat_timer(
+    metadata_storage_mode: MetadataStorageType,
+) -> HeartbeatResult {
     let metadata_storage = MetadataStorage::new(&metadata_storage_mode);
     loop {
-        std::thread::sleep(Duration::from_secs(3));
+        tokio::time::sleep(Duration::from_secs(3)).await;
 
-        let cluster_descriptor = loop_read_cluster_descriptor(&metadata_storage);
+        let cluster_descriptor = loop_read_cluster_descriptor(&metadata_storage).await;
 
         if cluster_descriptor.coordinator_manager.status == ManagerStatus::Terminated {
             return HeartbeatResult::End;

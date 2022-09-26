@@ -4,11 +4,12 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use clickhouse_rs::{ClientHandle, Options, Pool};
-use rlink::channel::utils::handover::Handover;
-use rlink::core::checkpoint::CheckpointFunction;
-use rlink::core::element::{FnSchema, Record};
+use rlink::channel::receiver::ChannelReceiver;
+use rlink::channel::sender::ChannelSender;
+use rlink::channel::{named_channel, TryRecvError};
+use rlink::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
+use rlink::core::element::{Element, FnSchema, Record};
 use rlink::core::function::{Context, NamedFunction, OutputFormat};
-use rlink::utils::thread::{async_runtime, async_sleep, async_spawn};
 use rlink::{core, utils};
 
 pub type CkBlock = clickhouse_rs::Block;
@@ -28,9 +29,8 @@ pub struct ClickhouseSink {
     table: String,
     batch_size: usize,
     batch_timeout: Duration,
-    tasks: usize,
     converter: Arc<Box<dyn ClickhouseConverter>>,
-    handover: Option<Handover>,
+    sender: Option<ChannelSender<Record>>,
 }
 
 impl ClickhouseSink {
@@ -39,7 +39,6 @@ impl ClickhouseSink {
         table: &str,
         batch_size: usize,
         batch_timeout: Duration,
-        tasks: usize,
         builder: Box<dyn ClickhouseConverter>,
     ) -> Self {
         ClickhouseSink {
@@ -47,16 +46,17 @@ impl ClickhouseSink {
             table: table.to_string(),
             batch_size,
             batch_timeout,
-            tasks,
             converter: Arc::new(builder),
-            handover: None,
+            sender: None,
         }
     }
 }
 
+#[async_trait]
 impl OutputFormat for ClickhouseSink {
-    fn open(&mut self, context: &Context) -> core::Result<()> {
-        self.handover = Some(Handover::new(self.name(), context.task_id.to_tags(), 10000));
+    async fn open(&mut self, context: &Context) -> core::Result<()> {
+        let (sender, receiver) = named_channel(self.name(), context.task_id.to_tags(), 10000);
+        self.sender = Some(sender);
 
         let urls: Vec<&str> = self.url.split(",").collect();
         let url = if urls.len() > 1 {
@@ -74,23 +74,25 @@ impl OutputFormat for ClickhouseSink {
             self.batch_size,
             self.batch_timeout,
             self.converter.clone(),
-            self.handover.as_ref().unwrap().clone(),
+            receiver,
         );
-        let tasks = self.tasks;
-        utils::thread::spawn("clickhouse-sink-block", move || {
-            async_runtime("ck_sink").block_on(async {
-                task.run(tasks).await;
-            });
+        tokio::spawn(async move {
+            task.run().await.unwrap();
         });
 
         Ok(())
     }
 
-    fn write_record(&mut self, record: Record) {
-        self.handover.as_ref().unwrap().produce(record).unwrap();
+    async fn write_element(&mut self, element: Element) {
+        self.sender
+            .as_ref()
+            .unwrap()
+            .send(element.into_record())
+            .await
+            .unwrap();
     }
 
-    fn close(&mut self) -> core::Result<()> {
+    async fn close(&mut self) -> core::Result<()> {
         Ok(())
     }
 
@@ -99,16 +101,30 @@ impl OutputFormat for ClickhouseSink {
     }
 }
 
-impl CheckpointFunction for ClickhouseSink {}
+#[async_trait]
+impl CheckpointFunction for ClickhouseSink {
+    async fn initialize_state(
+        &mut self,
+        _context: &FunctionSnapshotContext,
+        _handle: &Option<CheckpointHandle>,
+    ) {
+    }
 
-#[derive(Clone)]
+    async fn snapshot_state(
+        &mut self,
+        _context: &FunctionSnapshotContext,
+    ) -> Option<CheckpointHandle> {
+        None
+    }
+}
+
 pub struct ClickhouseSinkTask {
     pool: Pool,
     table: String,
     batch_size: usize,
     batch_timeout: Duration,
     converter: Arc<Box<dyn ClickhouseConverter>>,
-    handover: Handover,
+    receiver: ChannelReceiver<Record>,
 }
 
 impl ClickhouseSinkTask {
@@ -118,7 +134,7 @@ impl ClickhouseSinkTask {
         batch_size: usize,
         batch_timeout: Duration,
         builder: Arc<Box<dyn ClickhouseConverter>>,
-        handover: Handover,
+        handover: ChannelReceiver<Record>,
     ) -> Self {
         let opts = Options::from_str(url).expect("parse clickhouse url error");
         let pool = Pool::new(opts);
@@ -128,39 +144,39 @@ impl ClickhouseSinkTask {
             batch_size,
             batch_timeout,
             converter: builder,
-            handover,
+            receiver: handover,
         }
     }
 
-    pub async fn run(&mut self, tasks: usize) {
-        let mut join_handlers = Vec::new();
-        for _ in 0..tasks {
-            let mut self_clone = self.clone();
+    // pub async fn run(&mut self, tasks: usize) {
+    //     let mut join_handlers = Vec::new();
+    //     for _ in 0..tasks {
+    //         let mut self_clone = self.clone();
+    //
+    //         let handler = async_spawn(async move {
+    //             match self_clone.run0().await {
+    //                 Ok(_) => {}
+    //                 Err(e) => {
+    //                     error!("run task error. {}", e);
+    //                 }
+    //             }
+    //         });
+    //
+    //         join_handlers.push(handler);
+    //     }
+    //
+    //     for handler in join_handlers {
+    //         handler.await.unwrap();
+    //     }
+    // }
 
-            let handler = async_spawn(async move {
-                match self_clone.run0().await {
-                    Ok(_) => {}
-                    Err(e) => {
-                        error!("run task error. {}", e);
-                    }
-                }
-            });
-
-            join_handlers.push(handler);
-        }
-
-        for handler in join_handlers {
-            handler.await.unwrap();
-        }
-    }
-
-    pub async fn run0(&mut self) -> anyhow::Result<()> {
+    pub async fn run(&mut self) -> anyhow::Result<()> {
         let mut client = self.pool.get_handle().await?;
         loop {
             match self.batch_send(client.borrow_mut()).await {
                 Ok(len) => {
                     if len == 0 {
-                        async_sleep(Duration::from_secs(1)).await;
+                        tokio::time::sleep(Duration::from_secs(1)).await;
                     }
                 }
                 Err(e) => {
@@ -176,7 +192,7 @@ impl ClickhouseSinkTask {
     async fn reconnection(&mut self, client: &mut ClientHandle) -> anyhow::Result<()> {
         let mut err = None;
         for _ in 0..180 {
-            async_sleep(Duration::from_secs(1)).await;
+            tokio::time::sleep(Duration::from_secs(1)).await;
             match client.check_connection().await {
                 Ok(_) => {
                     err = None;
@@ -200,17 +216,20 @@ impl ClickhouseSinkTask {
         let begin_timestamp = utils::date_time::current_timestamp();
         let mut size = 0;
         for n in 0..self.batch_size {
-            match self.handover.try_poll_next() {
+            match self.receiver.try_recv() {
                 Ok(record) => {
                     batch_block.append(record);
                     size = n;
                 }
-                Err(_e) => {
-                    async_sleep(Duration::from_millis(100)).await;
+                Err(TryRecvError::Empty) => {
+                    tokio::time::sleep(Duration::from_millis(100)).await;
                     let current_timestamp = utils::date_time::current_timestamp();
                     if current_timestamp - begin_timestamp > self.batch_timeout {
                         break;
                     }
+                }
+                Err(TryRecvError::Disconnected) => {
+                    return Err(anyhow!("clickhouse channel has been disconnected"));
                 }
             }
         }

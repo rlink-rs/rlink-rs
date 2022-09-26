@@ -16,19 +16,20 @@ impl RangeFilterFunction {
     }
 }
 
+#[async_trait]
 impl FilterFunction for RangeFilterFunction {
-    fn open(&mut self, _context: &rlink::core::function::Context) -> rlink::core::Result<()> {
+    async fn open(&mut self, _context: &rlink::core::function::Context) -> rlink::core::Result<()> {
         Ok(())
     }
 
-    fn filter(&self, record: &mut rlink::core::element::Record) -> bool {
+    async fn filter(&self, record: &mut rlink::core::element::Record) -> bool {
         if let Some(window) = record.trigger_window() {
             return window.min_timestamp() >= self.left || window.max_timestamp() <= self.right;
         }
         return false;
     }
 
-    fn close(&mut self) -> rlink::core::Result<()> {
+    async fn close(&mut self) -> rlink::core::Result<()> {
         Ok(())
     }
 }

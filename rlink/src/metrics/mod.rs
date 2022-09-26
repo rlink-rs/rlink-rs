@@ -15,8 +15,9 @@ pub use metric::register_counter;
 pub use metric::register_gauge;
 pub use metric::Tag;
 
+#[async_trait]
 pub trait ProxyAddressLoader: Sync + Send {
-    fn load(&self) -> Vec<String>;
+    async fn load(&self) -> Vec<String>;
 }
 
 pub struct DefaultProxyAddressLoader {
@@ -29,8 +30,9 @@ impl DefaultProxyAddressLoader {
     }
 }
 
+#[async_trait]
 impl ProxyAddressLoader for DefaultProxyAddressLoader {
-    fn load(&self) -> Vec<String> {
+    async fn load(&self) -> Vec<String> {
         self.proxy_address.clone()
     }
 }
@@ -56,7 +58,7 @@ pub(crate) fn init_metrics(
 ) -> Option<SocketAddr> {
     let proxy_address_loader = Arc::new(proxy_address_loader);
 
-    let mut rng = rand::thread_rng();
+    let mut rng = thread_rng();
     let loops = 30;
     for _index in 0..loops {
         let port = rng.gen_range(10000..30000);

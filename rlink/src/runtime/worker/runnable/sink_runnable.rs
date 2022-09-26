@@ -6,7 +6,6 @@ use crate::core::runtime::{OperatorId, TaskId};
 use crate::dag::job_graph::JobEdge;
 use crate::metrics::metric::Counter;
 use crate::metrics::register_counter;
-use crate::runtime::worker::checkpoint::submit_checkpoint;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
 pub(crate) struct SinkRunnable {
@@ -39,11 +38,12 @@ impl SinkRunnable {
     }
 }
 
+#[async_trait]
 impl Runnable for SinkRunnable {
-    fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
+    async fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
         self.context = Some(context.clone());
 
-        self.task_id = context.task_descriptor.task_id;
+        self.task_id = context.task_context.task_descriptor.task_id;
         let child_jobs = context.child_jobs();
         self.child_parallelism = if child_jobs.len() > 1 {
             unimplemented!()
@@ -63,7 +63,7 @@ impl Runnable for SinkRunnable {
         );
 
         let fun_context = context.to_fun_context(self.operator_id);
-        self.stream_sink.operator_fn.open(&fun_context)?;
+        self.stream_sink.operator_fn.open(&fun_context).await?;
 
         self.counter = register_counter(
             format!("Sink_{}", self.stream_sink.operator_fn.as_ref().name()),
@@ -73,12 +73,13 @@ impl Runnable for SinkRunnable {
         Ok(())
     }
 
-    fn run(&mut self, element: Element) {
+    async fn run(&mut self, element: Element) {
         match element {
             Element::Record(record) => {
                 self.stream_sink
                     .operator_fn
-                    .write_element(Element::Record(record));
+                    .write_element(Element::Record(record))
+                    .await;
 
                 self.counter.fetch_add(1);
             }
@@ -95,7 +96,7 @@ impl Runnable for SinkRunnable {
                             completed_checkpoint_id,
                         )
                     };
-                    self.checkpoint(snapshot_context);
+                    self.checkpoint(snapshot_context).await;
                 }
 
                 match self.stream_sink.fn_creator() {
@@ -107,11 +108,11 @@ impl Runnable for SinkRunnable {
                                 ele.set_partition(index);
                                 debug!("downstream barrier: {}", index);
 
-                                self.stream_sink.operator_fn.write_element(ele);
+                                self.stream_sink.operator_fn.write_element(ele).await;
                             }
                         } else {
                             debug!("downstream barrier");
-                            self.stream_sink.operator_fn.write_element(element);
+                            self.stream_sink.operator_fn.write_element(element).await;
                         }
                     }
                     FunctionCreator::User => {}
@@ -120,8 +121,8 @@ impl Runnable for SinkRunnable {
         }
     }
 
-    fn close(&mut self) -> anyhow::Result<()> {
-        self.stream_sink.operator_fn.close()?;
+    async fn close(&mut self) -> anyhow::Result<()> {
+        self.stream_sink.operator_fn.close().await?;
         Ok(())
     }
 
@@ -129,11 +130,12 @@ impl Runnable for SinkRunnable {
         unimplemented!()
     }
 
-    fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext) {
+    async fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext) {
         let handle = self
             .stream_sink
             .operator_fn
             .snapshot_state(&snapshot_context)
+            .await
             .unwrap_or(CheckpointHandle::default());
 
         let ck = Checkpoint {
@@ -143,7 +145,7 @@ impl Runnable for SinkRunnable {
             completed_checkpoint_id: snapshot_context.completed_checkpoint_id,
             handle,
         };
-        submit_checkpoint(ck).map(|ck| {
+        snapshot_context.report(ck).map(|ck| {
             error!(
                 "{:?} submit checkpoint error. maybe report channel is full, checkpoint: {:?}",
                 snapshot_context.operator_id, ck

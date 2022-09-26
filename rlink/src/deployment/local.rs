@@ -2,7 +2,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use crate::core::cluster::TaskResourceInfo;
-use crate::core::env::{StreamApp, StreamExecutionEnvironment};
+use crate::core::env::StreamApp;
 use crate::core::runtime::ClusterDescriptor;
 use crate::deployment::{Resource, TResourceManager};
 use crate::runtime::context::Context;
@@ -23,16 +23,13 @@ impl LocalResourceManager {
     }
 }
 
+#[async_trait]
 impl TResourceManager for LocalResourceManager {
     fn prepare(&mut self, _context: &Context, cluster_descriptor: &ClusterDescriptor) {
         self.cluster_descriptor = Some(cluster_descriptor.clone());
     }
 
-    fn worker_allocate<S>(
-        &self,
-        stream_app: &S,
-        _stream_env: &StreamExecutionEnvironment,
-    ) -> anyhow::Result<Vec<TaskResourceInfo>>
+    async fn worker_allocate<S>(&self, stream_app: &S) -> anyhow::Result<Vec<TaskResourceInfo>>
     where
         S: StreamApp + 'static,
     {
@@ -54,27 +51,40 @@ impl TResourceManager for LocalResourceManager {
                 cluster_descriptor.coordinator_manager.web_address.clone();
 
             let stream_app_clone = stream_app.clone();
-            std::thread::Builder::new()
-                .name(format!(
-                    "TaskManager(id={})",
-                    &task_manager_descriptor.task_manager_id
-                ))
-                .spawn(move || {
-                    let stream_env = StreamExecutionEnvironment::new();
-                    match cluster::run_task(Arc::new(context_clone), stream_env, stream_app_clone) {
-                        Ok(_) => {}
-                        Err(e) => {
-                            panic!("TaskManager error. {}", e)
-                        }
+            tokio::spawn(async move {
+                match cluster::run_task(Arc::new(context_clone), stream_app_clone).await {
+                    Ok(_) => {
+                        info!("allocate local worker");
                     }
-                })
-                .unwrap();
+                    Err(e) => {
+                        panic!("TaskManager error. {}", e)
+                    }
+                }
+            });
+
+            // std::thread::Builder::new()
+            //     .name(format!(
+            //         "TaskManager(id={})",
+            //         &task_manager_descriptor.task_manager_id
+            //     ))
+            //     .spawn(move || {
+            //         let stream_env = StreamExecutionEnvironment::new();
+            //         match cluster::run_task(Arc::new(context_clone), stream_env, stream_app_clone)
+            //             .await
+            //         {
+            //             Ok(_) => {}
+            //             Err(e) => {
+            //                 panic!("TaskManager error. {}", e)
+            //             }
+            //         }
+            //     })
+            //     .unwrap();
         }
 
         Ok(Vec::new())
     }
 
-    fn stop_workers(&self, _task_ids: Vec<TaskResourceInfo>) -> anyhow::Result<()> {
+    async fn stop_workers(&self, _task_ids: Vec<TaskResourceInfo>) -> anyhow::Result<()> {
         Ok(())
     }
 }

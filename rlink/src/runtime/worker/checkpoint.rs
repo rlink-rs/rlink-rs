@@ -1,60 +1,62 @@
-use std::time::Duration;
+use std::fmt::{Debug, Formatter};
 
-use crate::channel::{bounded, Receiver, Sender, TryRecvError, TrySendError};
+use crate::channel::{bounded, Receiver, Sender, TrySendError};
 use crate::core::checkpoint::Checkpoint;
 use crate::core::cluster::StdResponse;
 use crate::utils::date_time;
 use crate::utils::http::client::post;
-use crate::utils::thread::async_sleep;
 
-pub struct CheckpointChannel {
-    sender: Sender<Checkpoint>,
-    receiver: Receiver<Checkpoint>,
+#[derive(Clone, Default)]
+pub struct CheckpointPublish {
+    sender: Option<Sender<Checkpoint>>,
 }
 
-impl CheckpointChannel {
-    pub fn new() -> Self {
+impl Debug for CheckpointPublish {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("CheckpointPublish").finish()
+    }
+}
+
+impl CheckpointPublish {
+    pub async fn new(coordinator_address: String) -> Self {
         let (sender, receiver) = bounded::<Checkpoint>(100);
-        CheckpointChannel { sender, receiver }
+        Self::start_report_checkpoint(coordinator_address, receiver).await;
+
+        Self {
+            sender: Some(sender),
+        }
     }
-}
 
-lazy_static! {
-    static ref CK_CHANNEL: CheckpointChannel = CheckpointChannel::new();
-}
-
-pub(crate) fn submit_checkpoint(ck: Checkpoint) -> Option<Checkpoint> {
-    let ck_channel = &*CK_CHANNEL;
-
-    debug!("report checkpoint: {:?}", &ck);
-    match ck_channel.sender.try_send(ck) {
-        Ok(_) => None,
-        Err(TrySendError::Full(ck)) => Some(ck),
-        Err(TrySendError::Disconnected(_ck)) => panic!("the Checkpoint channel is disconnected"),
+    async fn start_report_checkpoint(
+        coordinator_address: String,
+        mut receiver: Receiver<Checkpoint>,
+    ) {
+        info!("checkpoint loop starting...");
+        tokio::spawn(async move {
+            loop {
+                match receiver.recv().await {
+                    Some(ck) => {
+                        report_checkpoint(coordinator_address.as_str(), ck).await;
+                    }
+                    None => {
+                        panic!("the Checkpoint channel is disconnected")
+                    }
+                }
+            }
+        });
     }
-}
 
-pub(crate) async fn start_report_checkpoint(coordinator_address: String) {
-    info!("checkpoint loop starting...");
-
-    let ck_channel = &*CK_CHANNEL;
-
-    loop {
-        match ck_channel.receiver.try_recv() {
-            Ok(ck) => {
-                report_checkpoint(coordinator_address.as_str(), ck).await;
-            }
-            Err(TryRecvError::Empty) => {
-                async_sleep(Duration::from_secs(2)).await;
-            }
-            Err(TryRecvError::Disconnected) => {
-                panic!("the Checkpoint channel is disconnected")
-            }
+    pub(crate) fn report(&self, ck: Checkpoint) -> Option<Checkpoint> {
+        debug!("report checkpoint: {:?}", &ck);
+        match self.sender.as_ref().unwrap().try_send(ck) {
+            Ok(_) => None,
+            Err(TrySendError::Full(ck)) => Some(ck),
+            Err(TrySendError::Closed(_ck)) => panic!("the Checkpoint channel is disconnected"),
         }
     }
 }
 
-pub(crate) async fn report_checkpoint(coordinator_address: &str, ck: Checkpoint) {
+async fn report_checkpoint(coordinator_address: &str, ck: Checkpoint) {
     let url = format!("{}/api/checkpoint", coordinator_address);
 
     let body = serde_json::to_string(&ck).unwrap();
