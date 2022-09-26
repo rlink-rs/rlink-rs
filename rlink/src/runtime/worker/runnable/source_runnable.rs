@@ -77,42 +77,24 @@ impl SourceRunnable {
         running: Arc<AtomicBool>,
         daemon_task: bool,
     ) {
-        let stream = self.stream_source.operator_fn.element_stream().await;
-
+        let op_name = self.stream_source.operator_fn.name().to_string();
+        let mut stream = self.stream_source.operator_fn.element_stream().await;
         tokio::spawn(async move {
-            match SourceRunnable::poll_input_element0(
-                task_context,
-                stream,
-                sender,
-                running,
-                daemon_task,
-            )
-            .await
-            {
-                Ok(_) => info!("poll input_element task finish"),
-                Err(e) => panic!("poll_input_element thread error. {}", e),
+            while let Some(element) = stream.next().await {
+                if let Err(_e) = sender.send(element).await {
+                    error!("[{}] channel has closed", op_name);
+                    break;
+                }
+
+                if daemon_task && task_context.get_coordinator_status().is_terminating() {
+                    info!("[{}] daemon source stop by coordinator stop", op_name);
+                    break;
+                }
             }
+
+            running.store(false, Ordering::Relaxed);
+            info!("[{}] stream reached end", op_name);
         });
-    }
-
-    async fn poll_input_element0(
-        task_context: Arc<WorkerTaskContext>,
-        mut stream: SendableElementStream,
-        sender: ChannelSender<Element>,
-        running: Arc<AtomicBool>,
-        daemon_task: bool,
-    ) -> anyhow::Result<()> {
-        while let Some(element) = stream.next().await {
-            sender.send(element).await.map_err(|e| anyhow!(e))?;
-
-            if daemon_task && task_context.get_coordinator_status().is_terminating() {
-                info!("daemon source stop by coordinator stop");
-                break;
-            }
-        }
-
-        running.store(false, Ordering::Relaxed);
-        Ok(())
     }
 
     async fn poll_stream_status(
@@ -121,47 +103,28 @@ impl SourceRunnable {
         sender: ChannelSender<Element>,
         running: Arc<AtomicBool>,
     ) {
-        let stream_status_timer = self.stream_status_timer.take().unwrap();
-        // let stream_status_timer = self.stream_status_timer.as_ref().unwrap().clone();
+        let op_name = self.stream_source.operator_fn.name().to_string();
+        let mut stream_status_timer = self.stream_status_timer.take().unwrap();
         tokio::spawn(async move {
-            match SourceRunnable::poll_stream_status0(
-                task_context,
-                stream_status_timer,
-                sender,
-                running,
-            )
-            .await
-            {
-                Ok(_) => info!("poll stream_status task finish"),
-                Err(e) => warn!("poll stream_status thread error. {}", e),
-            }
-        });
-    }
+            while let Some(window_time) = stream_status_timer.recv().await {
+                let running = running.load(Ordering::Relaxed);
 
-    async fn poll_stream_status0(
-        task_context: Arc<WorkerTaskContext>,
-        mut stream_status_timer: TimerChannel,
-        sender: ChannelSender<Element>,
-        running: Arc<AtomicBool>,
-    ) -> anyhow::Result<()> {
-        loop {
-            let running = running.load(Ordering::Relaxed);
-
-            let window_time = stream_status_timer
-                .recv()
-                .await
-                .ok_or(anyhow!("timer closed"))?;
-            let stream_status = Element::new_stream_status(window_time, !running);
-            sender.send(stream_status).await.map_err(|e| anyhow!(e))?;
-
-            if !running {
-                info!("StreamStatus WindowTimer stop");
-                if task_context.get_coordinator_status().is_terminated() {
+                let stream_status = Element::new_stream_status(window_time, !running);
+                if let Err(_e) = sender.send(stream_status).await {
+                    error!("[{}] channel has closed", op_name);
                     break;
                 }
+
+                if !running {
+                    info!("[{}] StreamStatus WindowTimer stop", op_name);
+                    if task_context.get_coordinator_status().is_terminated() {
+                        return;
+                    }
+                }
             }
-        }
-        Ok(())
+
+            info!("[{}] stream status timer closed", op_name);
+        });
     }
 
     async fn poll_checkpoint(
@@ -170,40 +133,26 @@ impl SourceRunnable {
         sender: ChannelSender<Element>,
         running: Arc<AtomicBool>,
     ) {
-        let checkpoint_timer = self.checkpoint_timer.take().unwrap();
+        let op_name = self.stream_source.operator_fn.name().to_string();
+        let mut checkpoint_timer = self.checkpoint_timer.take().unwrap();
         tokio::spawn(async move {
-            match SourceRunnable::poll_checkpoint0(task_context, checkpoint_timer, sender, running)
-                .await
-            {
-                Ok(_) => info!("poll checkpoint task finish"),
-                Err(e) => warn!("poll checkpoint thread error. {}", e),
-            }
-        });
-    }
-
-    async fn poll_checkpoint0(
-        task_context: Arc<WorkerTaskContext>,
-        mut checkpoint_timer: TimerChannel,
-        sender: ChannelSender<Element>,
-        running: Arc<AtomicBool>,
-    ) -> anyhow::Result<()> {
-        loop {
-            let window_time = checkpoint_timer
-                .recv()
-                .await
-                .ok_or(anyhow!("timer closed"))?;
-            let barrier = Element::new_barrier(CheckpointId(window_time));
-            sender.send(barrier).await.map_err(|e| anyhow!(e))?;
-
-            let running = running.load(Ordering::Relaxed);
-            if !running {
-                info!("Checkpoint WindowTimer stop");
-                if task_context.get_coordinator_status().is_terminated() {
+            while let Some(window_time) = checkpoint_timer.recv().await {
+                let barrier = Element::new_barrier(CheckpointId(window_time));
+                if let Err(_e) = sender.send(barrier).await {
+                    error!("[{}] channel has closed", op_name);
                     break;
                 }
+
+                let running = running.load(Ordering::Relaxed);
+                if !running {
+                    info!("[{}] Checkpoint WindowTimer stop", op_name);
+                    if task_context.get_coordinator_status().is_terminated() {
+                        return;
+                    }
+                }
             }
-        }
-        Ok(())
+            info!("[{}] checkpoint timer closed", op_name);
+        });
     }
 
     fn task_context(&self) -> Arc<WorkerTaskContext> {
