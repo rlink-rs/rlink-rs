@@ -35,7 +35,6 @@ impl FlatMapFunction for RoundRobinFlagMapFunction {
         self.partition_num += 1;
 
         Box::pin(MemoryStream::new(vec![record]))
-        // Box::new(vec![record].into_iter())
     }
 
     async fn close(&mut self) -> crate::core::Result<()> {

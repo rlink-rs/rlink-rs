@@ -6,17 +6,17 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use futures::StreamExt;
+use metrics::Counter;
 
 use crate::channel::named_channel;
 use crate::channel::sender::ChannelSender;
 use crate::channel::utils::ChannelStream;
 use crate::core::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
 use crate::core::element::{Element, StreamStatus, Watermark};
-use crate::core::function::{ElementStream, InputFormat, SendableElementStream};
+use crate::core::function::{ElementStream, InputFormat};
 use crate::core::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
 use crate::core::runtime::{CheckpointId, JobId, OperatorId, TaskId};
 use crate::core::watermark::MAX_WATERMARK;
-use crate::metrics::metric::Counter;
 use crate::metrics::register_counter;
 use crate::runtime::timer::TimerChannel;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
@@ -66,7 +66,7 @@ impl SourceRunnable {
             barrier_alignment: AlignManager::default(),
             stream_status_alignment: AlignManager::default(),
             watermark_manager: WatermarkManager::default(),
-            counter: Counter::default(),
+            counter: Counter::noop(),
         }
     }
 
@@ -279,7 +279,7 @@ impl Runnable for SourceRunnable {
             match element {
                 Element::Record(_) => {
                     self.next_runnable.as_mut().unwrap().run(element).await;
-                    self.counter.fetch_add(1);
+                    self.counter.increment(1);
                 }
                 Element::Barrier(barrier) => {
                     let is_barrier_align = self.barrier_alignment.apply(barrier.checkpoint_id.0);

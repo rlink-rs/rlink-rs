@@ -18,6 +18,8 @@ use crate::core::checkpoint::Checkpoint;
 use crate::core::cluster::{MetadataStorageType, StdResponse};
 use crate::core::runtime::ManagerStatus;
 use crate::dag::metadata::DagMetadata;
+use crate::metrics::metric_handle;
+use crate::metrics::worker_proxy::collect_worker_metrics;
 use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
 use crate::runtime::HeartbeatRequest;
 use crate::storage::metadata::{MetadataStorage, TMetadataStorage};
@@ -119,6 +121,7 @@ async fn route(req: Request<Body>, web_context: Arc<WebContext>) -> anyhow::Resu
                 "/api/dag/job_graph" => get_job_graph(req, web_context).await,
                 "/api/dag/execution_graph" => get_execution_graph(req, web_context).await,
                 "/api/threads" => get_thread_infos(req, web_context).await,
+                "/api/metrics" => metrics(req, web_context).await,
                 _ => page_not_found().await,
             }
         } else if Method::POST.eq(method) {
@@ -137,6 +140,19 @@ async fn route(req: Request<Body>, web_context: Arc<WebContext>) -> anyhow::Resu
             page_not_found().await
         }
     }
+}
+
+async fn metrics(_req: Request<Body>, context: Arc<WebContext>) -> anyhow::Result<Response<Body>> {
+    let worker_renders = collect_worker_metrics(
+        !context.context.cluster_mode.is_local(),
+        context.metadata_mode.clone(),
+    )
+    .await;
+
+    let render = metric_handle().await.render();
+
+    let render = format!("{}\n{}\n", worker_renders, render);
+    Ok(Response::new(Body::from(render)))
 }
 
 async fn get_context(

@@ -60,7 +60,7 @@ pub trait FunctionProperties {
     fn extend_custom(&mut self, fn_name: &str, properties: Properties);
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct Properties {
     name: String,
     properties: HashMap<String, String>,

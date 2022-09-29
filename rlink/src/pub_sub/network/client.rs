@@ -225,7 +225,7 @@ impl Client {
                     }
                 }
 
-                counter.fetch_add(len as u64);
+                counter.increment(len as u64);
             }
             if len < 100 {
                 tokio::time::sleep(Duration::from_secs(3)).await;

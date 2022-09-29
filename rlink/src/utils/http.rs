@@ -28,16 +28,6 @@ pub mod client {
     use hyper::{Body, Client, Request};
     use serde::Serialize;
 
-    // pub fn post_sync<T>(
-    //     url: String,
-    //     body: String,
-    // ) -> Result<T, Box<dyn std::error::Error + Send + Sync>>
-    // where
-    //     T: Serialize + serde::de::DeserializeOwned + 'static,
-    // {
-    //     async_runtime("http-client").block_on(post(url, body))
-    // }
-
     pub async fn post<T>(
         url: String,
         body: String,
@@ -47,16 +37,6 @@ pub mod client {
     {
         request("POST", url, body).await
     }
-
-    // pub fn put_sync<T>(
-    //     url: String,
-    //     body: String,
-    // ) -> Result<T, Box<dyn std::error::Error + Send + Sync>>
-    // where
-    //     T: Serialize + serde::de::DeserializeOwned + 'static,
-    // {
-    //     async_runtime("http-client").block_on(put(url, body))
-    // }
 
     pub async fn put<T>(
         url: String,
@@ -92,11 +72,6 @@ pub mod client {
 
         Ok(result_json)
     }
-
-    // pub fn get_sync(url: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-    //     let url = url.to_string();
-    //     async_runtime_single().block_on(get(url.as_str()))
-    // }
 
     pub async fn get(url: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         let client = Client::new();

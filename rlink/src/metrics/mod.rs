@@ -1,107 +1,53 @@
-use std::net::SocketAddr;
-use std::sync::Arc;
-use std::time::Duration;
-
-use metrics_util::MetricKindMask;
-use rand::prelude::*;
-
-use crate::metrics::prometheus_exporter::PrometheusBuilder;
-
 pub mod metric;
-mod prometheus_exporter;
-mod worker_proxy;
+pub(crate) mod worker_proxy;
 
+use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle};
+use std::ops::Deref;
+use tokio::sync::RwLock;
+
+use crate::utils::process::sys_info_metric_task;
 pub use metric::register_counter;
 pub use metric::register_gauge;
 pub use metric::Tag;
 
-#[async_trait]
-pub trait ProxyAddressLoader: Sync + Send {
-    async fn load(&self) -> Vec<String>;
+#[derive(Clone)]
+pub(crate) struct MetricHandle {
+    prometheus_handle: PrometheusHandle,
 }
 
-pub struct DefaultProxyAddressLoader {
-    proxy_address: Vec<String>,
-}
+impl MetricHandle {
+    pub fn new(prometheus_handle: PrometheusHandle) -> Self {
+        Self { prometheus_handle }
+    }
 
-impl DefaultProxyAddressLoader {
-    pub fn new(proxy_address: Vec<String>) -> Self {
-        DefaultProxyAddressLoader { proxy_address }
+    pub fn render(&self) -> String {
+        self.prometheus_handle.render()
     }
 }
 
-#[async_trait]
-impl ProxyAddressLoader for DefaultProxyAddressLoader {
-    async fn load(&self) -> Vec<String> {
-        self.proxy_address.clone()
-    }
+lazy_static! {
+    static ref METRIC_HADNLE: RwLock<Option<MetricHandle>> = RwLock::new(None);
 }
 
-pub(crate) fn install(
-    addr: SocketAddr,
-    proxy_address_loader: Arc<Box<dyn ProxyAddressLoader>>,
-) -> anyhow::Result<()> {
-    PrometheusBuilder::new()
-        .listen_address(addr)
-        .idle_timeout(
-            MetricKindMask::COUNTER | MetricKindMask::HISTOGRAM,
-            Some(Duration::from_secs(10)),
-        )
-        .install(proxy_address_loader)?;
-
-    Ok(())
+pub(crate) async fn metric_handle() -> MetricHandle {
+    let metric_handle: &RwLock<Option<MetricHandle>> = &*METRIC_HADNLE;
+    let metric_handle = metric_handle.read().await;
+    let metric_handle = metric_handle.deref().clone();
+    metric_handle.unwrap()
 }
 
-pub(crate) fn init_metrics(
-    bind_ip: &str,
-    proxy_address_loader: Box<dyn ProxyAddressLoader>,
-) -> Option<SocketAddr> {
-    let proxy_address_loader = Arc::new(proxy_address_loader);
+pub(crate) async fn install_recorder(task_manager_id: &str) -> anyhow::Result<()> {
+    let handle = PrometheusBuilder::new()
+        .add_global_label("task_manager_id", task_manager_id)
+        .install_recorder()
+        .map(|h| MetricHandle::new(h))
+        .map_err(|e| anyhow!(e))?;
 
-    let mut rng = thread_rng();
-    let loops = 30;
-    for _index in 0..loops {
-        let port = rng.gen_range(10000..30000);
-        let addr_str = format!("{}:{}", bind_ip, port);
-        let addr: SocketAddr = addr_str
-            .as_str()
-            .parse()
-            .expect(format!("failed to parse http listen address {}", addr_str).as_str());
+    let metric_handle: &RwLock<Option<MetricHandle>> = &*METRIC_HADNLE;
+    let mut metric_handle = metric_handle.write().await;
+    *metric_handle = Some(handle);
 
-        match install(addr, proxy_address_loader.clone()) {
-            Ok(_) => {
-                info!(
-                    "metrics prometheus http exporter listen on http://{}",
-                    addr.to_string(),
-                );
-                return Some(addr);
-            }
-            Err(e) => {
-                info!("try install PrometheusBuilder on {} failure: {:?}", addr, e);
-                continue;
-            }
-        }
-    }
+    std::thread::spawn(|| sys_info_metric_task());
 
-    None
-}
-
-#[cfg(test)]
-mod tests {
-    use std::sync::Arc;
-
-    use crate::metrics::{install, DefaultProxyAddressLoader};
-
-    #[test]
-    pub fn install_test() {
-        install(
-            "127.0.0.1:9000".parse().unwrap(),
-            Arc::new(Box::new(DefaultProxyAddressLoader::new(vec![
-                "http://10.181.152.13:17405".to_string(),
-            ]))),
-        )
-        .unwrap();
-        // install("127.0.0.1:9000".parse().unwrap(), false).unwrap();
-        std::thread::sleep(std::time::Duration::from_secs(300000));
-    }
+    return Ok(());
 }

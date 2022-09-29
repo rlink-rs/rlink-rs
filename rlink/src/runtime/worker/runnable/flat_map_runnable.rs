@@ -1,13 +1,13 @@
 use std::borrow::BorrowMut;
 
 use futures::StreamExt;
+use metrics::Counter;
 
 use crate::core::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
 use crate::core::element::Element;
 use crate::core::function::FlatMapFunction;
 use crate::core::operator::DefaultStreamOperator;
 use crate::core::runtime::{OperatorId, TaskId};
-use crate::metrics::metric::Counter;
 use crate::metrics::register_counter;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
@@ -37,7 +37,7 @@ impl FlatMapRunnable {
             stream_map,
             next_runnable,
             context: None,
-            counter: Counter::default(),
+            counter: Counter::noop(),
         }
     }
 }
@@ -78,7 +78,7 @@ impl Runnable for FlatMapRunnable {
                     len += 1;
                 }
 
-                self.counter.fetch_add(len);
+                self.counter.increment(len);
             }
             Element::Barrier(barrier) => {
                 let checkpoint_id = barrier.checkpoint_id;

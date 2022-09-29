@@ -1,12 +1,11 @@
 use std::task::{Context, Poll};
 
+use metrics::{Counter, Gauge};
 use tokio::sync::mpsc::Receiver;
 
 use crate::channel::TryRecvError;
 use crate::channel::CHANNEL_SIZE_PREFIX;
-use crate::metrics::metric::{Counter, Gauge};
 
-#[derive(Debug)]
 pub struct ChannelReceiver<T>
 where
     T: Sync + Send,
@@ -38,8 +37,8 @@ where
 
     #[inline]
     fn on_success(&self) {
-        self.size.fetch_sub(1 as i64);
-        self.drain_counter.fetch_add(1 as u64);
+        self.size.decrement(1 as f64);
+        self.drain_counter.increment(1 as u64);
     }
 
     pub fn try_recv(&mut self) -> Result<T, TryRecvError> {

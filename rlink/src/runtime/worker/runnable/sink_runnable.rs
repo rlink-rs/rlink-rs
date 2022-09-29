@@ -1,10 +1,11 @@
+use metrics::Counter;
+
 use crate::core::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
 use crate::core::element::{Element, Partition};
 use crate::core::function::OutputFormat;
 use crate::core::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
 use crate::core::runtime::{OperatorId, TaskId};
 use crate::dag::job_graph::JobEdge;
-use crate::metrics::metric::Counter;
 use crate::metrics::register_counter;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
@@ -33,7 +34,7 @@ impl SinkRunnable {
             child_parallelism: 0,
             context: None,
             stream_sink,
-            counter: Counter::default(),
+            counter: Counter::noop(),
         }
     }
 }
@@ -81,7 +82,7 @@ impl Runnable for SinkRunnable {
                     .write_element(Element::Record(record))
                     .await;
 
-                self.counter.fetch_add(1);
+                self.counter.increment(1);
             }
             _ => {
                 if element.is_barrier() {

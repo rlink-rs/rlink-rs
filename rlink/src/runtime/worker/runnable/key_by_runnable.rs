@@ -1,11 +1,12 @@
 use std::borrow::BorrowMut;
 
+use metrics::Counter;
+
 use crate::core::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
 use crate::core::element::{Element, Partition};
 use crate::core::function::KeySelectorFunction;
 use crate::core::operator::DefaultStreamOperator;
 use crate::core::runtime::{OperatorId, TaskId};
-use crate::metrics::metric::Counter;
 use crate::metrics::register_counter;
 
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
@@ -37,7 +38,7 @@ impl KeyByRunnable {
             next_runnable,
             partition_size: 0,
             context: None,
-            counter: Counter::default(),
+            counter: Counter::noop(),
         }
     }
 }
@@ -87,7 +88,7 @@ impl Runnable for KeyByRunnable {
 
                 self.next_runnable.as_mut().unwrap().run(element).await;
 
-                self.counter.fetch_add(1);
+                self.counter.increment(1);
             }
             Element::Barrier(barrier) => {
                 let checkpoint_id = barrier.checkpoint_id;
