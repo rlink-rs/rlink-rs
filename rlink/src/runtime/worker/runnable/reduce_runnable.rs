@@ -1,12 +1,13 @@
 use std::borrow::BorrowMut;
 
+use metrics::Counter;
+
 use crate::core::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
 use crate::core::element::{Element, Record};
 use crate::core::function::{BaseReduceFunction, KeySelectorFunction};
 use crate::core::operator::DefaultStreamOperator;
 use crate::core::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::core::window::{TWindow, Window};
-use crate::metrics::metric::Counter;
 use crate::metrics::register_counter;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
@@ -44,8 +45,8 @@ impl ReduceRunnable {
             next_runnable,
             limited_watermark_window: Window::default(),
             completed_checkpoint_id: None,
-            counter: Counter::default(),
-            expire_counter: Counter::default(),
+            counter: Counter::noop(),
+            expire_counter: Counter::noop(),
         }
     }
 }
@@ -92,14 +93,15 @@ impl Runnable for ReduceRunnable {
                     .map(|window| window.min_timestamp() >= min_window_timestamp)
                     .unwrap_or(true);
                 if !acceptable {
-                    let n = self.expire_counter.fetch_add(1);
-                    if n & 1048575 == 1 {
-                        error!(
-                            "expire data. record window={:?}, limit window={:?}",
-                            record.min_location_window().unwrap(),
-                            self.limited_watermark_window
-                        );
-                    }
+                    self.expire_counter.increment(1);
+                    // let n = self.expire_counter.increment(1);
+                    // if n & 1048575 == 1 {
+                    //     error!(
+                    //         "expire data. record window={:?}, limit window={:?}",
+                    //         record.min_location_window().unwrap(),
+                    //         self.limited_watermark_window
+                    //     );
+                    // }
                     return;
                 }
 
@@ -116,7 +118,7 @@ impl Runnable for ReduceRunnable {
                     .reduce(key, record)
                     .await;
 
-                self.counter.fetch_add(1);
+                self.counter.increment(1);
             }
             Element::Watermark(watermark) => match watermark.min_location_windows() {
                 Some(min_watermark_window) => {

@@ -2,11 +2,8 @@ use std::convert::TryFrom;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use crate::core::cluster::{load_config, ClusterConfig, MetadataStorageType};
-use crate::metrics::metric::set_manager_id;
-use crate::metrics::ProxyAddressLoader;
+use crate::core::cluster::{load_config, ClusterConfig};
 use crate::runtime::{logger, ClusterMode, ManagerType};
-use crate::storage::metadata::{MetadataStorage, TMetadataStorage};
 use crate::utils;
 use crate::utils::process::{parse_arg, work_space};
 
@@ -56,7 +53,6 @@ pub(crate) struct Context {
     pub num_task_managers: u32,
     pub manager_type: ManagerType,
     pub cluster_config: ClusterConfig,
-    pub metric_addr: String,
     /// effective only in `Worker` mode
     pub coordinator_address: String,
     pub dashboard_path: String,
@@ -81,7 +77,6 @@ impl Context {
         num_task_managers: u32,
         manager_type: ManagerType,
         cluster_config: ClusterConfig,
-        metric_addr: String,
         coordinator_address: String,
         dashboard_path: String,
         yarn_manager_main_class: String,
@@ -99,7 +94,6 @@ impl Context {
             num_task_managers,
             manager_type,
             cluster_config,
-            metric_addr,
             coordinator_address,
             dashboard_path,
             yarn_manager_main_class,
@@ -135,7 +129,6 @@ impl Context {
             ManagerType::Coordinator => "coordinator".to_string(),
             ManagerType::Worker => parse_arg("task_manager_id")?,
         };
-        set_manager_id(format!("{}-{}", task_manager_id, bind_ip));
 
         let num_task_managers = match manager_type {
             ManagerType::Coordinator => match cluster_mode {
@@ -243,13 +236,6 @@ impl Context {
             .unwrap_or(None);
         logger::init_log(log_config_path)?;
 
-        let metric_addr = metrics_serve(
-            bind_ip.as_str(),
-            &cluster_mode,
-            &manager_type,
-            &cluster_config.metadata_storage,
-        );
-
         let coordinator_address = match manager_type {
             ManagerType::Coordinator => "".to_string(),
             _ => parse_arg("coordinator_address")?,
@@ -271,7 +257,6 @@ impl Context {
             num_task_managers,
             manager_type,
             cluster_config,
-            metric_addr,
             coordinator_address,
             dashboard_path,
             yarn_manager_main_class,
@@ -281,59 +266,5 @@ impl Context {
             exclusion_nodes,
             image_path,
         ))
-    }
-}
-
-fn metrics_serve(
-    bind_ip: &str,
-    cluster_mode: &ClusterMode,
-    manager_type: &ManagerType,
-    metadata_storage_type: &MetadataStorageType,
-) -> String {
-    let with_proxy = !cluster_mode.is_local() && manager_type.is_coordinator();
-
-    let addr = crate::metrics::init_metrics(
-        bind_ip,
-        Box::new(MetadataProxyAddressLoader::new(
-            with_proxy,
-            metadata_storage_type.clone(),
-        )),
-    )
-    .unwrap();
-    format!("http://{}:{}", bind_ip, addr.port())
-}
-
-struct MetadataProxyAddressLoader {
-    with_proxy: bool,
-    metadata_storage_type: MetadataStorageType,
-}
-
-impl MetadataProxyAddressLoader {
-    pub fn new(with_proxy: bool, metadata_storage_type: MetadataStorageType) -> Self {
-        MetadataProxyAddressLoader {
-            with_proxy,
-            metadata_storage_type,
-        }
-    }
-}
-
-#[async_trait]
-impl ProxyAddressLoader for MetadataProxyAddressLoader {
-    async fn load(&self) -> Vec<String> {
-        if !self.with_proxy {
-            return vec![];
-        }
-
-        match MetadataStorage::new(&self.metadata_storage_type)
-            .load()
-            .await
-        {
-            Ok(cluster_descriptor) => cluster_descriptor
-                .worker_managers
-                .iter()
-                .map(|x| x.metrics_address.clone())
-                .collect(),
-            Err(_e) => vec![],
-        }
     }
 }

@@ -37,7 +37,6 @@ impl FlatMapFunction for BroadcastFlagMapFunction {
         }
 
         Box::pin(MemoryStream::new(records))
-        // Box::new(records.into_iter())
     }
 
     async fn close(&mut self) -> crate::core::Result<()> {

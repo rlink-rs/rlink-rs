@@ -127,7 +127,6 @@ async fn start_heartbeat_task(
     let status = HeartbeatItem::WorkerAddrs {
         address: bind_addr.to_string(),
         web_address: web_addr.to_string(),
-        metrics_address: context.metric_addr.clone(),
     };
     heartbeat_publish.report(status).await;
 

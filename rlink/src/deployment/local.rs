@@ -61,24 +61,6 @@ impl TResourceManager for LocalResourceManager {
                     }
                 }
             });
-
-            // std::thread::Builder::new()
-            //     .name(format!(
-            //         "TaskManager(id={})",
-            //         &task_manager_descriptor.task_manager_id
-            //     ))
-            //     .spawn(move || {
-            //         let stream_env = StreamExecutionEnvironment::new();
-            //         match cluster::run_task(Arc::new(context_clone), stream_env, stream_app_clone)
-            //             .await
-            //         {
-            //             Ok(_) => {}
-            //             Err(e) => {
-            //                 panic!("TaskManager error. {}", e)
-            //             }
-            //         }
-            //     })
-            //     .unwrap();
         }
 
         Ok(Vec::new())

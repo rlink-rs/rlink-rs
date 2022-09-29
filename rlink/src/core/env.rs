@@ -56,7 +56,6 @@ pub async fn execute<S>(stream_app: S)
 where
     S: StreamApp + 'static,
 {
-    // let stream_env = StreamExecutionEnvironment::new();
     match runtime::run(stream_app).await {
         Ok(_) => {}
         Err(e) => {

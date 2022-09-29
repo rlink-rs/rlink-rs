@@ -13,7 +13,6 @@ use crate::core::runtime::{ClusterDescriptor, ManagerStatus};
 use crate::dag::metadata::DagMetadata;
 use crate::dag::DagManager;
 use crate::deployment::TResourceManager;
-use crate::metrics::metric::Gauge;
 use crate::metrics::register_gauge;
 use crate::runtime::context::Context;
 use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
@@ -25,6 +24,7 @@ use crate::storage::metadata::{
     MetadataStorage,
 };
 use crate::utils::date_time::timestamp_str;
+use metrics::Gauge;
 
 pub mod checkpoint_manager;
 pub mod heart_beat_manager;
@@ -40,7 +40,6 @@ where
     stream_app: S,
     metadata_storage_mode: MetadataStorageType,
     resource_manager: R,
-    // stream_env: StreamExecutionEnvironment,
     startup_number: Gauge,
 }
 
@@ -49,12 +48,7 @@ where
     S: StreamApp + 'static,
     R: TResourceManager + 'static,
 {
-    pub fn new(
-        context: Arc<Context>,
-        stream_app: S,
-        resource_manager: R,
-        // stream_env: StreamExecutionEnvironment,
-    ) -> Self {
+    pub fn new(context: Arc<Context>, stream_app: S, resource_manager: R) -> Self {
         let metadata_storage_mode = context.cluster_config.metadata_storage.clone();
 
         let startup_number = register_gauge("startup_number", vec![]);
@@ -64,7 +58,6 @@ where
             stream_app,
             metadata_storage_mode,
             resource_manager,
-            // stream_env,
             startup_number,
         }
     }
@@ -327,21 +320,21 @@ where
         let coordinator_manager = &cluster_descriptor.coordinator_manager;
 
         let uptime = register_gauge("uptime", vec![]);
-        uptime.store(coordinator_manager.uptime as i64);
+        uptime.set(coordinator_manager.uptime as f64);
 
         let v_cores = register_gauge("v_cores", vec![]);
-        v_cores.store(coordinator_manager.v_cores as i64);
+        v_cores.set(coordinator_manager.v_cores as f64);
 
         let memory_mb = register_gauge("memory_mb", vec![]);
-        memory_mb.store(coordinator_manager.memory_mb as i64);
+        memory_mb.set(coordinator_manager.memory_mb as f64);
 
         let num_task_managers = register_gauge("num_task_managers", vec![]);
-        num_task_managers.store(coordinator_manager.num_task_managers as i64);
+        num_task_managers.set(coordinator_manager.num_task_managers as f64);
     }
 
     fn gauge_startup_number(&self, cluster_descriptor: &mut ClusterDescriptor) {
         cluster_descriptor.coordinator_manager.startup_number += 1;
         self.startup_number
-            .store(cluster_descriptor.coordinator_manager.startup_number as i64);
+            .set(cluster_descriptor.coordinator_manager.startup_number as f64);
     }
 }

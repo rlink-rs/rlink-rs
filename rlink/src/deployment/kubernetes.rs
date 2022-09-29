@@ -178,7 +178,6 @@ async fn allocate_worker(
     match pods.create(&pp, &p).await {
         Ok(pod) => {
             info!("create worker({})pod success", task_manager_name);
-            // uid = Meta::meta(&pod).uid.clone().expect("kind has metadata.uid");
             uid = pod.metadata.uid.expect("kind has metadata.uid").to_string();
             // wait for it..
         }

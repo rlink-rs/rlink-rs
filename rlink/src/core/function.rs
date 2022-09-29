@@ -33,10 +33,6 @@ pub struct Context {
     pub(crate) children: Vec<(ExecutionNode, ExecutionEdge)>,
     pub(crate) parents: Vec<(ExecutionNode, ExecutionEdge)>,
 
-    // #[serde(skip)]
-    // pub(crate) cluster_descriptor: Arc<ClusterDescriptor>,
-    // #[serde(skip)]
-    // pub(crate) checkpoint_publish: Arc<CheckpointPublish>,
     #[serde(skip)]
     pub(crate) task_context: Option<Arc<WorkerTaskContext>>,
 }

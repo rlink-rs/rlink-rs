@@ -45,12 +45,10 @@ murmur3 = "0.5"
 dashmap = "5.4.0"
 crossbeam = "0.8"
 
-metrics = "0.14"
-metrics-macros = "0.2"
-metrics-util = "0.6"
-#metrics-exporter-prometheus = "0.3"
-parking_lot = "0.12"
-quanta = "0.7"
+metrics = "0.20"
+metrics-macros = "0.6"
+metrics-util = "0.14"
+metrics-exporter-prometheus = "0.11"
 
 # net
 bytes = "1.0"
@@ -64,9 +62,9 @@ hyper = { version = "0.14", features = ["client", "server", "http1", "tcp"] }
 mysql_async = "0.30"
 
 # kubernetes
-kube = { version = "0.74" }
-kube-runtime = { version = "0.74" }
-k8s-openapi = { version = "0.15.0", features = ["v1_24"]}
+kube = { version = "0.75" }
+kube-runtime = { version = "0.75" }
+k8s-openapi = { version = "0.16", features = ["v1_25"]}
 
 [dev-dependencies]
 uuid = { version = "1.1", features = ["serde", "v4"] }

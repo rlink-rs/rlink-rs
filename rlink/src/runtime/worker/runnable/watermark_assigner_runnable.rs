@@ -1,5 +1,7 @@
 use std::borrow::BorrowMut;
 
+use metrics::{Counter, Gauge};
+
 use crate::core::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
 use crate::core::element::Element;
 use crate::core::operator::DefaultStreamOperator;
@@ -8,7 +10,6 @@ use crate::core::watermark::{
     TimestampAssigner, Watermark, WatermarkGenerator, WatermarkStrategy, MAX_WATERMARK,
     MIN_WATERMARK,
 };
-use crate::metrics::metric::{Counter, Gauge};
 use crate::metrics::{register_counter, register_gauge};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 
@@ -46,8 +47,8 @@ impl WatermarkAssignerRunnable {
             next_runnable,
             watermark: MIN_WATERMARK,
             context: None,
-            watermark_gauge: Gauge::default(),
-            expire_counter: Counter::default(),
+            watermark_gauge: Gauge::noop(),
+            expire_counter: Counter::noop(),
         }
     }
 
@@ -57,7 +58,7 @@ impl WatermarkAssignerRunnable {
         }
 
         self.watermark = watermark;
-        self.watermark_gauge.store(self.watermark.timestamp as i64);
+        self.watermark_gauge.set(self.watermark.timestamp as f64);
     }
 }
 
@@ -96,14 +97,15 @@ impl Runnable for WatermarkAssignerRunnable {
                     .on_event(record.borrow_mut(), timestamp);
 
                 if record.timestamp < self.watermark.timestamp {
-                    let n = self.expire_counter.fetch_add(1);
-                    // 8388605 = 8 * 1024 * 1024 -1
-                    if n & 8388605 == 1 {
-                        warn!(
-                            "lost delay data {} < {}",
-                            record.timestamp, self.watermark.timestamp
-                        );
-                    }
+                    self.expire_counter.increment(1);
+                    // let n = self.expire_counter.increment(1);
+                    // // 8388605 = 8 * 1024 * 1024 -1
+                    // if n & 8388605 == 1 {
+                    //     warn!(
+                    //         "lost delay data {} < {}",
+                    //         record.timestamp, self.watermark.timestamp
+                    //     );
+                    // }
                     return;
                 }
 

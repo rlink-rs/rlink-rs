@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use crate::core::env::StreamApp;
 use crate::core::runtime::{HeartBeatStatus, TaskId};
+use crate::metrics::install_recorder;
 use crate::utils::panic::panic_notify;
 
 pub mod cluster;
@@ -64,15 +65,6 @@ pub enum ManagerType {
     Worker = 3,
 }
 
-impl ManagerType {
-    pub fn is_coordinator(&self) -> bool {
-        match self {
-            ManagerType::Coordinator => true,
-            _ => false,
-        }
-    }
-}
-
 impl<'a> TryFrom<&'a str> for ManagerType {
     type Error = anyhow::Error;
 
@@ -100,7 +92,6 @@ pub enum HeartbeatItem {
     WorkerAddrs {
         address: String,
         web_address: String,
-        metrics_address: String,
     },
     HeartBeatStatus(HeartBeatStatus),
     TaskEnd {
@@ -122,6 +113,8 @@ where
 
     let context = context::Context::parse_node_arg()?;
     info!("Context: {:?}", context);
+
+    install_recorder(context.task_manager_id.as_str()).await?;
 
     cluster::run_task(Arc::new(context), stream_app).await
 }

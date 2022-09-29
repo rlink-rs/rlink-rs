@@ -13,6 +13,7 @@ use rand::Rng;
 
 use crate::channel::{bounded, Sender};
 use crate::core::cluster::StdResponse;
+use crate::metrics::metric_handle;
 use crate::utils::fs::read_binary;
 use crate::utils::http::server::{as_ok_json, page_not_found};
 
@@ -95,6 +96,7 @@ async fn route(req: Request<Body>, web_context: Arc<WebContext>) -> anyhow::Resu
                 "/api/client/log/disable" => disable_client_log(req, web_context).await,
                 "/api/server/log/enable" => enable_server_log(req, web_context).await,
                 "/api/server/log/disable" => disable_server_log(req, web_context).await,
+                "/api/metrics" => metrics(req, web_context).await,
                 _ => page_not_found().await,
             }
         } else {
@@ -107,6 +109,11 @@ async fn route(req: Request<Body>, web_context: Arc<WebContext>) -> anyhow::Resu
             page_not_found().await
         }
     }
+}
+
+async fn metrics(_req: Request<Body>, _context: Arc<WebContext>) -> anyhow::Result<Response<Body>> {
+    let render = metric_handle().await.render();
+    Ok(Response::new(Body::from(render)))
 }
 
 async fn enable_client_log(

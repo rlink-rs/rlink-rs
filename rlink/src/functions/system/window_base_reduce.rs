@@ -1,6 +1,8 @@
 use std::borrow::BorrowMut;
 use std::collections::{BTreeMap, HashMap};
 
+use metrics::Gauge;
+
 use crate::core::backend::KeyedStateBackend;
 use crate::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
 use crate::core::element::{FnSchema, Record};
@@ -8,7 +10,6 @@ use crate::core::function::{BaseReduceFunction, Context, NamedFunction, ReduceFu
 use crate::core::properties::SystemProperties;
 use crate::core::runtime::CheckpointId;
 use crate::core::window::{TWindow, Window};
-use crate::metrics::metric::Gauge;
 use crate::metrics::register_gauge;
 use crate::runtime::worker::runnable::reduce_runnable::ReduceCheckpointHandle;
 use crate::storage::keyed_state::{TWindowState, WindowState};
@@ -32,7 +33,7 @@ impl WindowBaseReduceFunction {
             state: None,
             window_checkpoints: BTreeMap::new(),
             skip_windows: Vec::new(),
-            windows_gauge: Gauge::default(),
+            windows_gauge: Gauge::noop(),
         }
     }
 
@@ -96,7 +97,7 @@ impl BaseReduceFunction for WindowBaseReduceFunction {
         let state = self.state.as_mut().unwrap();
         let reduce_func = &self.reduce;
         let window_count = state.merge(key, record, |val1, val2| reduce_func.reduce(val1, val2));
-        self.windows_gauge.store(window_count as i64);
+        self.windows_gauge.set(window_count as f64);
     }
 
     async fn drop_state(&mut self, watermark_timestamp: u64) -> Vec<Record> {
@@ -110,7 +111,7 @@ impl BaseReduceFunction for WindowBaseReduceFunction {
             }
         }
 
-        self.windows_gauge.store(window_count as i64);
+        self.windows_gauge.set(window_count as f64);
 
         if drop_windows.len() > 0 {
             debug!(

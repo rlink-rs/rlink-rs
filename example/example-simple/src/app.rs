@@ -66,6 +66,6 @@ impl StreamApp for SimpleStreamApp {
     }
 
     async fn pre_worker_startup(&self, cluster_descriptor: &ClusterDescriptor) {
-        println!("{}", cluster_descriptor.coordinator_manager.metrics_address);
+        println!("{}", cluster_descriptor.coordinator_manager.web_address);
     }
 }

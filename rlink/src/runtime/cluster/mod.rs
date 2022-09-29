@@ -8,11 +8,7 @@ use crate::runtime::ManagerType;
 mod coordinator;
 mod worker;
 
-pub(crate) async fn run_task<S>(
-    context: Arc<Context>,
-    // stream_env: StreamExecutionEnvironment,
-    stream_app: S,
-) -> anyhow::Result<()>
+pub(crate) async fn run_task<S>(context: Arc<Context>, stream_app: S) -> anyhow::Result<()>
 where
     S: StreamApp + 'static,
 {

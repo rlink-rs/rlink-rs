@@ -177,6 +177,11 @@ pub enum ManagerStatus {
     Terminated = 4,
 }
 
+impl Default for ManagerStatus {
+    fn default() -> Self {
+        ManagerStatus::Pending
+    }
+}
 impl ManagerStatus {
     pub fn is_terminating(&self) -> bool {
         match self {
@@ -230,19 +235,17 @@ pub struct WorkerManagerDescriptor {
     pub latest_heart_beat_status: HeartBeatStatus,
     pub task_manager_id: String,
     pub task_manager_address: String,
-    pub metrics_address: String,
     pub web_address: String,
     pub task_descriptors: Vec<TaskDescriptor>,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct CoordinatorManagerDescriptor {
     /// `rlink` compile version
     pub version: String,
     pub application_id: String,
     pub application_properties: Properties,
     pub web_address: String,
-    pub metrics_address: String,
     pub status: ManagerStatus,
     pub v_cores: u32,
     pub memory_mb: u32,
@@ -251,7 +254,7 @@ pub struct CoordinatorManagerDescriptor {
     pub startup_number: u64,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct ClusterDescriptor {
     pub coordinator_manager: CoordinatorManagerDescriptor,
     pub worker_managers: Vec<WorkerManagerDescriptor>,
@@ -292,26 +295,5 @@ impl ClusterDescriptor {
 
     pub fn to_string(&self) -> String {
         serde_json::to_string(self).unwrap()
-    }
-}
-
-impl Default for ClusterDescriptor {
-    fn default() -> Self {
-        ClusterDescriptor {
-            coordinator_manager: CoordinatorManagerDescriptor {
-                version: "".to_string(),
-                application_id: "".to_string(),
-                application_properties: Properties::new(),
-                web_address: "".to_string(),
-                metrics_address: "".to_string(),
-                status: ManagerStatus::Pending,
-                v_cores: 0,
-                memory_mb: 0,
-                num_task_managers: 0,
-                uptime: 0,
-                startup_number: 0,
-            },
-            worker_managers: vec![],
-        }
     }
 }
