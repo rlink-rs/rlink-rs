@@ -103,7 +103,7 @@ impl CheckpointAlignManager {
 
         let mut operator_cks = HashMap::new();
         for node in dag_manager.job_graph().nodes() {
-            let job_node = node.detail();
+            let job_node = node.deref();
             let parallelism = job_node.parallelism;
             let job_id = job_node.job_id;
 

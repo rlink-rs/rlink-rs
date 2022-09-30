@@ -1,3 +1,4 @@
+use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -7,6 +8,7 @@ use crate::core::properties::SystemProperties;
 use crate::core::runtime::{CheckpointId, JobId, OperatorId, TaskId};
 use crate::dag::execution_graph::{ExecutionEdge, ExecutionNode};
 use crate::dag::job_graph::{JobEdge, JobNode};
+use crate::dag::metadata::DagMetadata;
 use crate::dag::stream_graph::StreamNode;
 use crate::runtime::worker::{FunctionContext, WorkerTaskContext};
 
@@ -39,27 +41,28 @@ impl RunnableContext {
         self.task_context.clone()
     }
 
+    fn job_id(&self) -> JobId {
+        self.task_context.task_descriptor.task_id.job_id
+    }
+
+    fn dag_metadata(&self) -> &DagMetadata {
+        self.task_context.dag_metadata.deref()
+    }
+
     pub(crate) fn to_fun_context(&self, operator_id: OperatorId) -> FunctionContext {
+        let dag_metadata = self.task_context.dag_metadata.deref();
         let coordinator_manager = &self.task_context.cluster_descriptor.coordinator_manager;
-        let parents = self
-            .task_context
-            .dag_metadata
+        let parents = dag_metadata
             .execution_parents(&self.task_context.task_descriptor.task_id)
             .into_iter()
             .map(|(node, edge)| (node.clone(), edge.clone()))
             .collect();
-        let children = self
-            .task_context
-            .dag_metadata
+        let children = dag_metadata
             .execution_children(&self.task_context.task_descriptor.task_id)
             .into_iter()
             .map(|(node, edge)| (node.clone(), edge.clone()))
             .collect();
-        let stream_node = self
-            .task_context
-            .dag_metadata
-            .stream_node(operator_id)
-            .unwrap();
+        let stream_node = dag_metadata.stream_node(operator_id).unwrap();
 
         let operator = self
             .task_context
@@ -120,9 +123,7 @@ impl RunnableContext {
 
     #[allow(dead_code)]
     pub(crate) fn parents_parallelism(&self) -> Vec<u16> {
-        self.task_context
-            .dag_metadata
-            .job_parents(self.task_context.task_descriptor.task_id.job_id)
+        self.parent_jobs()
             .iter()
             .map(|(job_node, _)| job_node.parallelism)
             .collect()
@@ -133,50 +134,29 @@ impl RunnableContext {
         *ps.get(0).unwrap()
     }
 
-    fn job_id(&self) -> JobId {
-        self.task_context.task_descriptor.task_id.job_id
-    }
-
     pub(crate) fn children_parallelism(&self) -> Vec<u16> {
-        self.task_context
-            .dag_metadata
-            .job_children(self.job_id())
+        self.child_jobs()
             .into_iter()
             .map(|(job_node, _)| job_node.parallelism)
             .collect()
     }
 
-    pub(crate) fn parent_jobs(&self) -> Vec<(JobNode, JobEdge)> {
-        self.task_context
-            .dag_metadata
-            .job_parents(self.job_id())
-            .into_iter()
-            .map(|(job_node, job_edge)| (job_node.clone(), job_edge.clone()))
-            .collect()
+    pub(crate) fn parent_jobs(&self) -> Vec<(&JobNode, &JobEdge)> {
+        self.dag_metadata().parent_jobs(self.job_id())
     }
 
-    pub(crate) fn child_jobs(&self) -> Vec<(JobNode, JobEdge)> {
-        self.task_context
-            .dag_metadata
-            .job_children(self.job_id())
-            .into_iter()
-            .map(|(job_node, job_edge)| (job_node.clone(), job_edge.clone()))
-            .collect()
+    pub(crate) fn child_jobs(&self) -> Vec<(&JobNode, &JobEdge)> {
+        self.dag_metadata().child_jobs(self.job_id())
     }
 
     #[allow(dead_code)]
     pub(crate) fn stream_node(&self, operator_id: OperatorId) -> &StreamNode {
-        self.task_context
-            .dag_metadata
-            .stream_node(operator_id)
-            .unwrap()
+        self.dag_metadata().stream_node(operator_id).unwrap()
     }
 
+    #[allow(dead_code)]
     pub(crate) fn job_node(&self) -> &JobNode {
-        self.task_context
-            .dag_metadata
-            .job_node(self.job_id())
-            .unwrap()
+        self.dag_metadata().job_node(self.job_id()).unwrap()
     }
 
     #[inline]
@@ -184,9 +164,7 @@ impl RunnableContext {
         &self,
         child_task_id: &TaskId,
     ) -> Vec<(&ExecutionNode, &ExecutionEdge)> {
-        self.task_context
-            .dag_metadata
-            .execution_parents(child_task_id)
+        self.dag_metadata().execution_parents(child_task_id)
     }
 }
 

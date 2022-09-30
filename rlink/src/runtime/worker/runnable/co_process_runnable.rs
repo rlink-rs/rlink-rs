@@ -1,5 +1,6 @@
-use futures::StreamExt;
 use std::collections::HashMap;
+
+use futures::StreamExt;
 
 use crate::core::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
 use crate::core::element::Element;
@@ -44,6 +45,13 @@ impl Runnable for CoProcessRunnable {
         self.next_runnable.as_mut().unwrap().open(context).await?;
 
         self.context = Some(context.clone());
+
+        // let parent_jobs = context.parent_jobs();
+        // for index in 0..parent_jobs.len() {
+        //     let (job_node, _job_edge) = parent_jobs[index];
+        //     self.parent_jobs.insert(job_node.job_id, index);
+        //     job_map0.insert(job_node.job_id, index);
+        // }
 
         // find the stream_node of `input_format`
         // the chain: input_format -> connect, so the `connect` is only one parent

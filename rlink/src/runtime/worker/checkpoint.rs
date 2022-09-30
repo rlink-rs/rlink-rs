@@ -33,16 +33,10 @@ impl CheckpointPublish {
     ) {
         info!("checkpoint loop starting...");
         tokio::spawn(async move {
-            loop {
-                match receiver.recv().await {
-                    Some(ck) => {
-                        report_checkpoint(coordinator_address.as_str(), ck).await;
-                    }
-                    None => {
-                        panic!("the Checkpoint channel is disconnected")
-                    }
-                }
+            while let Some(ck) = receiver.recv().await {
+                report_checkpoint(coordinator_address.as_str(), ck).await;
             }
+            panic!("the Checkpoint channel is disconnected");
         });
     }
 

@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::ops::Index;
+use std::ops::{Deref, Index};
 
 use daggy::{Dag, NodeIndex};
 use serde::Serialize;
@@ -20,8 +20,15 @@ where
     pub fn id(&self) -> &str {
         &self.id
     }
+}
 
-    pub fn detail(&self) -> &N {
+impl<N> Deref for JsonNode<N>
+where
+    N: Serialize,
+{
+    type Target = N;
+
+    fn deref(&self) -> &Self::Target {
         &self.detail
     }
 }
@@ -49,8 +56,15 @@ where
     pub fn target(&self) -> &str {
         &self.target
     }
+}
 
-    pub fn detail(&self) -> &E {
+impl<E> Deref for JsonEdge<E>
+where
+    E: Serialize,
+{
+    type Target = E;
+
+    fn deref(&self) -> &Self::Target {
         &self.detail
     }
 }

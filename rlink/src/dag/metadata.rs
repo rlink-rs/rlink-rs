@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use crate::core::runtime::{JobId, OperatorId, TaskId};
 use crate::dag::execution_graph::{ExecutionEdge, ExecutionNode};
 use crate::dag::job_graph::{JobEdge, JobNode};
@@ -42,38 +44,37 @@ impl DagMetadata {
 
 impl DagMetadata {
     pub fn stream_node(&self, operator_id: OperatorId) -> Option<&StreamNode> {
-        self.get_stream_node(operator_id).map(|node| node.detail())
+        self.get_stream_node(operator_id).map(|node| node.deref())
     }
 
     fn get_stream_node(&self, operator_id: OperatorId) -> Option<&JsonNode<StreamNode>> {
         self.stream_graph
             .nodes()
             .iter()
-            .find(|node| node.detail().id.eq(&operator_id))
+            .find(|node| node.deref().id.eq(&operator_id))
     }
+}
 
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-
+impl DagMetadata {
     pub fn job_node(&self, job_id: JobId) -> Option<&JobNode> {
-        self.get_job_node(job_id).map(|node| node.detail())
+        self.get_job_node(job_id).map(|node| node.deref())
     }
 
     fn get_job_node(&self, job_id: JobId) -> Option<&JsonNode<JobNode>> {
         self.job_graph
             .nodes()
             .iter()
-            .find(|node| node.detail().job_id.eq(&job_id))
+            .find(|node| node.deref().job_id.eq(&job_id))
     }
 
-    pub fn job_parents(&self, child_job_id: JobId) -> Vec<(&JobNode, &JobEdge)> {
+    pub fn parent_jobs(&self, child_job_id: JobId) -> Vec<(&JobNode, &JobEdge)> {
         match self.get_job_node(child_job_id) {
             Some(node) => {
                 let job_nodes: Vec<(&JobNode, &JobEdge)> = self
                     .job_graph
                     .parents(node.id())
                     .into_iter()
-                    .map(|(node, edge)| (node.detail(), edge.detail()))
+                    .map(|(node, edge)| (node.deref(), edge.deref()))
                     .collect();
 
                 job_nodes
@@ -82,14 +83,14 @@ impl DagMetadata {
         }
     }
 
-    pub fn job_children(&self, parent_job_id: JobId) -> Vec<(&JobNode, &JobEdge)> {
+    pub fn child_jobs(&self, parent_job_id: JobId) -> Vec<(&JobNode, &JobEdge)> {
         match self.get_job_node(parent_job_id) {
             Some(node) => {
                 let job_nodes: Vec<(&JobNode, &JobEdge)> = self
                     .job_graph
                     .children(node.id())
                     .into_iter()
-                    .map(|(node, edge)| (node.detail(), edge.detail()))
+                    .map(|(node, edge)| (node.deref(), edge.deref()))
                     .collect();
 
                 job_nodes
@@ -97,10 +98,9 @@ impl DagMetadata {
             None => vec![],
         }
     }
+}
 
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-
+impl DagMetadata {
     pub fn execution_parents(
         &self,
         child_task_id: &TaskId,
@@ -111,7 +111,7 @@ impl DagMetadata {
                     .execution_graph
                     .parents(node.id())
                     .into_iter()
-                    .map(|(node, edge)| (node.detail(), edge.detail()))
+                    .map(|(node, edge)| (node.deref(), edge.deref()))
                     .collect();
 
                 job_nodes
@@ -130,7 +130,7 @@ impl DagMetadata {
                     .execution_graph
                     .children(node.id())
                     .into_iter()
-                    .map(|(node, edge)| (node.detail(), edge.detail()))
+                    .map(|(node, edge)| (node.deref(), edge.deref()))
                     .collect();
 
                 job_nodes
@@ -143,6 +143,6 @@ impl DagMetadata {
         self.execution_graph
             .nodes()
             .iter()
-            .find(|node| node.detail().task_id.eq(task_id))
+            .find(|node| node.deref().task_id.eq(task_id))
     }
 }

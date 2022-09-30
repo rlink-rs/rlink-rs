@@ -47,9 +47,7 @@ impl KeyByRunnable {
 impl Runnable for KeyByRunnable {
     async fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()> {
         self.next_runnable.as_mut().unwrap().open(context).await?;
-
         self.context = Some(context.clone());
-
         self.task_id = context.task_context.task_descriptor.task_id;
 
         let fun_context = context.to_fun_context(self.operator_id);
