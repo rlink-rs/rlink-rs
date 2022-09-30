@@ -45,6 +45,13 @@ impl Runnable for CoProcessRunnable {
 
         self.context = Some(context.clone());
 
+        // let parent_jobs = context.parent_jobs();
+        // for index in 0..parent_jobs.len() {
+        //     let (job_node, _job_edge) = parent_jobs[index];
+        //     self.parent_jobs.insert(job_node.job_id, index);
+        //     job_map0.insert(job_node.job_id, index);
+        // }
+
         // find the stream_node of `input_format`
         // the chain: input_format -> connect, so the `connect` is only one parent
         let source_stream_node = &context.job_node().stream_nodes[0];

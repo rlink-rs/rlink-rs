@@ -74,6 +74,7 @@ impl WorkerTaskContext {
     pub fn dag_metadata(&self) -> Arc<DagMetadata> {
         self.dag_metadata.clone()
     }
+
     pub fn cluster_descriptor(&self) -> Arc<ClusterDescriptor> {
         self.cluster_descriptor.clone()
     }
@@ -87,6 +88,7 @@ impl WorkerTaskContext {
     pub fn window_timer(&self) -> WindowTimer {
         self.window_timer.clone()
     }
+
     pub fn checkpoint_publish(&self) -> Arc<CheckpointPublish> {
         self.checkpoint_publish.clone()
     }
@@ -252,7 +254,7 @@ where
         operators: &mut HashMap<OperatorId, StreamOperator>,
         job_id: JobId,
     ) -> Option<DefaultStreamOperator<dyn KeySelectorFunction>> {
-        let job_parents = self.task_context.dag_metadata.job_parents(job_id);
+        let job_parents = self.task_context.dag_metadata.parent_jobs(job_id);
         if job_parents.len() == 0 {
             error!("key by not found");
             None
