@@ -1,5 +1,6 @@
-use futures::StreamExt;
 use std::collections::HashMap;
+
+use futures::StreamExt;
 
 use crate::core::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
 use crate::core::element::Element;
