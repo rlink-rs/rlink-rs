@@ -2,7 +2,7 @@
 name = "rlink-example-utils"
 version = "0.6.0"
 authors = ["yorkart <wangyue11.4@163.com>"]
-edition = "2018"
+edition = "2021"
 description = "High performance Stream Processing Framework"
 keywords = ["stream", "window", "flink", "spark"]
 repository = "https://github.com/rlink-rs/rlink-rs.git"
@@ -24,8 +24,13 @@ serbuffer = "1.3"
 
 log = "0.4.8"
 anyhow = "1.0"
-rand = "0.7"
+rand = "0.8"
 chrono = "0.4"
+
+futures = "0.3"
+async-trait = "0.1"
+tokio = { version = "1" }
+tokio-stream = {version = "0.1", features = ["time"]}
 
 [build-dependencies]
 serbuffer-gen = "1.3"

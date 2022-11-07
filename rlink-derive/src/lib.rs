@@ -58,7 +58,21 @@ pub fn derive_function(input: TokenStream) -> TokenStream {
             }
         }
 
-        impl #im rlink::core::checkpoint::CheckpointFunction for #name #ty #wh {}
+        #[async_trait]
+        impl #im rlink::core::checkpoint::CheckpointFunction for #name #ty #wh {
+            async fn initialize_state(
+                &mut self,
+                _context: &rlink::core::checkpoint::FunctionSnapshotContext,
+                _handle: &Option<rlink::core::checkpoint::CheckpointHandle>,
+            ) {
+            }
+            async fn snapshot_state(
+                &mut self,
+                _context: &rlink::core::checkpoint::FunctionSnapshotContext,
+            ) -> Option<rlink::core::checkpoint::CheckpointHandle> {
+                None
+            }
+        }
     };
 
     // Hand the output tokens back to the compiler

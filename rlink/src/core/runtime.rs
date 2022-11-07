@@ -1,6 +1,7 @@
 use std::convert::TryFrom;
 use std::ops::Deref;
 
+use atomic_enum::atomic_enum;
 use bytes::{Buf, BufMut, BytesMut};
 
 use crate::core::checkpoint::CheckpointHandle;
@@ -157,12 +158,12 @@ pub struct TaskDescriptor {
     pub operators: Vec<OperatorDescriptor>,
     pub input_split: InputSplit,
     pub daemon: bool,
-    pub thread_id: String,
     /// mark the task is `Terminated` status
     pub terminated: bool,
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq)]
+#[atomic_enum]
+#[derive(Serialize, Deserialize, PartialEq)]
 pub enum ManagerStatus {
     /// Waiting for the TaskManager register
     Pending = 0,
@@ -176,6 +177,11 @@ pub enum ManagerStatus {
     Terminated = 4,
 }
 
+impl Default for ManagerStatus {
+    fn default() -> Self {
+        ManagerStatus::Pending
+    }
+}
 impl ManagerStatus {
     pub fn is_terminating(&self) -> bool {
         match self {
@@ -229,19 +235,17 @@ pub struct WorkerManagerDescriptor {
     pub latest_heart_beat_status: HeartBeatStatus,
     pub task_manager_id: String,
     pub task_manager_address: String,
-    pub metrics_address: String,
     pub web_address: String,
     pub task_descriptors: Vec<TaskDescriptor>,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct CoordinatorManagerDescriptor {
     /// `rlink` compile version
     pub version: String,
     pub application_id: String,
     pub application_properties: Properties,
     pub web_address: String,
-    pub metrics_address: String,
     pub status: ManagerStatus,
     pub v_cores: u32,
     pub memory_mb: u32,
@@ -250,7 +254,7 @@ pub struct CoordinatorManagerDescriptor {
     pub startup_number: u64,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct ClusterDescriptor {
     pub coordinator_manager: CoordinatorManagerDescriptor,
     pub worker_managers: Vec<WorkerManagerDescriptor>,

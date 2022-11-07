@@ -1,37 +1,39 @@
 use rlink::core;
 use rlink::core::element::{FnSchema, Record};
-use rlink::core::function::{CoProcessFunction, Context};
+use rlink::core::function::{CoProcessFunction, Context, SendableElementStream};
+use rlink::utils::stream::MemoryStream;
 use rlink_example_utils::buffer_gen::config;
 
 #[derive(Debug, Function)]
 pub struct MyCoProcessFunction {}
 
+#[async_trait]
 impl CoProcessFunction for MyCoProcessFunction {
-    fn open(&mut self, _context: &Context) -> core::Result<()> {
+    async fn open(&mut self, _context: &Context) -> core::Result<()> {
         Ok(())
     }
 
-    fn process_left(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>> {
+    async fn process_left(&mut self, record: Record) -> SendableElementStream {
         // let n = model::Entity::parse(record.as_buffer()).unwrap();
         // info!("--> {:?}", n);
-        Box::new(vec![record].into_iter())
+        Box::pin(MemoryStream::new(vec![record]))
     }
 
-    fn process_right(
+    async fn process_right(
         &mut self,
         stream_seq: usize,
         mut record: Record,
-    ) -> Box<dyn Iterator<Item = Record>> {
+    ) -> SendableElementStream {
         let conf = config::Entity::parse(record.as_buffer()).unwrap();
         info!(
             "Right Stream: {}, config [field:{}, val:{}]",
             stream_seq, conf.field, conf.value
         );
 
-        Box::new(vec![].into_iter())
+        Box::pin(MemoryStream::new(vec![]))
     }
 
-    fn close(&mut self) -> core::Result<()> {
+    async fn close(&mut self) -> core::Result<()> {
         Ok(())
     }
 

@@ -1,6 +1,8 @@
 use std::borrow::BorrowMut;
 use std::collections::{BTreeMap, HashMap};
 
+use metrics::Gauge;
+
 use crate::core::backend::KeyedStateBackend;
 use crate::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
 use crate::core::element::{FnSchema, Record};
@@ -8,7 +10,6 @@ use crate::core::function::{BaseReduceFunction, Context, NamedFunction, ReduceFu
 use crate::core::properties::SystemProperties;
 use crate::core::runtime::CheckpointId;
 use crate::core::window::{TWindow, Window};
-use crate::metrics::metric::Gauge;
 use crate::metrics::register_gauge;
 use crate::runtime::worker::runnable::reduce_runnable::ReduceCheckpointHandle;
 use crate::storage::keyed_state::{TWindowState, WindowState};
@@ -32,7 +33,7 @@ impl WindowBaseReduceFunction {
             state: None,
             window_checkpoints: BTreeMap::new(),
             skip_windows: Vec::new(),
-            windows_gauge: Gauge::default(),
+            windows_gauge: Gauge::noop(),
         }
     }
 
@@ -55,8 +56,9 @@ impl WindowBaseReduceFunction {
     }
 }
 
+#[async_trait]
 impl BaseReduceFunction for WindowBaseReduceFunction {
-    fn open(&mut self, context: &Context) -> crate::core::Result<()> {
+    async fn open(&mut self, context: &Context) -> crate::core::Result<()> {
         let task_id = context.task_id;
         let application_id = context.application_id.clone();
 
@@ -73,12 +75,13 @@ impl BaseReduceFunction for WindowBaseReduceFunction {
             task_id.task_number(),
             state_mode,
         ));
-        self.initialize_state(&context.checkpoint_context(), &context.checkpoint_handle);
+        self.initialize_state(&context.checkpoint_context(), &context.checkpoint_handle)
+            .await;
 
-        self.reduce.open(context)
+        self.reduce.open(context).await
     }
 
-    fn reduce(&mut self, key: Record, mut record: Record) {
+    async fn reduce(&mut self, key: Record, mut record: Record) {
         // check skip window
         if self.skip_windows.len() > 0 {
             if let Some(windows) = record.location_windows.borrow_mut() {
@@ -94,10 +97,10 @@ impl BaseReduceFunction for WindowBaseReduceFunction {
         let state = self.state.as_mut().unwrap();
         let reduce_func = &self.reduce;
         let window_count = state.merge(key, record, |val1, val2| reduce_func.reduce(val1, val2));
-        self.windows_gauge.store(window_count as i64);
+        self.windows_gauge.set(window_count as f64);
     }
 
-    fn drop_state(&mut self, watermark_timestamp: u64) -> Vec<Record> {
+    async fn drop_state(&mut self, watermark_timestamp: u64) -> Vec<Record> {
         let state = self.state.as_mut().unwrap();
         let mut drop_windows = Vec::new();
         let mut window_count = 0;
@@ -108,7 +111,7 @@ impl BaseReduceFunction for WindowBaseReduceFunction {
             }
         }
 
-        self.windows_gauge.store(window_count as i64);
+        self.windows_gauge.set(window_count as f64);
 
         if drop_windows.len() > 0 {
             debug!(
@@ -140,7 +143,7 @@ impl BaseReduceFunction for WindowBaseReduceFunction {
         }
     }
 
-    fn close(&mut self) -> crate::core::Result<()> {
+    async fn close(&mut self) -> crate::core::Result<()> {
         Ok(())
     }
 
@@ -165,8 +168,9 @@ impl NamedFunction for WindowBaseReduceFunction {
     }
 }
 
+#[async_trait]
 impl CheckpointFunction for WindowBaseReduceFunction {
-    fn initialize_state(
+    async fn initialize_state(
         &mut self,
         _context: &FunctionSnapshotContext,
         handle: &Option<CheckpointHandle>,
@@ -180,7 +184,10 @@ impl CheckpointFunction for WindowBaseReduceFunction {
         }
     }
 
-    fn snapshot_state(&mut self, context: &FunctionSnapshotContext) -> Option<CheckpointHandle> {
+    async fn snapshot_state(
+        &mut self,
+        context: &FunctionSnapshotContext,
+    ) -> Option<CheckpointHandle> {
         let windows = self.state.as_ref().unwrap().windows();
         let mut windows_map = HashMap::with_capacity(windows.len());
         windows.iter().for_each(|w| {

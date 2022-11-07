@@ -1,8 +1,14 @@
+use futures::Stream;
+use std::pin::Pin;
+use std::task::Poll;
 use std::time::Duration;
+use tokio::time::Interval;
 
 use rlink::core;
-use rlink::core::element::{FnSchema, Record};
-use rlink::core::function::{Context, InputFormat, InputSplit, InputSplitSource};
+use rlink::core::element::{Element, FnSchema, Record};
+use rlink::core::function::{
+    Context, ElementStream, InputFormat, InputSplit, InputSplitSource, SendableElementStream,
+};
 
 use crate::buffer_gen::config;
 
@@ -43,16 +49,20 @@ impl ConfigInputFormat {
 
 impl InputSplitSource for ConfigInputFormat {}
 
+#[async_trait]
 impl InputFormat for ConfigInputFormat {
-    fn open(&mut self, _input_split: InputSplit, _context: &Context) -> core::Result<()> {
+    async fn open(&mut self, _input_split: InputSplit, _context: &Context) -> core::Result<()> {
         Ok(())
     }
 
-    fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record> + Send> {
-        Box::new(ConfigIterator::new(self.gen_row()))
+    async fn element_stream(&mut self) -> SendableElementStream {
+        Box::pin(IntervalConfigStream::new(
+            Duration::from_secs(1),
+            self.gen_row().into_iter(),
+        ))
     }
 
-    fn close(&mut self) -> core::Result<()> {
+    async fn close(&mut self) -> core::Result<()> {
         Ok(())
     }
 
@@ -69,27 +79,32 @@ impl InputFormat for ConfigInputFormat {
     }
 }
 
-struct ConfigIterator {
+pub struct IntervalConfigStream {
+    inner: Interval,
     conf: std::vec::IntoIter<Record>,
 }
 
-impl ConfigIterator {
-    pub fn new(conf: Vec<Record>) -> Self {
-        ConfigIterator {
-            conf: conf.into_iter(),
+impl IntervalConfigStream {
+    pub fn new(period: Duration, conf: std::vec::IntoIter<Record>) -> Self {
+        let interval = tokio::time::interval(period);
+        Self {
+            inner: interval,
+            conf,
         }
     }
 }
 
-impl Iterator for ConfigIterator {
-    type Item = Record;
+impl ElementStream for IntervalConfigStream {}
 
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.conf.next() {
-            Some(record) => Some(record),
-            None => loop {
-                std::thread::sleep(Duration::from_secs(60));
-            },
-        }
+impl Stream for IntervalConfigStream {
+    type Item = Element;
+
+    fn poll_next(
+        mut self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        self.inner
+            .poll_tick(cx)
+            .map(|_| self.conf.next().map(|record| Element::Record(record)))
     }
 }

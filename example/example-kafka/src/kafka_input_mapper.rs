@@ -1,18 +1,20 @@
 use std::error::Error;
-use std::iter::Iterator;
 
 use rlink::core;
-use rlink::core::element::FnSchema;
+use rlink::core::element::{Element, FnSchema};
+use rlink::core::function::SendableElementStream;
 use rlink::core::{
     element::Record,
     function::{Context, FlatMapFunction},
 };
+use rlink::utils::stream::MemoryStream;
+use rlink_connector_kafka::buffer_gen::kafka_message;
 use serde_json::Value;
 
 use crate::buffer_gen::checkpoint_data;
-use rlink_connector_kafka::buffer_gen::kafka_message;
 
 #[derive(Debug, Default, Function)]
+#[allow(dead_code)]
 pub struct KafkaInputMapperFunction {
     // err_counter: u64,
 // topic: String,
@@ -28,21 +30,24 @@ impl KafkaInputMapperFunction {
     }
 }
 
+#[async_trait]
 impl FlatMapFunction for KafkaInputMapperFunction {
-    fn open(&mut self, _context: &Context) -> core::Result<()> {
+    async fn open(&mut self, _context: &Context) -> core::Result<()> {
         Ok(())
     }
 
-    fn flat_map(&mut self, mut record: Record) -> Box<dyn Iterator<Item = Record>> {
+    async fn flat_map_element(&mut self, element: Element) -> SendableElementStream {
+        let mut record = element.into_record();
         let kafka_message::Entity { payload, .. } =
             kafka_message::Entity::parse(record.as_buffer()).unwrap();
 
         let line = String::from_utf8(payload.to_vec()).unwrap();
         let record_new = parse_data(line.as_str()).unwrap();
 
-        Box::new(vec![record_new].into_iter())
+        Box::pin(MemoryStream::new(vec![record_new]))
     }
-    fn close(&mut self) -> core::Result<()> {
+
+    async fn close(&mut self) -> core::Result<()> {
         Ok(())
     }
 

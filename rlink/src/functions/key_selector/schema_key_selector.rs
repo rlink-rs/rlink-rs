@@ -1,4 +1,4 @@
-use crate::core::checkpoint::CheckpointFunction;
+use crate::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
 use crate::core::data_types::{Field, Schema};
 use crate::core::element::{FnSchema, Record};
 use crate::core::function::{Context, KeySelectorFunction, NamedFunction};
@@ -38,8 +38,9 @@ impl SchemaKeySelector {
     }
 }
 
+#[async_trait]
 impl KeySelectorFunction for SchemaKeySelector {
-    fn open(&mut self, context: &Context) -> crate::core::Result<()> {
+    async fn open(&mut self, context: &Context) -> crate::core::Result<()> {
         // if `KeySelector` opened in `Reduce` operator, the `input_schema` is a Tuple
         let schema = context.input_schema.first();
 
@@ -52,7 +53,7 @@ impl KeySelectorFunction for SchemaKeySelector {
         Ok(())
     }
 
-    fn get_key(&self, record: &mut Record) -> Record {
+    async fn get_key(&self, record: &mut Record) -> Record {
         let mut record_key = Record::with_capacity(record.len());
         let mut writer = record_key.as_writer(&self.key_schema.as_type_ids());
 
@@ -67,7 +68,7 @@ impl KeySelectorFunction for SchemaKeySelector {
         record_key
     }
 
-    fn close(&mut self) -> crate::core::Result<()> {
+    async fn close(&mut self) -> crate::core::Result<()> {
         Ok(())
     }
 
@@ -90,4 +91,19 @@ impl NamedFunction for SchemaKeySelector {
     }
 }
 
-impl CheckpointFunction for SchemaKeySelector {}
+#[async_trait]
+impl CheckpointFunction for SchemaKeySelector {
+    async fn initialize_state(
+        &mut self,
+        _context: &FunctionSnapshotContext,
+        _handle: &Option<CheckpointHandle>,
+    ) {
+    }
+
+    async fn snapshot_state(
+        &mut self,
+        _context: &FunctionSnapshotContext,
+    ) -> Option<CheckpointHandle> {
+        None
+    }
+}

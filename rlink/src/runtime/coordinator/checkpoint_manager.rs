@@ -1,6 +1,8 @@
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::ops::Deref;
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::RwLock;
 
 use crate::channel::{bounded, Receiver, Sender};
 use crate::core::checkpoint::Checkpoint;
@@ -8,7 +10,7 @@ use crate::core::properties::SystemProperties;
 use crate::core::runtime::{CheckpointId, ClusterDescriptor, JobId, OperatorId};
 use crate::dag::metadata::DagMetadata;
 use crate::runtime::context::Context;
-use crate::storage::checkpoint::{CheckpointStorage, TCheckpointStorage};
+use crate::storage::checkpoint::{CheckpointEntity, CheckpointStorage, TCheckpointStorage};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct OperatorCheckpoint {
@@ -101,7 +103,7 @@ impl CheckpointAlignManager {
 
         let mut operator_cks = HashMap::new();
         for node in dag_manager.job_graph().nodes() {
-            let job_node = node.detail();
+            let job_node = node.deref();
             let parallelism = job_node.parallelism;
             let job_id = job_node.job_id;
 
@@ -131,7 +133,7 @@ impl CheckpointAlignManager {
         }
     }
 
-    pub fn apply(&mut self, ck: Checkpoint) -> anyhow::Result<()> {
+    pub async fn apply(&mut self, ck: Checkpoint) -> anyhow::Result<()> {
         let checkpoint_id = ck.checkpoint_id;
         if self.current_ck_id.0 > checkpoint_id.0 {
             warn!(
@@ -189,13 +191,14 @@ impl CheckpointAlignManager {
                         cks
                     };
 
-                    storage.save(
-                        self.application_name.as_str(),
-                        self.application_id.as_str(),
+                    let ck = CheckpointEntity::new(
+                        self.application_name.clone(),
+                        self.application_id.clone(),
                         complete_checkpoint_id,
                         cks,
                         self.checkpoint_ttl.as_millis() as u64,
-                    )?;
+                    );
+                    storage.save(ck).await?;
                 }
                 None => {}
             }
@@ -238,12 +241,13 @@ impl CheckpointAlignManager {
         }
     }
 
-    pub fn load(&mut self) -> anyhow::Result<HashMap<OperatorId, Vec<Checkpoint>>> {
+    pub async fn load(&mut self) -> anyhow::Result<HashMap<OperatorId, Vec<Checkpoint>>> {
         let mut operator_checkpoints = HashMap::new();
 
         if let Some(storage) = self.storage.as_mut() {
-            let mut checkpoints =
-                storage.load(self.application_name.as_str(), self.application_id.as_str())?;
+            let mut checkpoints = storage
+                .load(self.application_name.as_str(), self.application_id.as_str())
+                .await?;
             let completed_checkpoint_id = checkpoints
                 .iter()
                 .filter(|c| {
@@ -258,11 +262,13 @@ impl CheckpointAlignManager {
                 .unwrap_or_default();
 
             if !completed_checkpoint_id.is_default() {
-                checkpoints = storage.load_by_checkpoint_id(
-                    self.application_name.as_str(),
-                    self.application_id.as_str(),
-                    completed_checkpoint_id,
-                )?;
+                checkpoints = storage
+                    .load_by_checkpoint_id(
+                        self.application_name.as_str(),
+                        self.application_id.as_str(),
+                        completed_checkpoint_id,
+                    )
+                    .await?;
             }
 
             for checkpoint in checkpoints {
@@ -296,18 +302,17 @@ pub(crate) struct CheckpointManager {
     ck_align_manager_task: Arc<RwLock<CheckpointAlignManager>>,
 
     sender: Sender<Checkpoint>,
-    receiver: Receiver<Checkpoint>,
 }
 
 impl CheckpointManager {
-    pub fn new(
+    pub async fn new(
         dag_manager: &DagMetadata,
         context: &Context,
         cluster_descriptor: &ClusterDescriptor,
         checkpoint_ttl: Duration,
     ) -> Self {
         let (sender, receiver) = bounded(100);
-        CheckpointManager {
+        let manager = CheckpointManager {
             ck_align_manager_task: Arc::new(RwLock::new(CheckpointAlignManager::new(
                 dag_manager,
                 context,
@@ -315,17 +320,19 @@ impl CheckpointManager {
                 checkpoint_ttl,
             ))),
             sender,
-            receiver,
-        }
+        };
+
+        manager.run_align_task(receiver).await;
+
+        manager
     }
 
-    pub fn run_align_task(&self) {
+    pub async fn run_align_task(&self, mut receiver: Receiver<Checkpoint>) {
         let task = self.ck_align_manager_task.clone();
-        let receiver = self.receiver.clone();
-        crate::utils::thread::spawn("ck_align_mgr", move || {
-            while let Ok(checkpoint) = receiver.recv() {
-                let mut ck_align_manager = task.write().unwrap();
-                match ck_align_manager.apply(checkpoint) {
+        tokio::spawn(async move {
+            while let Some(checkpoint) = receiver.recv().await {
+                let mut ck_align_manager = task.write().await;
+                match ck_align_manager.apply(checkpoint).await {
                     Ok(_) => {}
                     Err(e) => {
                         error!("apply checkpoint error. {}", e);
@@ -342,13 +349,13 @@ impl CheckpointManager {
         Ok(())
     }
 
-    pub fn get(&self) -> CheckpointAlignManager {
-        let ck_align_manager = self.ck_align_manager_task.read().unwrap();
-        ck_align_manager.clone()
+    pub async fn get(&self) -> CheckpointAlignManager {
+        let ck_align_manager = self.ck_align_manager_task.read().await;
+        ck_align_manager.deref().clone()
     }
 
-    pub fn load(&mut self) -> anyhow::Result<HashMap<OperatorId, Vec<Checkpoint>>> {
-        let mut ck_align_manager = self.ck_align_manager_task.write().unwrap();
-        ck_align_manager.load()
+    pub async fn load(&mut self) -> anyhow::Result<HashMap<OperatorId, Vec<Checkpoint>>> {
+        let mut ck_align_manager = self.ck_align_manager_task.write().await;
+        ck_align_manager.load().await
     }
 }

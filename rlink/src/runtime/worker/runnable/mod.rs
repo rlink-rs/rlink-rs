@@ -1,16 +1,16 @@
+use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
 
 use crate::core::checkpoint::FunctionSnapshotContext;
 use crate::core::element::Element;
 use crate::core::properties::SystemProperties;
-use crate::core::runtime::{CheckpointId, ClusterDescriptor, OperatorId, TaskDescriptor, TaskId};
+use crate::core::runtime::{CheckpointId, JobId, OperatorId, TaskId};
 use crate::dag::execution_graph::{ExecutionEdge, ExecutionNode};
 use crate::dag::job_graph::{JobEdge, JobNode};
 use crate::dag::metadata::DagMetadata;
 use crate::dag::stream_graph::StreamNode;
-use crate::runtime::timer::WindowTimer;
-use crate::runtime::worker::FunctionContext;
+use crate::runtime::worker::{FunctionContext, WorkerTaskContext};
 
 pub mod co_process_runnable;
 pub mod filter_runnable;
@@ -33,30 +33,39 @@ pub(crate) use window_assigner_runnable::WindowAssignerRunnable;
 
 #[derive(Clone)]
 pub(crate) struct RunnableContext {
-    pub(crate) dag_metadata: Arc<DagMetadata>,
-    pub(crate) cluster_descriptor: Arc<ClusterDescriptor>,
-    pub(crate) task_descriptor: TaskDescriptor,
-    pub(crate) window_timer: WindowTimer,
+    pub(crate) task_context: Arc<WorkerTaskContext>,
 }
 
 impl RunnableContext {
+    pub fn task_context(&self) -> Arc<WorkerTaskContext> {
+        self.task_context.clone()
+    }
+
+    fn job_id(&self) -> JobId {
+        self.task_context.task_descriptor.task_id.job_id
+    }
+
+    fn dag_metadata(&self) -> &DagMetadata {
+        self.task_context.dag_metadata.deref()
+    }
+
     pub(crate) fn to_fun_context(&self, operator_id: OperatorId) -> FunctionContext {
-        let coordinator_manager = &self.cluster_descriptor.coordinator_manager;
-        let parents = self
-            .dag_metadata
-            .execution_parents(&self.task_descriptor.task_id)
+        let dag_metadata = self.task_context.dag_metadata.deref();
+        let coordinator_manager = &self.task_context.cluster_descriptor.coordinator_manager;
+        let parents = dag_metadata
+            .execution_parents(&self.task_context.task_descriptor.task_id)
             .into_iter()
             .map(|(node, edge)| (node.clone(), edge.clone()))
             .collect();
-        let children = self
-            .dag_metadata
-            .execution_children(&self.task_descriptor.task_id)
+        let children = dag_metadata
+            .execution_children(&self.task_context.task_descriptor.task_id)
             .into_iter()
             .map(|(node, edge)| (node.clone(), edge.clone()))
             .collect();
-        let stream_node = self.dag_metadata.stream_node(operator_id).unwrap();
+        let stream_node = dag_metadata.stream_node(operator_id).unwrap();
 
         let operator = self
+            .task_context
             .task_descriptor
             .operators
             .iter()
@@ -67,7 +76,7 @@ impl RunnableContext {
             application_id: coordinator_manager.application_id.clone(),
             application_properties: coordinator_manager.application_properties.clone(),
             operator_id,
-            task_id: self.task_descriptor.task_id.clone(),
+            task_id: self.task_context.task_descriptor.task_id.clone(),
             checkpoint_id: operator.checkpoint_id,
             completed_checkpoint_id: operator.completed_checkpoint_id,
             checkpoint_handle: operator.checkpoint_handle.clone(),
@@ -77,6 +86,8 @@ impl RunnableContext {
 
             parents,
             children,
+
+            task_context: Some(self.task_context.clone()),
         }
     }
 
@@ -88,14 +99,16 @@ impl RunnableContext {
     ) -> FunctionSnapshotContext {
         FunctionSnapshotContext::new(
             operator_id,
-            self.task_descriptor.task_id,
+            self.task_context.task_descriptor.task_id,
             checkpoint_id,
             completed_checkpoint_id,
+            self.task_context.clone(),
         )
     }
 
     pub(crate) fn checkpoint_interval(&self, default_value: Duration) -> Duration {
-        self.cluster_descriptor
+        self.task_context
+            .cluster_descriptor
             .coordinator_manager
             .application_properties
             .get_checkpoint_interval()
@@ -110,8 +123,7 @@ impl RunnableContext {
 
     #[allow(dead_code)]
     pub(crate) fn parents_parallelism(&self) -> Vec<u16> {
-        self.dag_metadata
-            .job_parents(self.task_descriptor.task_id.job_id)
+        self.parent_jobs()
             .iter()
             .map(|(job_node, _)| job_node.parallelism)
             .collect()
@@ -123,38 +135,28 @@ impl RunnableContext {
     }
 
     pub(crate) fn children_parallelism(&self) -> Vec<u16> {
-        self.dag_metadata
-            .job_children(self.task_descriptor.task_id.job_id)
+        self.child_jobs()
             .into_iter()
             .map(|(job_node, _)| job_node.parallelism)
             .collect()
     }
 
-    pub(crate) fn parent_jobs(&self) -> Vec<(JobNode, JobEdge)> {
-        self.dag_metadata
-            .job_parents(self.task_descriptor.task_id.job_id)
-            .into_iter()
-            .map(|(job_node, job_edge)| (job_node.clone(), job_edge.clone()))
-            .collect()
+    pub(crate) fn parent_jobs(&self) -> Vec<(&JobNode, &JobEdge)> {
+        self.dag_metadata().parent_jobs(self.job_id())
     }
 
-    pub(crate) fn child_jobs(&self) -> Vec<(JobNode, JobEdge)> {
-        self.dag_metadata
-            .job_children(self.task_descriptor.task_id.job_id)
-            .into_iter()
-            .map(|(job_node, job_edge)| (job_node.clone(), job_edge.clone()))
-            .collect()
+    pub(crate) fn child_jobs(&self) -> Vec<(&JobNode, &JobEdge)> {
+        self.dag_metadata().child_jobs(self.job_id())
     }
 
     #[allow(dead_code)]
     pub(crate) fn stream_node(&self, operator_id: OperatorId) -> &StreamNode {
-        self.dag_metadata.stream_node(operator_id).unwrap()
+        self.dag_metadata().stream_node(operator_id).unwrap()
     }
 
+    #[allow(dead_code)]
     pub(crate) fn job_node(&self) -> &JobNode {
-        self.dag_metadata
-            .job_node(self.task_descriptor.task_id.job_id)
-            .unwrap()
+        self.dag_metadata().job_node(self.job_id()).unwrap()
     }
 
     #[inline]
@@ -162,14 +164,15 @@ impl RunnableContext {
         &self,
         child_task_id: &TaskId,
     ) -> Vec<(&ExecutionNode, &ExecutionEdge)> {
-        self.dag_metadata.execution_parents(child_task_id)
+        self.dag_metadata().execution_parents(child_task_id)
     }
 }
 
-pub(crate) trait Runnable {
-    fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()>;
-    fn run(&mut self, element: Element);
-    fn close(&mut self) -> anyhow::Result<()>;
+#[async_trait]
+pub(crate) trait Runnable: Send + Sync {
+    async fn open(&mut self, context: &RunnableContext) -> anyhow::Result<()>;
+    async fn run(&mut self, element: Element);
+    async fn close(&mut self) -> anyhow::Result<()>;
     fn set_next_runnable(&mut self, next_runnable: Option<Box<dyn Runnable>>);
-    fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext);
+    async fn checkpoint(&mut self, snapshot_context: FunctionSnapshotContext);
 }

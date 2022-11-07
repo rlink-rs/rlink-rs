@@ -178,16 +178,16 @@ mod tests {
     use std::time::Duration;
 
     use crate::core;
-    use crate::core::checkpoint::CheckpointFunction;
+    use crate::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
     use crate::core::data_stream::CoStream;
     use crate::core::data_stream::{TConnectedStreams, TKeyedStream};
     use crate::core::data_stream::{TDataStream, TWindowedStream};
     use crate::core::data_types::{DataType, Field, Schema};
-    use crate::core::element::{FnSchema, Record};
+    use crate::core::element::{Element, FnSchema, Record};
     use crate::core::env::StreamExecutionEnvironment;
     use crate::core::function::{
         CoProcessFunction, Context, FlatMapFunction, InputFormat, InputSplit, InputSplitSource,
-        KeySelectorFunction, NamedFunction, OutputFormat, ReduceFunction,
+        KeySelectorFunction, NamedFunction, OutputFormat, ReduceFunction, SendableElementStream,
     };
     use crate::core::properties::Properties;
     use crate::core::watermark::TimestampAssigner;
@@ -195,6 +195,7 @@ mod tests {
     use crate::dag::DagManager;
     use crate::functions::watermark::DefaultWatermarkStrategy;
     use crate::functions::window::SlidingEventTimeWindows;
+    use crate::utils::stream::MemoryStream;
 
     #[test]
     pub fn data_stream_test() {
@@ -326,7 +327,22 @@ mod tests {
 
     impl InputSplitSource for MyInputFormat {}
 
-    impl CheckpointFunction for MyInputFormat {}
+    #[async_trait]
+    impl CheckpointFunction for MyInputFormat {
+        async fn initialize_state(
+            &mut self,
+            _context: &FunctionSnapshotContext,
+            _handle: &Option<CheckpointHandle>,
+        ) {
+        }
+
+        async fn snapshot_state(
+            &mut self,
+            _context: &FunctionSnapshotContext,
+        ) -> Option<CheckpointHandle> {
+            None
+        }
+    }
 
     impl NamedFunction for MyInputFormat {
         fn name(&self) -> &str {
@@ -334,16 +350,17 @@ mod tests {
         }
     }
 
+    #[async_trait]
     impl InputFormat for MyInputFormat {
-        fn open(&mut self, _input_split: InputSplit, _context: &Context) -> core::Result<()> {
+        async fn open(&mut self, _input_split: InputSplit, _context: &Context) -> core::Result<()> {
             Ok(())
         }
 
-        fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record> + Send> {
+        async fn element_stream(&mut self) -> SendableElementStream {
             unimplemented!()
         }
 
-        fn close(&mut self) -> core::Result<()> {
+        async fn close(&mut self) -> core::Result<()> {
             Ok(())
         }
 
@@ -368,16 +385,17 @@ mod tests {
         }
     }
 
+    #[async_trait]
     impl FlatMapFunction for MyFlatMapFunction {
-        fn open(&mut self, _context: &Context) -> core::Result<()> {
+        async fn open(&mut self, _context: &Context) -> core::Result<()> {
             Ok(())
         }
 
-        fn flat_map(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>> {
-            Box::new(vec![record].into_iter())
+        async fn flat_map_element(&mut self, element: Element) -> SendableElementStream {
+            Box::pin(MemoryStream::new(vec![element.into_record()]))
         }
 
-        fn close(&mut self) -> core::Result<()> {
+        async fn close(&mut self) -> core::Result<()> {
             Ok(())
         }
 
@@ -392,7 +410,22 @@ mod tests {
         }
     }
 
-    impl CheckpointFunction for MyFlatMapFunction {}
+    #[async_trait]
+    impl CheckpointFunction for MyFlatMapFunction {
+        async fn initialize_state(
+            &mut self,
+            _context: &FunctionSnapshotContext,
+            _handle: &Option<CheckpointHandle>,
+        ) {
+        }
+
+        async fn snapshot_state(
+            &mut self,
+            _context: &FunctionSnapshotContext,
+        ) -> Option<CheckpointHandle> {
+            None
+        }
+    }
 
     #[derive(Serialize, Deserialize, Debug, Clone)]
     pub struct MyTimestampAssigner {}
@@ -423,7 +456,22 @@ mod tests {
         }
     }
 
-    impl CheckpointFunction for MyTimestampAssigner {}
+    #[async_trait]
+    impl CheckpointFunction for MyTimestampAssigner {
+        async fn initialize_state(
+            &mut self,
+            _context: &FunctionSnapshotContext,
+            _handle: &Option<CheckpointHandle>,
+        ) {
+        }
+
+        async fn snapshot_state(
+            &mut self,
+            _context: &FunctionSnapshotContext,
+        ) -> Option<CheckpointHandle> {
+            None
+        }
+    }
 
     #[derive(Serialize, Deserialize, Debug)]
     pub struct MyKeySelectorFunction {}
@@ -434,17 +482,18 @@ mod tests {
         }
     }
 
+    #[async_trait]
     impl KeySelectorFunction for MyKeySelectorFunction {
-        fn open(&mut self, _context: &Context) -> core::Result<()> {
+        async fn open(&mut self, _context: &Context) -> core::Result<()> {
             Ok(())
         }
 
-        fn get_key(&self, _record: &mut Record) -> Record {
+        async fn get_key(&self, _record: &mut Record) -> Record {
             let record_rt = Record::new();
             record_rt
         }
 
-        fn close(&mut self) -> core::Result<()> {
+        async fn close(&mut self) -> core::Result<()> {
             Ok(())
         }
 
@@ -459,7 +508,22 @@ mod tests {
         }
     }
 
-    impl CheckpointFunction for MyKeySelectorFunction {}
+    #[async_trait]
+    impl CheckpointFunction for MyKeySelectorFunction {
+        async fn initialize_state(
+            &mut self,
+            _context: &FunctionSnapshotContext,
+            _handle: &Option<CheckpointHandle>,
+        ) {
+        }
+
+        async fn snapshot_state(
+            &mut self,
+            _context: &FunctionSnapshotContext,
+        ) -> Option<CheckpointHandle> {
+            None
+        }
+    }
 
     #[derive(Serialize, Deserialize, Debug)]
     pub struct MyReduceFunction {}
@@ -470,8 +534,9 @@ mod tests {
         }
     }
 
+    #[async_trait]
     impl ReduceFunction for MyReduceFunction {
-        fn open(&mut self, _context: &Context) -> core::Result<()> {
+        async fn open(&mut self, _context: &Context) -> core::Result<()> {
             Ok(())
         }
 
@@ -479,7 +544,7 @@ mod tests {
             record.clone()
         }
 
-        fn close(&mut self) -> core::Result<()> {
+        async fn close(&mut self) -> core::Result<()> {
             Ok(())
         }
 
@@ -498,9 +563,25 @@ mod tests {
         }
     }
 
-    impl CheckpointFunction for MyReduceFunction {}
+    #[async_trait]
+    impl CheckpointFunction for MyReduceFunction {
+        async fn initialize_state(
+            &mut self,
+            _context: &FunctionSnapshotContext,
+            _handle: &Option<CheckpointHandle>,
+        ) {
+        }
+
+        async fn snapshot_state(
+            &mut self,
+            _context: &FunctionSnapshotContext,
+        ) -> Option<CheckpointHandle> {
+            None
+        }
+    }
 
     #[derive(Debug)]
+    #[allow(dead_code)]
     pub struct MyOutputFormat {
         _properties: Properties,
     }
@@ -513,14 +594,15 @@ mod tests {
         }
     }
 
+    #[async_trait]
     impl OutputFormat for MyOutputFormat {
-        fn open(&mut self, _context: &Context) -> core::Result<()> {
+        async fn open(&mut self, _context: &Context) -> core::Result<()> {
             Ok(())
         }
 
-        fn write_record(&mut self, _record: Record) {}
+        async fn write_element(&mut self, _element: Element) {}
 
-        fn close(&mut self) -> core::Result<()> {
+        async fn close(&mut self) -> core::Result<()> {
             Ok(())
         }
 
@@ -535,28 +617,44 @@ mod tests {
         }
     }
 
-    impl CheckpointFunction for MyOutputFormat {}
+    #[async_trait]
+    impl CheckpointFunction for MyOutputFormat {
+        async fn initialize_state(
+            &mut self,
+            _context: &FunctionSnapshotContext,
+            _handle: &Option<CheckpointHandle>,
+        ) {
+        }
+
+        async fn snapshot_state(
+            &mut self,
+            _context: &FunctionSnapshotContext,
+        ) -> Option<CheckpointHandle> {
+            None
+        }
+    }
 
     pub struct MyCoProcessFunction {}
 
+    #[async_trait]
     impl CoProcessFunction for MyCoProcessFunction {
-        fn open(&mut self, _context: &Context) -> core::Result<()> {
+        async fn open(&mut self, _context: &Context) -> core::Result<()> {
             Ok(())
         }
 
-        fn process_left(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>> {
-            Box::new(vec![record].into_iter())
+        async fn process_left(&mut self, _record: Record) -> SendableElementStream {
+            unimplemented!()
         }
 
-        fn process_right(
+        async fn process_right(
             &mut self,
             _stream_seq: usize,
             _record: Record,
-        ) -> Box<dyn Iterator<Item = Record>> {
-            Box::new(vec![].into_iter())
+        ) -> SendableElementStream {
+            unimplemented!()
         }
 
-        fn close(&mut self) -> core::Result<()> {
+        async fn close(&mut self) -> core::Result<()> {
             Ok(())
         }
 
@@ -571,5 +669,20 @@ mod tests {
         }
     }
 
-    impl CheckpointFunction for MyCoProcessFunction {}
+    #[async_trait]
+    impl CheckpointFunction for MyCoProcessFunction {
+        async fn initialize_state(
+            &mut self,
+            _context: &FunctionSnapshotContext,
+            _handle: &Option<CheckpointHandle>,
+        ) {
+        }
+
+        async fn snapshot_state(
+            &mut self,
+            _context: &FunctionSnapshotContext,
+        ) -> Option<CheckpointHandle> {
+            None
+        }
+    }
 }

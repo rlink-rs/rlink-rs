@@ -1,10 +1,15 @@
 use std::fmt::Debug;
+use std::pin::Pin;
+use std::sync::Arc;
+
+use futures::Stream;
 
 use crate::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
 use crate::core::element::{Element, FnSchema, Record};
 use crate::core::properties::Properties;
 use crate::core::runtime::{CheckpointId, OperatorId, TaskId};
 use crate::dag::execution_graph::{ExecutionEdge, ExecutionNode};
+use crate::runtime::worker::WorkerTaskContext;
 
 /// Base class of all operators in the Rust API.
 pub trait NamedFunction {
@@ -27,6 +32,9 @@ pub struct Context {
 
     pub(crate) children: Vec<(ExecutionNode, ExecutionEdge)>,
     pub(crate) parents: Vec<(ExecutionNode, ExecutionEdge)>,
+
+    #[serde(skip)]
+    pub(crate) task_context: Option<Arc<WorkerTaskContext>>,
 }
 
 impl Context {
@@ -36,7 +44,12 @@ impl Context {
             self.task_id,
             self.checkpoint_id,
             self.completed_checkpoint_id,
+            self.task_context(),
         )
+    }
+
+    pub(crate) fn task_context(&self) -> Arc<WorkerTaskContext> {
+        self.task_context.as_ref().unwrap().clone()
     }
 }
 
@@ -85,6 +98,7 @@ impl InputSplitAssigner {
 
 /// InputSplitSources create InputSplit that define portions of data to be produced by `InputFormat`
 ///
+#[async_trait]
 pub trait InputSplitSource {
     /// Create InputSplits by system parallelism[`min_num_splits`]
     ///
@@ -105,39 +119,45 @@ pub trait InputSplitSource {
     }
 }
 
+/// Trait for types that stream [rlink::core::Element]
+pub trait ElementStream: Stream<Item = Element> {}
+
+/// Trait for a stream of record batches.
+pub type SendableElementStream = Pin<Box<dyn ElementStream + Send>>;
+
 /// The base interface for data sources that produces records.
 ///
+#[async_trait]
 pub trait InputFormat
 where
-    Self: InputSplitSource + NamedFunction + CheckpointFunction,
+    Self: InputSplitSource + NamedFunction + CheckpointFunction + Send + Sync,
 {
     /// Initialization of `InputFormat`, Each task will be called once when it starts.
-    fn open(&mut self, input_split: InputSplit, context: &Context) -> crate::core::Result<()>;
-    /// return an `Iterator` of `Record`, if the `next` of `Iterator` is `None`,
-    /// the task of `InputFormat` will be `Terminated`.
-    /// the function is called by `element_iter`, a user-friendly function,
-    /// usually you just need to implement it
-    fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record> + Send>;
-    /// return an `Iterator` of `Element`, if the `next` of `Iterator` is `None`,
+    async fn open(&mut self, input_split: InputSplit, context: &Context)
+        -> crate::core::Result<()>;
+    /// return an `Stream` of `Element`, if the `next` of `Stream` is `None`,
     /// the task of `InputFormat` will be `Terminated`.
     /// the function is called by runtime
-    fn element_iter(&mut self) -> Box<dyn Iterator<Item = Element> + Send> {
-        Box::new(ElementIterator::new(self.record_iter()))
-    }
-    fn close(&mut self) -> crate::core::Result<()>;
+    async fn element_stream(&mut self) -> SendableElementStream;
+
+    async fn close(&mut self) -> crate::core::Result<()>;
+
     /// mark the `InputFormat` is running in daemon mode,
     /// if `true`, this `InputFormat` is automatically terminated when any task instance ends
+    /// todo check daemon by whether there are some parent jobs
     fn daemon(&self) -> bool {
         false
     }
 
     fn schema(&self, input_schema: FnSchema) -> FnSchema;
+
     fn parallelism(&self) -> u16;
 }
 
+#[async_trait]
 pub trait OutputFormat
 where
-    Self: NamedFunction + CheckpointFunction,
+    Self: NamedFunction + CheckpointFunction + Send + Sync,
 {
     /// Opens a parallel instance of the output format to store the result of its parallel instance.
     ///
@@ -145,15 +165,11 @@ where
     ///
     /// `taskNumber` The number of the parallel instance.
     /// `numTasks` The number of parallel tasks.
-    fn open(&mut self, context: &Context) -> crate::core::Result<()>;
+    async fn open(&mut self, context: &Context) -> crate::core::Result<()>;
 
-    fn write_record(&mut self, record: Record);
+    async fn write_element(&mut self, element: Element);
 
-    fn write_element(&mut self, element: Element) {
-        self.write_record(element.into_record())
-    }
-
-    fn close(&mut self) -> crate::core::Result<()>;
+    async fn close(&mut self) -> crate::core::Result<()>;
 
     // todo unsupported. `TwoPhaseCommitSinkFunction`
     // fn begin_transaction(&mut self) {}
@@ -166,110 +182,91 @@ where
     }
 }
 
+#[async_trait]
 pub trait FlatMapFunction
 where
-    Self: NamedFunction + CheckpointFunction,
+    Self: NamedFunction + CheckpointFunction + Send + Sync,
 {
-    fn open(&mut self, context: &Context) -> crate::core::Result<()>;
-    fn flat_map(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>>;
-    fn flat_map_element(&mut self, element: Element) -> Box<dyn Iterator<Item = Element>> {
-        let iterator = self.flat_map(element.into_record());
-        Box::new(ElementIterator::new(iterator))
-    }
-    fn close(&mut self) -> crate::core::Result<()>;
+    async fn open(&mut self, context: &Context) -> crate::core::Result<()>;
+    async fn flat_map_element(&mut self, element: Element) -> SendableElementStream;
+    async fn close(&mut self) -> crate::core::Result<()>;
 
     fn schema(&self, input_schema: FnSchema) -> FnSchema;
 }
 
+#[async_trait]
 pub trait FilterFunction
 where
-    Self: NamedFunction + CheckpointFunction,
+    Self: NamedFunction + CheckpointFunction + Send + Sync,
 {
-    fn open(&mut self, context: &Context) -> crate::core::Result<()>;
-    fn filter(&self, record: &mut Record) -> bool;
-    fn close(&mut self) -> crate::core::Result<()>;
+    async fn open(&mut self, context: &Context) -> crate::core::Result<()>;
+
+    async fn filter(&self, record: &mut Record) -> bool;
+
+    async fn close(&mut self) -> crate::core::Result<()>;
 }
 
+#[async_trait]
 pub trait KeySelectorFunction
 where
-    Self: NamedFunction + CheckpointFunction,
+    Self: NamedFunction + CheckpointFunction + Send + Sync,
 {
-    fn open(&mut self, context: &Context) -> crate::core::Result<()>;
-    fn get_key(&self, record: &mut Record) -> Record;
-    fn close(&mut self) -> crate::core::Result<()>;
+    async fn open(&mut self, context: &Context) -> crate::core::Result<()>;
+
+    async fn get_key(&self, record: &mut Record) -> Record;
+
+    async fn close(&mut self) -> crate::core::Result<()>;
 
     fn key_schema(&self, input_schema: FnSchema) -> FnSchema;
 }
 
+#[async_trait]
 pub trait ReduceFunction
 where
-    Self: NamedFunction,
+    Self: NamedFunction + Send + Sync,
 {
-    fn open(&mut self, context: &Context) -> crate::core::Result<()>;
+    async fn open(&mut self, context: &Context) -> crate::core::Result<()>;
+
     fn reduce(&self, value: Option<&mut Record>, record: &mut Record) -> Record;
-    fn close(&mut self) -> crate::core::Result<()>;
+
+    async fn close(&mut self) -> crate::core::Result<()>;
 
     fn schema(&self, input_schema: FnSchema) -> FnSchema;
+
     fn parallelism(&self) -> u16;
 }
 
+#[async_trait]
 pub(crate) trait BaseReduceFunction
 where
-    Self: NamedFunction + CheckpointFunction,
+    Self: NamedFunction + CheckpointFunction + Send + Sync,
 {
-    fn open(&mut self, context: &Context) -> crate::core::Result<()>;
-    fn reduce(&mut self, key: Record, record: Record);
-    fn drop_state(&mut self, watermark_timestamp: u64) -> Vec<Record>;
-    fn close(&mut self) -> crate::core::Result<()>;
+    async fn open(&mut self, context: &Context) -> crate::core::Result<()>;
+
+    async fn reduce(&mut self, key: Record, record: Record);
+
+    async fn drop_state(&mut self, watermark_timestamp: u64) -> Vec<Record>;
+
+    async fn close(&mut self) -> crate::core::Result<()>;
 
     fn value_schema(&self, key_schema: FnSchema) -> FnSchema;
 }
 
+#[async_trait]
 pub trait CoProcessFunction
 where
-    Self: NamedFunction + CheckpointFunction,
+    Self: NamedFunction + CheckpointFunction + Send + Sync,
 {
-    fn open(&mut self, context: &Context) -> crate::core::Result<()>;
+    async fn open(&mut self, context: &Context) -> crate::core::Result<()>;
+
     /// This method is called for each element in the first of the connected streams.
     ///
     /// `stream_seq` is the `DataStream` index
-    fn process_left(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>>;
-    fn process_right(
-        &mut self,
-        stream_seq: usize,
-        record: Record,
-    ) -> Box<dyn Iterator<Item = Record>>;
-    fn close(&mut self) -> crate::core::Result<()>;
+    async fn process_left(&mut self, record: Record) -> SendableElementStream;
+
+    async fn process_right(&mut self, stream_seq: usize, record: Record) -> SendableElementStream;
+
+    async fn close(&mut self) -> crate::core::Result<()>;
 
     fn schema(&self, input_schema: FnSchema) -> FnSchema;
-}
-
-pub(crate) struct ElementIterator<T>
-where
-    T: Iterator<Item = Record>,
-{
-    iterator: T,
-}
-
-impl<T> ElementIterator<T>
-where
-    T: Iterator<Item = Record>,
-{
-    pub fn new(iterator: T) -> Self {
-        ElementIterator { iterator }
-    }
-}
-
-impl<T> Iterator for ElementIterator<T>
-where
-    T: Iterator<Item = Record>,
-{
-    type Item = Element;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.iterator.next() {
-            Some(record) => Some(Element::Record(record)),
-            None => None,
-        }
-    }
 }

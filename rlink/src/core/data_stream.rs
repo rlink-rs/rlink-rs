@@ -6,7 +6,7 @@ use crate::core::function::{
     CoProcessFunction, FilterFunction, FlatMapFunction, InputFormat, KeySelectorFunction,
     OutputFormat, ReduceFunction,
 };
-use crate::core::operator::{FnOwner, StreamOperator};
+use crate::core::operator::{FunctionCreator, StreamOperator};
 use crate::core::runtime::OperatorId;
 use crate::core::watermark::WatermarkStrategy;
 use crate::core::window::WindowAssigner;
@@ -158,14 +158,15 @@ impl TDataStream for DataStream {
 #[derive(Debug)]
 pub struct ConnectedStreams {
     co_stream: StreamBuilder,
-    // parent_pipeline_ids: Vec<OperatorId>,
+    #[allow(dead_code)]
+    parent_pipeline_ids: Vec<OperatorId>,
 }
 
 impl ConnectedStreams {
-    pub(crate) fn new(co_stream: StreamBuilder, _dependency_pipeline_ids: Vec<OperatorId>) -> Self {
+    pub(crate) fn new(co_stream: StreamBuilder, dependency_pipeline_ids: Vec<OperatorId>) -> Self {
         ConnectedStreams {
             co_stream,
-            // parent_pipeline_ids: dependency_pipeline_ids,
+            parent_pipeline_ids: dependency_pipeline_ids,
         }
     }
 }
@@ -235,12 +236,13 @@ impl TWindowedStream for WindowedStream {
 
 #[derive(Debug)]
 pub struct SinkStream {
-    // end_stream: StreamBuilder,
+    #[allow(dead_code)]
+    end_stream: StreamBuilder,
 }
 
 impl SinkStream {
-    pub(crate) fn new(_end_stream: StreamBuilder) -> Self {
-        SinkStream {}
+    pub(crate) fn new(end_stream: StreamBuilder) -> Self {
+        SinkStream { end_stream }
     }
 }
 
@@ -249,7 +251,6 @@ impl SinkStream {
 
 #[derive(Debug)]
 pub(crate) struct StreamBuilder {
-    // current_id: u32,
     cur_operator_id: OperatorId,
     stream_manager: Rc<StreamManager>,
 }
@@ -260,11 +261,11 @@ impl StreamBuilder {
         source_func: Box<dyn InputFormat>,
         parallelism: u16,
     ) -> Self {
-        let source_operator = StreamOperator::new_source(parallelism, FnOwner::User, source_func);
+        let source_operator =
+            StreamOperator::new_source(parallelism, FunctionCreator::User, source_func);
         let operator_id = stream_manager.add_operator(source_operator, vec![]);
 
         StreamBuilder {
-            // current_id: 0,
             cur_operator_id: operator_id,
             stream_manager,
         }
@@ -279,7 +280,6 @@ impl StreamBuilder {
         let operator_id = stream_manager.add_operator(co_operator, parent_ids);
 
         StreamBuilder {
-            // current_id: 0,
             cur_operator_id: operator_id,
             stream_manager,
         }
@@ -375,7 +375,7 @@ impl TDataStream for StreamBuilder {
         O: OutputFormat + 'static,
     {
         let sink_func = Box::new(output_format);
-        let stream_sink = StreamOperator::new_sink(FnOwner::User, sink_func);
+        let stream_sink = StreamOperator::new_sink(FunctionCreator::User, sink_func);
 
         self.cur_operator_id = self
             .stream_manager
@@ -403,7 +403,7 @@ impl TKeyedStream for StreamBuilder {
         O: OutputFormat + 'static,
     {
         let sink_func = Box::new(output_format);
-        let stream_sink = StreamOperator::new_sink(FnOwner::User, sink_func);
+        let stream_sink = StreamOperator::new_sink(FunctionCreator::User, sink_func);
 
         self.cur_operator_id = self
             .stream_manager

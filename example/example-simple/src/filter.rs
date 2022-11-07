@@ -1,6 +1,7 @@
 use rlink::core;
-use rlink::core::element::{FnSchema, Record};
-use rlink::core::function::{Context, FlatMapFunction};
+use rlink::core::element::{Element, FnSchema};
+use rlink::core::function::{Context, FlatMapFunction, SendableElementStream};
+use rlink::utils::stream::MemoryStream;
 
 #[derive(Debug, Function)]
 pub struct MyFlatMapFunction {}
@@ -11,16 +12,17 @@ impl MyFlatMapFunction {
     }
 }
 
+#[async_trait]
 impl FlatMapFunction for MyFlatMapFunction {
-    fn open(&mut self, _context: &Context) -> core::Result<()> {
+    async fn open(&mut self, _context: &Context) -> core::Result<()> {
         Ok(())
     }
 
-    fn flat_map(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>> {
-        Box::new(vec![record].into_iter())
+    async fn flat_map_element(&mut self, element: Element) -> SendableElementStream {
+        Box::pin(MemoryStream::new(vec![element.into_record()]))
     }
 
-    fn close(&mut self) -> core::Result<()> {
+    async fn close(&mut self) -> core::Result<()> {
         Ok(())
     }
 

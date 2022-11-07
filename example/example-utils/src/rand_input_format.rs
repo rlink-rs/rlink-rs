@@ -1,10 +1,17 @@
+use std::pin::Pin;
+use std::task::Poll;
 use std::time::Duration;
 
-use rand::Rng;
+use futures::Stream;
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use rlink::core;
-use rlink::core::element::{FnSchema, Record};
-use rlink::core::function::{Context, InputFormat, InputSplit, InputSplitSource};
+use rlink::core::element::{Element, FnSchema, Record};
+use rlink::core::function::{
+    Context, ElementStream, InputFormat, InputSplit, InputSplitSource, SendableElementStream,
+};
 use rlink::utils::date_time::current_timestamp_millis;
+use tokio::time::Interval;
 
 use crate::buffer_gen::model;
 
@@ -21,16 +28,17 @@ impl RandInputFormat {
 
 impl InputSplitSource for RandInputFormat {}
 
+#[async_trait]
 impl InputFormat for RandInputFormat {
-    fn open(&mut self, _input_split: InputSplit, _context: &Context) -> core::Result<()> {
+    async fn open(&mut self, _input_split: InputSplit, _context: &Context) -> core::Result<()> {
         Ok(())
     }
 
-    fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record> + Send> {
-        Box::new(RandIterator::new())
+    async fn element_stream(&mut self) -> SendableElementStream {
+        Box::pin(IntervalRandStream::new())
     }
 
-    fn close(&mut self) -> core::Result<()> {
+    async fn close(&mut self) -> core::Result<()> {
         Ok(())
     }
 
@@ -43,33 +51,123 @@ impl InputFormat for RandInputFormat {
     }
 }
 
-struct RandIterator {}
+// struct RandIterator {
+//     receiver: Receiver<Record>,
+// }
+//
+// impl RandIterator {
+//     pub fn new() -> Self {
+//         let (sender, receiver) = channel();
+//         Self::rand_record(sender);
+//         RandIterator { receiver }
+//     }
+//
+//     fn rand_record(sender: Sender<Record>) {
+//         loop {
+//             std::thread::sleep(Duration::from_millis(10));
+//
+//             let mut rng: StdRng = SeedableRng::from_entropy();
+//             let v = rng.gen_range(0i32..100i32) as i64;
+//
+//             let name = format!("name-{}", v);
+//             let model = model::Entity {
+//                 timestamp: current_timestamp_millis(),
+//                 name: name.as_str(),
+//                 value: v,
+//             };
+//
+//             let mut record = Record::new();
+//             model.to_buffer(record.as_buffer()).unwrap();
+//
+//             match sender.send(record) {
+//                 Ok(()) => {}
+//                 Err(_e) => println!("rand buffer is full"),
+//             }
+//         }
+//     }
+// }
+//
+// impl Iterator for RandIterator {
+//     type Item = Record;
+//
+//     fn next(&mut self) -> Option<Self::Item> {
+//         if let Ok(record) = self.receiver.try_recv() {}
+//         std::thread::sleep(Duration::from_millis(10));
+//
+//         let mut rng: StdRng = SeedableRng::from_entropy();
+//         let v = rng.gen_range(0i32..100i32) as i64;
+//
+//         let name = format!("name-{}", v);
+//         let model = model::Entity {
+//             timestamp: current_timestamp_millis(),
+//             name: name.as_str(),
+//             value: v,
+//         };
+//
+//         let mut record = Record::new();
+//         model.to_buffer(record.as_buffer()).unwrap();
+//
+//         Some(record)
+//     }
+// }
 
-impl RandIterator {
+pub struct IntervalRandStream {
+    inner: Interval,
+}
+
+impl IntervalRandStream {
     pub fn new() -> Self {
-        RandIterator {}
+        let interval = tokio::time::interval(Duration::from_millis(10));
+        Self { inner: interval }
+    }
+
+    pub fn with_period(period: Duration) -> Self {
+        let interval = tokio::time::interval(period);
+        Self { inner: interval }
     }
 }
 
-impl Iterator for RandIterator {
-    type Item = Record;
+impl ElementStream for IntervalRandStream {}
 
-    fn next(&mut self) -> Option<Self::Item> {
-        std::thread::sleep(Duration::from_millis(10));
+impl Stream for IntervalRandStream {
+    type Item = Element;
 
-        let mut thread_rng = rand::thread_rng();
-        let v = thread_rng.gen_range(0i32, 100i32) as i64;
+    fn poll_next(
+        mut self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        self.inner.poll_tick(cx).map(|_| {
+            let mut rng: StdRng = SeedableRng::from_entropy();
+            let v = rng.gen_range(0i32..100i32) as i64;
 
-        let name = format!("name-{}", v);
-        let model = model::Entity {
-            timestamp: current_timestamp_millis(),
-            name: name.as_str(),
-            value: v,
-        };
+            let name = format!("name-{}", v);
+            let model = model::Entity {
+                timestamp: current_timestamp_millis(),
+                name: name.as_str(),
+                value: v,
+            };
 
-        let mut record = Record::new();
-        model.to_buffer(record.as_buffer()).unwrap();
+            let mut record = Record::new();
+            model.to_buffer(record.as_buffer()).unwrap();
 
-        Some(record)
+            Some(Element::Record(record))
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use futures::StreamExt;
+
+    use crate::rand_input_format::IntervalRandStream;
+
+    #[tokio::test]
+    pub async fn interval_rand_stream_test() {
+        let mut stream = IntervalRandStream::with_period(Duration::from_secs(1));
+        while let Some(element) = stream.next().await {
+            println!("{:?}", element);
+        }
     }
 }

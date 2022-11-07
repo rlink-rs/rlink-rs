@@ -1,136 +1,168 @@
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::thread::JoinHandle;
+
+use tokio::task::JoinHandle;
 
 use crate::core::element::{Element, Record};
 use crate::core::env::{StreamApp, StreamExecutionEnvironment};
 use crate::core::function::KeySelectorFunction;
 use crate::core::operator::{DefaultStreamOperator, StreamOperator};
-use crate::core::runtime::{ClusterDescriptor, JobId, OperatorId, TaskDescriptor};
+use crate::core::runtime::{ClusterDescriptor, JobId, ManagerStatus, OperatorId, TaskDescriptor};
 use crate::dag::metadata::DagMetadata;
 use crate::dag::OperatorType;
 use crate::runtime::context::Context;
 use crate::runtime::timer::WindowTimer;
-use crate::runtime::worker::heart_beat::submit_heartbeat;
+use crate::runtime::worker::checkpoint::CheckpointPublish;
+use crate::runtime::worker::heart_beat::HeartbeatPublish;
 use crate::runtime::worker::runnable::co_process_runnable::CoProcessRunnable;
 use crate::runtime::worker::runnable::{
     FilterRunnable, FlatMapRunnable, KeyByRunnable, ReduceRunnable, Runnable, RunnableContext,
     SinkRunnable, SourceRunnable, WatermarkAssignerRunnable, WindowAssignerRunnable,
 };
-use crate::runtime::HeartbeatItem;
 
 pub mod checkpoint;
 pub mod heart_beat;
 pub mod runnable;
 pub mod web_server;
 
-pub(crate) type FunctionContext = crate::core::function::Context;
-
-pub(crate) fn run<S>(
-    _context: Arc<Context>,
+#[derive(Clone, Debug)]
+pub(crate) struct WorkerTaskContext {
+    #[allow(unused)]
+    context: Arc<Context>,
     dag_metadata: Arc<DagMetadata>,
     cluster_descriptor: Arc<ClusterDescriptor>,
     task_descriptor: TaskDescriptor,
-    stream_app: S,
-    _stream_env: &StreamExecutionEnvironment,
+
     window_timer: WindowTimer,
-) -> JoinHandle<()>
+    checkpoint_publish: Arc<CheckpointPublish>,
+    #[allow(unused)]
+    heartbeat_publish: Arc<HeartbeatPublish>,
+}
+
+impl WorkerTaskContext {
+    pub fn new(
+        context: Arc<Context>,
+        dag_metadata: Arc<DagMetadata>,
+        cluster_descriptor: Arc<ClusterDescriptor>,
+        task_descriptor: TaskDescriptor,
+        window_timer: WindowTimer,
+        checkpoint_publish: Arc<CheckpointPublish>,
+        heartbeat_publish: Arc<HeartbeatPublish>,
+    ) -> Self {
+        Self {
+            context,
+            dag_metadata,
+            cluster_descriptor,
+            task_descriptor,
+            window_timer,
+            checkpoint_publish,
+            heartbeat_publish,
+        }
+    }
+
+    pub fn get_coordinator_status(&self) -> ManagerStatus {
+        self.heartbeat_publish.get_coordinator_status()
+    }
+
+    #[allow(unused)]
+    pub fn context(&self) -> Arc<Context> {
+        self.context.clone()
+    }
+
+    #[allow(unused)]
+    pub fn dag_metadata(&self) -> Arc<DagMetadata> {
+        self.dag_metadata.clone()
+    }
+
+    pub fn cluster_descriptor(&self) -> Arc<ClusterDescriptor> {
+        self.cluster_descriptor.clone()
+    }
+
+    #[allow(unused)]
+    pub fn task_descriptor(&self) -> &TaskDescriptor {
+        &self.task_descriptor
+    }
+
+    #[allow(unused)]
+    pub fn window_timer(&self) -> WindowTimer {
+        self.window_timer.clone()
+    }
+
+    pub fn checkpoint_publish(&self) -> Arc<CheckpointPublish> {
+        self.checkpoint_publish.clone()
+    }
+
+    #[allow(unused)]
+    pub fn heartbeat_publish(&self) -> Arc<HeartbeatPublish> {
+        self.heartbeat_publish.clone()
+    }
+}
+
+pub(crate) type FunctionContext = crate::core::function::Context;
+
+pub(crate) async fn run<S>(task_context: Arc<WorkerTaskContext>, stream_app: S) -> JoinHandle<()>
 where
     S: StreamApp + 'static,
 {
-    std::thread::Builder::new()
-        .name(format!(
-            "RM-Task-{}-{}",
-            task_descriptor.task_id.job_id.0, task_descriptor.task_id.task_number,
-        ))
-        .spawn(move || {
-            submit_heartbeat(HeartbeatItem::TaskThreadId {
-                task_id: task_descriptor.task_id.clone(),
-                thread_id: thread_id::get() as u64,
-            });
-
-            let stream_env = StreamExecutionEnvironment::new();
-            let worker_task = WorkerTask::new(
-                dag_metadata,
-                cluster_descriptor,
-                task_descriptor,
-                stream_app,
-                stream_env,
-                window_timer,
-            );
-            // todo error handle
-            worker_task.run().unwrap();
-        })
-        .unwrap()
+    tokio::spawn(async move {
+        let worker_task = WorkerTask::new(task_context, stream_app);
+        // todo error handle
+        worker_task.run().await.unwrap();
+    })
 }
 
 pub struct WorkerTask<S>
 where
     S: StreamApp + 'static,
 {
-    // context: Arc<Context>,
-    dag_metadata: Arc<DagMetadata>,
-    cluster_descriptor: Arc<ClusterDescriptor>,
-    task_descriptor: TaskDescriptor,
+    task_context: Arc<WorkerTaskContext>,
     stream_app: S,
-    stream_env: StreamExecutionEnvironment,
-    window_timer: WindowTimer,
 }
 
 impl<S> WorkerTask<S>
 where
     S: StreamApp + 'static,
 {
-    pub(crate) fn new(
-        // context: Arc<Context>,
-        dag_metadata: Arc<DagMetadata>,
-        cluster_descriptor: Arc<ClusterDescriptor>,
-        task_descriptor: TaskDescriptor,
-        stream_app: S,
-        stream_env: StreamExecutionEnvironment,
-        window_timer: WindowTimer,
-    ) -> Self {
+    pub(crate) fn new(task_context: Arc<WorkerTaskContext>, stream_app: S) -> Self {
         WorkerTask {
-            // context,
-            dag_metadata,
-            cluster_descriptor,
-            task_descriptor,
+            task_context,
             stream_app,
-            stream_env,
-            window_timer,
         }
     }
 
-    pub fn run(mut self) -> anyhow::Result<()> {
+    pub async fn run(self) -> anyhow::Result<()> {
         let application_properties = &self
+            .task_context
             .cluster_descriptor
             .coordinator_manager
             .application_properties;
-        self.stream_app
-            .build_stream(application_properties, self.stream_env.borrow_mut());
+        let operators = {
+            let mut stream_env = StreamExecutionEnvironment::new();
+            self.stream_app
+                .build_stream(application_properties, stream_env.borrow_mut());
 
-        let mut raw_stream_graph = self.stream_env.stream_manager.stream_graph.borrow_mut();
-        let operators = raw_stream_graph.pop_operators();
+            let mut raw_stream_graph = stream_env.stream_manager.stream_graph.borrow_mut();
+            raw_stream_graph.pop_operators()
+        };
 
         let mut operator_invoke_chain = self.build_invoke_chain(operators);
         // debug!("Invoke: {:?}", operator_invoke_chain);
 
         let runnable_context = RunnableContext {
-            dag_metadata: self.dag_metadata.clone(),
-            cluster_descriptor: self.cluster_descriptor.clone(),
-            task_descriptor: self.task_descriptor.clone(),
-            window_timer: self.window_timer.clone(),
+            task_context: self.task_context.clone(),
         };
 
         info!("open Operator Chain");
-        operator_invoke_chain.open(&runnable_context)?;
+        operator_invoke_chain.open(&runnable_context).await?;
 
         info!("run Operator Chain");
-        operator_invoke_chain.run(Element::Record(Record::new()));
+        operator_invoke_chain
+            .run(Element::Record(Record::new()))
+            .await;
 
         info!("close Operator Chain");
-        operator_invoke_chain.close()?;
+        operator_invoke_chain.close().await?;
 
         Ok(())
     }
@@ -140,9 +172,10 @@ where
         mut operators: HashMap<OperatorId, StreamOperator>,
     ) -> Box<dyn Runnable> {
         let job_node = self
+            .task_context
             .dag_metadata
-            .job_node(self.task_descriptor.task_id.job_id)
-            .expect(format!("Job={:?} is not found", &self.task_descriptor).as_str());
+            .job_node(self.task_context.task_descriptor.task_id.job_id)
+            .expect(format!("Job={:?} is not found", &self.task_context.task_descriptor).as_str());
 
         let mut invoke_operators = Vec::new();
         for index in 0..job_node.stream_nodes.len() {
@@ -221,7 +254,7 @@ where
         operators: &mut HashMap<OperatorId, StreamOperator>,
         job_id: JobId,
     ) -> Option<DefaultStreamOperator<dyn KeySelectorFunction>> {
-        let job_parents = self.dag_metadata.job_parents(job_id);
+        let job_parents = self.task_context.dag_metadata.parent_jobs(job_id);
         if job_parents.len() == 0 {
             error!("key by not found");
             None

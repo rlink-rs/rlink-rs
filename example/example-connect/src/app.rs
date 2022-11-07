@@ -4,7 +4,8 @@ use rlink::core::backend::{CheckpointBackend, KeyedStateBackend};
 use rlink::core::data_stream::CoStream;
 use rlink::core::data_stream::{TConnectedStreams, TDataStream, TKeyedStream, TWindowedStream};
 use rlink::core::env::{StreamApp, StreamExecutionEnvironment};
-use rlink::core::properties::{ChannelBaseOn, Properties, SystemProperties};
+use rlink::core::properties::{Properties, SystemProperties};
+use rlink::core::runtime::ClusterDescriptor;
 use rlink::functions::flat_map::broadcast_flat_map::BroadcastFlagMapFunction;
 use rlink::functions::flat_map::round_robin_flat_map::RoundRobinFlagMapFunction;
 use rlink::functions::key_selector::SchemaKeySelector;
@@ -23,11 +24,11 @@ use crate::percentile::get_percentile_scale;
 #[derive(Clone, Debug)]
 pub struct ConnectStreamApp0 {}
 
+#[async_trait]
 impl StreamApp for ConnectStreamApp0 {
-    fn prepare_properties(&self, properties: &mut Properties) {
+    async fn prepare_properties(&self, properties: &mut Properties) {
         properties.set_keyed_state_backend(KeyedStateBackend::Memory);
         properties.set_pub_sub_channel_size(100000);
-        properties.set_pub_sub_channel_base(ChannelBaseOn::Unbounded);
         properties.set_checkpoint_interval(Duration::from_secs(15));
     }
 
@@ -70,17 +71,19 @@ impl StreamApp for ConnectStreamApp0 {
             ))
             .add_sink(print_sink());
     }
+
+    async fn pre_worker_startup(&self, _cluster_descriptor: &ClusterDescriptor) {}
 }
 
 #[derive(Clone, Debug)]
 pub struct ConnectStreamApp1 {}
 
+#[async_trait]
 impl StreamApp for ConnectStreamApp1 {
-    fn prepare_properties(&self, properties: &mut Properties) {
+    async fn prepare_properties(&self, properties: &mut Properties) {
         properties.set_application_name("rlink-connect");
         properties.set_keyed_state_backend(KeyedStateBackend::Memory);
         properties.set_pub_sub_channel_size(100000);
-        properties.set_pub_sub_channel_base(ChannelBaseOn::Unbounded);
 
         properties.set_checkpoint(CheckpointBackend::Memory);
         properties.set_checkpoint_interval(Duration::from_secs(15));
@@ -128,4 +131,6 @@ impl StreamApp for ConnectStreamApp1 {
             )
             .add_sink(print_sink());
     }
+
+    async fn pre_worker_startup(&self, _cluster_descriptor: &ClusterDescriptor) {}
 }

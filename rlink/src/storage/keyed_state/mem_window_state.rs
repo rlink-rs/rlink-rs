@@ -10,7 +10,8 @@ use crate::storage::keyed_state::{StateKey, TReducingState, TWindowState};
 
 #[derive(Clone)]
 pub struct MemoryWindowState {
-    // application_id: String,
+    #[allow(dead_code)]
+    application_id: String,
     job_id: JobId,
     task_number: u16,
 
@@ -18,9 +19,9 @@ pub struct MemoryWindowState {
 }
 
 impl MemoryWindowState {
-    pub fn new(_application_id: String, job_id: JobId, task_number: u16) -> Self {
+    pub fn new(application_id: String, job_id: JobId, task_number: u16) -> Self {
         MemoryWindowState {
-            // application_id,
+            application_id,
             job_id,
             task_number,
             windows: HashMap::new(),

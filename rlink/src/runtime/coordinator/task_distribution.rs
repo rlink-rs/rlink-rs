@@ -36,7 +36,6 @@ pub(crate) fn build_cluster_descriptor(
                 operators,
                 input_split: task_instance.input_split.clone(),
                 daemon: task_instance.daemon,
-                thread_id: "".to_string(),
                 terminated: false,
             };
             task_descriptors.push(task_descriptor);
@@ -48,7 +47,6 @@ pub(crate) fn build_cluster_descriptor(
             latest_heart_beat_status: HeartBeatStatus::Ok,
             task_manager_id: task_manager_instance.worker_manager_id.clone(),
             task_manager_address: "".to_string(),
-            metrics_address: "".to_string(),
             web_address: "".to_string(),
             task_descriptors,
         };
@@ -60,7 +58,6 @@ pub(crate) fn build_cluster_descriptor(
         application_id: context.application_id.clone(),
         application_properties: application_properties.clone(),
         web_address: "".to_string(),
-        metrics_address: context.metric_addr.clone(),
         status: ManagerStatus::Pending,
         v_cores: context.v_cores,
         memory_mb: context.memory_mb,

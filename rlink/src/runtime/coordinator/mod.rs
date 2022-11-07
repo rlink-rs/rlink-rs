@@ -13,7 +13,6 @@ use crate::core::runtime::{ClusterDescriptor, ManagerStatus};
 use crate::dag::metadata::DagMetadata;
 use crate::dag::DagManager;
 use crate::deployment::TResourceManager;
-use crate::metrics::metric::Gauge;
 use crate::metrics::register_gauge;
 use crate::runtime::context::Context;
 use crate::runtime::coordinator::checkpoint_manager::CheckpointManager;
@@ -25,6 +24,7 @@ use crate::storage::metadata::{
     MetadataStorage,
 };
 use crate::utils::date_time::timestamp_str;
+use metrics::Gauge;
 
 pub mod checkpoint_manager;
 pub mod heart_beat_manager;
@@ -40,8 +40,6 @@ where
     stream_app: S,
     metadata_storage_mode: MetadataStorageType,
     resource_manager: R,
-    stream_env: StreamExecutionEnvironment,
-
     startup_number: Gauge,
 }
 
@@ -50,12 +48,7 @@ where
     S: StreamApp + 'static,
     R: TResourceManager + 'static,
 {
-    pub fn new(
-        context: Arc<Context>,
-        stream_app: S,
-        resource_manager: R,
-        stream_env: StreamExecutionEnvironment,
-    ) -> Self {
+    pub fn new(context: Arc<Context>, stream_app: S, resource_manager: R) -> Self {
         let metadata_storage_mode = context.cluster_config.metadata_storage.clone();
 
         let startup_number = register_gauge("startup_number", vec![]);
@@ -65,22 +58,25 @@ where
             stream_app,
             metadata_storage_mode,
             resource_manager,
-            stream_env,
             startup_number,
         }
     }
 
-    pub fn run(&mut self) -> anyhow::Result<()> {
+    pub async fn run(&mut self) -> anyhow::Result<()> {
         info!("coordinator start with mode {}", self.context.manager_type);
 
-        let application_properties = self.prepare_properties();
-
-        self.stream_app
-            .build_stream(&application_properties, self.stream_env.borrow_mut());
+        let application_properties = self.prepare_properties().await;
 
         let dag_manager = {
-            let raw_stream_graph = self.stream_env.stream_manager.stream_graph.borrow();
-            DagManager::try_from(raw_stream_graph.deref())?
+            let mut stream_env = StreamExecutionEnvironment::new();
+            self.stream_app
+                .build_stream(&application_properties, stream_env.borrow_mut());
+
+            let dag_manager = {
+                let raw_stream_graph = stream_env.stream_manager.stream_graph.borrow();
+                DagManager::try_from(raw_stream_graph.deref())?
+            };
+            dag_manager
         };
         info!("DagManager build success");
 
@@ -90,15 +86,17 @@ where
         let mut cluster_descriptor = self.build_metadata(&dag_manager, &application_properties);
         debug!("ApplicationDescriptor : {}", cluster_descriptor.to_string());
 
-        let ck_manager = self.build_checkpoint_manager(
-            &dag_metadata,
-            &application_properties,
-            cluster_descriptor.borrow_mut(),
-        );
-        ck_manager.run_align_task();
+        let ck_manager = self
+            .build_checkpoint_manager(
+                &dag_metadata,
+                &application_properties,
+                cluster_descriptor.borrow_mut(),
+            )
+            .await;
         info!("start CheckpointManager align task");
 
-        self.web_serve(cluster_descriptor.borrow_mut(), ck_manager, dag_metadata);
+        self.web_serve(cluster_descriptor.borrow_mut(), ck_manager, dag_metadata)
+            .await;
         info!(
             "serve coordinator web ui {}",
             &cluster_descriptor.coordinator_manager.web_address
@@ -115,27 +113,29 @@ where
             self.gauge_startup_number(cluster_descriptor.borrow_mut());
 
             // save metadata to storage
-            self.save_metadata(&cluster_descriptor);
+            self.save_metadata(&cluster_descriptor).await;
             info!("save metadata to storage");
 
-            self.stream_app.pre_worker_startup(&cluster_descriptor);
+            self.stream_app
+                .pre_worker_startup(&cluster_descriptor)
+                .await;
             info!("pre-worker startup event");
 
             // allocate all worker's resources
-            let worker_task_ids = self.allocate_worker();
+            let worker_task_ids = self.allocate_worker().await;
             info!("allocate workers success");
 
             // blocking util all worker's status is `Register` status
-            self.waiting_worker_status_fine();
+            self.waiting_worker_status_fine().await;
             info!("all worker status is fine");
 
             // heartbeat check. blocking util heartbeat timeout
             let heartbeat_result =
-                heart_beat_manager::start_heartbeat_timer(self.metadata_storage_mode.clone());
+                heart_beat_manager::start_heartbeat_timer(self.metadata_storage_mode.clone()).await;
             info!("heartbeat timer has interrupted");
 
             // heartbeat timeout and stop all worker's tasks
-            self.stop_all_worker_tasks(worker_task_ids);
+            self.stop_all_worker_tasks(worker_task_ids).await;
             info!("stop all workers");
 
             if let HeartbeatResult::End = heartbeat_result {
@@ -144,12 +144,13 @@ where
         }
     }
 
-    fn prepare_properties(&self) -> Properties {
+    async fn prepare_properties(&self) -> Properties {
         let mut application_properties = Properties::new();
         application_properties.set_cluster_mode(self.context.cluster_mode);
 
         self.stream_app
-            .prepare_properties(application_properties.borrow_mut());
+            .prepare_properties(application_properties.borrow_mut())
+            .await;
 
         let mut keys: Vec<&str> = application_properties
             .as_map()
@@ -178,9 +179,10 @@ where
         cluster_descriptor
     }
 
-    fn save_metadata(&self, cluster_descriptor: &ClusterDescriptor) {
+    async fn save_metadata(&self, cluster_descriptor: &ClusterDescriptor) {
         let mut metadata_storage = MetadataStorage::new(&self.metadata_storage_mode);
-        loop_save_cluster_descriptor(metadata_storage.borrow_mut(), cluster_descriptor.clone());
+        loop_save_cluster_descriptor(metadata_storage.borrow_mut(), cluster_descriptor.clone())
+            .await;
     }
 
     // fn clear_metadata(&self) {
@@ -188,7 +190,7 @@ where
     //     loop_delete_cluster_descriptor(metadata_storage.borrow_mut());
     // }
 
-    fn build_checkpoint_manager(
+    async fn build_checkpoint_manager(
         &self,
         dag_manager: &DagMetadata,
         application_properties: &Properties,
@@ -203,8 +205,9 @@ where
             &self.context,
             cluster_descriptor,
             checkpoint_ttl,
-        );
-        let operator_checkpoints = ck_manager.load().expect("load checkpoints error");
+        )
+        .await;
+        let operator_checkpoints = ck_manager.load().await.expect("load checkpoints error");
         if operator_checkpoints.len() == 0 {
             return ck_manager;
         }
@@ -235,7 +238,7 @@ where
         ck_manager
     }
 
-    fn web_serve(
+    async fn web_serve(
         &self,
         cluster_descriptor: &mut ClusterDescriptor,
         checkpoint_manager: CheckpointManager,
@@ -249,22 +252,24 @@ where
             metadata_storage_mode,
             checkpoint_manager,
             dag_metadata,
-        );
+        )
+        .await;
         cluster_descriptor.coordinator_manager.web_address = address;
     }
 
-    fn allocate_worker(&self) -> Vec<TaskResourceInfo> {
+    async fn allocate_worker(&self) -> Vec<TaskResourceInfo> {
         self.resource_manager
-            .worker_allocate(&self.stream_app, &self.stream_env)
+            .worker_allocate(&self.stream_app)
+            .await
             .expect("try allocate worker error")
     }
 
-    fn waiting_worker_status_fine(&self /*, metadata_storage: Box<dyn MetadataStorage>*/) {
+    async fn waiting_worker_status_fine(&self) {
         let mut metadata_storage = MetadataStorage::new(&self.metadata_storage_mode);
         loop {
             info!("waiting all workers status fine...");
 
-            let job_descriptor = loop_read_cluster_descriptor(&metadata_storage);
+            let job_descriptor = loop_read_cluster_descriptor(&metadata_storage).await;
 
             let unregister_worker = job_descriptor
                 .worker_managers
@@ -275,7 +280,8 @@ where
                 loop_update_application_status(
                     metadata_storage.borrow_mut(),
                     ManagerStatus::Registered,
-                );
+                )
+                .await;
                 info!("all workers status fine and Job update state to `Registered`");
                 job_descriptor.worker_managers.iter().for_each(|tm| {
                     info!(
@@ -287,21 +293,24 @@ where
                 break;
             }
 
-            std::thread::sleep(Duration::from_secs(3));
+            tokio::time::sleep(Duration::from_secs(3)).await;
         }
     }
 
-    fn stop_all_worker_tasks(&self, worker_task_ids: Vec<TaskResourceInfo>) {
+    async fn stop_all_worker_tasks(&self, worker_task_ids: Vec<TaskResourceInfo>) {
         // loop stop all workers util all are success
         loop {
-            let rt = self.resource_manager.stop_workers(worker_task_ids.clone());
+            let rt = self
+                .resource_manager
+                .stop_workers(worker_task_ids.clone())
+                .await;
             match rt {
                 Ok(_) => {
                     break;
                 }
                 Err(e) => {
                     error!("try stop all workers error. {}", e);
-                    std::thread::sleep(Duration::from_secs(2));
+                    tokio::time::sleep(Duration::from_secs(2)).await;
                 }
             }
         }
@@ -311,21 +320,21 @@ where
         let coordinator_manager = &cluster_descriptor.coordinator_manager;
 
         let uptime = register_gauge("uptime", vec![]);
-        uptime.store(coordinator_manager.uptime as i64);
+        uptime.set(coordinator_manager.uptime as f64);
 
         let v_cores = register_gauge("v_cores", vec![]);
-        v_cores.store(coordinator_manager.v_cores as i64);
+        v_cores.set(coordinator_manager.v_cores as f64);
 
         let memory_mb = register_gauge("memory_mb", vec![]);
-        memory_mb.store(coordinator_manager.memory_mb as i64);
+        memory_mb.set(coordinator_manager.memory_mb as f64);
 
         let num_task_managers = register_gauge("num_task_managers", vec![]);
-        num_task_managers.store(coordinator_manager.num_task_managers as i64);
+        num_task_managers.set(coordinator_manager.num_task_managers as f64);
     }
 
     fn gauge_startup_number(&self, cluster_descriptor: &mut ClusterDescriptor) {
         cluster_descriptor.coordinator_manager.startup_number += 1;
         self.startup_number
-            .store(cluster_descriptor.coordinator_manager.startup_number as i64);
+            .set(cluster_descriptor.coordinator_manager.startup_number as f64);
     }
 }

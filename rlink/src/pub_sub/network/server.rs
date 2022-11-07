@@ -2,6 +2,7 @@ use std::borrow::BorrowMut;
 use std::collections::LinkedList;
 use std::convert::TryFrom;
 use std::net::{IpAddr, SocketAddr};
+use std::ops::DerefMut;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -16,14 +17,12 @@ use tokio::net::TcpStream;
 use tokio::sync::RwLock;
 use tokio_util::codec::{BytesCodec, FramedWrite};
 
-use crate::channel::{named_channel_with_base, ElementReceiver, ElementSender, TryRecvError};
+use crate::channel::{named_channel, ElementReceiver, ElementSender, TryRecvError};
 use crate::core::element::Element;
-use crate::core::properties::ChannelBaseOn;
 use crate::core::runtime::{ChannelKey, TaskId};
 use crate::pub_sub::network::{
     new_framed_read, new_framed_write, ElementRequest, ElementResponse, ResponseCode,
 };
-use crate::utils::thread::{async_runtime, async_runtime_single};
 
 pub(crate) static ENABLE_LOG: AtomicBool = AtomicBool::new(false);
 
@@ -51,7 +50,6 @@ pub(crate) fn publish(
     source_task_id: &TaskId,
     target_task_ids: &Vec<TaskId>,
     channel_size: usize,
-    channel_base_on: ChannelBaseOn,
 ) -> Vec<(ChannelKey, ElementSender)> {
     let mut senders = Vec::new();
     for target_task_id in target_task_ids {
@@ -60,12 +58,8 @@ pub(crate) fn publish(
             target_task_id: target_task_id.clone(),
         };
 
-        let (sender, receiver) = named_channel_with_base(
-            "NetworkPublish",
-            channel_key.to_tags(),
-            channel_size,
-            channel_base_on,
-        );
+        let (sender, receiver) =
+            named_channel("NetworkPublish", channel_key.to_tags(), channel_size);
 
         senders.push((channel_key.clone(), sender));
         set_network_channel(channel_key, receiver);
@@ -84,11 +78,11 @@ fn set_network_channel(key: ChannelKey, receiver: ElementReceiver) {
     network_channels.insert(key, receiver);
 }
 
-/// Get a channel by `ChannelKey`
-fn get_network_channel(key: &ChannelKey) -> Option<ElementReceiver> {
-    let network_channels: &DashMap<ChannelKey, ElementReceiver> = &*NETWORK_CHANNELS;
-    network_channels.get(key).map(|x| x.value().clone())
-}
+// /// Get a channel by `ChannelKey`
+// fn get_network_channel(key: &ChannelKey) -> Option<ElementReceiver> {
+//     let network_channels: &DashMap<ChannelKey, ElementReceiver> = &*NETWORK_CHANNELS;
+//     network_channels.get(key).map(|x| x.value().clone())
+// }
 
 /// Remove a channel by `ChannelKey`
 /// When the `StreamStatus` of the `end` state is consumed from the channel,
@@ -121,20 +115,10 @@ impl Server {
         }
     }
 
-    pub fn bind_addr_sync(&self) -> Option<SocketAddr> {
-        let self_clone = self.clone();
-        async_runtime_single().block_on(self_clone.bind_addr())
-    }
-
     pub async fn bind_addr(&self) -> Option<SocketAddr> {
         let addr = self.bind_addr.read().await;
         let addr = *addr;
         addr.clone()
-    }
-
-    pub fn serve_sync(&self) -> std::io::Result<()> {
-        let self_clone = self.clone();
-        async_runtime("server").block_on(self_clone.serve())
     }
 
     pub async fn serve(&self) -> std::io::Result<()> {
@@ -161,7 +145,7 @@ impl Server {
     }
 
     pub async fn try_bind(&self, _ip: &str) -> Result<TcpListener, std::io::Error> {
-        let mut rng = rand::thread_rng();
+        let mut rng: StdRng = SeedableRng::from_entropy();
         let loops = 30;
         for index in 0..loops {
             let port = rng.gen_range(10000..30000);
@@ -263,8 +247,12 @@ impl Server {
 
     /// batch get elements by `ChannelKey`
     fn batch_get(&self, channel_key: &ChannelKey, batch_pull_size: u16) -> LinkedList<Element> {
-        match get_network_channel(&channel_key) {
-            Some(receiver) => self.batch_receive(channel_key, batch_pull_size, receiver),
+        let network_channels: &DashMap<ChannelKey, ElementReceiver> = &*NETWORK_CHANNELS;
+        match network_channels.get_mut(channel_key) {
+            Some(mut ref_value) => {
+                let receiver = ref_value.deref_mut();
+                self.batch_receive(channel_key, batch_pull_size, receiver)
+            }
             None => {
                 // The child's job are subscribed to before the channel is initialized.
                 // This is not a mistake, the child's job will retry repeatedly.
@@ -275,6 +263,18 @@ impl Server {
                 LinkedList::new()
             }
         }
+        // match get_network_channel(&channel_key) {
+        //     Some(receiver) => self.batch_receive(channel_key, batch_pull_size, receiver),
+        //     None => {
+        //         // The child's job are subscribed to before the channel is initialized.
+        //         // This is not a mistake, the child's job will retry repeatedly.
+        //         warn!(
+        //             "channel_key({:?}) not found, maybe the job haven't initialized yet",
+        //             channel_key
+        //         );
+        //         LinkedList::new()
+        //     }
+        // }
     }
 
     /// batch receive from `ElementReceiver`
@@ -282,7 +282,7 @@ impl Server {
         &self,
         channel_key: &ChannelKey,
         batch_pull_size: u16,
-        receiver: ElementReceiver,
+        receiver: &mut ElementReceiver,
     ) -> LinkedList<Element> {
         let mut element_list = LinkedList::new();
         for _ in 0..batch_pull_size {

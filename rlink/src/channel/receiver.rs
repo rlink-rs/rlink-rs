@@ -1,15 +1,20 @@
-use std::time::Duration;
+use std::task::{Context, Poll};
 
-use crate::channel::{Receiver, RecvError, RecvTimeoutError, TryRecvError};
-use crate::metrics::metric::{Counter, Gauge};
+use metrics::{Counter, Gauge};
+use tokio::sync::mpsc::Receiver;
 
-#[derive(Clone)]
+use crate::channel::TryRecvError;
+use crate::channel::CHANNEL_SIZE_PREFIX;
+
 pub struct ChannelReceiver<T>
 where
     T: Sync + Send,
 {
-    // name: String,
-    // guava_size_name: String,
+    #[allow(dead_code)]
+    name: String,
+    #[allow(dead_code)]
+    guava_size_name: String,
+
     pub(crate) receiver: Receiver<T>,
 
     size: Gauge,
@@ -20,10 +25,10 @@ impl<T> ChannelReceiver<T>
 where
     T: Sync + Send,
 {
-    pub fn new(_name: &str, receiver: Receiver<T>, size: Gauge, drain_counter: Counter) -> Self {
+    pub fn new(name: &str, receiver: Receiver<T>, size: Gauge, drain_counter: Counter) -> Self {
         ChannelReceiver {
-            // name: name.to_string(),
-            // guava_size_name: CHANNEL_SIZE_PREFIX.to_owned() + name,
+            name: name.to_string(),
+            guava_size_name: CHANNEL_SIZE_PREFIX.to_owned() + name,
             receiver,
             size,
             drain_counter,
@@ -32,28 +37,38 @@ where
 
     #[inline]
     fn on_success(&self) {
-        self.size.fetch_sub(1 as i64);
-        self.drain_counter.fetch_add(1 as u64);
+        self.size.decrement(1 as f64);
+        self.drain_counter.increment(1 as u64);
     }
 
-    pub fn try_recv(&self) -> Result<T, TryRecvError> {
+    pub fn try_recv(&mut self) -> Result<T, TryRecvError> {
         self.receiver.try_recv().map(|event| {
             self.on_success();
             event
         })
     }
 
-    pub fn recv(&self) -> Result<T, RecvError> {
-        self.receiver.recv().map(|event| {
+    pub async fn recv(&mut self) -> Option<T> {
+        let t = self.receiver.recv().await;
+        if t.is_some() {
             self.on_success();
-            event
-        })
+        }
+        t
     }
 
-    pub fn recv_timeout(&self, timeout: Duration) -> Result<T, RecvTimeoutError> {
-        self.receiver.recv_timeout(timeout).map(|event| {
-            self.on_success();
-            event
-        })
+    pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
+        match self.receiver.poll_recv(cx) {
+            Poll::Ready(t) => {
+                if t.is_some() {
+                    self.on_success();
+                }
+                Poll::Ready(t)
+            }
+            Poll::Pending => Poll::Pending,
+        }
+    }
+
+    pub fn close(&mut self) {
+        self.receiver.close();
     }
 }

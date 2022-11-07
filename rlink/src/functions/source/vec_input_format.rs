@@ -1,9 +1,12 @@
 use std::fmt::{Debug, Formatter};
 
-use crate::core::checkpoint::CheckpointFunction;
+use crate::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
 use crate::core::data_types::Schema;
 use crate::core::element::{FnSchema, Record};
-use crate::core::function::{Context, InputFormat, InputSplit, InputSplitSource, NamedFunction};
+use crate::core::function::{
+    Context, InputFormat, InputSplit, InputSplitSource, NamedFunction, SendableElementStream,
+};
+use crate::utils::stream::IteratorStream;
 
 pub fn vec_source(
     data: Vec<Record>,
@@ -39,7 +42,7 @@ pub fn vec_source(
 
 pub struct IteratorInputFormat<T>
 where
-    T: FnOnce(InputSplit, Context) -> Box<dyn Iterator<Item = Record> + Send>,
+    T: FnOnce(InputSplit, Context) -> Box<dyn Iterator<Item = Record> + Send> + Send + Sync,
 {
     parallelism: u16,
 
@@ -52,7 +55,7 @@ where
 
 impl<T> IteratorInputFormat<T>
 where
-    T: FnOnce(InputSplit, Context) -> Box<dyn Iterator<Item = Record> + Send>,
+    T: FnOnce(InputSplit, Context) -> Box<dyn Iterator<Item = Record> + Send> + Send + Sync,
 {
     pub fn new(vec_builder: T, schema: Schema, parallelism: u16) -> Self {
         IteratorInputFormat {
@@ -66,30 +69,36 @@ where
 }
 
 impl<T> InputSplitSource for IteratorInputFormat<T> where
-    T: FnOnce(InputSplit, Context) -> Box<dyn Iterator<Item = Record> + Send>
+    T: FnOnce(InputSplit, Context) -> Box<dyn Iterator<Item = Record> + Send> + Send + Sync
 {
 }
 
+#[async_trait]
 impl<T> InputFormat for IteratorInputFormat<T>
 where
-    T: FnOnce(InputSplit, Context) -> Box<dyn Iterator<Item = Record> + Send>,
+    T: FnOnce(InputSplit, Context) -> Box<dyn Iterator<Item = Record> + Send> + Send + Sync,
 {
-    fn open(&mut self, input_split: InputSplit, context: &Context) -> crate::core::Result<()> {
+    async fn open(
+        &mut self,
+        input_split: InputSplit,
+        context: &Context,
+    ) -> crate::core::Result<()> {
         self.input_split = Some(input_split);
         self.context = Some(context.clone());
 
         Ok(())
     }
 
-    fn record_iter(&mut self) -> Box<dyn Iterator<Item = Record> + Send> {
+    async fn element_stream(&mut self) -> SendableElementStream {
         let vec_builder = self.vec_builder.take().unwrap();
         let input_split = self.input_split.take().unwrap();
         let context = self.context.take().unwrap();
 
-        vec_builder(input_split, context)
+        let itr = vec_builder(input_split, context);
+        Box::pin(IteratorStream::new(itr))
     }
 
-    fn close(&mut self) -> crate::core::Result<()> {
+    async fn close(&mut self) -> crate::core::Result<()> {
         Ok(())
     }
 
@@ -104,21 +113,36 @@ where
 
 impl<T> NamedFunction for IteratorInputFormat<T>
 where
-    T: FnOnce(InputSplit, Context) -> Box<dyn Iterator<Item = Record> + Send>,
+    T: FnOnce(InputSplit, Context) -> Box<dyn Iterator<Item = Record> + Send> + Send + Sync,
 {
     fn name(&self) -> &str {
         "IteratorInputFormat"
     }
 }
 
-impl<T> CheckpointFunction for IteratorInputFormat<T> where
-    T: FnOnce(InputSplit, Context) -> Box<dyn Iterator<Item = Record> + Send>
+#[async_trait]
+impl<T> CheckpointFunction for IteratorInputFormat<T>
+where
+    T: FnOnce(InputSplit, Context) -> Box<dyn Iterator<Item = Record> + Send> + Send + Sync,
 {
+    async fn initialize_state(
+        &mut self,
+        _context: &FunctionSnapshotContext,
+        _handle: &Option<CheckpointHandle>,
+    ) {
+    }
+
+    async fn snapshot_state(
+        &mut self,
+        _context: &FunctionSnapshotContext,
+    ) -> Option<CheckpointHandle> {
+        None
+    }
 }
 
 impl<T> Debug for IteratorInputFormat<T>
 where
-    T: FnOnce(InputSplit, Context) -> Box<dyn Iterator<Item = Record> + Send>,
+    T: FnOnce(InputSplit, Context) -> Box<dyn Iterator<Item = Record> + Send> + Send + Sync,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "IteratorInputFormat")

@@ -7,7 +7,8 @@ use rlink::core::runtime::TaskId;
 #[derive(Debug, Clone)]
 pub struct KafkaCheckpointFunction {
     pub(crate) state_recorder: Option<KafkaSourceStateRecorder>,
-    // pub(crate) application_id: String,
+    #[allow(dead_code)]
+    pub(crate) application_id: String,
     #[allow(dead_code)]
     pub(crate) task_id: TaskId,
     topic: String,
@@ -15,10 +16,10 @@ pub struct KafkaCheckpointFunction {
 }
 
 impl KafkaCheckpointFunction {
-    pub fn new(task_id: TaskId, topic: &str, partition: i32) -> Self {
+    pub fn new(application_id: String, task_id: TaskId, topic: &str, partition: i32) -> Self {
         KafkaCheckpointFunction {
             state_recorder: None,
-            // application_id,
+            application_id,
             task_id,
             topic: topic.to_string(),
             partition,
@@ -30,8 +31,9 @@ impl KafkaCheckpointFunction {
     }
 }
 
+#[async_trait]
 impl CheckpointFunction for KafkaCheckpointFunction {
-    fn initialize_state(
+    async fn initialize_state(
         &mut self,
         context: &FunctionSnapshotContext,
         handle: &Option<CheckpointHandle>,
@@ -59,7 +61,10 @@ impl CheckpointFunction for KafkaCheckpointFunction {
         );
     }
 
-    fn snapshot_state(&mut self, context: &FunctionSnapshotContext) -> Option<CheckpointHandle> {
+    async fn snapshot_state(
+        &mut self,
+        context: &FunctionSnapshotContext,
+    ) -> Option<CheckpointHandle> {
         let handle = self.state_recorder.as_ref().unwrap().snapshot();
         debug!("Checkpoint snapshot: {:?}, context: {:?}", handle, context);
 

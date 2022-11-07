@@ -1,5 +1,6 @@
 use std::borrow::BorrowMut;
-use std::sync::Mutex;
+
+use tokio::sync::Mutex;
 
 use crate::core::runtime::{ClusterDescriptor, ManagerStatus};
 use crate::runtime::HeartbeatItem;
@@ -19,24 +20,23 @@ impl MemoryMetadataStorage {
     }
 }
 
+#[async_trait]
 impl TMetadataStorage for MemoryMetadataStorage {
-    fn save(&mut self, metadata: ClusterDescriptor) -> anyhow::Result<()> {
-        let mut lock = METADATA_STORAGE
-            .lock()
-            .expect("METADATA_STORAGE lock failed");
+    async fn save(&mut self, metadata: ClusterDescriptor) -> anyhow::Result<()> {
+        let mut lock = METADATA_STORAGE.lock().await;
         *lock = Some(metadata);
 
-        debug!("Save metadata {:?}", lock.as_ref());
+        info!("Save metadata {:?}", lock.as_ref());
         Ok(())
     }
 
-    fn load(&self) -> anyhow::Result<ClusterDescriptor> {
-        let lock = METADATA_STORAGE.lock().unwrap();
+    async fn load(&self) -> anyhow::Result<ClusterDescriptor> {
+        let lock = METADATA_STORAGE.lock().await;
         lock.clone().ok_or(anyhow!("ClusterDescriptor not found"))
     }
 
-    fn update_coordinator_status(&self, status: ManagerStatus) -> anyhow::Result<()> {
-        let mut lock = METADATA_STORAGE.lock().unwrap();
+    async fn update_coordinator_status(&self, status: ManagerStatus) -> anyhow::Result<()> {
+        let mut lock = METADATA_STORAGE.lock().await;
 
         let cluster_descriptor = lock
             .as_mut()
@@ -46,13 +46,13 @@ impl TMetadataStorage for MemoryMetadataStorage {
         Ok(())
     }
 
-    fn update_worker_status(
+    async fn update_worker_status(
         &self,
         task_manager_id: String,
         heartbeat_items: Vec<HeartbeatItem>,
         status: ManagerStatus,
     ) -> anyhow::Result<ManagerStatus> {
-        let mut lock = METADATA_STORAGE.lock().unwrap();
+        let mut lock = METADATA_STORAGE.lock().await;
         let cluster_descriptor = (&mut *lock)
             .as_mut()
             .ok_or(anyhow!("ClusterDescriptor not found"))?;
@@ -73,24 +73,15 @@ impl TMetadataStorage for MemoryMetadataStorage {
         let mut exist_task_end_hb = false;
         for heartbeat_item in heartbeat_items {
             match heartbeat_item {
-                HeartbeatItem::MetricsAddress(addr) => {
-                    task_manager_descriptor.metrics_address = addr;
-                }
-                HeartbeatItem::WorkerManagerAddress(addr) => {
-                    task_manager_descriptor.task_manager_address = addr;
-                }
-                HeartbeatItem::WorkerManagerWebAddress(addr) => {
-                    task_manager_descriptor.web_address = addr;
+                HeartbeatItem::WorkerAddrs {
+                    address,
+                    web_address,
+                } => {
+                    task_manager_descriptor.task_manager_address = address;
+                    task_manager_descriptor.web_address = web_address;
                 }
                 HeartbeatItem::HeartBeatStatus(status) => {
                     task_manager_descriptor.latest_heart_beat_status = status;
-                }
-                HeartbeatItem::TaskThreadId { task_id, thread_id } => {
-                    for task_descriptor in &mut task_manager_descriptor.task_descriptors {
-                        if task_descriptor.task_id.eq(&task_id) {
-                            task_descriptor.thread_id = format!("0x{:x}", thread_id);
-                        }
-                    }
                 }
                 HeartbeatItem::TaskEnd { task_id } => {
                     for task_descriptor in &mut task_manager_descriptor.task_descriptors {

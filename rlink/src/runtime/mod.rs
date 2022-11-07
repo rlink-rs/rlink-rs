@@ -1,8 +1,9 @@
 use std::convert::TryFrom;
 use std::sync::Arc;
 
-use crate::core::env::{StreamApp, StreamExecutionEnvironment};
+use crate::core::env::StreamApp;
 use crate::core::runtime::{HeartBeatStatus, TaskId};
+use crate::metrics::install_recorder;
 use crate::utils::panic::panic_notify;
 
 pub mod cluster;
@@ -64,15 +65,6 @@ pub enum ManagerType {
     Worker = 3,
 }
 
-impl ManagerType {
-    pub fn is_coordinator(&self) -> bool {
-        match self {
-            ManagerType::Coordinator => true,
-            _ => false,
-        }
-    }
-}
-
 impl<'a> TryFrom<&'a str> for ManagerType {
     type Error = anyhow::Error;
 
@@ -97,12 +89,14 @@ impl std::fmt::Display for ManagerType {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum HeartbeatItem {
-    WorkerManagerAddress(String),
-    WorkerManagerWebAddress(String),
-    MetricsAddress(String),
+    WorkerAddrs {
+        address: String,
+        web_address: String,
+    },
     HeartBeatStatus(HeartBeatStatus),
-    TaskThreadId { task_id: TaskId, thread_id: u64 },
-    TaskEnd { task_id: TaskId },
+    TaskEnd {
+        task_id: TaskId,
+    },
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -111,7 +105,7 @@ pub(crate) struct HeartbeatRequest {
     pub change_items: Vec<HeartbeatItem>,
 }
 
-pub fn run<S>(stream_env: StreamExecutionEnvironment, stream_app: S) -> anyhow::Result<()>
+pub async fn run<S>(stream_app: S) -> anyhow::Result<()>
 where
     S: StreamApp + 'static,
 {
@@ -120,5 +114,7 @@ where
     let context = context::Context::parse_node_arg()?;
     info!("Context: {:?}", context);
 
-    cluster::run_task(Arc::new(context), stream_env, stream_app)
+    install_recorder(context.task_manager_id.as_str()).await?;
+
+    cluster::run_task(Arc::new(context), stream_app).await
 }

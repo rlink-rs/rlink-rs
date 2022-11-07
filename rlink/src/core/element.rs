@@ -533,7 +533,7 @@ impl Element {
         }
     }
 
-    pub(crate) fn into_record(self) -> Record {
+    pub fn into_record(self) -> Record {
         match self {
             Element::Record(record) => record,
             _ => panic!("Element is not Record"),

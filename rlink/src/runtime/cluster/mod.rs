@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::core::env::{StreamApp, StreamExecutionEnvironment};
+use crate::core::env::StreamApp;
 use crate::deployment::ResourceManager;
 use crate::runtime::context::Context;
 use crate::runtime::ManagerType;
@@ -8,11 +8,7 @@ use crate::runtime::ManagerType;
 mod coordinator;
 mod worker;
 
-pub(crate) fn run_task<S>(
-    context: Arc<Context>,
-    stream_env: StreamExecutionEnvironment,
-    stream_app: S,
-) -> anyhow::Result<()>
+pub(crate) async fn run_task<S>(context: Arc<Context>, stream_app: S) -> anyhow::Result<()>
 where
     S: StreamApp + 'static,
 {
@@ -20,9 +16,9 @@ where
     match context.manager_type {
         ManagerType::Coordinator => {
             let resource_manager = ResourceManager::new(context.clone());
-            coordinator::run(context, stream_env, stream_app, resource_manager)
+            coordinator::run(context, stream_app, resource_manager).await
         }
-        ManagerType::Worker => worker::run(context, stream_env, stream_app),
+        ManagerType::Worker => worker::run(context, stream_app).await,
     }
 }
 

@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Formatter};
 use std::time::Duration;
 
-use crate::core::checkpoint::CheckpointFunction;
+use crate::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
 use crate::core::function::NamedFunction;
 use crate::core::watermark::{TimestampAssigner, WatermarkGenerator, WatermarkStrategy};
 use crate::functions::column_locate::ColumnLocateBuilder;
@@ -93,7 +93,22 @@ impl NamedFunction for DefaultWatermarkStrategy {
     }
 }
 
-impl CheckpointFunction for DefaultWatermarkStrategy {}
+#[async_trait]
+impl CheckpointFunction for DefaultWatermarkStrategy {
+    async fn initialize_state(
+        &mut self,
+        _context: &FunctionSnapshotContext,
+        _handle: &Option<CheckpointHandle>,
+    ) {
+    }
+
+    async fn snapshot_state(
+        &mut self,
+        _context: &FunctionSnapshotContext,
+    ) -> Option<CheckpointHandle> {
+        None
+    }
+}
 
 impl Debug for DefaultWatermarkStrategy {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

@@ -65,7 +65,7 @@ impl AggregationDescriptor {
     }
 }
 
-pub trait Aggregation: Debug {
+pub trait Aggregation: Debug + Send + Sync {
     fn output_field(&self) -> &Field;
     fn len(&self) -> usize;
     fn reduce(
@@ -194,8 +194,11 @@ impl Display for BasicAggType {
 pub struct BasicAggregation<T: ValueAgg> {
     column_index: usize,
     agg_type: BasicAggType,
-    // input_field: Field,
+
+    #[allow(dead_code)]
+    input_field: Field,
     output_field: Field,
+
     value_agg: T,
 }
 
@@ -209,7 +212,7 @@ impl<T: ValueAgg> BasicAggregation<T> {
         BasicAggregation {
             column_index,
             agg_type,
-            // input_field,
+            input_field,
             output_field,
             value_agg: T::default(),
         }
@@ -261,7 +264,7 @@ impl<T: ValueAgg> Aggregation for BasicAggregation<T> {
     }
 }
 
-pub trait ValueAgg: Add<Output = Self> + PartialOrd + Default + Debug {
+pub trait ValueAgg: Add<Output = Self> + PartialOrd + Default + Debug + Send + Sync {
     fn read_value(&self, value_reader: &mut BufferMutReader, index: usize) -> Self;
     fn read_record(&self, record_reader: &BufferReader, index: usize) -> Self;
     fn write_record(&self, writer: &mut BufferWriter, value: Self);
@@ -416,7 +419,8 @@ pub struct PctAggregation {
     scale: &'static [f64],
     count_container: Vec<u8>,
 
-    // input_field: Field,
+    #[allow(dead_code)]
+    input_field: Field,
     output_field: Field,
 }
 
@@ -436,7 +440,7 @@ impl PctAggregation {
             column_index,
             scale,
             count_container,
-            // input_field,
+            input_field,
             output_field,
         }
     }
@@ -525,8 +529,9 @@ impl SchemaReduceFunction {
     }
 }
 
+#[async_trait]
 impl ReduceFunction for SchemaReduceFunction {
-    fn open(&mut self, context: &Context) -> crate::core::Result<()> {
+    async fn open(&mut self, context: &Context) -> crate::core::Result<()> {
         self.schema = context.input_schema.first().clone();
         self.val_schema = self.schema(context.input_schema.clone()).into();
 
@@ -570,7 +575,7 @@ impl ReduceFunction for SchemaReduceFunction {
         record_rt
     }
 
-    fn close(&mut self) -> crate::core::Result<()> {
+    async fn close(&mut self) -> crate::core::Result<()> {
         Ok(())
     }
 

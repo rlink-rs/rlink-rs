@@ -8,29 +8,25 @@ use hyper::http::header;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response};
 use hyper::{Server, StatusCode};
+use rand::prelude::StdRng;
 use rand::Rng;
 
 use crate::channel::{bounded, Sender};
 use crate::core::cluster::StdResponse;
+use crate::metrics::metric_handle;
 use crate::utils::fs::read_binary;
 use crate::utils::http::server::{as_ok_json, page_not_found};
-use crate::utils::thread::async_runtime_multi;
 
-pub(crate) fn web_launch(context: Arc<crate::runtime::context::Context>) -> String {
-    let (tx, rx) = bounded(1);
+pub(crate) async fn web_launch(context: Arc<crate::runtime::context::Context>) -> String {
+    let (tx, mut rx) = bounded(1);
 
-    std::thread::Builder::new()
-        .name("WebUI".to_string())
-        .spawn(move || {
-            async_runtime_multi("web", 2).block_on(async move {
-                let ip = context.bind_ip.clone();
-                let web_context = Arc::new(WebContext { context });
-                serve_with_rand_port(web_context, ip, tx).await;
-            });
-        })
-        .unwrap();
+    tokio::spawn(async move {
+        let ip = context.bind_ip.clone();
+        let web_context = Arc::new(WebContext { context });
+        serve_with_rand_port(web_context, ip, tx).await;
+    });
 
-    let bind_addr: SocketAddr = rx.recv().unwrap();
+    let bind_addr: SocketAddr = rx.recv().await.unwrap();
     format!("http://{}", bind_addr.to_string())
 }
 
@@ -43,7 +39,7 @@ async fn serve_with_rand_port(
     bind_id: String,
     bind_addr_tx: Sender<SocketAddr>,
 ) {
-    let mut rng = rand::thread_rng();
+    let mut rng: StdRng = rand::SeedableRng::from_entropy();
     for _ in 0..30 {
         let port = rng.gen_range(10000..30000);
         let address = format!("{}:{}", bind_id.as_str(), port);
@@ -78,7 +74,7 @@ async fn serve(
     // Then bind and serve...
     let server = Server::try_bind(bind_addr)?.serve(make_service);
 
-    bind_addr_tx.send(bind_addr.clone()).unwrap();
+    bind_addr_tx.send(bind_addr.clone()).await.unwrap();
 
     // And run forever...
     if let Err(e) = server.await {
@@ -100,6 +96,7 @@ async fn route(req: Request<Body>, web_context: Arc<WebContext>) -> anyhow::Resu
                 "/api/client/log/disable" => disable_client_log(req, web_context).await,
                 "/api/server/log/enable" => enable_server_log(req, web_context).await,
                 "/api/server/log/disable" => disable_server_log(req, web_context).await,
+                "/api/metrics" => metrics(req, web_context).await,
                 _ => page_not_found().await,
             }
         } else {
@@ -112,6 +109,11 @@ async fn route(req: Request<Body>, web_context: Arc<WebContext>) -> anyhow::Resu
             page_not_found().await
         }
     }
+}
+
+async fn metrics(_req: Request<Body>, _context: Arc<WebContext>) -> anyhow::Result<Response<Body>> {
+    let render = metric_handle().await.render();
+    Ok(Response::new(Body::from(render)))
 }
 
 async fn enable_client_log(

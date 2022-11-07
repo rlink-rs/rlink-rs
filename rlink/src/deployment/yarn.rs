@@ -3,9 +3,8 @@ use std::io::{BufRead, Write};
 use std::process::Stdio;
 use std::sync::Arc;
 
-use crate::channel::{bounded, Receiver, Sender};
 use crate::core::cluster::TaskResourceInfo;
-use crate::core::env::{StreamApp, StreamExecutionEnvironment};
+use crate::core::env::StreamApp;
 use crate::core::runtime::ClusterDescriptor;
 use crate::deployment::TResourceManager;
 use crate::runtime::context::Context;
@@ -29,6 +28,7 @@ impl YarnResourceManager {
     }
 }
 
+#[async_trait]
 impl TResourceManager for YarnResourceManager {
     fn prepare(&mut self, context: &Context, job_descriptor: &ClusterDescriptor) {
         self.cluster_descriptor = Some(job_descriptor.clone());
@@ -36,11 +36,7 @@ impl TResourceManager for YarnResourceManager {
         self.yarn_command = Some(YarnCliCommand::new(&context, job_descriptor));
     }
 
-    fn worker_allocate<S>(
-        &self,
-        _stream_app: &S,
-        _stream_env: &StreamExecutionEnvironment,
-    ) -> anyhow::Result<Vec<TaskResourceInfo>>
+    async fn worker_allocate<S>(&self, _stream_app: &S) -> anyhow::Result<Vec<TaskResourceInfo>>
     where
         S: StreamApp + 'static,
     {
@@ -73,7 +69,7 @@ impl TResourceManager for YarnResourceManager {
         self.yarn_command.as_ref().unwrap().allocate(task_args)
     }
 
-    fn stop_workers(&self, task_ids: Vec<TaskResourceInfo>) -> anyhow::Result<()> {
+    async fn stop_workers(&self, task_ids: Vec<TaskResourceInfo>) -> anyhow::Result<()> {
         self.yarn_command.as_ref().unwrap().stop(task_ids)
     }
 }
@@ -112,8 +108,8 @@ fn parse_line(command_line: &std::io::Result<String>) -> Option<&str> {
 }
 
 struct YarnCliCommand {
-    cmd_sender: Sender<String>,
-    ret_receiver: Receiver<String>,
+    cmd_sender: crossbeam::channel::Sender<String>,
+    ret_receiver: crossbeam::channel::Receiver<String>,
 }
 
 impl YarnCliCommand {
@@ -140,8 +136,8 @@ impl YarnCliCommand {
             .spawn()
             .unwrap();
 
-        let (cmd_sender, cmd_receiver) = bounded::<String>(2);
-        let (ret_sender, ret_receiver) = bounded::<String>(200);
+        let (cmd_sender, cmd_receiver) = crossbeam::channel::bounded::<String>(2);
+        let (ret_sender, ret_receiver) = crossbeam::channel::bounded::<String>(200);
 
         match child.stdin {
             Some(mut stdin) => {

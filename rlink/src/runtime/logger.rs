@@ -29,8 +29,7 @@ fn load_config_from_file(path: PathBuf) -> anyhow::Result<Config> {
 fn init_default() -> Result<Config, log4rs::config::runtime::ConfigErrors> {
     let name = "console";
     let default_level = LevelFilter::Info;
-    let encoder =
-        PatternEncoder::new("{d(%Y-%m-%d %H:%M:%S%.3f)} {level} [{thread}] {target} - {m}{n}");
+    let encoder = PatternEncoder::new("{d(%Y-%m-%d %H:%M:%S%.3f)} {level} {target} - {m}{n}");
     let appender = create_console_appender(encoder);
     Config::builder()
         .appender(Appender::builder().build(name, appender))

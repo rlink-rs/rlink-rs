@@ -135,6 +135,7 @@ pub trait TWindowState {
     fn snapshot(&mut self, barrier: Barrier);
 }
 
+#[derive(Clone)]
 pub enum WindowState {
     MemoryWindowState(MemoryWindowState),
 }

@@ -26,7 +26,7 @@ pub trait TStreamOperator: Debug {
 
 pub struct DefaultStreamOperator<T>
 where
-    T: ?Sized + NamedFunction,
+    T: ?Sized + NamedFunction + 'static,
 {
     parallelism: u16,
     fn_owner: FnOwner,

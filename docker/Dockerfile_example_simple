@@ -1,19 +1,18 @@
-FROM rust:1.51.0 as builder
+FROM rust:1.63.0 as builder
 
 WORKDIR /rlink-rs
 
 ADD ./ ./
 
-COPY ./docker/config.toml .cargo/
-
+#COPY ./docker/config.toml .cargo/
 
 RUN cargo build --bin rlink-example-simple --release
 
-FROM ubuntu:20.04
+FROM debian:latest
 
 RUN apt update
 
-RUN apt install openssl -y
+RUN apt install openssl procps linux-perf -y
 
 COPY  --from=builder /rlink-rs/target/release/rlink-example-simple /usr/local/bin
 

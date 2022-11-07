@@ -1,6 +1,7 @@
-use crate::core::checkpoint::CheckpointFunction;
-use crate::core::element::{FnSchema, Record};
-use crate::core::function::{Context, FlatMapFunction, NamedFunction};
+use crate::core::checkpoint::{CheckpointFunction, CheckpointHandle, FunctionSnapshotContext};
+use crate::core::element::{Element, FnSchema};
+use crate::core::function::{Context, FlatMapFunction, NamedFunction, SendableElementStream};
+use crate::utils::stream::MemoryStream;
 
 pub struct BroadcastFlagMapFunction {
     child_job_parallelism: u16,
@@ -14,8 +15,9 @@ impl BroadcastFlagMapFunction {
     }
 }
 
+#[async_trait]
 impl FlatMapFunction for BroadcastFlagMapFunction {
-    fn open(&mut self, context: &Context) -> crate::core::Result<()> {
+    async fn open(&mut self, context: &Context) -> crate::core::Result<()> {
         // if context.children.len() != 1{
         //     panic!("BroadcastFlagMapFunction must has only one child job");
         // }
@@ -25,7 +27,8 @@ impl FlatMapFunction for BroadcastFlagMapFunction {
         Ok(())
     }
 
-    fn flat_map(&mut self, record: Record) -> Box<dyn Iterator<Item = Record>> {
+    async fn flat_map_element(&mut self, element: Element) -> SendableElementStream {
+        let record = element.into_record();
         let mut records = Vec::new();
         for partition_num in 0..self.child_job_parallelism {
             let mut r = record.clone();
@@ -33,10 +36,10 @@ impl FlatMapFunction for BroadcastFlagMapFunction {
             records.push(r);
         }
 
-        Box::new(records.into_iter())
+        Box::pin(MemoryStream::new(records))
     }
 
-    fn close(&mut self) -> crate::core::Result<()> {
+    async fn close(&mut self) -> crate::core::Result<()> {
         Ok(())
     }
 
@@ -51,4 +54,19 @@ impl NamedFunction for BroadcastFlagMapFunction {
     }
 }
 
-impl CheckpointFunction for BroadcastFlagMapFunction {}
+#[async_trait]
+impl CheckpointFunction for BroadcastFlagMapFunction {
+    async fn initialize_state(
+        &mut self,
+        _context: &FunctionSnapshotContext,
+        _handle: &Option<CheckpointHandle>,
+    ) {
+    }
+
+    async fn snapshot_state(
+        &mut self,
+        _context: &FunctionSnapshotContext,
+    ) -> Option<CheckpointHandle> {
+        None
+    }
+}
