@@ -19,7 +19,7 @@ log4rs = "1.0"
 
 num_cpus = "1.13"
 thread-id = "4"
-sysinfo = "0.26.2"
+sysinfo = "0.28"
 chrono = "0.4"
 lazy_static = "1.4.0"
 async-trait = "0.1"
@@ -30,6 +30,7 @@ daggy = "0.8.0"
 hostname = "0.3"
 dns-lookup = "1.0"
 atomic_enum = "0.2"
+#enum_dispatch = "0.3"
 
 # randomness
 rand = "0.8"
@@ -59,12 +60,12 @@ tokio-stream = "0.1"
 hyper = { version = "0.14", features = ["client", "server", "http1", "tcp"] }
 
 # storage
-mysql_async = "0.30"
+mysql_async = "0.31"
 
 # kubernetes
-kube = { version = "0.75" }
-kube-runtime = { version = "0.75" }
-k8s-openapi = { version = "0.16", features = ["v1_25"]}
+kube = { version = "0.78" }
+kube-runtime = { version = "0.78" }
+k8s-openapi = { version = "0.17", features = ["v1_26"]}
 
 [dev-dependencies]
 uuid = { version = "1.1", features = ["serde", "v4"] }

@@ -6,6 +6,7 @@ use std::ops::Deref;
 use tokio::sync::RwLock;
 
 use crate::utils::process::sys_info_metric_task;
+
 pub use metric::register_counter;
 pub use metric::register_gauge;
 pub use metric::Tag;
