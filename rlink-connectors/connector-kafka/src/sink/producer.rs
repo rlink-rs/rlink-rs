@@ -73,7 +73,7 @@ impl KafkaProducerThread {
                         match self.producer.send_result(future_record) {
                             Ok(delivery_future) => future_queue.push(delivery_future),
                             Err((e, _future_record)) => {
-                                error!("send error. {}", e);
+                                error!("send error: {}", e);
                                 discard_counter += 1;
                             }
                         }
@@ -96,7 +96,11 @@ impl KafkaProducerThread {
                 }
             } else {
                 idle_counter = 0;
-                self.producer.flush(Duration::from_secs(3));
+
+                // TODO data write consistency fault tolerant processing
+                if let Err(e) = self.producer.flush(Duration::from_secs(3)) {
+                    error!("produce flush error: {:?}", e);
+                }
 
                 let mut drain_counter = 0;
                 for future in future_queue {
@@ -109,7 +113,7 @@ impl KafkaProducerThread {
                             }
                         },
                         Err(e) => {
-                            error!("produce `Canceled` error. {}", e);
+                            error!("produce `Canceled` error: {}", e);
                             discard_counter += 1;
                         }
                     }

@@ -22,7 +22,7 @@ pub fn timestamp_to_tz(ts: u64) -> DateTimeShanghai {
 
     let secs = d.as_secs();
     let nsecs = (ts - secs * 1000) as u32 * 1_000_000;
-    let naive_dt = NaiveDateTime::from_timestamp(secs as i64, nsecs);
+    let naive_dt = NaiveDateTime::from_timestamp_opt(secs as i64, nsecs).unwrap();
     let dt: DateTime<chrono_tz::Tz> = Asia::Shanghai.from_utc_datetime(&naive_dt);
     dt
 }
