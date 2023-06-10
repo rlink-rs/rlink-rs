@@ -1,0 +1,265 @@
+use std::convert::Infallible;
+use std::net::SocketAddr;
+use std::ops::Deref;
+use std::path::PathBuf;
+use std::str::FromStr;
+use std::sync::Arc;
+
+use bytes::Buf;
+use hyper::http::header;
+use hyper::service::{make_service_fn, service_fn};
+use hyper::{Body, Method, Request, Response};
+use hyper::{Server, StatusCode};
+use rand::prelude::StdRng;
+use rand::{Rng, SeedableRng};
+use rlink_core::channel::{bounded, Sender};
+use rlink_core::cluster::{ManagerStatus, MetadataStorageType, StdResponse};
+use rlink_core::context::Args;
+use rlink_core::HeartbeatRequest;
+
+use crate::dag::dag_manager::DagManager;
+use crate::metrics::metric_handle;
+use crate::metrics::worker_proxy::collect_worker_metrics;
+use crate::storage::metadata::{MetadataStorage, TMetadataStorage};
+use crate::utils::fs::read_binary;
+use crate::utils::http::server::{as_ok_json, page_not_found};
+
+pub(crate) async fn web_launch(
+    context: Arc<Args>,
+    metadata_mode: MetadataStorageType,
+    dag_manager: DagManager,
+) -> String {
+    let (tx, mut rx) = bounded(1);
+
+    tokio::spawn(async move {
+        let ip = context.bind_ip.clone();
+        let web_context = Arc::new(WebContext {
+            context,
+            metadata_mode,
+            dag_manager,
+        });
+        serve_with_rand_port(web_context, ip, tx).await;
+    });
+
+    let bind_addr: SocketAddr = rx.recv().await.unwrap();
+    format!("http://{}", bind_addr.to_string())
+}
+
+struct WebContext {
+    context: Arc<Args>,
+    metadata_mode: MetadataStorageType,
+    dag_manager: DagManager,
+}
+
+async fn serve_with_rand_port(
+    web_context: Arc<WebContext>,
+    bind_id: String,
+    bind_addr_tx: Sender<SocketAddr>,
+) {
+    let mut rng: StdRng = SeedableRng::from_entropy();
+    for _ in 0..30 {
+        let port = rng.gen_range(10000..30000);
+        let address = format!("{}:{}", bind_id.as_str(), port);
+        let socket_addr = SocketAddr::from_str(address.as_str()).unwrap();
+
+        let serve_result = serve(web_context.clone(), &socket_addr, bind_addr_tx.clone()).await;
+        match serve_result {
+            Ok(_) => error!("server stop"),
+            Err(e) => info!("try bind failure> {}", e),
+        }
+    }
+
+    error!("no port can be bound");
+}
+
+async fn serve(
+    web_context: Arc<WebContext>,
+    bind_addr: &SocketAddr,
+    bind_addr_tx: Sender<SocketAddr>,
+) -> anyhow::Result<()> {
+    // And a MakeService to handle each connection...
+    let make_service = make_service_fn(move |_conn| {
+        let web_context = web_context.clone();
+        async move {
+            Ok::<_, Infallible>(service_fn(move |req| {
+                let web_context = web_context.clone();
+                route(req, web_context)
+            }))
+        }
+    });
+
+    // Then bind and serve...
+    let server = Server::try_bind(bind_addr)?.serve(make_service);
+
+    bind_addr_tx.send(bind_addr.clone()).await.unwrap();
+
+    // And run forever...
+    if let Err(e) = server.await {
+        eprintln!("server error: {}", e);
+    }
+
+    Ok(())
+}
+
+async fn route(req: Request<Body>, web_context: Arc<WebContext>) -> anyhow::Result<Response<Body>> {
+    let path = req.uri().path();
+    let method = req.method();
+
+    if path.starts_with("/api/") {
+        if Method::GET.eq(method) {
+            match path {
+                "/api/context" => get_context(req, web_context).await,
+                "/api/cluster_metadata" => get_cluster_metadata(req, web_context).await,
+                "/api/dag_metadata" => get_dag_metadata(req, web_context).await,
+                "/api/dag/job_graph" => get_job_graph(req, web_context).await,
+                "/api/dag/execution_graph" => get_execution_graph(req, web_context).await,
+                "/api/metrics" => metrics(req, web_context).await,
+                _ => page_not_found().await,
+            }
+        } else if Method::POST.eq(method) {
+            match path {
+                "/api/heartbeat" => heartbeat(req, web_context).await,
+                _ => page_not_found().await,
+            }
+        } else {
+            page_not_found().await
+        }
+    } else {
+        if Method::GET.eq(method) {
+            static_file(req, web_context).await
+        } else {
+            page_not_found().await
+        }
+    }
+}
+
+async fn metrics(_req: Request<Body>, context: Arc<WebContext>) -> anyhow::Result<Response<Body>> {
+    let worker_renders = collect_worker_metrics(
+        !context.context.cluster_mode.is_local(),
+        context.metadata_mode.clone(),
+    )
+    .await;
+
+    let render = metric_handle().await.render();
+
+    let render = format!("{}\n{}\n", worker_renders, render);
+    Ok(Response::new(Body::from(render)))
+}
+
+async fn get_context(
+    _req: Request<Body>,
+    context: Arc<WebContext>,
+) -> anyhow::Result<Response<Body>> {
+    let c = context.context.deref().clone();
+    as_ok_json(&StdResponse::ok(Some(c)))
+}
+
+async fn get_cluster_metadata(
+    _req: Request<Body>,
+    context: Arc<WebContext>,
+) -> anyhow::Result<Response<Body>> {
+    let metadata_storage = MetadataStorage::new(&context.metadata_mode);
+    let cluster_descriptor = metadata_storage.load().await.unwrap();
+    as_ok_json(&StdResponse::ok(Some(cluster_descriptor)))
+}
+
+async fn get_dag_metadata(
+    _req: Request<Body>,
+    context: Arc<WebContext>,
+) -> anyhow::Result<Response<Body>> {
+    let json_dag = context.dag_manager.graph();
+    as_ok_json(&StdResponse::ok(Some(json_dag)))
+}
+
+async fn get_job_graph(
+    _req: Request<Body>,
+    context: Arc<WebContext>,
+) -> anyhow::Result<Response<Body>> {
+    let json_dag = context.dag_manager.job_graph().clone();
+    as_ok_json(&StdResponse::ok(Some(json_dag)))
+}
+
+async fn get_execution_graph(
+    _req: Request<Body>,
+    context: Arc<WebContext>,
+) -> anyhow::Result<Response<Body>> {
+    let json_dag = context.dag_manager.execution_graph().clone();
+    as_ok_json(&StdResponse::ok(Some(json_dag)))
+}
+
+async fn heartbeat(req: Request<Body>, context: Arc<WebContext>) -> anyhow::Result<Response<Body>> {
+    let whole_body = hyper::body::aggregate(req).await?;
+    let HeartbeatRequest {
+        task_manager_id,
+        change_items,
+    } = serde_json::from_reader(whole_body.reader())?;
+
+    debug!(
+        "<heartbeat> from {}, items: {:?}",
+        task_manager_id, change_items
+    );
+
+    let metadata_storage = MetadataStorage::new(&context.metadata_mode);
+    let coordinator_status = metadata_storage
+        .update_worker_status(task_manager_id, change_items, ManagerStatus::Registered)
+        .await;
+
+    let resp: StdResponse<ManagerStatus> = coordinator_status.into();
+    as_ok_json(&resp)
+}
+
+async fn static_file(
+    req: Request<Body>,
+    context: Arc<WebContext>,
+) -> anyhow::Result<Response<Body>> {
+    let path = {
+        let mut path = req.uri().path();
+        if path.is_empty() || "/".eq(path) {
+            path = "/index.html";
+        };
+
+        &path[1..path.len()]
+    };
+
+    let static_file_path = {
+        let path = PathBuf::from_str(path)?;
+
+        let dashboard_path = context.context.dashboard_path.as_str();
+        let base_path = PathBuf::from_str(dashboard_path)?;
+
+        let n = base_path.join(path);
+        n
+    };
+
+    let ext = {
+        let ext_pos = path.rfind(".").ok_or(anyhow!("file ext name not found"))?;
+        &path[ext_pos + 1..path.len()]
+    };
+
+    let context_type = match ext {
+        "html" => "text/html; charset=utf-8",
+        "js" => "application/javascript",
+        "css" => "text/css",
+        "ico" => "image/x-icon",
+        "gif" => "image/gif",
+        "png" => "image/png",
+        "svg" => "image/svg+xml",
+        "woff" => "application/font-woff",
+        _ => "",
+    };
+
+    match read_binary(&static_file_path) {
+        Ok(context) => Response::builder()
+            .header(header::CONTENT_TYPE, context_type)
+            .status(StatusCode::OK)
+            .body(Body::from(context))
+            .map_err(|e| anyhow!(e)),
+        Err(e) => {
+            error!(
+                "static file not found. file path: {:?}, error: {}",
+                static_file_path, e
+            );
+            page_not_found().await
+        }
+    }
+}
