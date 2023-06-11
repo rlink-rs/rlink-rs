@@ -35,7 +35,7 @@ async-trait = "0.1"
 tokio = { version = "1" }
 
 # kafka
-rdkafka = { version = "0.29", features = ["cmake-build"] }
+rdkafka = { version = "0.31", features = ["cmake-build"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["time", "rt-multi-thread"] }

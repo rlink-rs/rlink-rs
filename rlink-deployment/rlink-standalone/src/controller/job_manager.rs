@@ -1,7 +1,6 @@
 use std::io::Write;
 
 use actix_multipart::Multipart;
-use actix_web::http::StatusCode;
 use actix_web::web::{Data, Path};
 use actix_web::{web, Error, HttpRequest, HttpResponse};
 use futures::{StreamExt, TryStreamExt};
@@ -27,10 +26,8 @@ pub async fn download_application_resource(
 ) -> Result<HttpResponse, Error> {
     let app_resource_path = get_resource_storage_path(req_model.application_id.as_str());
     let filepath = app_resource_path.join(req_model.file_name.as_str());
-    actix_files::NamedFile::open(filepath)
-        .unwrap()
-        .set_status_code(StatusCode::from_u16(200).unwrap())
-        .into_response(&req)
+    let named_file = actix_files::NamedFile::open(filepath)?;
+    Ok(named_file.into_response(&req))
 }
 
 pub async fn create_application(
@@ -41,7 +38,7 @@ pub async fn create_application(
 
     // iterate over multipart stream
     while let Ok(Some(mut field)) = payload.try_next().await {
-        let content_type = field.content_disposition().unwrap();
+        let content_type = field.content_disposition();
         let filename = content_type.get_filename().unwrap();
         let storage_path = get_resource_storage_path(application_id.as_str());
 
@@ -50,12 +47,14 @@ pub async fn create_application(
         // File::create is blocking operation, use threadpool
         let mut f = web::block(|| std::fs::File::create(filepath))
             .await
-            .unwrap();
+            .unwrap()?;
         // Field in turn is stream of *Bytes* object
         while let Some(chunk) = field.next().await {
             let data = chunk.unwrap();
             // filesystem operations are blocking, we have to use threadpool
-            f = web::block(move || f.write_all(&data).map(|_| f)).await?;
+            f = web::block(move || f.write_all(&data).map(|_| f))
+                .await
+                .unwrap()?;
         }
 
         let job = Application::new(application_id.clone(), filename);
@@ -186,10 +185,11 @@ async fn publish_task(
         "http://{}:8771/task/{}",
         task_manager_address, application_id
     );
-    let mut response = actix_web::client::Client::default()
+
+    let mut response = awc::Client::default()
         .post(url.as_str())
-        .header("Accept", "application/json")
-        .header("Content-type", "application/json")
+        .insert_header(("Accept", "application/json"))
+        .insert_header(("Content-type", "application/json"))
         .send_json(execute_model)
         .await
         .map_err(|e| HttpClientError::from(e))?;
@@ -244,10 +244,10 @@ async fn kill_task(
         "http://{}:8771/task/{}/{}/shutdown",
         task_manager_address, application_id, task_id
     );
-    let mut response = actix_web::client::Client::default()
+    let mut response = awc::Client::default()
         .delete(url.as_str())
-        .header("Accept", "application/json")
-        .header("Content-type", "application/json")
+        .insert_header(("Accept", "application/json"))
+        .insert_header(("Content-type", "application/json"))
         .send()
         .await
         .map_err(|e| HttpClientError::from(e))?;
@@ -291,10 +291,10 @@ async fn kill_job_task(
         "http://{}:8771/task/{}/shutdown",
         task_manager_address, application_id
     );
-    let mut response = actix_web::client::Client::default()
+    let mut response = awc::Client::default()
         .delete(url.as_str())
-        .header("Accept", "application/json")
-        .header("Content-type", "application/json")
+        .insert_header(("Accept", "application/json"))
+        .insert_header(("Content-type", "application/json"))
         .send()
         .await
         .map_err(|e| HttpClientError::from(e))?;

@@ -8,7 +8,7 @@ use crate::controller::job_manager::{
 use crate::controller::task_manager::{execute_task, kill_job_tasks, kill_task};
 use crate::utils::parse_arg;
 
-pub fn index() -> HttpResponse {
+pub async fn index() -> HttpResponse {
     let html = r#"<html>
         <head><title>Upload Test</title></head>
         <body>

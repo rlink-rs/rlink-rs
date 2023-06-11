@@ -79,80 +79,80 @@ pub fn derive_function(input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-#[proc_macro_attribute]
-#[cfg(not(test))]
-pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
-    let mut input = syn::parse_macro_input!(item as syn::ItemFn);
-    let args = syn::parse_macro_input!(args as syn::AttributeArgs);
-
-    let sig = &mut input.sig; // eg: struct Name, function sig
-    let name = &sig.ident;
-    let inputs = &sig.inputs;
-    let body = &input.block;
-    let _attrs = &input.attrs;
-    let _vis = input.vis; // eg: pub, pub(crate), etc...
-
-    if sig.asyncness.is_some() {
-        let msg = "the async keyword is unsupported from the function declaration";
-        return syn::Error::new_spanned(sig.fn_token, msg)
-            .to_compile_error()
-            .into();
-    } else if name != "main" {
-        let msg = "the function name must be `main`";
-        return syn::Error::new_spanned(&sig.inputs, msg)
-            .to_compile_error()
-            .into();
-    } else if inputs.is_empty() {
-        let msg = "the main function accept arguments";
-        return syn::Error::new_spanned(&sig.inputs, msg)
-            .to_compile_error()
-            .into();
-    }
-
-    // if args.len() != 1 {
-    //     let msg = "the main function accept arguments";
-    //     return syn::Error::new_spanned(&args., msg)
-    //         .to_compile_error()
-    //         .into();
-    // }
-
-    let arg0 = &args[0];
-    let stream_fn = if let syn::NestedMeta::Meta(syn::Meta::Path(path)) = arg0 {
-        let ident = path.get_ident();
-        if ident.is_none() {
-            let msg = "Must have specified ident";
-            return syn::Error::new_spanned(path, msg).to_compile_error().into();
-        }
-
-        ident.unwrap()
-    } else {
-        let msg = "Must have specified ident..";
-        return syn::Error::new_spanned(arg0, msg).to_compile_error().into();
-    };
-
-    let result = quote! {
-        #[derive(Clone, Debug)]
-        pub struct GenStreamJob {}
-
-        impl rlink::core::env::StreamJob for GenStreamJob {
-            fn prepare_properties(&self, properties: &mut Properties) {
-                #body
-            }
-
-            fn build_stream(
-                &self,
-                properties: &Properties,
-                env: &StreamExecutionEnvironment,
-            ) -> SinkStream {
-                #stream_fn(properties, env)
-            }
-        }
-
-        fn main() {
-            rlink::core::env::execute("job_name", GenStreamJob{});
-        }
-    };
-
-    // println!("{}", result.to_string());
-    result.into()
-}
+// #[proc_macro_attribute]
+// #[cfg(not(test))]
+// pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
+//     let mut input = syn::parse_macro_input!(item as syn::ItemFn);
+//     let args = syn::parse_macro_input!(args as syn::AttributeArgs);
+//
+//     let sig = &mut input.sig; // eg: struct Name, function sig
+//     let name = &sig.ident;
+//     let inputs = &sig.inputs;
+//     let body = &input.block;
+//     let _attrs = &input.attrs;
+//     let _vis = input.vis; // eg: pub, pub(crate), etc...
+//
+//     if sig.asyncness.is_some() {
+//         let msg = "the async keyword is unsupported from the function declaration";
+//         return syn::Error::new_spanned(sig.fn_token, msg)
+//             .to_compile_error()
+//             .into();
+//     } else if name != "main" {
+//         let msg = "the function name must be `main`";
+//         return syn::Error::new_spanned(&sig.inputs, msg)
+//             .to_compile_error()
+//             .into();
+//     } else if inputs.is_empty() {
+//         let msg = "the main function accept arguments";
+//         return syn::Error::new_spanned(&sig.inputs, msg)
+//             .to_compile_error()
+//             .into();
+//     }
+//
+//     // if args.len() != 1 {
+//     //     let msg = "the main function accept arguments";
+//     //     return syn::Error::new_spanned(&args., msg)
+//     //         .to_compile_error()
+//     //         .into();
+//     // }
+//
+//     let arg0 = &args[0];
+//     let stream_fn = if let syn::NestedMeta::Meta(syn::Meta::Path(path)) = arg0 {
+//         let ident = path.get_ident();
+//         if ident.is_none() {
+//             let msg = "Must have specified ident";
+//             return syn::Error::new_spanned(path, msg).to_compile_error().into();
+//         }
+//
+//         ident.unwrap()
+//     } else {
+//         let msg = "Must have specified ident..";
+//         return syn::Error::new_spanned(arg0, msg).to_compile_error().into();
+//     };
+//
+//     let result = quote! {
+//         #[derive(Clone, Debug)]
+//         pub struct GenStreamJob {}
+//
+//         impl rlink::core::env::StreamJob for GenStreamJob {
+//             fn prepare_properties(&self, properties: &mut Properties) {
+//                 #body
+//             }
+//
+//             fn build_stream(
+//                 &self,
+//                 properties: &Properties,
+//                 env: &StreamExecutionEnvironment,
+//             ) -> SinkStream {
+//                 #stream_fn(properties, env)
+//             }
+//         }
+//
+//         fn main() {
+//             rlink::core::env::execute("job_name", GenStreamJob{});
+//         }
+//     };
+//
+//     // println!("{}", result.to_string());
+//     result.into()
+// }

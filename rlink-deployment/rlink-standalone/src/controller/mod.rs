@@ -16,7 +16,7 @@ fn get_resource_storage_path(application_id: &str) -> PathBuf {
 #[derive(Debug)]
 pub enum HttpClientError {
     MessageStatusError(String),
-    SendRequestError(actix_web::client::SendRequestError),
+    SendRequestError(awc::error::SendRequestError),
     JsonPayloadError(awc::error::JsonPayloadError),
 }
 
@@ -48,8 +48,8 @@ impl From<String> for HttpClientError {
     }
 }
 
-impl From<actix_web::client::SendRequestError> for HttpClientError {
-    fn from(err: actix_web::client::SendRequestError) -> Self {
+impl From<awc::error::SendRequestError> for HttpClientError {
+    fn from(err: awc::error::SendRequestError) -> Self {
         HttpClientError::SendRequestError(err)
     }
 }
