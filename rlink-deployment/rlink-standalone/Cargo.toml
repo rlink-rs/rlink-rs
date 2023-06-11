@@ -32,16 +32,16 @@ serde_yaml = "0.9"
 crossbeam = "0.8"
 
 # net
-bytes = "0.5"
+bytes = "1"
 futures = "0.3"
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
 
-actix-rt = "1.1"
-actix-web = "3.1"
-actix-multipart = "0.3"
-actix-files = "0.4"
-awc = "2.0"
+actix-rt = "2.8"
+actix-web = "4.3"
+actix-multipart = "0.6"
+actix-files = "0.6"
+awc = "3.1"
 
-sanitize-filename = "0.2"
+sanitize-filename = "0.4"
 
 uuid = { version = "1.1", features = ["serde", "v4"] }
