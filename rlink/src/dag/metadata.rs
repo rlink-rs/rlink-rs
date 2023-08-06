@@ -51,7 +51,7 @@ impl DagMetadata {
         self.stream_graph
             .nodes()
             .iter()
-            .find(|node| node.deref().id.eq(&operator_id))
+            .find(|node| node.id.eq(&operator_id))
     }
 }
 
@@ -64,7 +64,7 @@ impl DagMetadata {
         self.job_graph
             .nodes()
             .iter()
-            .find(|node| node.deref().job_id.eq(&job_id))
+            .find(|node| node.job_id.eq(&job_id))
     }
 
     pub fn parent_jobs(&self, child_job_id: JobId) -> Vec<(&JobNode, &JobEdge)> {
@@ -143,6 +143,6 @@ impl DagMetadata {
         self.execution_graph
             .nodes()
             .iter()
-            .find(|node| node.deref().task_id.eq(task_id))
+            .find(|node| node.task_id.eq(task_id))
     }
 }

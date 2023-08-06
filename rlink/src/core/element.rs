@@ -82,7 +82,7 @@ pub(crate) trait Serde {
     fn capacity(&self) -> usize;
     fn to_bytes(&self) -> BytesMut {
         let mut data = BytesMut::with_capacity(self.capacity());
-        self.serialize(data.borrow_mut());
+        self.serialize(&mut data);
         data
     }
     fn serialize(&self, bytes: &mut BytesMut);
@@ -707,8 +707,6 @@ impl From<Barrier> for Element {
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::BorrowMut;
-
     use serbuffer::types;
 
     use crate::core::element::{Element, Record, Serde, StreamStatus, Watermark};
@@ -739,7 +737,7 @@ mod tests {
 
         let element_record = Element::Record(record_clone);
         let mut data = element_record.to_bytes();
-        let mut element_record_de = Element::deserialize(data.borrow_mut());
+        let mut element_record_de = Element::deserialize(&mut data);
 
         let de_reader = element_record_de.as_record_mut().as_reader(&data_types);
         assert_eq!(reader.get_u32(0).unwrap(), de_reader.get_u32(0).unwrap());
@@ -760,7 +758,7 @@ mod tests {
 
         let element_watermark = Element::Watermark(watermark.clone());
         let mut data = element_watermark.to_bytes();
-        let element_watermark_de = Element::deserialize(data.borrow_mut());
+        let element_watermark_de = Element::deserialize(&mut data);
 
         let de_watermark = element_watermark_de.as_watermark();
         assert_eq!(watermark.timestamp, de_watermark.timestamp);
@@ -772,7 +770,7 @@ mod tests {
 
         let element_watermark = Element::StreamStatus(stream_status.clone());
         let mut data = element_watermark.to_bytes();
-        let element_watermark_de = Element::deserialize(data.borrow_mut());
+        let element_watermark_de = Element::deserialize(&mut data);
 
         let de_watermark = element_watermark_de.as_stream_status();
         assert_eq!(stream_status.end, de_watermark.end);
