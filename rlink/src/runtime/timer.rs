@@ -91,6 +91,23 @@ impl WindowTimer {
         let timer_channel = TimerChannel::new(receiver);
         Ok(timer_channel)
     }
+
+    pub fn register_status_stream(
+        &self,
+        name: &str,
+        interval: Duration,
+    ) -> anyhow::Result<StreamStatusStream> {
+        self.register(name, interval)
+            .map(|t| StreamStatusStream::new(t))
+    }
+
+    pub fn register_barrier(
+        &self,
+        name: &str,
+        interval: Duration,
+    ) -> anyhow::Result<BarrierStream> {
+        self.register(name, interval).map(|t| BarrierStream::new(t))
+    }
 }
 
 pub async fn start_window_timer() -> WindowTimer {

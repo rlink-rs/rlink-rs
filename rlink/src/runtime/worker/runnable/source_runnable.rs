@@ -18,7 +18,7 @@ use crate::core::operator::{DefaultStreamOperator, FunctionCreator, TStreamOpera
 use crate::core::runtime::{JobId, OperatorId, TaskId};
 use crate::core::watermark::MAX_WATERMARK;
 use crate::metrics::register_counter;
-use crate::runtime::timer::{BarrierStream, StreamStatusStream, TimerChannel};
+use crate::runtime::timer::{BarrierStream, StreamStatusStream};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 use crate::runtime::worker::WorkerTaskContext;
 use crate::runtime::HeartbeatItem;
@@ -33,8 +33,8 @@ pub(crate) struct SourceRunnable {
     stream_source: DefaultStreamOperator<dyn InputFormat>,
     next_runnable: Option<Box<dyn Runnable>>,
 
-    stream_status_timer: Option<TimerChannel>,
-    checkpoint_timer: Option<TimerChannel>,
+    stream_status_timer: Option<StreamStatusStream>,
+    checkpoint_timer: Option<BarrierStream>,
 
     waiting_end_flags: usize,
     barrier_alignment: AlignManager,
@@ -103,7 +103,7 @@ impl Runnable for SourceRunnable {
             let stream_status_timer = context
                 .task_context
                 .window_timer
-                .register("StreamStatus Event Timer", Duration::from_secs(10))
+                .register_status_stream("StreamStatus Event Timer", Duration::from_secs(10))
                 .expect("register StreamStatus timer error");
             self.stream_status_timer = Some(stream_status_timer);
 
@@ -111,7 +111,7 @@ impl Runnable for SourceRunnable {
             let checkpoint_timer = context
                 .task_context
                 .window_timer
-                .register("Checkpoint Event Timer", checkpoint_period)
+                .register_barrier("Checkpoint Event Timer", checkpoint_period)
                 .expect("register Checkpoint timer error");
             self.checkpoint_timer = Some(checkpoint_timer);
         }
@@ -166,8 +166,8 @@ impl Runnable for SourceRunnable {
                 let executor = ElementEmitExecutor::new(
                     op_name,
                     self.task_context(),
-                    StreamStatusStream::new(self.stream_status_timer.take().unwrap()),
-                    BarrierStream::new(self.checkpoint_timer.take().unwrap()),
+                    self.stream_status_timer.take().unwrap(),
+                    self.checkpoint_timer.take().unwrap(),
                     record_stream,
                 );
                 executor.execute().await
