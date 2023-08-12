@@ -1,5 +1,8 @@
+use futures::Stream;
 use std::borrow::BorrowMut;
 use std::fmt::{Debug, Formatter};
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 use tokio::time::{interval_at, Duration, Instant};
 
@@ -46,6 +49,14 @@ impl TimerChannel {
 
     pub async fn recv(&mut self) -> Option<u64> {
         self.receiver.recv().await
+    }
+}
+
+impl Stream for TimerChannel {
+    type Item = u64;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.receiver.poll_recv(cx)
     }
 }
 

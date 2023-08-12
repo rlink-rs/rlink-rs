@@ -3,9 +3,10 @@ use std::pin::Pin;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::task::{Context, Poll};
 use std::time::Duration;
 
-use futures::StreamExt;
+use futures::{Stream, StreamExt};
 use metrics::Counter;
 
 use crate::channel::named_channel;
@@ -13,7 +14,7 @@ use crate::channel::sender::ChannelSender;
 use crate::channel::utils::ChannelStream;
 use crate::core::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
 use crate::core::element::{Element, StreamStatus, Watermark};
-use crate::core::function::{ElementStream, InputFormat};
+use crate::core::function::{ElementStream, InputFormat, SendableElementStream};
 use crate::core::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
 use crate::core::runtime::{CheckpointId, JobId, OperatorId, TaskId};
 use crate::core::watermark::MAX_WATERMARK;
@@ -22,6 +23,225 @@ use crate::runtime::timer::TimerChannel;
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 use crate::runtime::worker::WorkerTaskContext;
 use crate::runtime::HeartbeatItem;
+
+struct BarrierStream {
+    barrier_timer: TimerChannel,
+}
+
+impl Stream for BarrierStream {
+    type Item = Element;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        match Pin::new(&mut self.barrier_timer).poll_next(cx) {
+            Poll::Ready(window_time) => Poll::Ready(
+                window_time.map(|window_time| Element::new_barrier(CheckpointId(window_time))),
+            ),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
+
+struct StreamStatusStream {
+    stream_status_timer: TimerChannel,
+}
+
+impl Stream for StreamStatusStream {
+    type Item = Element;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        match Pin::new(&mut self.stream_status_timer).poll_next(cx) {
+            Poll::Ready(window_time) => Poll::Ready(
+                window_time.map(|window_time| Element::new_stream_status(window_time, false)),
+            ),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
+
+struct PollingContext {
+    task_context: Arc<WorkerTaskContext>,
+    running_signal: Arc<AtomicBool>,
+}
+
+#[async_trait]
+trait Polling {
+    async fn poll(&mut self, op_name: &str, sender: ChannelSender<Element>);
+}
+
+struct StreamStatusPolling {
+    task_context: Arc<WorkerTaskContext>,
+    stream_status_timer: StreamStatusStream,
+    running_signal: Arc<AtomicBool>,
+}
+
+#[async_trait]
+impl Polling for StreamStatusPolling {
+    async fn poll(&mut self, op_name: &str, sender: ChannelSender<Element>) {
+        while let Some(mut stream_status) = self.stream_status_timer.next().await {
+            let running = self.running_signal.load(Ordering::Relaxed);
+            if !running {
+                stream_status =
+                    Element::new_stream_status(stream_status.as_stream_status().timestamp, true);
+            }
+
+            if let Err(_e) = sender.send(stream_status).await {
+                error!("[{}] channel has closed", op_name);
+                break;
+            }
+
+            if !running {
+                info!("[{}] StreamStatus WindowTimer stop", op_name);
+                if self.task_context.get_coordinator_status().is_terminated() {
+                    return;
+                }
+            }
+        }
+
+        info!("[{}] stream status timer closed", op_name);
+    }
+}
+
+struct BarrierPolling {
+    task_context: Arc<WorkerTaskContext>,
+    barrier_timer: BarrierStream,
+    running_signal: Arc<AtomicBool>,
+}
+
+#[async_trait]
+impl Polling for BarrierPolling {
+    async fn poll(&mut self, op_name: &str, sender: ChannelSender<Element>) {
+        while let Some(barrier) = self.barrier_timer.next().await {
+            if let Err(_e) = sender.send(barrier).await {
+                error!("[{}] channel has closed", op_name);
+                break;
+            }
+
+            let running = self.running_signal.load(Ordering::Relaxed);
+            if !running {
+                info!("[{}] Checkpoint WindowTimer stop", op_name);
+                if self.task_context.get_coordinator_status().is_terminated() {
+                    return;
+                }
+            }
+        }
+        info!("[{}] checkpoint timer closed", op_name);
+    }
+}
+
+struct RecordPolling {
+    task_context: Arc<WorkerTaskContext>,
+    stream: SendableElementStream,
+    running_signal: Arc<AtomicBool>,
+}
+
+#[async_trait]
+impl Polling for RecordPolling {
+    async fn poll(&mut self, op_name: &str, sender: ChannelSender<Element>) {
+        let daemon_task = self.task_context.task_descriptor.daemon;
+        while let Some(element) = self.stream.next().await {
+            if let Err(_e) = sender.send(element).await {
+                error!("[{}] channel has closed", op_name);
+                break;
+            }
+
+            if daemon_task && self.task_context.get_coordinator_status().is_terminating() {
+                info!("[{}] daemon source stop by coordinator stop", op_name);
+                break;
+            }
+        }
+
+        self.running_signal.store(false, Ordering::Relaxed);
+        info!("[{}] stream reached end", op_name);
+    }
+}
+
+struct PollingExecutor {
+    fn_name: String,
+    task_id: TaskId,
+
+    stream_status_polling: StreamStatusPolling,
+    barrier_polling: BarrierPolling,
+    record_polling: RecordPolling,
+}
+
+impl PollingExecutor {
+    pub fn new(
+        fn_name: &str,
+        task_context: Arc<WorkerTaskContext>,
+        stream_status_event: StreamStatusStream,
+        barrier_event: BarrierStream,
+        record_stream: SendableElementStream,
+    ) -> Self {
+        let running = Arc::new(AtomicBool::new(true));
+
+        let stream_status_polling = StreamStatusPolling {
+            task_context: task_context.clone(),
+            stream_status_timer: stream_status_event,
+            running_signal: running.clone(),
+        };
+
+        let barrier_polling = BarrierPolling {
+            task_context: task_context.clone(),
+            barrier_timer: barrier_event,
+            running_signal: running.clone(),
+        };
+
+        let record_polling = RecordPolling {
+            task_context: task_context.clone(),
+            stream: record_stream,
+            running_signal: running.clone(),
+        };
+
+        Self {
+            fn_name: fn_name.to_string(),
+            task_id: task_context.task_descriptor.task_id.clone(),
+            stream_status_polling,
+            barrier_polling,
+            record_polling,
+        }
+    }
+
+    async fn execute(self) -> Pin<Box<dyn ElementStream + Send>> {
+        let PollingExecutor {
+            fn_name,
+            task_id,
+            mut stream_status_polling,
+            mut barrier_polling,
+            mut record_polling,
+        } = self;
+
+        let (sender, receiver) = named_channel(
+            format!("Source_{}", fn_name.as_str()).as_str(),
+            task_id.to_tags(),
+            10240,
+        );
+
+        {
+            let sender = sender.clone();
+            let fn_name = fn_name.to_string();
+            tokio::spawn(async move {
+                stream_status_polling.poll(fn_name.as_str(), sender).await;
+            });
+        }
+        {
+            let sender = sender.clone();
+            let fn_name = fn_name.to_string();
+            tokio::spawn(async move {
+                barrier_polling.poll(fn_name.as_str(), sender).await;
+            });
+        }
+        {
+            let sender = sender.clone();
+            let fn_name = fn_name.to_string();
+            tokio::spawn(async move {
+                record_polling.poll(fn_name.as_str(), sender).await;
+            });
+        }
+
+        let stream: Pin<Box<dyn ElementStream + Send>> = Box::pin(ChannelStream::new(receiver));
+        stream
+    }
+}
 
 pub(crate) struct SourceRunnable {
     operator_id: OperatorId,
@@ -308,7 +528,7 @@ impl Runnable for SourceRunnable {
                         self.next_runnable
                             .as_mut()
                             .unwrap()
-                            .run(Element::Watermark(min_watermark.clone()))
+                            .run(Element::Watermark(min_watermark))
                             .await
                     }
                     None => {}
