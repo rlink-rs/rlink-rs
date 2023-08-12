@@ -13,12 +13,12 @@ use crate::channel::sender::ChannelSender;
 use crate::channel::utils::ChannelStream;
 use crate::core::checkpoint::{Checkpoint, CheckpointHandle, FunctionSnapshotContext};
 use crate::core::element::{Element, StreamStatus, Watermark};
-use crate::core::function::{ElementStream, InputFormat};
+use crate::core::function::{ElementStream, InputFormat, SendableElementStream};
 use crate::core::operator::{DefaultStreamOperator, FunctionCreator, TStreamOperator};
-use crate::core::runtime::{CheckpointId, JobId, OperatorId, TaskId};
+use crate::core::runtime::{JobId, OperatorId, TaskId};
 use crate::core::watermark::MAX_WATERMARK;
 use crate::metrics::register_counter;
-use crate::runtime::timer::TimerChannel;
+use crate::runtime::timer::{BarrierStream, StreamStatusStream};
 use crate::runtime::worker::runnable::{Runnable, RunnableContext};
 use crate::runtime::worker::WorkerTaskContext;
 use crate::runtime::HeartbeatItem;
@@ -33,8 +33,8 @@ pub(crate) struct SourceRunnable {
     stream_source: DefaultStreamOperator<dyn InputFormat>,
     next_runnable: Option<Box<dyn Runnable>>,
 
-    stream_status_timer: Option<TimerChannel>,
-    checkpoint_timer: Option<TimerChannel>,
+    stream_status_timer: Option<StreamStatusStream>,
+    checkpoint_timer: Option<BarrierStream>,
 
     waiting_end_flags: usize,
     barrier_alignment: AlignManager,
@@ -70,91 +70,6 @@ impl SourceRunnable {
         }
     }
 
-    async fn poll_input_element(
-        &mut self,
-        task_context: Arc<WorkerTaskContext>,
-        sender: ChannelSender<Element>,
-        running: Arc<AtomicBool>,
-        daemon_task: bool,
-    ) {
-        let op_name = self.stream_source.operator_fn.name().to_string();
-        let mut stream = self.stream_source.operator_fn.element_stream().await;
-        tokio::spawn(async move {
-            while let Some(element) = stream.next().await {
-                if let Err(_e) = sender.send(element).await {
-                    error!("[{}] channel has closed", op_name);
-                    break;
-                }
-
-                if daemon_task && task_context.get_coordinator_status().is_terminating() {
-                    info!("[{}] daemon source stop by coordinator stop", op_name);
-                    break;
-                }
-            }
-
-            running.store(false, Ordering::Relaxed);
-            info!("[{}] stream reached end", op_name);
-        });
-    }
-
-    async fn poll_stream_status(
-        &mut self,
-        task_context: Arc<WorkerTaskContext>,
-        sender: ChannelSender<Element>,
-        running: Arc<AtomicBool>,
-    ) {
-        let op_name = self.stream_source.operator_fn.name().to_string();
-        let mut stream_status_timer = self.stream_status_timer.take().unwrap();
-        tokio::spawn(async move {
-            while let Some(window_time) = stream_status_timer.recv().await {
-                let running = running.load(Ordering::Relaxed);
-
-                let stream_status = Element::new_stream_status(window_time, !running);
-                if let Err(_e) = sender.send(stream_status).await {
-                    error!("[{}] channel has closed", op_name);
-                    break;
-                }
-
-                if !running {
-                    info!("[{}] StreamStatus WindowTimer stop", op_name);
-                    if task_context.get_coordinator_status().is_terminated() {
-                        return;
-                    }
-                }
-            }
-
-            info!("[{}] stream status timer closed", op_name);
-        });
-    }
-
-    async fn poll_checkpoint(
-        &mut self,
-        task_context: Arc<WorkerTaskContext>,
-        sender: ChannelSender<Element>,
-        running: Arc<AtomicBool>,
-    ) {
-        let op_name = self.stream_source.operator_fn.name().to_string();
-        let mut checkpoint_timer = self.checkpoint_timer.take().unwrap();
-        tokio::spawn(async move {
-            while let Some(window_time) = checkpoint_timer.recv().await {
-                let barrier = Element::new_barrier(CheckpointId(window_time));
-                if let Err(_e) = sender.send(barrier).await {
-                    error!("[{}] channel has closed", op_name);
-                    break;
-                }
-
-                let running = running.load(Ordering::Relaxed);
-                if !running {
-                    info!("[{}] Checkpoint WindowTimer stop", op_name);
-                    if task_context.get_coordinator_status().is_terminated() {
-                        return;
-                    }
-                }
-            }
-            info!("[{}] checkpoint timer closed", op_name);
-        });
-    }
-
     fn task_context(&self) -> Arc<WorkerTaskContext> {
         self.context.as_ref().unwrap().task_context.clone()
     }
@@ -188,7 +103,7 @@ impl Runnable for SourceRunnable {
             let stream_status_timer = context
                 .task_context
                 .window_timer
-                .register("StreamStatus Event Timer", Duration::from_secs(10))
+                .register_status_stream("StreamStatus Event Timer", Duration::from_secs(10))
                 .expect("register StreamStatus timer error");
             self.stream_status_timer = Some(stream_status_timer);
 
@@ -196,7 +111,7 @@ impl Runnable for SourceRunnable {
             let checkpoint_timer = context
                 .task_context
                 .window_timer
-                .register("Checkpoint Event Timer", checkpoint_period)
+                .register_barrier("Checkpoint Event Timer", checkpoint_period)
                 .expect("register Checkpoint timer error");
             self.checkpoint_timer = Some(checkpoint_timer);
         }
@@ -241,37 +156,23 @@ impl Runnable for SourceRunnable {
         Ok(())
     }
 
-    async fn run(&mut self, mut _element: Element) {
+    async fn run(&mut self, _element: Element) {
         info!("{} running...", self.stream_source.operator_fn.name());
 
+        let record_stream = self.stream_source.operator_fn.element_stream().await;
         let mut element_stream = match self.stream_source.fn_creator() {
             FunctionCreator::User => {
-                let (sender, receiver) = named_channel(
-                    format!("Source_{}", self.stream_source.operator_fn.as_ref().name()).as_str(),
-                    self.task_id.to_tags(),
-                    10240,
+                let op_name = self.stream_source.operator_fn.name();
+                let executor = ElementEmitExecutor::new(
+                    op_name,
+                    self.task_context(),
+                    self.stream_status_timer.take().unwrap(),
+                    self.checkpoint_timer.take().unwrap(),
+                    record_stream,
                 );
-                let running = Arc::new(AtomicBool::new(true));
-
-                let task_context = self.context.as_ref().unwrap().task_context();
-                self.poll_input_element(
-                    task_context.clone(),
-                    sender.clone(),
-                    running.clone(),
-                    self.daemon_task,
-                )
-                .await;
-
-                self.poll_stream_status(task_context.clone(), sender.clone(), running.clone())
-                    .await;
-                self.poll_checkpoint(task_context.clone(), sender.clone(), running.clone())
-                    .await;
-
-                let stream: Pin<Box<dyn ElementStream + Send>> =
-                    Box::pin(ChannelStream::new(receiver));
-                stream
+                executor.execute().await
             }
-            FunctionCreator::System => self.stream_source.operator_fn.element_stream().await,
+            FunctionCreator::System => record_stream,
         };
 
         let mut end_flags = 0;
@@ -308,7 +209,7 @@ impl Runnable for SourceRunnable {
                         self.next_runnable
                             .as_mut()
                             .unwrap()
-                            .run(Element::Watermark(min_watermark.clone()))
+                            .run(Element::Watermark(min_watermark))
                             .await
                     }
                     None => {}
@@ -379,6 +280,194 @@ impl Runnable for SourceRunnable {
                 snapshot_context.operator_id, ck
             )
         });
+    }
+}
+
+#[derive(Clone)]
+struct EmitterContext {
+    op_name: String,
+    task_context: Arc<WorkerTaskContext>,
+    running_signal: Arc<AtomicBool>,
+}
+
+#[async_trait]
+trait ElementEmitter {
+    async fn emit(&mut self, context: EmitterContext, sender: ChannelSender<Element>);
+}
+
+struct StreamStatusEmitter {
+    stream_status_timer: StreamStatusStream,
+}
+
+impl StreamStatusEmitter {
+    pub fn new(stream_status_timer: StreamStatusStream) -> Self {
+        Self {
+            stream_status_timer,
+        }
+    }
+}
+
+#[async_trait]
+impl ElementEmitter for StreamStatusEmitter {
+    async fn emit(&mut self, context: EmitterContext, sender: ChannelSender<Element>) {
+        while let Some(mut stream_status) = self.stream_status_timer.next().await {
+            let running = context.running_signal.load(Ordering::Relaxed);
+            if !running {
+                stream_status =
+                    Element::new_stream_status(stream_status.as_stream_status().timestamp, true);
+            }
+
+            if let Err(_e) = sender.send(stream_status).await {
+                error!("[{}] channel has closed", context.op_name.as_str());
+                break;
+            }
+
+            if !running {
+                info!(
+                    "[{}] StreamStatus WindowTimer stop",
+                    context.op_name.as_str()
+                );
+                if context
+                    .task_context
+                    .get_coordinator_status()
+                    .is_terminated()
+                {
+                    return;
+                }
+            }
+        }
+
+        info!("[{}] stream status timer closed", context.op_name.as_str());
+    }
+}
+
+struct BarrierEmitter {
+    barrier_timer: BarrierStream,
+}
+
+impl BarrierEmitter {
+    pub fn new(barrier_timer: BarrierStream) -> Self {
+        Self { barrier_timer }
+    }
+}
+
+#[async_trait]
+impl ElementEmitter for BarrierEmitter {
+    async fn emit(&mut self, context: EmitterContext, sender: ChannelSender<Element>) {
+        while let Some(barrier) = self.barrier_timer.next().await {
+            if let Err(_e) = sender.send(barrier).await {
+                error!("[{}] channel has closed", context.op_name.as_str());
+                break;
+            }
+
+            let running = context.running_signal.load(Ordering::Relaxed);
+            if !running {
+                info!("[{}] Checkpoint WindowTimer stop", context.op_name.as_str());
+                if context
+                    .task_context
+                    .get_coordinator_status()
+                    .is_terminated()
+                {
+                    return;
+                }
+            }
+        }
+        info!("[{}] checkpoint timer closed", context.op_name.as_str());
+    }
+}
+
+struct RecordEmitter {
+    stream: SendableElementStream,
+}
+
+impl RecordEmitter {
+    pub fn new(stream: SendableElementStream) -> Self {
+        Self { stream }
+    }
+}
+
+#[async_trait]
+impl ElementEmitter for RecordEmitter {
+    async fn emit(&mut self, context: EmitterContext, sender: ChannelSender<Element>) {
+        let daemon_task = context.task_context.task_descriptor.daemon;
+        while let Some(element) = self.stream.next().await {
+            if let Err(_e) = sender.send(element).await {
+                error!("[{}] channel has closed", context.op_name.as_str());
+                break;
+            }
+
+            if daemon_task
+                && context
+                    .task_context
+                    .get_coordinator_status()
+                    .is_terminating()
+            {
+                info!(
+                    "[{}] daemon source stop by coordinator stop",
+                    context.op_name.as_str()
+                );
+                break;
+            }
+        }
+
+        context.running_signal.store(false, Ordering::Relaxed);
+        info!("[{}] stream reached end", context.op_name.as_str());
+    }
+}
+
+struct ElementEmitExecutor {
+    context: EmitterContext,
+    emitters: Vec<Box<dyn ElementEmitter + Send>>,
+}
+
+impl ElementEmitExecutor {
+    pub fn new(
+        fn_name: &str,
+        task_context: Arc<WorkerTaskContext>,
+        stream_status_event: StreamStatusStream,
+        barrier_event: BarrierStream,
+        record_stream: SendableElementStream,
+    ) -> Self {
+        let running_signal = Arc::new(AtomicBool::new(true));
+        let context = EmitterContext {
+            op_name: fn_name.to_string(),
+            task_context,
+            running_signal,
+        };
+
+        let mut emitters: Vec<Box<dyn ElementEmitter + Send>> = Vec::new();
+
+        let stream_status_emitter = StreamStatusEmitter::new(stream_status_event);
+        emitters.push(Box::new(stream_status_emitter));
+
+        let barrier_emitter = BarrierEmitter::new(barrier_event);
+        emitters.push(Box::new(barrier_emitter));
+
+        let record_emitter = RecordEmitter::new(record_stream);
+        emitters.push(Box::new(record_emitter));
+
+        Self { context, emitters }
+    }
+
+    async fn execute(self) -> Pin<Box<dyn ElementStream + Send>> {
+        let ElementEmitExecutor { context, emitters } = self;
+
+        let (sender, receiver) = named_channel(
+            format!("Source_{}", context.op_name.as_str()).as_str(),
+            context.task_context.task_descriptor.task_id.to_tags(),
+            10240,
+        );
+
+        for mut emitter in emitters {
+            let sender = sender.clone();
+            let context = context.clone();
+            tokio::spawn(async move {
+                emitter.emit(context, sender).await;
+            });
+        }
+
+        let stream: Pin<Box<dyn ElementStream + Send>> = Box::pin(ChannelStream::new(receiver));
+        stream
     }
 }
 
