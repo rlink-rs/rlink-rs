@@ -37,6 +37,7 @@ pub(crate) struct RunnableContext {
 }
 
 impl RunnableContext {
+    #[allow(unused)]
     pub fn task_context(&self) -> Arc<WorkerTaskContext> {
         self.task_context.clone()
     }

@@ -9,6 +9,8 @@ use tokio::time::{interval_at, Duration, Instant};
 use crate::channel::receiver::ChannelReceiver;
 use crate::channel::sender::ChannelSender;
 use crate::channel::{named_channel, TryRecvError};
+use crate::core::element::Element;
+use crate::core::runtime::CheckpointId;
 use crate::utils;
 
 #[derive(Clone)]
@@ -47,6 +49,7 @@ impl TimerChannel {
         TimerChannel { receiver }
     }
 
+    #[allow(unused)]
     pub async fn recv(&mut self) -> Option<u64> {
         self.receiver.recv().await
     }
@@ -164,6 +167,54 @@ fn check_window(timer_senders: &mut Vec<TimerSender>) {
                     full_errs += 1;
                 }
             }
+        }
+    }
+}
+
+pub struct BarrierStream {
+    barrier_timer: TimerChannel,
+}
+
+impl BarrierStream {
+    pub fn new(barrier_timer: TimerChannel) -> Self {
+        Self { barrier_timer }
+    }
+}
+
+impl Stream for BarrierStream {
+    type Item = Element;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        match Pin::new(&mut self.barrier_timer).poll_next(cx) {
+            Poll::Ready(window_time) => Poll::Ready(
+                window_time.map(|window_time| Element::new_barrier(CheckpointId(window_time))),
+            ),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
+
+pub struct StreamStatusStream {
+    stream_status_timer: TimerChannel,
+}
+
+impl StreamStatusStream {
+    pub fn new(stream_status_timer: TimerChannel) -> Self {
+        Self {
+            stream_status_timer,
+        }
+    }
+}
+
+impl Stream for StreamStatusStream {
+    type Item = Element;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        match Pin::new(&mut self.stream_status_timer).poll_next(cx) {
+            Poll::Ready(window_time) => Poll::Ready(
+                window_time.map(|window_time| Element::new_stream_status(window_time, false)),
+            ),
+            Poll::Pending => Poll::Pending,
         }
     }
 }
