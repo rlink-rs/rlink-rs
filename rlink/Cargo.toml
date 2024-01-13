@@ -63,9 +63,9 @@ hyper = { version = "0.14", features = ["client", "server", "http1", "tcp"] }
 mysql_async = "0.32"
 
 # kubernetes
-kube = { version = "0.83" }
-kube-runtime = { version = "0.83" }
-k8s-openapi = { version = "0.18", features = ["v1_26"]}
+kube = { version = "0.85" }
+kube-runtime = { version = "0.85" }
+k8s-openapi = { version = "0.19", features = ["v1_26"]}
 
 [dev-dependencies]
 uuid = { version = "1.1", features = ["serde", "v4"] }
