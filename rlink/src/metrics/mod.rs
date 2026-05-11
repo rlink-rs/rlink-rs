@@ -38,8 +38,8 @@ pub(crate) async fn metric_handle() -> MetricHandle {
 }
 
 pub(crate) async fn install_recorder(task_manager_id: &str) -> anyhow::Result<()> {
-    let handle = PrometheusBuilder::new()
-        .add_global_label("task_manager_id", task_manager_id)
+    let builder = PrometheusBuilder::new();
+    let handle = builder
         .install_recorder()
         .map(|h| MetricHandle::new(h))
         .map_err(|e| anyhow!(e))?;
@@ -48,6 +48,7 @@ pub(crate) async fn install_recorder(task_manager_id: &str) -> anyhow::Result<()
     let mut metric_handle = metric_handle.write().await;
     *metric_handle = Some(handle);
 
+    let _task_manager_id = task_manager_id.to_string();
     std::thread::spawn(|| sys_info_metric_task());
 
     return Ok(());

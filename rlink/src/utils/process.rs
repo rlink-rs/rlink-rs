@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use metrics::gauge;
-use sysinfo::{ProcessExt, SystemExt};
+use sysinfo::{Pid, ProcessesToUpdate, System};
 
 pub fn work_space() -> PathBuf {
     std::env::current_dir().expect("Get current dir error")
@@ -37,25 +37,24 @@ pub fn parse_arg_to_u64(arg_key: &str) -> anyhow::Result<u64> {
 }
 
 pub(crate) fn sys_info_metric_task() {
-    let mut system = sysinfo::System::new();
-    let pid = sysinfo::get_current_pid().unwrap();
+    let mut system = System::new();
+    let pid = Pid::from_u32(std::process::id());
     loop {
-        system.refresh_process(pid);
-        // system.refresh_cpu();
+        system.refresh_processes(ProcessesToUpdate::Some(&[pid]), false);
         system.refresh_memory();
 
-        let load_avg = system.load_average();
-        gauge!("sys_load_average", load_avg.one, "minute" => "one");
-        gauge!("sys_load_average", load_avg.five, "minute" => "five");
-        gauge!("sys_load_average", load_avg.fifteen, "minute" => "fifteen");
+        let load_avg = System::load_average();
+        gauge!("sys_load_average", "minute" => "one").set(load_avg.one);
+        gauge!("sys_load_average", "minute" => "five").set(load_avg.five);
+        gauge!("sys_load_average", "minute" => "fifteen").set(load_avg.fifteen);
 
         if let Some(p) = system.process(pid) {
-            gauge!("proc_cpu_usage", p.cpu_usage() as f64);
-            gauge!("proc_memory", p.memory() as f64);
+            gauge!("proc_cpu_usage").set(p.cpu_usage() as f64);
+            gauge!("proc_memory").set(p.memory() as f64);
         }
 
-        gauge!("sys_used_swap", system.used_swap() as f64);
-        gauge!("sys_available_memory", system.available_memory() as f64);
+        gauge!("sys_used_swap").set(system.used_swap() as f64);
+        gauge!("sys_available_memory").set(system.available_memory() as f64);
 
         std::thread::sleep(std::time::Duration::from_secs(5));
     }

@@ -1,15 +1,19 @@
-use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use bytes::Bytes;
+use http_body_util::Full;
+use hyper::body::Incoming;
 use hyper::http::header;
-use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Method, Request, Response};
-use hyper::{Server, StatusCode};
+use hyper::service::service_fn;
+use hyper::{Method, Request, Response, StatusCode};
+use hyper_util::rt::{TokioExecutor, TokioIo};
+use hyper_util::server::conn::auto::Builder;
 use rand::prelude::StdRng;
 use rand::Rng;
+use tokio::net::TcpListener;
 
 use crate::channel::{bounded, Sender};
 use crate::core::cluster::StdResponse;
@@ -60,31 +64,35 @@ async fn serve(
     bind_addr: &SocketAddr,
     bind_addr_tx: Sender<SocketAddr>,
 ) -> anyhow::Result<()> {
-    // And a MakeService to handle each connection...
-    let make_service = make_service_fn(move |_conn| {
-        let web_context = web_context.clone();
-        async move {
-            Ok::<_, Infallible>(service_fn(move |req| {
-                let web_context = web_context.clone();
-                route(req, web_context)
-            }))
-        }
-    });
-
-    // Then bind and serve...
-    let server = Server::try_bind(bind_addr)?.serve(make_service);
+    let listener = TcpListener::bind(bind_addr).await?;
 
     bind_addr_tx.send(bind_addr.clone()).await.unwrap();
 
-    // And run forever...
-    if let Err(e) = server.await {
-        eprintln!("server error: {}", e);
-    }
+    loop {
+        let (stream, _) = listener.accept().await?;
+        let io = TokioIo::new(stream);
+        let web_context = web_context.clone();
 
-    Ok(())
+        tokio::spawn(async move {
+            let service = service_fn(move |req| {
+                let web_context = web_context.clone();
+                route(req, web_context)
+            });
+
+            if let Err(e) = Builder::new(TokioExecutor::new())
+                .serve_connection(io, service)
+                .await
+            {
+                eprintln!("server connection error: {}", e);
+            }
+        });
+    }
 }
 
-async fn route(req: Request<Body>, web_context: Arc<WebContext>) -> anyhow::Result<Response<Body>> {
+async fn route(
+    req: Request<Incoming>,
+    web_context: Arc<WebContext>,
+) -> anyhow::Result<Response<Full<Bytes>>> {
     let path = req.uri().path();
     let method = req.method();
 
@@ -111,55 +119,58 @@ async fn route(req: Request<Body>, web_context: Arc<WebContext>) -> anyhow::Resu
     }
 }
 
-async fn metrics(_req: Request<Body>, _context: Arc<WebContext>) -> anyhow::Result<Response<Body>> {
+async fn metrics(
+    _req: Request<Incoming>,
+    _context: Arc<WebContext>,
+) -> anyhow::Result<Response<Full<Bytes>>> {
     let render = metric_handle().await.render();
-    Ok(Response::new(Body::from(render)))
+    Ok(Response::new(Full::new(Bytes::from(render))))
 }
 
 async fn enable_client_log(
-    _req: Request<Body>,
+    _req: Request<Incoming>,
     _context: Arc<WebContext>,
-) -> anyhow::Result<Response<Body>> {
+) -> anyhow::Result<Response<Full<Bytes>>> {
     crate::pub_sub::network::client::enable_log();
     as_ok_json(&StdResponse::ok(Some(true)))
 }
 
 async fn disable_client_log(
-    _req: Request<Body>,
+    _req: Request<Incoming>,
     _context: Arc<WebContext>,
-) -> anyhow::Result<Response<Body>> {
+) -> anyhow::Result<Response<Full<Bytes>>> {
     crate::pub_sub::network::client::disable_log();
     as_ok_json(&StdResponse::ok(Some(false)))
 }
 
 async fn enable_server_log(
-    _req: Request<Body>,
+    _req: Request<Incoming>,
     _context: Arc<WebContext>,
-) -> anyhow::Result<Response<Body>> {
+) -> anyhow::Result<Response<Full<Bytes>>> {
     crate::pub_sub::network::server::enable_log();
     as_ok_json(&StdResponse::ok(Some(true)))
 }
 
 async fn disable_server_log(
-    _req: Request<Body>,
+    _req: Request<Incoming>,
     _context: Arc<WebContext>,
-) -> anyhow::Result<Response<Body>> {
+) -> anyhow::Result<Response<Full<Bytes>>> {
     crate::pub_sub::network::server::disable_log();
     as_ok_json(&StdResponse::ok(Some(false)))
 }
 
 async fn get_thread_infos(
-    _req: Request<Body>,
+    _req: Request<Incoming>,
     _context: Arc<WebContext>,
-) -> anyhow::Result<Response<Body>> {
+) -> anyhow::Result<Response<Full<Bytes>>> {
     let c = crate::utils::thread::get_thread_infos();
     as_ok_json(&StdResponse::ok(Some(c)))
 }
 
 async fn static_file(
-    req: Request<Body>,
+    req: Request<Incoming>,
     context: Arc<WebContext>,
-) -> anyhow::Result<Response<Body>> {
+) -> anyhow::Result<Response<Full<Bytes>>> {
     let path = {
         let mut path = req.uri().path();
         if path.is_empty() || "/".eq(path) {
@@ -200,7 +211,7 @@ async fn static_file(
         Ok(context) => Response::builder()
             .header(header::CONTENT_TYPE, context_type)
             .status(StatusCode::OK)
-            .body(Body::from(context))
+            .body(Full::new(Bytes::from(context)))
             .map_err(|e| anyhow!(e)),
         Err(e) => {
             error!(
