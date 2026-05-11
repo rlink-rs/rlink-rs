@@ -106,7 +106,7 @@ impl KafkaProducerThread {
                 for future in future_queue {
                     match future.await {
                         Ok(result) => match result {
-                            Ok((_, _)) => drain_counter += 1,
+                            Ok(_) => drain_counter += 1,
                             Err((err, _msg)) => {
                                 error!("produce error: {:?}", err);
                                 discard_counter += 1;
