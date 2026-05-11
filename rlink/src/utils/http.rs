@@ -1,27 +1,20 @@
 pub mod server {
-    use bytes::Bytes;
-    use http_body_util::Full;
-    use hyper::http::header;
-    use hyper::{Response, StatusCode};
+    use actix_web::http::header;
+    use actix_web::HttpResponse;
     use serde::Serialize;
 
-    pub fn as_ok_json<T>(t: &T) -> anyhow::Result<Response<Full<Bytes>>>
+    pub fn as_ok_json<T>(t: &T) -> HttpResponse
     where
         T: Serialize,
     {
         let json = serde_json::to_string(t).unwrap();
-        return Response::builder()
-            .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
-            .status(StatusCode::OK)
-            .body(Full::new(Bytes::from(json)))
-            .map_err(|e| anyhow!(e));
+        HttpResponse::Ok()
+            .insert_header((header::CONTENT_TYPE, "application/json; charset=utf-8"))
+            .body(json)
     }
 
-    pub async fn page_not_found() -> anyhow::Result<Response<Full<Bytes>>> {
-        Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .body(Full::new(Bytes::from("Page not found")))
-            .map_err(|e| anyhow!(e))
+    pub fn page_not_found() -> HttpResponse {
+        HttpResponse::NotFound().body("Page not found")
     }
 }
 

@@ -50,13 +50,14 @@ metrics-util = "0.20"
 metrics-exporter-prometheus = "0.16"
 
 # net
+actix-web = "4.9"
 bytes = "1.0"
 futures = "0.3"
 tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "time", "io-util"] }
 tokio-util = { version = "0.7", features = ["codec"] }
 tokio-stream = "0.1"
-hyper = { version = "1", features = ["client", "server", "http1"] }
-hyper-util = { version = "0.1", features = ["full"] }
+hyper = { version = "1", features = ["client", "http1"] }
+hyper-util = { version = "0.1", features = ["client", "client-legacy", "http1", "tokio"] }
 http-body-util = "0.1"
 
 # storage
