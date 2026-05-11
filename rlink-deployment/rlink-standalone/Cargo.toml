@@ -14,11 +14,11 @@ path = "../../rlink"
 
 [dependencies]
 chrono = "0.4"
-lazy_static = "1.4.0"
+lazy_static = "1.5"
 anyhow = "1.0"
 
 log = "0.4"
-log4rs = "1.0"
+log4rs = "1.4"
 
 # randomness
 rand = "0.8"
@@ -27,7 +27,7 @@ rand = "0.8"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
-serde_yaml = "0.9"
+serde_yml = "0.0.12"
 
 crossbeam = "0.8"
 
@@ -36,12 +36,12 @@ bytes = "1"
 futures = "0.3"
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
 
-actix-rt = "2.8"
-actix-web = "4.3"
-actix-multipart = "0.6"
+actix-rt = "2.10"
+actix-web = "4.9"
+actix-multipart = "0.7"
 actix-files = "0.6"
-awc = "3.1"
+awc = "3.5"
 
-sanitize-filename = "0.4"
+sanitize-filename = "0.6"
 
-uuid = { version = "1.1", features = ["serde", "v4"] }
+uuid = { version = "1.19", features = ["serde", "v4"] }

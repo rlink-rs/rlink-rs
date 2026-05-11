@@ -21,12 +21,12 @@ path = "../../rlink-derive"
 
 [dependencies]
 log = "0.4"
-anyhow = "1.0.31"
+anyhow = "1.0"
 
 chrono = "0.4"
-chrono-tz = "0.8"
+chrono-tz = "0.9"
 
 async-trait = "0.1"
 tokio = "1"
 
-clickhouse-rs = "1.0.0-alpha.1"
+clickhouse-rs = "1.1.0-alpha.1"

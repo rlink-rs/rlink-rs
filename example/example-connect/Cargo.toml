@@ -23,7 +23,7 @@ path = "../example-utils"
 [dependencies]
 serbuffer = "1.3"
 
-log = "0.4.8"
+log = "0.4"
 anyhow = "1.0"
 rand = "0.8"
 chrono = "0.4"

@@ -38,7 +38,7 @@ pub async fn create_application(
 
     // iterate over multipart stream
     while let Ok(Some(mut field)) = payload.try_next().await {
-        let content_type = field.content_disposition();
+        let content_type = field.content_disposition().unwrap();
         let filename = content_type.get_filename().unwrap();
         let storage_path = get_resource_storage_path(application_id.as_str());
 

@@ -24,13 +24,16 @@ where
     K: ToString,
 {
     let tags: Vec<Label> = tags.into_iter().map(|t| Label::new(t.0, t.1)).collect();
-
     let key = Key::from_parts(KeyName::from(name.to_string()), tags);
+    let labels: Vec<(String, String)> = key
+        .labels()
+        .map(|l| (l.key().to_string(), l.value().to_string()))
+        .collect();
 
-    if let Some(recorder) = metrics::try_recorder() {
-        recorder.register_counter(&key)
+    if labels.is_empty() {
+        metrics::counter!(key.name().to_string())
     } else {
-        Counter::noop()
+        metrics::counter!(key.name().to_string(), &labels)
     }
 }
 
@@ -39,12 +42,15 @@ where
     K: ToString,
 {
     let tags: Vec<Label> = tags.into_iter().map(|t| Label::new(t.0, t.1)).collect();
-
     let key = Key::from_parts(KeyName::from(name.to_string()), tags);
+    let labels: Vec<(String, String)> = key
+        .labels()
+        .map(|l| (l.key().to_string(), l.value().to_string()))
+        .collect();
 
-    if let Some(recorder) = metrics::try_recorder() {
-        recorder.register_gauge(&key)
+    if labels.is_empty() {
+        metrics::gauge!(key.name().to_string())
     } else {
-        Gauge::noop()
+        metrics::gauge!(key.name().to_string(), &labels)
     }
 }

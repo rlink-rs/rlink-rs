@@ -47,7 +47,7 @@ impl ClusterConfig {
 pub fn load_config(path: PathBuf) -> anyhow::Result<ClusterConfig> {
     let context =
         read_config_from_path(path).map_err(|e| anyhow!("read Cluster config error {}", e))?;
-    serde_yaml::from_str(&context).map_err(|e| anyhow!("parse Cluster config error {}", e))
+    serde_yml::from_str(&context).map_err(|e| anyhow!("parse Cluster config error {}", e))
 }
 
 /// load text config form path
@@ -162,10 +162,10 @@ mod tests {
             task_manager_work_dir: "/data/rlink/application".to_string(),
         };
 
-        let yaml = serde_yaml::to_string(&config).unwrap();
+        let yaml = serde_yml::to_string(&config).unwrap();
         println!("{}", yaml);
 
-        let config1: ClusterConfig = serde_yaml::from_str(yaml.as_str()).unwrap();
+        let config1: ClusterConfig = serde_yml::from_str(yaml.as_str()).unwrap();
 
         assert!(config.metadata_storage.eq(&config1.metadata_storage));
     }

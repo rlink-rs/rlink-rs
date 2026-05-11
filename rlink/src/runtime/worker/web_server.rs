@@ -1,13 +1,11 @@
-use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use hyper::http::header;
-use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Method, Request, Response};
-use hyper::{Server, StatusCode};
+use actix_web::http::{header, Method};
+use actix_web::web::Data;
+use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer};
 use rand::prelude::StdRng;
 use rand::Rng;
 
@@ -20,10 +18,12 @@ use crate::utils::http::server::{as_ok_json, page_not_found};
 pub(crate) async fn web_launch(context: Arc<crate::runtime::context::Context>) -> String {
     let (tx, mut rx) = bounded(1);
 
-    tokio::spawn(async move {
-        let ip = context.bind_ip.clone();
-        let web_context = Arc::new(WebContext { context });
-        serve_with_rand_port(web_context, ip, tx).await;
+    std::thread::spawn(move || {
+        actix_web::rt::System::new().block_on(async move {
+            let ip = context.bind_ip.clone();
+            let web_context = Arc::new(WebContext { context });
+            serve_with_rand_port(web_context, ip, tx).await;
+        });
     });
 
     let bind_addr: SocketAddr = rx.recv().await.unwrap();
@@ -60,108 +60,73 @@ async fn serve(
     bind_addr: &SocketAddr,
     bind_addr_tx: Sender<SocketAddr>,
 ) -> anyhow::Result<()> {
-    // And a MakeService to handle each connection...
-    let make_service = make_service_fn(move |_conn| {
-        let web_context = web_context.clone();
-        async move {
-            Ok::<_, Infallible>(service_fn(move |req| {
-                let web_context = web_context.clone();
-                route(req, web_context)
-            }))
-        }
-    });
+    let server_context = web_context.clone();
+    let server = HttpServer::new(move || {
+        App::new()
+            .app_data(Data::from(server_context.clone()))
+            .service(web::resource("/api/threads").route(web::get().to(get_thread_infos)))
+            .service(
+                web::resource("/api/client/log/enable").route(web::get().to(enable_client_log)),
+            )
+            .service(
+                web::resource("/api/client/log/disable").route(web::get().to(disable_client_log)),
+            )
+            .service(
+                web::resource("/api/server/log/enable").route(web::get().to(enable_server_log)),
+            )
+            .service(
+                web::resource("/api/server/log/disable").route(web::get().to(disable_server_log)),
+            )
+            .service(web::resource("/api/metrics").route(web::get().to(metrics)))
+            .default_service(web::route().to(default_handler))
+    })
+    .bind(*bind_addr)?;
 
-    // Then bind and serve...
-    let server = Server::try_bind(bind_addr)?.serve(make_service);
-
-    bind_addr_tx.send(bind_addr.clone()).await.unwrap();
-
-    // And run forever...
-    if let Err(e) = server.await {
-        eprintln!("server error: {}", e);
-    }
-
-    Ok(())
+    bind_addr_tx.send(*bind_addr).await.unwrap();
+    server.run().await.map_err(|e| anyhow!(e))
 }
 
-async fn route(req: Request<Body>, web_context: Arc<WebContext>) -> anyhow::Result<Response<Body>> {
-    let path = req.uri().path();
-    let method = req.method();
-
-    if path.starts_with("/api/") {
-        if Method::GET.eq(method) {
-            match path {
-                "/api/threads" => get_thread_infos(req, web_context).await,
-                "/api/client/log/enable" => enable_client_log(req, web_context).await,
-                "/api/client/log/disable" => disable_client_log(req, web_context).await,
-                "/api/server/log/enable" => enable_server_log(req, web_context).await,
-                "/api/server/log/disable" => disable_server_log(req, web_context).await,
-                "/api/metrics" => metrics(req, web_context).await,
-                _ => page_not_found().await,
-            }
-        } else {
-            page_not_found().await
-        }
+async fn default_handler(req: HttpRequest, context: Data<WebContext>) -> HttpResponse {
+    if req.method() == Method::GET && !req.path().starts_with("/api/") {
+        static_file(req, context).await
     } else {
-        if Method::GET.eq(method) {
-            static_file(req, web_context).await
-        } else {
-            page_not_found().await
-        }
+        page_not_found()
     }
 }
 
-async fn metrics(_req: Request<Body>, _context: Arc<WebContext>) -> anyhow::Result<Response<Body>> {
+async fn metrics(_context: Data<WebContext>) -> HttpResponse {
     let render = metric_handle().await.render();
-    Ok(Response::new(Body::from(render)))
+    HttpResponse::Ok().body(render)
 }
 
-async fn enable_client_log(
-    _req: Request<Body>,
-    _context: Arc<WebContext>,
-) -> anyhow::Result<Response<Body>> {
+async fn enable_client_log(_context: Data<WebContext>) -> HttpResponse {
     crate::pub_sub::network::client::enable_log();
     as_ok_json(&StdResponse::ok(Some(true)))
 }
 
-async fn disable_client_log(
-    _req: Request<Body>,
-    _context: Arc<WebContext>,
-) -> anyhow::Result<Response<Body>> {
+async fn disable_client_log(_context: Data<WebContext>) -> HttpResponse {
     crate::pub_sub::network::client::disable_log();
     as_ok_json(&StdResponse::ok(Some(false)))
 }
 
-async fn enable_server_log(
-    _req: Request<Body>,
-    _context: Arc<WebContext>,
-) -> anyhow::Result<Response<Body>> {
+async fn enable_server_log(_context: Data<WebContext>) -> HttpResponse {
     crate::pub_sub::network::server::enable_log();
     as_ok_json(&StdResponse::ok(Some(true)))
 }
 
-async fn disable_server_log(
-    _req: Request<Body>,
-    _context: Arc<WebContext>,
-) -> anyhow::Result<Response<Body>> {
+async fn disable_server_log(_context: Data<WebContext>) -> HttpResponse {
     crate::pub_sub::network::server::disable_log();
     as_ok_json(&StdResponse::ok(Some(false)))
 }
 
-async fn get_thread_infos(
-    _req: Request<Body>,
-    _context: Arc<WebContext>,
-) -> anyhow::Result<Response<Body>> {
+async fn get_thread_infos(_context: Data<WebContext>) -> HttpResponse {
     let c = crate::utils::thread::get_thread_infos();
     as_ok_json(&StdResponse::ok(Some(c)))
 }
 
-async fn static_file(
-    req: Request<Body>,
-    context: Arc<WebContext>,
-) -> anyhow::Result<Response<Body>> {
+async fn static_file(req: HttpRequest, context: Data<WebContext>) -> HttpResponse {
     let path = {
-        let mut path = req.uri().path();
+        let mut path = req.path();
         if path.is_empty() || "/".eq(path) {
             path = "/index.html";
         };
@@ -170,18 +135,19 @@ async fn static_file(
     };
 
     let static_file_path = {
-        let path = PathBuf::from_str(path)?;
+        let path = PathBuf::from(path);
 
         let dashboard_path = context.context.dashboard_path.as_str();
-        let base_path = PathBuf::from_str(dashboard_path)?;
+        let base_path = PathBuf::from(dashboard_path);
 
-        let n = base_path.join(path);
-        n
+        base_path.join(path)
     };
 
     let ext = {
-        let ext_pos = path.rfind(".").ok_or(anyhow!("file ext name not found"))?;
-        &path[ext_pos + 1..path.len()]
+        let Some(ext_pos) = path.rfind(".") else {
+            return page_not_found();
+        };
+        &path[ext_pos + 1..]
     };
 
     let context_type = match ext {
@@ -197,17 +163,15 @@ async fn static_file(
     };
 
     match read_binary(&static_file_path) {
-        Ok(context) => Response::builder()
-            .header(header::CONTENT_TYPE, context_type)
-            .status(StatusCode::OK)
-            .body(Body::from(context))
-            .map_err(|e| anyhow!(e)),
+        Ok(context) => HttpResponse::Ok()
+            .insert_header((header::CONTENT_TYPE, context_type))
+            .body(context),
         Err(e) => {
             error!(
                 "static file not found. file path: {:?}, error: {}",
                 static_file_path, e
             );
-            page_not_found().await
+            page_not_found()
         }
     }
 }
